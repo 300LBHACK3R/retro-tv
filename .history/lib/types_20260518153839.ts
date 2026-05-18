@@ -1,6 +1,11 @@
-export type ThemeId = "shaw-2006" | "telus-2008-inspired" | "gold-luxe";
 export type MediaType = "show" | "commercial" | "movie" | "bumper";
 export type AppMode = "viewer" | "admin";
+
+export type ThemeId =
+  | "shaw-2006"
+  | "telus-2008-inspired"
+  | "obsidian-gold"
+  | "midas-gold";
 
 export interface ChannelBranding {
   displayName: string;
@@ -16,10 +21,8 @@ export interface MediaItem {
   type: MediaType;
   duration: number;
   file: string;
-  storageKey?: string;
   mimeType?: string;
   originalName?: string;
-  isBroken?: boolean;
 }
 
 export interface Channel {

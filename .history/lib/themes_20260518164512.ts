@@ -72,29 +72,67 @@ export const THEMES: ThemeDefinition[] = [
     },
   },
   {
-    id: "gold-luxe",
-    name: "Gold Luxe",
-    description: "Premium gold-on-black broadcast styling.",
+    id: "obsidian-gold",
+    name: "Obsidian Gold",
+    description: "Black broadcast interface with refined gold highlights.",
     priceLabel: "$3",
     isPremium: true,
     colors: {
-      appBg: "#0a0a0a",
-      panelBg: "rgba(10,10,10,0.94)",
-      panelAltBg: "rgba(17,17,17,0.96)",
-      border: "#2a2a2a",
+      appBg: "#050505",
+      panelBg: "rgba(8,8,8,0.95)",
+      panelAltBg: "rgba(18,18,18,0.96)",
+      border: "#2f2a1c",
       text: "#f5f5f5",
-      textMuted: "#a1a1a1",
-      buttonBg: "#1a1a1a",
-      buttonHover: "#242424",
+      textMuted: "#b8aa7a",
+      buttonBg: "#17130a",
+      buttonHover: "#241d0f",
       primary: "#d4af37",
-      guideHeaderBg: "rgba(20,20,20,0.98)",
-      guideRowBg: "#101010",
-      guideRowAltBg: "#151515",
+      guideHeaderBg: "rgba(14,14,14,0.98)",
+      guideRowBg: "#0c0c0c",
+      guideRowAltBg: "#14110a",
       guideActiveBg: "#d4af37",
-      guideCurrentBg: "#facc15",
+      guideCurrentBg: "#f4c84a",
     },
   },
-];
+  {
+  id: "midas-gold",
+  name: "Midas Gold",
+  description: "Full premium gold interface with deep black accents.",
+  priceLabel: "$3",
+  isPremium: true,
+  colors: {
+    appBg: "#b8860b",
+
+    panelBg:
+      "linear-gradient(135deg, rgba(255,215,64,0.96), rgba(184,134,11,0.94))",
+
+    panelAltBg:
+      "linear-gradient(135deg, rgba(250,204,21,0.96), rgba(161,98,7,0.94))",
+
+    border: "#3b2a06",
+
+    text: "#ffffff",
+
+    textMuted: "rgba(255,255,255,0.78)",
+
+    buttonBg: "#050505",
+
+    buttonHover: "#111111",
+
+    primary: "#050505",
+
+    guideHeaderBg:
+      "linear-gradient(135deg, rgba(255,215,64,0.98), rgba(161,98,7,0.96))",
+
+    guideRowBg: "#d4a514",
+
+    guideRowAltBg: "#b8860b",
+
+    guideActiveBg: "#050505",
+
+    guideCurrentBg: "#ffe27a",
+  },
+},
 
 export function getThemeById(id: ThemeId) {
   return THEMES.find((theme) => theme.id === id) ?? THEMES[0];
