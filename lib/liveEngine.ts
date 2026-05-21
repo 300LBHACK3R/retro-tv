@@ -15,7 +15,10 @@ function getTotalDuration(schedule: MediaItem[]) {
   return schedule.reduce((sum, item) => sum + Math.max(item.duration, 1), 0);
 }
 
-export function getLiveState(schedule: MediaItem[], nowMs = Date.now()): LiveState {
+export function getLiveState(
+  schedule: MediaItem[],
+  nowMs = Date.now()
+): LiveState {
   const totalDuration = getTotalDuration(schedule);
 
   if (!schedule.length || totalDuration <= 0) {
@@ -30,6 +33,7 @@ export function getLiveState(schedule: MediaItem[], nowMs = Date.now()): LiveSta
   }
 
   const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH) / 1000);
+
   const offsetInLoop =
     ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
 

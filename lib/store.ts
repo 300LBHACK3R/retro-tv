@@ -44,34 +44,33 @@ interface AppState {
 
 const defaultMedia: MediaItem[] = [
   {
-  id: "martin-mystery-s01e01",
-  title: "Martin Mystery S01E01",
-  type: "show",
-  duration: 1320,
-  file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
-  originalName: "martin-mystery-s01e01.mp4",
-},
+    id: "martin-mystery-s01e01",
+    title: "Martin Mystery S01E01",
+    type: "show",
+    duration: 1320,
+    file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
+    originalName: "martin-mystery-s01e01.mp4",
+  },
   {
-    id: "ad-1",
-    title: "Demo Commercial",
-    type: "commercial",
-    duration: 30,
-    file: "/demo-ad.mp4",
-    originalName: "demo-ad.mp4",
+    id: "martin-mystery-s01e02",
+    title: "Martin Mystery S01E02",
+    type: "show",
+    duration: 1320,
+    file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e02.mp4",
+    originalName: "martin-mystery-s01e02.mp4",
   },
 ];
 
 const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, i) => {
   const n = i + 1;
+
   return {
     id: String(n),
     name: `Channel ${n}`,
     mediaIds:
-  n === 1
-    ? ["martin-mystery-s01e01", "ad-1"]
-    : n <= 4
-    ? ["ad-1"]
-    : [],
+      n === 1
+        ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
+        : [],
     branding: {
       displayName:
         n === 1
@@ -84,7 +83,15 @@ const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, i) => {
           ? "Retro TV"
           : `Channel ${n}`,
       callsign:
-        n === 1 ? "TTV" : n === 2 ? "TTS" : n === 3 ? "GAME" : n === 4 ? "RETRO" : `CH${n}`,
+        n === 1
+          ? "TTV"
+          : n === 2
+          ? "TTS"
+          : n === 3
+          ? "GAME"
+          : n === 4
+          ? "RETRO"
+          : `CH${n}`,
       description:
         n === 1
           ? "Main network feed"
@@ -185,6 +192,7 @@ export const useStore = create<AppState>()(
             if (channel.id !== channelId) return channel;
 
             const mediaIds = [...channel.mediaIds];
+
             if (
               fromIndex < 0 ||
               toIndex < 0 ||
@@ -205,6 +213,7 @@ export const useStore = create<AppState>()(
       setGuideHeight: (height) => set({ guideHeight: height }),
       setAppMode: (mode) => set({ appMode: mode }),
       setTheme: (themeId) => set({ themeId }),
+
       unlockTheme: (themeId) =>
         set((state) => ({
           ownedPremiumThemes: state.ownedPremiumThemes.includes(themeId)
@@ -220,10 +229,8 @@ export const useStore = create<AppState>()(
       closeGuide: () => set({ isGuideOpen: false }),
     }),
     {
-      name: "retro-tv-launch-v4",
+      name: "retro-tv-global-schedule-v1",
       partialize: (state) => ({
-        media: state.media,
-        channels: state.channels,
         currentChannelId: state.currentChannelId,
         isGuideOpen: state.isGuideOpen,
         sidebarWidth: state.sidebarWidth,
