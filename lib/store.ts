@@ -44,12 +44,12 @@ interface AppState {
 
 const defaultMedia: MediaItem[] = [
   {
-    id: "show-1",
-    title: "Demo Show",
+    id: "martin-mystery-s01e01",
+    title: "Martin Mystery S01E01",
     type: "show",
-    duration: 1800,
-    file: "/demo-show.mp4",
-    originalName: "demo-show.mp4",
+    duration: 1320,
+    file: "https://pub-84728dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
+    originalName: "martin-mystery-s01e01.mp4",
   },
   {
     id: "ad-1",
@@ -66,7 +66,12 @@ const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, i) => {
   return {
     id: String(n),
     name: `Channel ${n}`,
-    mediaIds: n <= 4 ? ["show-1", "ad-1"] : [],
+    mediaIds:
+  n === 1
+    ? ["martin-mystery-s01e01", "ad-1"]
+    : n <= 4
+    ? ["ad-1"]
+    : [],
     branding: {
       displayName:
         n === 1
