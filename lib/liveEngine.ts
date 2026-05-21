@@ -9,27 +9,23 @@ export type LiveState = {
   totalDuration: number;
 };
 
-/**
- * Global broadcast start point.
- * Every device calculates playback position from this same fixed timestamp.
- */
 const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
-function getSafeDuration(item: MediaItem) {
+function safeDuration(item: MediaItem) {
   return Math.max(Math.floor(item.duration || 0), 1);
 }
 
-function getTotalDuration(schedule: MediaItem[]) {
-  return schedule.reduce((total, item) => total + getSafeDuration(item), 0);
+function totalDuration(schedule: MediaItem[]) {
+  return schedule.reduce((sum, item) => sum + safeDuration(item), 0);
 }
 
 export function getLiveState(
   schedule: MediaItem[],
   nowMs = Date.now()
 ): LiveState {
-  const totalDuration = getTotalDuration(schedule);
+  const total = totalDuration(schedule);
 
-  if (!schedule.length || totalDuration <= 0) {
+  if (!schedule.length || total <= 0) {
     return {
       item: null,
       index: -1,
@@ -41,18 +37,16 @@ export function getLiveState(
   }
 
   const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
-
-  const offsetInLoop =
-    ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
+  const offsetInLoop = ((secondsSinceEpoch % total) + total) % total;
 
   let cursor = 0;
 
   for (let index = 0; index < schedule.length; index += 1) {
     const item = schedule[index];
-    const duration = getSafeDuration(item);
-    const nextCursor = cursor + duration;
+    const duration = safeDuration(item);
+    const end = cursor + duration;
 
-    if (offsetInLoop >= cursor && offsetInLoop < nextCursor) {
+    if (offsetInLoop >= cursor && offsetInLoop < end) {
       const elapsed = offsetInLoop - cursor;
 
       return {
@@ -61,22 +55,19 @@ export function getLiveState(
         elapsed,
         remaining: duration - elapsed,
         offsetInLoop,
-        totalDuration,
+        totalDuration: total,
       };
     }
 
-    cursor = nextCursor;
+    cursor = end;
   }
 
-  const fallback = schedule[0];
-  const fallbackDuration = getSafeDuration(fallback);
-
   return {
-    item: fallback,
+    item: schedule[0],
     index: 0,
     elapsed: 0,
-    remaining: fallbackDuration,
+    remaining: safeDuration(schedule[0]),
     offsetInLoop: 0,
-    totalDuration,
+    totalDuration: total,
   };
 }

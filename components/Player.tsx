@@ -8,25 +8,93 @@ type PlayerProps = {
   schedule: MediaItem[];
 };
 
-const HARD_SEEK_DRIFT_SECONDS = 0.45;
-const SOFT_DRIFT_SECONDS = 0.12;
-const FAST_CATCHUP_RATE = 1.06;
-const SLOW_CORRECTION_RATE = 0.94;
+const HARD_SYNC_SECONDS = 0.25;
+const SOFT_SYNC_SECONDS = 0.08;
+const SYNC_INTERVAL_MS = 250;
 
 export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const currentIdRef = useRef<string | null>(null);
+  const currentMediaIdRef = useRef<string | null>(null);
   const audioUnlockedRef = useRef(false);
+  const pendingSeekRef = useRef<number | null>(null);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const [errorTitle, setErrorTitle] = useState("");
+  const [syncLabel, setSyncLabel] = useState("Syncing live feed...");
 
   const playableSchedule = useMemo(() => {
     return schedule.filter((item) => item.file && !failedIds.includes(item.id));
   }, [schedule, failedIds]);
+
+  const getTarget = useCallback(() => {
+    return getLiveState(playableSchedule);
+  }, [playableSchedule]);
+
+  const seekToLivePosition = useCallback(
+    (reason: "load" | "drift" | "tick") => {
+      const video = videoRef.current;
+      if (!video || !playableSchedule.length) return;
+
+      const live = getTarget();
+      if (!live.item) return;
+
+      const target = Math.max(0, live.elapsed);
+
+      if (currentMediaIdRef.current !== live.item.id) {
+        currentMediaIdRef.current = live.item.id;
+        pendingSeekRef.current = target;
+        setErrorTitle("");
+        setSyncLabel(`Loading ${live.item.title}...`);
+
+        video.pause();
+        video.src = live.item.file;
+        video.defaultMuted = !audioUnlockedRef.current;
+        video.muted = !audioUnlockedRef.current;
+        video.volume = audioUnlockedRef.current ? volume : 0;
+        video.playbackRate = 1;
+        video.load();
+        return;
+      }
+
+      if (video.readyState < 1) {
+        pendingSeekRef.current = target;
+        return;
+      }
+
+      const safeTarget =
+        Number.isFinite(video.duration) && video.duration > 0
+          ? Math.min(target, Math.max(video.duration - 0.35, 0))
+          : target;
+
+      const drift = safeTarget - video.currentTime;
+      const absDrift = Math.abs(drift);
+
+      if (reason === "load" || absDrift > HARD_SYNC_SECONDS) {
+        video.currentTime = safeTarget;
+        video.playbackRate = 1;
+      } else if (absDrift > SOFT_SYNC_SECONDS) {
+        video.playbackRate = drift > 0 ? 1.04 : 0.96;
+      } else {
+        video.playbackRate = 1;
+      }
+
+      if (video.paused) {
+        void video.play().catch(() => {});
+      }
+
+      setSyncLabel(
+        live.item
+          ? `${live.item.title} • Live ${Math.floor(live.elapsed / 60)}:${String(
+              live.elapsed % 60
+            ).padStart(2, "0")}`
+          : "Live feed"
+      );
+    },
+    [getTarget, playableSchedule.length, volume]
+  );
 
   const unlockAudio = useCallback(async () => {
     const video = videoRef.current;
@@ -38,8 +106,8 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = false;
     video.volume = Math.max(volume, 0.8);
 
-    setVolume(video.volume);
     setIsMuted(false);
+    setVolume(video.volume);
 
     try {
       await video.play();
@@ -53,27 +121,14 @@ export default function Player({ schedule }: PlayerProps) {
     if (!video) return;
 
     if (video.muted || video.volume === 0) {
-      audioUnlockedRef.current = true;
-
-      video.defaultMuted = false;
-      video.muted = false;
-      video.volume = Math.max(volume, 0.8);
-
-      setVolume(video.volume);
-      setIsMuted(false);
-    } else {
-      video.muted = true;
-      video.defaultMuted = true;
-
-      setIsMuted(true);
+      await unlockAudio();
+      return;
     }
 
-    try {
-      await video.play();
-    } catch {
-      // Browser may require direct user interaction.
-    }
-  }, [volume]);
+    video.muted = true;
+    video.defaultMuted = true;
+    setIsMuted(true);
+  }, [unlockAudio]);
 
   const changeVolume = useCallback(async (nextVolume: number) => {
     const video = videoRef.current;
@@ -84,73 +139,23 @@ export default function Player({ schedule }: PlayerProps) {
     if (!video) return;
 
     audioUnlockedRef.current = safeVolume > 0;
-
     video.volume = safeVolume;
     video.muted = safeVolume === 0;
     video.defaultMuted = safeVolume === 0;
-
-    setIsMuted(video.muted || safeVolume === 0);
+    setIsMuted(video.muted);
 
     if (safeVolume > 0) {
       try {
         await video.play();
       } catch {
-        // Ignore browser autoplay restriction.
+        // Browser may still require click.
       }
     }
   }, []);
 
-  const synchronizeToLiveClock = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || !playableSchedule.length) return;
-
-    const live = getLiveState(playableSchedule);
-
-    if (!live.item) return;
-
-    if (currentIdRef.current !== live.item.id) {
-      currentIdRef.current = live.item.id;
-      setErrorTitle("");
-
-      video.src = live.item.file;
-      video.defaultMuted = !audioUnlockedRef.current;
-      video.muted = !audioUnlockedRef.current;
-      video.volume = audioUnlockedRef.current ? volume : 0;
-      video.playbackRate = 1;
-
-      setIsMuted(video.muted || video.volume === 0);
-
-      video.load();
-      return;
-    }
-
-    if (video.readyState < 1) return;
-
-    const targetTime = Math.max(0, live.elapsed);
-    const drift = targetTime - video.currentTime;
-    const absoluteDrift = Math.abs(drift);
-
-    if (Number.isFinite(targetTime)) {
-      if (absoluteDrift > HARD_SEEK_DRIFT_SECONDS) {
-        video.currentTime = targetTime;
-        video.playbackRate = 1;
-      } else if (absoluteDrift > SOFT_DRIFT_SECONDS) {
-        video.playbackRate =
-          drift > 0 ? FAST_CATCHUP_RATE : SLOW_CORRECTION_RATE;
-      } else {
-        video.playbackRate = 1;
-      }
-    }
-
-    if (video.paused) {
-      void video.play().catch(() => {});
-    }
-  }, [playableSchedule, volume]);
-
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
-
       if (["input", "textarea", "select"].includes(activeTag || "")) return;
 
       if (event.key.toLowerCase() === "f") {
@@ -168,45 +173,55 @@ export default function Player({ schedule }: PlayerProps) {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggleMute]);
 
   useEffect(() => {
-    if (!playableSchedule.length || !videoRef.current) return;
-
     const video = videoRef.current;
+    if (!video || !playableSchedule.length) return;
 
-    const handleLoadedMetadata = () => {
-      synchronizeToLiveClock();
+    const applyPendingSeek = () => {
+      const pending = pendingSeekRef.current;
 
-      if (video.paused) {
-        void video.play().catch(() => {});
+      if (pending !== null && video.readyState >= 1) {
+        const safePending =
+          Number.isFinite(video.duration) && video.duration > 0
+            ? Math.min(pending, Math.max(video.duration - 0.35, 0))
+            : pending;
+
+        video.currentTime = safePending;
+        pendingSeekRef.current = null;
       }
+
+      void video.play().catch(() => {});
     };
 
-    const handleCanPlay = () => {
-      synchronizeToLiveClock();
-
-      if (video.paused) {
-        void video.play().catch(() => {});
-      }
+    const onLoadedMetadata = () => {
+      applyPendingSeek();
+      seekToLivePosition("load");
     };
 
-    video.addEventListener("loadedmetadata", handleLoadedMetadata);
-    video.addEventListener("canplay", handleCanPlay);
+    const onCanPlay = () => {
+      applyPendingSeek();
+      seekToLivePosition("load");
+    };
 
-    synchronizeToLiveClock();
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    video.addEventListener("canplay", onCanPlay);
 
-    const interval = window.setInterval(synchronizeToLiveClock, 500);
+    seekToLivePosition("load");
+
+    const interval = window.setInterval(() => {
+      seekToLivePosition("tick");
+    }, SYNC_INTERVAL_MS);
 
     return () => {
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("canplay", onCanPlay);
       window.clearInterval(interval);
     };
-  }, [playableSchedule, synchronizeToLiveClock]);
+  }, [playableSchedule, seekToLivePosition]);
 
   if (!schedule.length) {
     return <OfflineState message="This channel is currently off air." />;
@@ -218,7 +233,7 @@ export default function Player({ schedule }: PlayerProps) {
     );
   }
 
-  const live = getLiveState(playableSchedule);
+  const live = getTarget();
   const currentItem = live.item;
 
   return (
@@ -247,6 +262,10 @@ export default function Player({ schedule }: PlayerProps) {
           className="h-full w-full bg-black object-contain"
         />
       )}
+
+      <div className="absolute left-4 top-4 z-40 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/80 backdrop-blur-sm">
+        {syncLabel}
+      </div>
 
       {errorTitle ? (
         <div className="absolute bottom-4 left-4 z-50 rounded-lg border border-red-700/50 bg-black/80 px-3 py-2 text-sm text-red-200">
@@ -291,10 +310,6 @@ export default function Player({ schedule }: PlayerProps) {
         >
           {isExpanded ? "Exit Fullscreen" : "Fullscreen"}
         </button>
-      </div>
-
-      <div className="pointer-events-none absolute bottom-4 left-4 z-40 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/75 opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-        F = fullscreen · M = mute · click video = enable sound
       </div>
     </div>
   );
