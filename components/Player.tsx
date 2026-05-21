@@ -8,16 +8,7 @@ type PlayerProps = {
   schedule: MediaItem[];
 };
 
-const DESKTOP_SYNC_INTERVAL_MS = 750;
-const MOBILE_SYNC_INTERVAL_MS = 2000;
-
-const DESKTOP_HARD_SYNC_SECONDS = 0.75;
-const MOBILE_HARD_SYNC_SECONDS = 2.5;
-
-const DESKTOP_SOFT_SYNC_SECONDS = 0.25;
-const MOBILE_SOFT_SYNC_SECONDS = 0.75;
-
-function isSmallScreen() {
+function isMobileScreen() {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(max-width: 768px)").matches;
 }
@@ -26,22 +17,16 @@ export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const currentMediaIdRef = useRef<string | null>(null);
   const audioUnlockedRef = useRef(false);
-  const pendingSeekRef = useRef<number | null>(null);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const [errorTitle, setErrorTitle] = useState("");
-  const [syncLabel, setSyncLabel] = useState("Live feed");
 
   const playableSchedule = useMemo(() => {
     return schedule.filter((item) => item.file && !failedIds.includes(item.id));
   }, [schedule, failedIds]);
-
-  const getTarget = useCallback(() => {
-    return getLiveState(playableSchedule);
-  }, [playableSchedule]);
 
   const unlockAudio = useCallback(async () => {
     const video = videoRef.current;
@@ -99,78 +84,63 @@ export default function Player({ schedule }: PlayerProps) {
     }
   }, []);
 
-  const syncToBroadcast = useCallback(
-    (reason: "load" | "tick") => {
-      const video = videoRef.current;
-      if (!video || !playableSchedule.length) return;
+  const loadLivePosition = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !playableSchedule.length) return;
 
-      const live = getTarget();
-      if (!live.item) return;
+    const live = getLiveState(playableSchedule);
+    if (!live.item) return;
 
-      const mobile = isSmallScreen();
+    if (currentMediaIdRef.current !== live.item.id) {
+      currentMediaIdRef.current = live.item.id;
 
-      const hardSync = mobile
-        ? MOBILE_HARD_SYNC_SECONDS
-        : DESKTOP_HARD_SYNC_SECONDS;
+      setErrorTitle("");
 
-      const softSync = mobile
-        ? MOBILE_SOFT_SYNC_SECONDS
-        : DESKTOP_SOFT_SYNC_SECONDS;
+      video.pause();
+      video.src = live.item.file;
+      video.defaultMuted = !audioUnlockedRef.current;
+      video.muted = !audioUnlockedRef.current;
+      video.volume = audioUnlockedRef.current ? volume : 0;
+      video.playbackRate = 1;
+      video.load();
 
-      const target = Math.max(0, live.elapsed);
+      const seekOnReady = () => {
+        const target =
+          Number.isFinite(video.duration) && video.duration > 0
+            ? Math.min(live.elapsed, Math.max(video.duration - 0.5, 0))
+            : live.elapsed;
 
-      if (currentMediaIdRef.current !== live.item.id) {
-        currentMediaIdRef.current = live.item.id;
-        pendingSeekRef.current = target;
+        video.currentTime = Math.max(0, target);
+        void video.play().catch(() => {});
+      };
 
-        setErrorTitle("");
-        setSyncLabel(`Loading ${live.item.title}...`);
+      video.onloadedmetadata = seekOnReady;
+      video.oncanplay = seekOnReady;
 
-        video.pause();
-        video.src = live.item.file;
-        video.defaultMuted = !audioUnlockedRef.current;
-        video.muted = !audioUnlockedRef.current;
-        video.volume = audioUnlockedRef.current ? volume : 0;
-        video.playbackRate = 1;
-        video.load();
+      return;
+    }
 
-        return;
-      }
-
-      if (video.readyState < 1) {
-        pendingSeekRef.current = target;
-        return;
-      }
-
-      const safeTarget =
+    if (video.readyState >= 1) {
+      const liveNow = getLiveState(playableSchedule);
+      const target =
         Number.isFinite(video.duration) && video.duration > 0
-          ? Math.min(target, Math.max(video.duration - 0.35, 0))
-          : target;
+          ? Math.min(liveNow.elapsed, Math.max(video.duration - 0.5, 0))
+          : liveNow.elapsed;
 
-      const drift = safeTarget - video.currentTime;
-      const absoluteDrift = Math.abs(drift);
+      const drift = Math.abs(video.currentTime - target);
 
-      if (reason === "load" || absoluteDrift > hardSync) {
-        video.currentTime = safeTarget;
-        video.playbackRate = 1;
-      } else if (absoluteDrift > softSync && !mobile) {
-        video.playbackRate = drift > 0 ? 1.03 : 0.97;
-      } else {
-        video.playbackRate = 1;
+      // Mobile must stay smooth. Only hard-correct if it is badly wrong.
+      const threshold = isMobileScreen() ? 8 : 1.25;
+
+      if (drift > threshold) {
+        video.currentTime = Math.max(0, target);
       }
 
       if (video.paused) {
         void video.play().catch(() => {});
       }
-
-      setSyncLabel(
-        `${live.item.title} • Live ${Math.floor(live.elapsed / 60)}:${String(
-          live.elapsed % 60
-        ).padStart(2, "0")}`
-      );
-    },
-    [getTarget, playableSchedule.length, volume]
-  );
+    }
+  }, [playableSchedule, volume]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -197,51 +167,17 @@ export default function Player({ schedule }: PlayerProps) {
   }, [toggleMute]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !playableSchedule.length) return;
+    if (!playableSchedule.length || !videoRef.current) return;
 
-    const applyPendingSeek = () => {
-      const pending = pendingSeekRef.current;
-
-      if (pending !== null && video.readyState >= 1) {
-        const safePending =
-          Number.isFinite(video.duration) && video.duration > 0
-            ? Math.min(pending, Math.max(video.duration - 0.35, 0))
-            : pending;
-
-        video.currentTime = safePending;
-        pendingSeekRef.current = null;
-      }
-
-      void video.play().catch(() => {});
-    };
-
-    const onLoadedMetadata = () => {
-      applyPendingSeek();
-      syncToBroadcast("load");
-    };
-
-    const onCanPlay = () => {
-      applyPendingSeek();
-      syncToBroadcast("load");
-    };
-
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    video.addEventListener("canplay", onCanPlay);
-
-    syncToBroadcast("load");
+    loadLivePosition();
 
     const interval = window.setInterval(
-      () => syncToBroadcast("tick"),
-      isSmallScreen() ? MOBILE_SYNC_INTERVAL_MS : DESKTOP_SYNC_INTERVAL_MS
+      loadLivePosition,
+      isMobileScreen() ? 15000 : 3000
     );
 
-    return () => {
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("canplay", onCanPlay);
-      window.clearInterval(interval);
-    };
-  }, [playableSchedule, syncToBroadcast]);
+    return () => window.clearInterval(interval);
+  }, [playableSchedule, loadLivePosition]);
 
   if (!schedule.length) {
     return <OfflineState message="This channel is currently off air." />;
@@ -253,7 +189,7 @@ export default function Player({ schedule }: PlayerProps) {
     );
   }
 
-  const live = getTarget();
+  const live = getLiveState(playableSchedule);
   const currentItem = live.item;
 
   return (
@@ -282,10 +218,6 @@ export default function Player({ schedule }: PlayerProps) {
           className="h-full w-full bg-black object-contain"
         />
       )}
-
-      <div className="absolute left-3 top-3 z-40 max-w-[75%] rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[11px] text-white/80 backdrop-blur-sm sm:left-4 sm:top-4 sm:text-xs">
-        {syncLabel}
-      </div>
 
       {errorTitle ? (
         <div className="absolute bottom-4 left-4 z-50 rounded-lg border border-red-700/50 bg-black/80 px-3 py-2 text-sm text-red-200">
