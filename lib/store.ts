@@ -220,7 +220,7 @@ export const useStore = create<AppState>()(
       closeGuide: () => set({ isGuideOpen: false }),
     }),
     {
-      name: "retro-tv-launch-v1",
+      name: "retro-tv-launch-v4",
       partialize: (state) => ({
         media: state.media,
         channels: state.channels,
