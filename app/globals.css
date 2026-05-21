@@ -4,37 +4,14 @@ html,
 body {
   margin: 0;
   padding: 0;
+  min-height: 100%;
   background: #020617;
 }
 
-.ttv-player-shell:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  background: #000;
+* {
+  box-sizing: border-box;
 }
 
-.ttv-player-shell:fullscreen video {
-  width: 100vw;
-  height: 100vh;
-  object-fit: contain;
-}
-
-.ttv-player-fallback-fullscreen {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 999999 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  border-radius: 0 !important;
-  background: #000 !important;
-}
-
-.ttv-player-fallback-fullscreen video {
-  width: 100vw !important;
-  height: 100vh !important;
-  object-fit: contain !important;
-}
 .ttv-player-expanded {
   position: fixed !important;
   inset: 0 !important;

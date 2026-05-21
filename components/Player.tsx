@@ -8,6 +8,11 @@ type PlayerProps = {
   schedule: MediaItem[];
 };
 
+const HARD_SEEK_DRIFT_SECONDS = 0.45;
+const SOFT_DRIFT_SECONDS = 0.12;
+const FAST_CATCHUP_RATE = 1.06;
+const SLOW_CORRECTION_RATE = 0.94;
+
 export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const currentIdRef = useRef<string | null>(null);
@@ -23,13 +28,6 @@ export default function Player({ schedule }: PlayerProps) {
     return schedule.filter((item) => item.file && !failedIds.includes(item.id));
   }, [schedule, failedIds]);
 
-  const currentLive = useMemo(() => {
-    if (!playableSchedule.length) return null;
-    return getLiveState(playableSchedule);
-  }, [playableSchedule]);
-
-  const currentItem = currentLive?.item ?? null;
-
   const unlockAudio = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -40,8 +38,8 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = false;
     video.volume = Math.max(volume, 0.8);
 
-    setIsMuted(false);
     setVolume(video.volume);
+    setIsMuted(false);
 
     try {
       await video.play();
@@ -56,20 +54,24 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.muted || video.volume === 0) {
       audioUnlockedRef.current = true;
+
       video.defaultMuted = false;
       video.muted = false;
       video.volume = Math.max(volume, 0.8);
-      setIsMuted(false);
+
       setVolume(video.volume);
+      setIsMuted(false);
     } else {
       video.muted = true;
+      video.defaultMuted = true;
+
       setIsMuted(true);
     }
 
     try {
       await video.play();
     } catch {
-      // Browser may require clicking the video/audio overlay.
+      // Browser may require direct user interaction.
     }
   }, [volume]);
 
@@ -82,20 +84,68 @@ export default function Player({ schedule }: PlayerProps) {
     if (!video) return;
 
     audioUnlockedRef.current = safeVolume > 0;
+
     video.volume = safeVolume;
     video.muted = safeVolume === 0;
     video.defaultMuted = safeVolume === 0;
 
-    setIsMuted(video.muted);
+    setIsMuted(video.muted || safeVolume === 0);
 
     if (safeVolume > 0) {
       try {
         await video.play();
       } catch {
-        // Ignore autoplay restriction.
+        // Ignore browser autoplay restriction.
       }
     }
   }, []);
+
+  const synchronizeToLiveClock = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !playableSchedule.length) return;
+
+    const live = getLiveState(playableSchedule);
+
+    if (!live.item) return;
+
+    if (currentIdRef.current !== live.item.id) {
+      currentIdRef.current = live.item.id;
+      setErrorTitle("");
+
+      video.src = live.item.file;
+      video.defaultMuted = !audioUnlockedRef.current;
+      video.muted = !audioUnlockedRef.current;
+      video.volume = audioUnlockedRef.current ? volume : 0;
+      video.playbackRate = 1;
+
+      setIsMuted(video.muted || video.volume === 0);
+
+      video.load();
+      return;
+    }
+
+    if (video.readyState < 1) return;
+
+    const targetTime = Math.max(0, live.elapsed);
+    const drift = targetTime - video.currentTime;
+    const absoluteDrift = Math.abs(drift);
+
+    if (Number.isFinite(targetTime)) {
+      if (absoluteDrift > HARD_SEEK_DRIFT_SECONDS) {
+        video.currentTime = targetTime;
+        video.playbackRate = 1;
+      } else if (absoluteDrift > SOFT_DRIFT_SECONDS) {
+        video.playbackRate =
+          drift > 0 ? FAST_CATCHUP_RATE : SLOW_CORRECTION_RATE;
+      } else {
+        video.playbackRate = 1;
+      }
+    }
+
+    if (video.paused) {
+      void video.play().catch(() => {});
+    }
+  }, [playableSchedule, volume]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -119,61 +169,44 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     window.addEventListener("keydown", handleKeyDown);
+
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleMute]);
 
   useEffect(() => {
-    if (!currentItem || !videoRef.current || !currentLive) return;
+    if (!playableSchedule.length || !videoRef.current) return;
 
     const video = videoRef.current;
 
-    if (currentIdRef.current !== currentItem.id) {
-      currentIdRef.current = currentItem.id;
-      setErrorTitle("");
-
-      video.src = currentItem.file;
-      video.defaultMuted = !audioUnlockedRef.current;
-      video.muted = !audioUnlockedRef.current;
-      video.volume = audioUnlockedRef.current ? volume : 0;
-
-      setIsMuted(video.muted);
-
-      video.load();
-    }
-
-    const syncPlayback = () => {
-      if (!videoRef.current || !currentItem) return;
-
-      const live = getLiveState(playableSchedule);
-      const safeElapsed = Math.max(0, live.elapsed);
-
-      if (video.readyState >= 1 && Number.isFinite(safeElapsed)) {
-        const delta = Math.abs(video.currentTime - safeElapsed);
-
-        if (delta > 2.5) {
-          video.currentTime = safeElapsed;
-        }
-      }
+    const handleLoadedMetadata = () => {
+      synchronizeToLiveClock();
 
       if (video.paused) {
         void video.play().catch(() => {});
       }
     };
 
-    const onLoadedMetadata = () => {
-      syncPlayback();
+    const handleCanPlay = () => {
+      synchronizeToLiveClock();
+
+      if (video.paused) {
+        void video.play().catch(() => {});
+      }
     };
 
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    syncPlayback();
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("canplay", handleCanPlay);
 
-    const interval = window.setInterval(syncPlayback, 1000);
+    synchronizeToLiveClock();
+
+    const interval = window.setInterval(synchronizeToLiveClock, 500);
 
     return () => {
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("canplay", handleCanPlay);
       window.clearInterval(interval);
     };
-  }, [currentItem, currentLive, playableSchedule, volume]);
+  }, [playableSchedule, synchronizeToLiveClock]);
 
   if (!schedule.length) {
     return <OfflineState message="This channel is currently off air." />;
@@ -184,6 +217,9 @@ export default function Player({ schedule }: PlayerProps) {
       <OfflineState message="Add playable media in admin mode to start this channel." />
     );
   }
+
+  const live = getLiveState(playableSchedule);
+  const currentItem = live.item;
 
   return (
     <div
@@ -255,6 +291,10 @@ export default function Player({ schedule }: PlayerProps) {
         >
           {isExpanded ? "Exit Fullscreen" : "Fullscreen"}
         </button>
+      </div>
+
+      <div className="pointer-events-none absolute bottom-4 left-4 z-40 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/75 opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+        F = fullscreen · M = mute · click video = enable sound
       </div>
     </div>
   );

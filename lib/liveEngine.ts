@@ -9,10 +9,18 @@ export type LiveState = {
   totalDuration: number;
 };
 
-const BROADCAST_EPOCH = Date.UTC(2026, 0, 1, 0, 0, 0);
+/**
+ * Global broadcast start point.
+ * Every device calculates playback position from this same fixed timestamp.
+ */
+const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
+
+function getSafeDuration(item: MediaItem) {
+  return Math.max(Math.floor(item.duration || 0), 1);
+}
 
 function getTotalDuration(schedule: MediaItem[]) {
-  return schedule.reduce((sum, item) => sum + Math.max(item.duration, 1), 0);
+  return schedule.reduce((total, item) => total + getSafeDuration(item), 0);
 }
 
 export function getLiveState(
@@ -32,7 +40,7 @@ export function getLiveState(
     };
   }
 
-  const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH) / 1000);
+  const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
 
   const offsetInLoop =
     ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
@@ -41,7 +49,7 @@ export function getLiveState(
 
   for (let index = 0; index < schedule.length; index += 1) {
     const item = schedule[index];
-    const duration = Math.max(item.duration, 1);
+    const duration = getSafeDuration(item);
     const nextCursor = cursor + duration;
 
     if (offsetInLoop >= cursor && offsetInLoop < nextCursor) {
@@ -61,12 +69,13 @@ export function getLiveState(
   }
 
   const fallback = schedule[0];
+  const fallbackDuration = getSafeDuration(fallback);
 
   return {
     item: fallback,
     index: 0,
     elapsed: 0,
-    remaining: Math.max(fallback.duration, 1),
+    remaining: fallbackDuration,
     offsetInLoop: 0,
     totalDuration,
   };
