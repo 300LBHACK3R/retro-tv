@@ -44,13 +44,13 @@ interface AppState {
 
 const defaultMedia: MediaItem[] = [
   {
-    id: "martin-mystery-s01e01",
-    title: "Martin Mystery S01E01",
-    type: "show",
-    duration: 1320,
-    file: "https://pub-84728dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
-    originalName: "martin-mystery-s01e01.mp4",
-  },
+  id: "martin-mystery-s01e01",
+  title: "Martin Mystery S01E01",
+  type: "show",
+  duration: 1320,
+  file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
+  originalName: "martin-mystery-s01e01.mp4",
+},
   {
     id: "ad-1",
     title: "Demo Commercial",
