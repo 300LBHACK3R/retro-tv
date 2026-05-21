@@ -79,24 +79,27 @@ export default function Player({ schedule }: PlayerProps) {
       try {
         await video.play();
       } catch {
-        // Browser may require direct interaction.
+        // Browser may require direct user interaction.
       }
     }
   }, []);
 
-  const loadLivePosition = useCallback(() => {
+  const loadLiveSource = useCallback(() => {
     const video = videoRef.current;
     if (!video || !playableSchedule.length) return;
 
     const live = getLiveState(playableSchedule);
     if (!live.item) return;
 
+    const target =
+      Number.isFinite(video.duration) && video.duration > 0
+        ? Math.min(live.elapsed, Math.max(video.duration - 0.5, 0))
+        : live.elapsed;
+
     if (currentMediaIdRef.current !== live.item.id) {
       currentMediaIdRef.current = live.item.id;
-
       setErrorTitle("");
 
-      video.pause();
       video.src = live.item.file;
       video.defaultMuted = !audioUnlockedRef.current;
       video.muted = !audioUnlockedRef.current;
@@ -104,36 +107,30 @@ export default function Player({ schedule }: PlayerProps) {
       video.playbackRate = 1;
       video.load();
 
-      const seekOnReady = () => {
-        const target =
-          Number.isFinite(video.duration) && video.duration > 0
-            ? Math.min(live.elapsed, Math.max(video.duration - 0.5, 0))
-            : live.elapsed;
-
+      video.onloadedmetadata = () => {
         video.currentTime = Math.max(0, target);
         void video.play().catch(() => {});
       };
 
-      video.onloadedmetadata = seekOnReady;
-      video.oncanplay = seekOnReady;
+      video.oncanplay = () => {
+        void video.play().catch(() => {});
+      };
 
       return;
     }
 
-    if (video.readyState >= 1) {
+    // Desktop can lightly correct drift. Mobile must stay smooth.
+    if (!isMobileScreen() && video.readyState >= 1) {
       const liveNow = getLiveState(playableSchedule);
-      const target =
+      const desktopTarget =
         Number.isFinite(video.duration) && video.duration > 0
           ? Math.min(liveNow.elapsed, Math.max(video.duration - 0.5, 0))
           : liveNow.elapsed;
 
-      const drift = Math.abs(video.currentTime - target);
+      const drift = Math.abs(video.currentTime - desktopTarget);
 
-      // Mobile must stay smooth. Only hard-correct if it is badly wrong.
-      const threshold = isMobileScreen() ? 8 : 1.25;
-
-      if (drift > threshold) {
-        video.currentTime = Math.max(0, target);
+      if (drift > 4) {
+        video.currentTime = Math.max(0, desktopTarget);
       }
 
       if (video.paused) {
@@ -169,15 +166,17 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     if (!playableSchedule.length || !videoRef.current) return;
 
-    loadLivePosition();
+    loadLiveSource();
 
-    const interval = window.setInterval(
-      loadLivePosition,
-      isMobileScreen() ? 15000 : 3000
-    );
+    // Emergency mobile fix:
+    // no recurring sync loop on mobile. Let hardware decoder play smoothly.
+    if (isMobileScreen()) {
+      return;
+    }
 
+    const interval = window.setInterval(loadLiveSource, 10000);
     return () => window.clearInterval(interval);
-  }, [playableSchedule, loadLivePosition]);
+  }, [playableSchedule, loadLiveSource]);
 
   if (!schedule.length) {
     return <OfflineState message="This channel is currently off air." />;
@@ -229,13 +228,13 @@ export default function Player({ schedule }: PlayerProps) {
         <button
           type="button"
           onClick={unlockAudio}
-          className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/20 bg-black/85 px-5 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-sm transition hover:bg-black"
+          className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/20 bg-black/85 px-5 py-3 text-sm font-semibold text-white shadow-2xl transition hover:bg-black"
         >
           Tap to enable sound
         </button>
       ) : null}
 
-      <div className="absolute bottom-3 right-3 z-50 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/75 p-2 shadow-2xl backdrop-blur-md sm:bottom-4 sm:right-4">
+      <div className="absolute bottom-3 right-3 z-50 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/75 p-2 shadow-2xl sm:bottom-4 sm:right-4">
         <button
           type="button"
           onClick={toggleMute}
