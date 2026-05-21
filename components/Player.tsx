@@ -8,9 +8,19 @@ type PlayerProps = {
   schedule: MediaItem[];
 };
 
-const HARD_SYNC_SECONDS = 0.25;
-const SOFT_SYNC_SECONDS = 0.08;
-const SYNC_INTERVAL_MS = 250;
+const DESKTOP_SYNC_INTERVAL_MS = 750;
+const MOBILE_SYNC_INTERVAL_MS = 2000;
+
+const DESKTOP_HARD_SYNC_SECONDS = 0.75;
+const MOBILE_HARD_SYNC_SECONDS = 2.5;
+
+const DESKTOP_SOFT_SYNC_SECONDS = 0.25;
+const MOBILE_SOFT_SYNC_SECONDS = 0.75;
+
+function isSmallScreen() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 768px)").matches;
+}
 
 export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -23,7 +33,7 @@ export default function Player({ schedule }: PlayerProps) {
   const [volume, setVolume] = useState(1);
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const [errorTitle, setErrorTitle] = useState("");
-  const [syncLabel, setSyncLabel] = useState("Syncing live feed...");
+  const [syncLabel, setSyncLabel] = useState("Live feed");
 
   const playableSchedule = useMemo(() => {
     return schedule.filter((item) => item.file && !failedIds.includes(item.id));
@@ -33,75 +43,11 @@ export default function Player({ schedule }: PlayerProps) {
     return getLiveState(playableSchedule);
   }, [playableSchedule]);
 
-  const seekToLivePosition = useCallback(
-    (reason: "load" | "drift" | "tick") => {
-      const video = videoRef.current;
-      if (!video || !playableSchedule.length) return;
-
-      const live = getTarget();
-      if (!live.item) return;
-
-      const target = Math.max(0, live.elapsed);
-
-      if (currentMediaIdRef.current !== live.item.id) {
-        currentMediaIdRef.current = live.item.id;
-        pendingSeekRef.current = target;
-        setErrorTitle("");
-        setSyncLabel(`Loading ${live.item.title}...`);
-
-        video.pause();
-        video.src = live.item.file;
-        video.defaultMuted = !audioUnlockedRef.current;
-        video.muted = !audioUnlockedRef.current;
-        video.volume = audioUnlockedRef.current ? volume : 0;
-        video.playbackRate = 1;
-        video.load();
-        return;
-      }
-
-      if (video.readyState < 1) {
-        pendingSeekRef.current = target;
-        return;
-      }
-
-      const safeTarget =
-        Number.isFinite(video.duration) && video.duration > 0
-          ? Math.min(target, Math.max(video.duration - 0.35, 0))
-          : target;
-
-      const drift = safeTarget - video.currentTime;
-      const absDrift = Math.abs(drift);
-
-      if (reason === "load" || absDrift > HARD_SYNC_SECONDS) {
-        video.currentTime = safeTarget;
-        video.playbackRate = 1;
-      } else if (absDrift > SOFT_SYNC_SECONDS) {
-        video.playbackRate = drift > 0 ? 1.04 : 0.96;
-      } else {
-        video.playbackRate = 1;
-      }
-
-      if (video.paused) {
-        void video.play().catch(() => {});
-      }
-
-      setSyncLabel(
-        live.item
-          ? `${live.item.title} • Live ${Math.floor(live.elapsed / 60)}:${String(
-              live.elapsed % 60
-            ).padStart(2, "0")}`
-          : "Live feed"
-      );
-    },
-    [getTarget, playableSchedule.length, volume]
-  );
-
   const unlockAudio = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
 
     audioUnlockedRef.current = true;
-
     video.defaultMuted = false;
     video.muted = false;
     video.volume = Math.max(volume, 0.8);
@@ -148,10 +94,83 @@ export default function Player({ schedule }: PlayerProps) {
       try {
         await video.play();
       } catch {
-        // Browser may still require click.
+        // Browser may require direct interaction.
       }
     }
   }, []);
+
+  const syncToBroadcast = useCallback(
+    (reason: "load" | "tick") => {
+      const video = videoRef.current;
+      if (!video || !playableSchedule.length) return;
+
+      const live = getTarget();
+      if (!live.item) return;
+
+      const mobile = isSmallScreen();
+
+      const hardSync = mobile
+        ? MOBILE_HARD_SYNC_SECONDS
+        : DESKTOP_HARD_SYNC_SECONDS;
+
+      const softSync = mobile
+        ? MOBILE_SOFT_SYNC_SECONDS
+        : DESKTOP_SOFT_SYNC_SECONDS;
+
+      const target = Math.max(0, live.elapsed);
+
+      if (currentMediaIdRef.current !== live.item.id) {
+        currentMediaIdRef.current = live.item.id;
+        pendingSeekRef.current = target;
+
+        setErrorTitle("");
+        setSyncLabel(`Loading ${live.item.title}...`);
+
+        video.pause();
+        video.src = live.item.file;
+        video.defaultMuted = !audioUnlockedRef.current;
+        video.muted = !audioUnlockedRef.current;
+        video.volume = audioUnlockedRef.current ? volume : 0;
+        video.playbackRate = 1;
+        video.load();
+
+        return;
+      }
+
+      if (video.readyState < 1) {
+        pendingSeekRef.current = target;
+        return;
+      }
+
+      const safeTarget =
+        Number.isFinite(video.duration) && video.duration > 0
+          ? Math.min(target, Math.max(video.duration - 0.35, 0))
+          : target;
+
+      const drift = safeTarget - video.currentTime;
+      const absoluteDrift = Math.abs(drift);
+
+      if (reason === "load" || absoluteDrift > hardSync) {
+        video.currentTime = safeTarget;
+        video.playbackRate = 1;
+      } else if (absoluteDrift > softSync && !mobile) {
+        video.playbackRate = drift > 0 ? 1.03 : 0.97;
+      } else {
+        video.playbackRate = 1;
+      }
+
+      if (video.paused) {
+        void video.play().catch(() => {});
+      }
+
+      setSyncLabel(
+        `${live.item.title} • Live ${Math.floor(live.elapsed / 60)}:${String(
+          live.elapsed % 60
+        ).padStart(2, "0")}`
+      );
+    },
+    [getTarget, playableSchedule.length, volume]
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -199,29 +218,30 @@ export default function Player({ schedule }: PlayerProps) {
 
     const onLoadedMetadata = () => {
       applyPendingSeek();
-      seekToLivePosition("load");
+      syncToBroadcast("load");
     };
 
     const onCanPlay = () => {
       applyPendingSeek();
-      seekToLivePosition("load");
+      syncToBroadcast("load");
     };
 
     video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("canplay", onCanPlay);
 
-    seekToLivePosition("load");
+    syncToBroadcast("load");
 
-    const interval = window.setInterval(() => {
-      seekToLivePosition("tick");
-    }, SYNC_INTERVAL_MS);
+    const interval = window.setInterval(
+      () => syncToBroadcast("tick"),
+      isSmallScreen() ? MOBILE_SYNC_INTERVAL_MS : DESKTOP_SYNC_INTERVAL_MS
+    );
 
     return () => {
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("canplay", onCanPlay);
       window.clearInterval(interval);
     };
-  }, [playableSchedule, seekToLivePosition]);
+  }, [playableSchedule, syncToBroadcast]);
 
   if (!schedule.length) {
     return <OfflineState message="This channel is currently off air." />;
@@ -250,7 +270,7 @@ export default function Player({ schedule }: PlayerProps) {
           ref={videoRef}
           autoPlay
           playsInline
-          preload="auto"
+          preload="metadata"
           controls={false}
           onClick={unlockAudio}
           onError={() => {
@@ -263,7 +283,7 @@ export default function Player({ schedule }: PlayerProps) {
         />
       )}
 
-      <div className="absolute left-4 top-4 z-40 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white/80 backdrop-blur-sm">
+      <div className="absolute left-3 top-3 z-40 max-w-[75%] rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[11px] text-white/80 backdrop-blur-sm sm:left-4 sm:top-4 sm:text-xs">
         {syncLabel}
       </div>
 
@@ -283,11 +303,11 @@ export default function Player({ schedule }: PlayerProps) {
         </button>
       ) : null}
 
-      <div className="absolute bottom-4 right-4 z-50 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/75 p-2 shadow-2xl backdrop-blur-md">
+      <div className="absolute bottom-3 right-3 z-50 flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/75 p-2 shadow-2xl backdrop-blur-md sm:bottom-4 sm:right-4">
         <button
           type="button"
           onClick={toggleMute}
-          className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 sm:px-4 sm:text-sm"
         >
           {isMuted ? "Unmute" : "Mute"}
         </button>
@@ -299,16 +319,16 @@ export default function Player({ schedule }: PlayerProps) {
           step={0.05}
           value={isMuted ? 0 : volume}
           onChange={(event) => void changeVolume(Number(event.target.value))}
-          className="w-24 accent-white"
+          className="w-20 accent-white sm:w-24"
           aria-label="Volume"
         />
 
         <button
           type="button"
           onClick={() => setIsExpanded((value) => !value)}
-          className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 sm:px-4 sm:text-sm"
         >
-          {isExpanded ? "Exit Fullscreen" : "Fullscreen"}
+          {isExpanded ? "Exit" : "Full"}
         </button>
       </div>
     </div>
@@ -317,7 +337,7 @@ export default function Player({ schedule }: PlayerProps) {
 
 function OfflineState({ message }: { message: string }) {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-black text-white">
+    <div className="flex h-full w-full items-center justify-center bg-black px-4 text-white">
       <div className="text-center">
         <div className="text-lg font-semibold">Channel Offline</div>
         <div className="mt-1 text-sm text-slate-400">{message}</div>
