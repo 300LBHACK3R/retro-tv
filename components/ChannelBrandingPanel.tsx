@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Channel, ChannelBranding } from "@/lib/types";
 
 const DEFAULT_ACCENT_COLOR = "#2563eb";
+
+type BrandingDraft = ChannelBranding;
 
 function getFallbackBranding(channel: Channel): ChannelBranding {
   return {
@@ -24,6 +26,28 @@ function isValidHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
 
+function normalizeDraft(draft: BrandingDraft, fallback: ChannelBranding): ChannelBranding {
+  return {
+    displayName: draft.displayName.trim() || fallback.displayName,
+    callsign: draft.callsign.trim().toUpperCase() || fallback.callsign,
+    logoText: draft.logoText.trim() || fallback.logoText,
+    description: draft.description.trim(),
+    accentColor: isValidHexColor(draft.accentColor)
+      ? draft.accentColor
+      : fallback.accentColor || DEFAULT_ACCENT_COLOR,
+  };
+}
+
+function areBrandingValuesEqual(a: ChannelBranding, b: ChannelBranding): boolean {
+  return (
+    a.displayName === b.displayName &&
+    a.callsign === b.callsign &&
+    a.logoText === b.logoText &&
+    a.description === b.description &&
+    a.accentColor.toLowerCase() === b.accentColor.toLowerCase()
+  );
+}
+
 export default function ChannelBrandingPanel() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -34,7 +58,28 @@ export default function ChannelBrandingPanel() {
     [channels, currentChannelId],
   );
 
-  if (!activeChannel) {
+  const savedBranding = useMemo(() => {
+    if (!activeChannel) {
+      return null;
+    }
+
+    return getFallbackBranding(activeChannel);
+  }, [activeChannel]);
+
+  const [draft, setDraft] = useState<BrandingDraft | null>(savedBranding);
+  const [message, setMessage] = useState("Edit the fields, then click Save Changes.");
+
+  useEffect(() => {
+    if (!savedBranding) {
+      setDraft(null);
+      return;
+    }
+
+    setDraft(savedBranding);
+    setMessage("Edit the fields, then click Save Changes.");
+  }, [activeChannel?.id, savedBranding]);
+
+  if (!activeChannel || !savedBranding || !draft) {
     return (
       <section
         className="rounded-2xl border p-4"
@@ -52,13 +97,43 @@ export default function ChannelBrandingPanel() {
     );
   }
 
-  const branding = getFallbackBranding(activeChannel);
-  const accentColor = isValidHexColor(branding.accentColor)
-    ? branding.accentColor
+  const accentColor = isValidHexColor(draft.accentColor)
+    ? draft.accentColor
     : DEFAULT_ACCENT_COLOR;
 
-  const updateBranding = (patch: Partial<ChannelBranding>) => {
-    updateChannelBranding(activeChannel.id, patch);
+  const normalizedDraft = normalizeDraft(draft, savedBranding);
+  const hasUnsavedChanges = !areBrandingValuesEqual(
+    normalizedDraft,
+    normalizeDraft(savedBranding, savedBranding),
+  );
+
+  const updateDraft = (patch: Partial<BrandingDraft>) => {
+    setDraft((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        ...patch,
+      };
+    });
+
+    setMessage("Unsaved changes.");
+  };
+
+  const saveChanges = () => {
+    const nextBranding = normalizeDraft(draft, savedBranding);
+
+    updateChannelBranding(activeChannel.id, nextBranding);
+
+    setDraft(nextBranding);
+    setMessage("Saved locally. Wait for the global sync badge to finish saving.");
+  };
+
+  const resetChanges = () => {
+    setDraft(savedBranding);
+    setMessage("Changes reset.");
   };
 
   return (
@@ -107,25 +182,25 @@ export default function ChannelBrandingPanel() {
               boxShadow: `0 0 18px ${accentColor}66`,
             }}
           >
-            {branding.callsign.slice(0, 4)}
+            {draft.callsign.slice(0, 4) || "CH"}
           </div>
 
           <div className="min-w-0">
             <div className="truncate text-base font-bold uppercase tracking-[0.12em] text-white">
-              {branding.logoText || branding.displayName}
+              {draft.logoText || draft.displayName || activeChannel.name}
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
-              <span>{branding.callsign}</span>
+              <span>{draft.callsign || activeChannel.name}</span>
               <span className="text-white/35">•</span>
               <span>{getChannelLabel(activeChannel)}</span>
               <span className="text-white/35">•</span>
               <span>Live</span>
             </div>
 
-            {branding.description ? (
+            {draft.description ? (
               <div className="mt-1 truncate text-xs text-white/60">
-                {branding.description}
+                {draft.description}
               </div>
             ) : null}
           </div>
@@ -144,9 +219,9 @@ export default function ChannelBrandingPanel() {
 
           <input
             id="channel-display-name"
-            value={branding.displayName}
+            value={draft.displayName}
             onChange={(event) =>
-              updateBranding({
+              updateDraft({
                 displayName: event.target.value,
               })
             }
@@ -171,9 +246,9 @@ export default function ChannelBrandingPanel() {
 
             <input
               id="channel-callsign"
-              value={branding.callsign}
+              value={draft.callsign}
               onChange={(event) =>
-                updateBranding({
+                updateDraft({
                   callsign: event.target.value.toUpperCase(),
                 })
               }
@@ -198,9 +273,9 @@ export default function ChannelBrandingPanel() {
 
             <input
               id="channel-logo-text"
-              value={branding.logoText}
+              value={draft.logoText}
               onChange={(event) =>
-                updateBranding({
+                updateDraft({
                   logoText: event.target.value,
                 })
               }
@@ -225,9 +300,9 @@ export default function ChannelBrandingPanel() {
 
           <textarea
             id="channel-description"
-            value={branding.description}
+            value={draft.description}
             onChange={(event) =>
-              updateBranding({
+              updateDraft({
                 description: event.target.value,
               })
             }
@@ -256,7 +331,7 @@ export default function ChannelBrandingPanel() {
               type="color"
               value={accentColor}
               onChange={(event) =>
-                updateBranding({
+                updateDraft({
                   accentColor: event.target.value,
                 })
               }
@@ -268,19 +343,17 @@ export default function ChannelBrandingPanel() {
             />
 
             <input
-              value={accentColor}
-              onChange={(event) => {
-                const nextColor = event.target.value.trim();
-
-                updateBranding({
-                  accentColor: nextColor,
-                });
-              }}
+              value={draft.accentColor}
+              onChange={(event) =>
+                updateDraft({
+                  accentColor: event.target.value.trim(),
+                })
+              }
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
               placeholder="#2563eb"
               style={{
                 background: "var(--panel-alt-bg)",
-                borderColor: isValidHexColor(accentColor)
+                borderColor: isValidHexColor(draft.accentColor)
                   ? "var(--border)"
                   : "#f87171",
                 color: "var(--text)",
@@ -288,12 +361,53 @@ export default function ChannelBrandingPanel() {
             />
           </div>
 
-          {!isValidHexColor(branding.accentColor) ? (
+          {!isValidHexColor(draft.accentColor) ? (
             <div className="mt-1 text-[11px] text-red-300">
               Use a valid 6-digit hex color like #2563eb.
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div
+        className="mt-4 rounded-xl border px-3 py-2 text-xs"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: hasUnsavedChanges
+            ? "rgba(250, 204, 21, 0.45)"
+            : "var(--border)",
+          color: hasUnsavedChanges ? "#fde68a" : "var(--text-muted)",
+        }}
+      >
+        {message}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={saveChanges}
+          disabled={!hasUnsavedChanges || !isValidHexColor(draft.accentColor)}
+          className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: "var(--primary)",
+            color: "var(--text)",
+          }}
+        >
+          Save Changes
+        </button>
+
+        <button
+          type="button"
+          onClick={resetChanges}
+          disabled={!hasUnsavedChanges}
+          className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: "var(--button-bg)",
+            color: "var(--text)",
+          }}
+        >
+          Reset
+        </button>
       </div>
     </section>
   );
