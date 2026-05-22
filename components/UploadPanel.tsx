@@ -20,18 +20,23 @@ function stripExtension(filename: string) {
   return filename.replace(/\.[^/.]+$/, "");
 }
 
-function normalizeFolderPath(folder: string) {
+function normalizeLocalFolder(folder: string) {
   const trimmed = folder.trim().replace(/\\/g, "/");
   if (!trimmed) return "/media";
-  const noLeading = trimmed.replace(/^\/+/, "");
-  const noTrailing = noLeading.replace(/\/+$/, "");
-  return `/${noTrailing}`;
+  const clean = trimmed.replace(/^\/+/, "").replace(/\/+$/, "");
+  return `/${clean}`;
 }
 
-function buildPublicPath(folder: string, filename: string) {
-  const normalizedFolder = normalizeFolderPath(folder);
-  const cleanFilename = filename.trim().replace(/^\/+/, "");
-  return `${normalizedFolder}/${cleanFilename}`;
+function buildLocalPath(folder: string, filename: string) {
+  return `${normalizeLocalFolder(folder)}/${filename.trim().replace(/^\/+/, "")}`;
+}
+
+function cleanUrl(value: string) {
+  return value.trim().replace(/\s/g, "%20");
+}
+
+function isRemoteUrl(value: string) {
+  return /^https?:\/\//i.test(value.trim());
 }
 
 export default function UploadPanel() {
@@ -42,7 +47,9 @@ export default function UploadPanel() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [sourceMode, setSourceMode] = useState<"cloud" | "local">("cloud");
   const [title, setTitle] = useState("");
+  const [cloudUrl, setCloudUrl] = useState("");
   const [folder, setFolder] = useState("/media");
   const [filename, setFilename] = useState("");
   const [duration, setDuration] = useState("1800");
@@ -51,25 +58,55 @@ export default function UploadPanel() {
   const [lastMessage, setLastMessage] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  const recentMedia = useMemo(() => {
-    return [...media].slice(-6).reverse();
-  }, [media]);
-
   const finalPath = useMemo(() => {
+    if (sourceMode === "cloud") return cleanUrl(cloudUrl);
     if (!filename.trim()) return "";
-    return buildPublicPath(folder, filename);
-  }, [folder, filename]);
+    return buildLocalPath(folder, filename);
+  }, [sourceMode, cloudUrl, folder, filename]);
+
+  const recentMedia = useMemo(() => [...media].slice(-8).reverse(), [media]);
+
+  const handleLocalBrowse = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+
+    setSourceMode("local");
+    setTitle(stripExtension(file.name));
+    setFilename(file.name);
+    setLastMessage(
+      `Loaded "${file.name}". This does not upload it. It must already exist at ${buildLocalPath(folder, file.name)}.`
+    );
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const testPath = () => {
+    if (!finalPath) {
+      setLastMessage("Enter a Cloudflare URL or local file path first.");
+      return;
+    }
+
+    window.open(finalPath, "_blank", "noopener,noreferrer");
+  };
 
   const addHostedMedia = () => {
     setLastMessage("");
 
-    if (!title.trim()) {
+    const cleanTitle = title.trim();
+    const cleanPath = finalPath.trim();
+
+    if (!cleanTitle) {
       setLastMessage("Title is required.");
       return;
     }
 
-    if (!filename.trim()) {
-      setLastMessage("Filename is required.");
+    if (!cleanPath) {
+      setLastMessage("Media URL/path is required.");
+      return;
+    }
+
+    if (sourceMode === "cloud" && !isRemoteUrl(cleanPath)) {
+      setLastMessage("Cloudflare/R2 source must start with https://");
       return;
     }
 
@@ -79,20 +116,12 @@ export default function UploadPanel() {
       return;
     }
 
-    const channelExists = channels.some((channel) => channel.id === channelId);
-    if (!channelExists) {
-      setLastMessage("Selected channel does not exist.");
-      return;
-    }
-
     const duplicate = media.find(
-      (item) =>
-        item.file.trim().toLowerCase() === finalPath.trim().toLowerCase() &&
-        item.title.trim().toLowerCase() === title.trim().toLowerCase()
+      (item) => item.file.trim().toLowerCase() === cleanPath.toLowerCase()
     );
 
     if (duplicate) {
-      setLastMessage("That media item already exists.");
+      setLastMessage(`Already added: "${duplicate.title}"`);
       return;
     }
 
@@ -101,55 +130,31 @@ export default function UploadPanel() {
 
       const mediaItem: MediaItem = {
         id: makeId(),
-        title: title.trim(),
+        title: cleanTitle,
         type: mediaType,
         duration: durationNumber,
-        file: finalPath,
-        originalName: filename.trim(),
+        file: cleanPath,
+        originalName:
+          sourceMode === "cloud"
+            ? cleanPath.split("/").pop() ?? cleanTitle
+            : filename.trim(),
       };
 
       addMedia(mediaItem);
       assignMediaToChannel(channelId, mediaItem.id);
 
-      setLastMessage(
-        `Added "${mediaItem.title}" to CH ${channelId} using ${mediaItem.file}`
-      );
+      setLastMessage(`Added "${mediaItem.title}" to CH ${channelId}.`);
 
       setTitle("");
+      setCloudUrl("");
       setFilename("");
       setDuration("1800");
     } catch (error) {
-      console.error("Add media failed:", error);
-      setLastMessage("Failed to add media. Check the console for details.");
+      console.error(error);
+      setLastMessage("Failed to add media. Check console.");
     } finally {
       setIsAdding(false);
     }
-  };
-
-  const handleLocalBrowse = (files: FileList | null) => {
-    const file = files?.[0];
-    if (!file) return;
-
-    setTitle(stripExtension(file.name));
-    setFilename(file.name);
-    setLastMessage(
-      `Loaded "${file.name}". Make sure it really exists at ${buildPublicPath(
-        folder,
-        file.name
-      )}`
-    );
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const testPath = () => {
-    if (!finalPath) {
-      setLastMessage("Enter a filename first.");
-      return;
-    }
-    window.open(finalPath, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -166,57 +171,42 @@ export default function UploadPanel() {
       </div>
 
       <div className="grid gap-3">
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
-          }}
-        >
-          <div
-            className="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Quick File Helper
-          </div>
-
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+            onClick={() => setSourceMode("cloud")}
+            className="rounded-lg px-3 py-2 text-sm font-semibold"
             style={{
-              background: "var(--button-bg)",
+              background:
+                sourceMode === "cloud" ? "var(--primary)" : "var(--button-bg)",
               color: "var(--text)",
             }}
           >
-            Browse Local File
+            Cloudflare URL
           </button>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={(e) => handleLocalBrowse(e.target.files)}
-          />
-
-          <div className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
-            This only fills the title and filename. Your file must already exist
-            inside the matching <code>public</code> folder.
-          </div>
+          <button
+            type="button"
+            onClick={() => setSourceMode("local")}
+            className="rounded-lg px-3 py-2 text-sm font-semibold"
+            style={{
+              background:
+                sourceMode === "local" ? "var(--primary)" : "var(--button-bg)",
+              color: "var(--text)",
+            }}
+          >
+            Local Public File
+          </button>
         </div>
 
         <div>
-          <label
-            className="mb-1 block text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
             Title
           </label>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="DragonBall Z EP:01"
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Naruto EP01"
             className="w-full rounded-lg border px-3 py-2"
             style={{
               background: "var(--panel-alt-bg)",
@@ -226,18 +216,15 @@ export default function UploadPanel() {
           />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        {sourceMode === "cloud" ? (
           <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Folder inside public
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+              Cloudflare/R2 Public URL
             </label>
             <input
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              placeholder="/media/channel1"
+              value={cloudUrl}
+              onChange={(event) => setCloudUrl(event.target.value)}
+              placeholder="https://pub-xxxx.r2.dev/naruto-s01e01.mp4"
               className="w-full rounded-lg border px-3 py-2"
               style={{
                 background: "var(--panel-alt-bg)",
@@ -246,34 +233,89 @@ export default function UploadPanel() {
               }}
             />
           </div>
+        ) : (
+          <>
+            <div
+              className="rounded-xl border p-3"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--panel-alt-bg)",
+              }}
+            >
+              <div
+                className="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Quick File Helper
+              </div>
 
-          <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Filename
-            </label>
-            <input
-              value={filename}
-              onChange={(e) => setFilename(e.target.value)}
-              placeholder="show.mp4"
-              className="w-full rounded-lg border px-3 py-2"
-              style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            />
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                Browse Local File
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(event) => handleLocalBrowse(event.target.files)}
+              />
+
+              <div className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                This only fills title and filename. It does not upload to
+                Cloudflare or Vercel.
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                  Folder inside public
+                </label>
+                <input
+                  value={folder}
+                  onChange={(event) => setFolder(event.target.value)}
+                  placeholder="/media"
+                  className="w-full rounded-lg border px-3 py-2"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                  Filename
+                </label>
+                <input
+                  value={filename}
+                  onChange={(event) => setFilename(event.target.value)}
+                  placeholder="show.mp4"
+                  className="w-full rounded-lg border px-3 py-2"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         <div>
-          <label
-            className="mb-1 block text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Final public path
+          <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+            Final media source
           </label>
           <input
             value={finalPath}
@@ -289,15 +331,12 @@ export default function UploadPanel() {
 
         <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
               Type
             </label>
             <select
               value={mediaType}
-              onChange={(e) => setMediaType(e.target.value as MediaType)}
+              onChange={(event) => setMediaType(event.target.value as MediaType)}
               className="w-full rounded-lg border px-3 py-2"
               style={{
                 background: "var(--panel-alt-bg)",
@@ -313,15 +352,12 @@ export default function UploadPanel() {
           </div>
 
           <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
               Duration (seconds)
             </label>
             <input
               value={duration}
-              onChange={(e) => setDuration(e.target.value)}
+              onChange={(event) => setDuration(event.target.value)}
               className="w-full rounded-lg border px-3 py-2"
               style={{
                 background: "var(--panel-alt-bg)",
@@ -332,15 +368,12 @@ export default function UploadPanel() {
           </div>
 
           <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
               Channel
             </label>
             <select
               value={channelId}
-              onChange={(e) => setChannelId(e.target.value)}
+              onChange={(event) => setChannelId(event.target.value)}
               className="w-full rounded-lg border px-3 py-2"
               style={{
                 background: "var(--panel-alt-bg)",
@@ -385,7 +418,7 @@ export default function UploadPanel() {
         </div>
 
         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {lastMessage || "Make the final path work in a browser first, then add it."}
+          {lastMessage || "Use Cloudflare URLs for live streaming media."}
         </div>
       </div>
 
@@ -419,16 +452,10 @@ export default function UploadPanel() {
                 }}
               >
                 <div className="truncate text-sm font-medium">{item.title}</div>
-                <div
-                  className="text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
+                <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
                   {item.type.toUpperCase()} • {prettyDuration(item.duration)}
                 </div>
-                <div
-                  className="mt-1 truncate text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
+                <div className="mt-1 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>
                   {item.file}
                 </div>
                 <div className="mt-2">
