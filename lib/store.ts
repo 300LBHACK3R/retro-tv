@@ -40,6 +40,7 @@ interface AppState {
   unlockTheme: (themeId: ThemeId) => void;
   toggleGuide: () => void;
   closeGuide: () => void;
+  resetProgramming: () => void;
 }
 
 const defaultMedia: MediaItem[] = [
@@ -117,6 +118,15 @@ const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, i) => {
   };
 });
 
+function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]) {
+  const map = new Map<string, T>();
+
+  defaults.forEach((item) => map.set(item.id, item));
+  saved?.forEach((item) => map.set(item.id, item));
+
+  return Array.from(map.values());
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
@@ -132,7 +142,11 @@ export const useStore = create<AppState>()(
 
       addMedia: (item) =>
         set((state) => ({
-          media: [...state.media, item],
+          media: state.media.some((mediaItem) => mediaItem.id === item.id)
+            ? state.media.map((mediaItem) =>
+                mediaItem.id === item.id ? item : mediaItem
+              )
+            : [...state.media, item],
         })),
 
       removeMedia: (mediaId) =>
@@ -227,10 +241,30 @@ export const useStore = create<AppState>()(
         })),
 
       closeGuide: () => set({ isGuideOpen: false }),
+
+      resetProgramming: () =>
+        set({
+          media: defaultMedia,
+          channels: defaultChannels,
+          currentChannelId: "1",
+        }),
     }),
     {
-      name: "retro-tv-global-schedule-v1",
+      name: "retro-tv-programming-v1",
+      version: 1,
+      merge: (persistedState, currentState) => {
+        const saved = persistedState as Partial<AppState> | undefined;
+
+        return {
+          ...currentState,
+          ...saved,
+          media: mergeById(defaultMedia, saved?.media),
+          channels: mergeById(defaultChannels, saved?.channels),
+        };
+      },
       partialize: (state) => ({
+        media: state.media,
+        channels: state.channels,
         currentChannelId: state.currentChannelId,
         isGuideOpen: state.isGuideOpen,
         sidebarWidth: state.sidebarWidth,
