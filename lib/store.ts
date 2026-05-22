@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 import type {
   AppMode,
   Channel,
@@ -24,14 +25,14 @@ interface AppState {
   setChannel: (id: string) => void;
   updateChannelBranding: (
     channelId: string,
-    brandingPatch: Partial<ChannelBranding>
+    brandingPatch: Partial<ChannelBranding>,
   ) => void;
   assignMediaToChannel: (channelId: string, mediaId: string) => void;
   removeMediaFromChannel: (channelId: string, mediaId: string) => void;
   moveMediaInChannel: (
     channelId: string,
     fromIndex: number,
-    toIndex: number
+    toIndex: number,
   ) => void;
   setSidebarWidth: (width: number) => void;
   setGuideHeight: (height: number) => void;
@@ -43,6 +44,19 @@ interface AppState {
   resetProgramming: () => void;
 }
 
+const STORE_NAME = "retro-tv-programming-v1";
+const STORE_VERSION = 1;
+
+const MIN_SIDEBAR_WIDTH = 280;
+const MAX_SIDEBAR_WIDTH = 720;
+const DEFAULT_SIDEBAR_WIDTH = 420;
+
+const MIN_GUIDE_HEIGHT = 220;
+const MAX_GUIDE_HEIGHT = 560;
+const DEFAULT_GUIDE_HEIGHT = 290;
+
+const DEFAULT_ACCENT_COLOR = "#2563eb";
+
 const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
@@ -50,7 +64,9 @@ const defaultMedia: MediaItem[] = [
     type: "show",
     duration: 1320,
     file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e01.mp4",
+    mimeType: "video/mp4",
     originalName: "martin-mystery-s01e01.mp4",
+    provider: "cloudflare-r2",
   },
   {
     id: "martin-mystery-s01e02",
@@ -58,96 +74,290 @@ const defaultMedia: MediaItem[] = [
     type: "show",
     duration: 1320,
     file: "https://pub-84f28dd5f9cd442aa30785cc1837eb3f.r2.dev/martin-mystery-s01e02.mp4",
+    mimeType: "video/mp4",
     originalName: "martin-mystery-s01e02.mp4",
+    provider: "cloudflare-r2",
   },
 ];
 
-const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, i) => {
-  const n = i + 1;
+const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, index) => {
+  const channelNumber = index + 1;
+
+  const branding = createDefaultChannelBranding(channelNumber);
 
   return {
-    id: String(n),
-    name: `Channel ${n}`,
+    id: String(channelNumber),
+    number: channelNumber,
+    name: `Channel ${channelNumber}`,
     mediaIds:
-      n === 1
+      channelNumber === 1
         ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
         : [],
-    branding: {
-      displayName:
-        n === 1
-          ? "Tate's TV Main"
-          : n === 2
-          ? "The True Standard"
-          : n === 3
-          ? "Gaming Clips"
-          : n === 4
-          ? "Retro TV"
-          : `Channel ${n}`,
-      callsign:
-        n === 1
-          ? "TTV"
-          : n === 2
-          ? "TTS"
-          : n === 3
-          ? "GAME"
-          : n === 4
-          ? "RETRO"
-          : `CH${n}`,
-      description:
-        n === 1
-          ? "Main network feed"
-          : n === 2
-          ? "Christian channel"
-          : n === 3
-          ? "Gaming promos and highlights"
-          : n === 4
-          ? "Retro television channel"
-          : `Channel ${n} programming`,
-      accentColor: n === 2 ? "#7c3aed" : "#2563eb",
-      logoText:
-        n === 1
-          ? "TATE'S TV"
-          : n === 2
-          ? "TRUE STANDARD"
-          : n === 3
-          ? "GAMING"
-          : n === 4
-          ? "RETRO TV"
-          : `CHANNEL ${n}`,
-    },
+    isEnabled: true,
+    branding,
   };
 });
 
-function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]) {
+function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
+  if (channelNumber === 1) {
+    return {
+      displayName: "Tate's TV Main",
+      callsign: "TTV",
+      description: "Main network feed",
+      accentColor: DEFAULT_ACCENT_COLOR,
+      logoText: "TATE'S TV",
+    };
+  }
+
+  if (channelNumber === 2) {
+    return {
+      displayName: "The True Standard",
+      callsign: "TTS",
+      description: "Christian channel",
+      accentColor: "#7c3aed",
+      logoText: "TRUE STANDARD",
+    };
+  }
+
+  if (channelNumber === 3) {
+    return {
+      displayName: "Gaming Clips",
+      callsign: "GAME",
+      description: "Gaming promos and highlights",
+      accentColor: DEFAULT_ACCENT_COLOR,
+      logoText: "GAMING",
+    };
+  }
+
+  if (channelNumber === 4) {
+    return {
+      displayName: "Retro TV",
+      callsign: "RETRO",
+      description: "Retro television channel",
+      accentColor: DEFAULT_ACCENT_COLOR,
+      logoText: "RETRO TV",
+    };
+  }
+
+  return {
+    displayName: `Channel ${channelNumber}`,
+    callsign: `CH${channelNumber}`,
+    description: `Channel ${channelNumber} programming`,
+    accentColor: DEFAULT_ACCENT_COLOR,
+    logoText: `CHANNEL ${channelNumber}`,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeText(value: unknown, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizeMediaItem(item: MediaItem): MediaItem {
+  const now = new Date().toISOString();
+
+  return {
+    ...item,
+    id: normalizeText(item.id, crypto.randomUUID()),
+    title: normalizeText(item.title, "Untitled Media"),
+    type: item.type,
+    duration: Math.max(1, Math.floor(Number(item.duration) || 1)),
+    file: normalizeText(item.file, ""),
+    mimeType: item.mimeType ?? "video/mp4",
+    provider: item.provider ?? inferMediaProvider(item.file),
+    createdAt: item.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+function inferMediaProvider(file: string | undefined): MediaItem["provider"] {
+  if (!file) {
+    return "unknown";
+  }
+
+  if (file.includes(".r2.dev") || file.includes("cloudflare")) {
+    return "cloudflare-r2";
+  }
+
+  if (file.startsWith("/")) {
+    return "local-dev";
+  }
+
+  if (file.startsWith("http://") || file.startsWith("https://")) {
+    return "external-url";
+  }
+
+  return "unknown";
+}
+
+function isValidMediaItem(value: unknown): value is MediaItem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const item = value as Partial<MediaItem>;
+
+  return (
+    typeof item.id === "string" &&
+    typeof item.title === "string" &&
+    typeof item.file === "string" &&
+    typeof item.duration === "number" &&
+    item.duration > 0 &&
+    ["show", "commercial", "movie", "bumper"].includes(String(item.type))
+  );
+}
+
+function isValidChannel(value: unknown): value is Channel {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const channel = value as Partial<Channel>;
+
+  return (
+    typeof channel.id === "string" &&
+    typeof channel.name === "string" &&
+    Array.isArray(channel.mediaIds) &&
+    channel.mediaIds.every((id) => typeof id === "string")
+  );
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function normalizeChannel(channel: Channel): Channel {
+  const channelNumber = Number(channel.number ?? channel.id);
+  const fallbackBranding = createDefaultChannelBranding(
+    Number.isFinite(channelNumber) ? channelNumber : 1,
+  );
+
+  return {
+    ...channel,
+    id: normalizeText(channel.id, String(channelNumber || 1)),
+    name: normalizeText(channel.name, `Channel ${channelNumber || 1}`),
+    mediaIds: dedupeStrings(channel.mediaIds),
+    number: Number.isFinite(channelNumber) ? channelNumber : undefined,
+    isEnabled: channel.isEnabled ?? true,
+    branding: {
+      displayName:
+        channel.branding?.displayName ??
+        fallbackBranding.displayName ??
+        channel.name,
+      callsign:
+        channel.branding?.callsign ?? fallbackBranding.callsign ?? channel.name,
+      description:
+        channel.branding?.description ?? fallbackBranding.description ?? "",
+      accentColor:
+        channel.branding?.accentColor ??
+        fallbackBranding.accentColor ??
+        DEFAULT_ACCENT_COLOR,
+      logoText:
+        channel.branding?.logoText ?? fallbackBranding.logoText ?? channel.name,
+    },
+  };
+}
+
+function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]): T[] {
   const map = new Map<string, T>();
 
-  defaults.forEach((item) => map.set(item.id, item));
-  saved?.forEach((item) => map.set(item.id, item));
+  defaults.forEach((item) => {
+    map.set(item.id, item);
+  });
+
+  saved?.forEach((item) => {
+    map.set(item.id, item);
+  });
 
   return Array.from(map.values());
 }
 
+function getValidSavedMedia(value: unknown): MediaItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isValidMediaItem).map(normalizeMediaItem);
+}
+
+function getValidSavedChannels(value: unknown): Channel[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isValidChannel).map(normalizeChannel);
+}
+
+function getValidThemeId(value: unknown): ThemeId {
+  return isThemeId(value) ? value : DEFAULT_THEME_ID;
+}
+
+function getValidOwnedThemes(value: unknown): ThemeId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return dedupeStrings(value).filter(isThemeId);
+}
+
+function getValidAppMode(value: unknown): AppMode {
+  return value === "admin" || value === "viewer" ? value : "viewer";
+}
+
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       media: defaultMedia,
       channels: defaultChannels,
       currentChannelId: "1",
       isGuideOpen: false,
-      sidebarWidth: 420,
-      guideHeight: 290,
+      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+      guideHeight: DEFAULT_GUIDE_HEIGHT,
       appMode: "viewer",
-      themeId: "shaw-2006",
+      themeId: DEFAULT_THEME_ID,
       ownedPremiumThemes: [],
 
       addMedia: (item) =>
-        set((state) => ({
-          media: state.media.some((mediaItem) => mediaItem.id === item.id)
-            ? state.media.map((mediaItem) =>
-                mediaItem.id === item.id ? item : mediaItem
-              )
-            : [...state.media, item],
-        })),
+        set((state) => {
+          const normalizedItem = normalizeMediaItem(item);
+
+          if (!normalizedItem.file) {
+            return state;
+          }
+
+          const mediaExists = state.media.some(
+            (mediaItem) => mediaItem.id === normalizedItem.id,
+          );
+
+          return {
+            media: mediaExists
+              ? state.media.map((mediaItem) =>
+                  mediaItem.id === normalizedItem.id
+                    ? {
+                        ...mediaItem,
+                        ...normalizedItem,
+                        createdAt:
+                          normalizedItem.createdAt ?? mediaItem.createdAt,
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : mediaItem,
+                )
+              : [...state.media, normalizedItem],
+          };
+        }),
 
       removeMedia: (mediaId) =>
         set((state) => ({
@@ -158,35 +368,72 @@ export const useStore = create<AppState>()(
           })),
         })),
 
-      setChannel: (id) => set({ currentChannelId: id }),
+      setChannel: (id) =>
+        set((state) => {
+          const channelExists = state.channels.some((channel) => channel.id === id);
+
+          if (!channelExists) {
+            return state;
+          }
+
+          return {
+            currentChannelId: id,
+            isGuideOpen: false,
+          };
+        }),
 
       updateChannelBranding: (channelId, brandingPatch) =>
         set((state) => ({
-          channels: state.channels.map((channel) =>
-            channel.id === channelId
-              ? {
-                  ...channel,
-                  branding: {
-                    displayName: channel.branding?.displayName ?? channel.name,
-                    callsign: channel.branding?.callsign ?? channel.name,
-                    description: channel.branding?.description ?? "",
-                    accentColor: channel.branding?.accentColor ?? "#2563eb",
-                    logoText: channel.branding?.logoText ?? channel.name,
-                    ...brandingPatch,
-                  },
-                }
-              : channel
-          ),
+          channels: state.channels.map((channel) => {
+            if (channel.id !== channelId) {
+              return channel;
+            }
+
+            const fallbackBranding =
+              channel.branding ??
+              createDefaultChannelBranding(Number(channel.number ?? channel.id));
+
+            return {
+              ...channel,
+              branding: {
+                displayName:
+                  fallbackBranding.displayName ?? channel.name ?? "Channel",
+                callsign: fallbackBranding.callsign ?? channel.name ?? "CH",
+                description: fallbackBranding.description ?? "",
+                accentColor:
+                  fallbackBranding.accentColor ?? DEFAULT_ACCENT_COLOR,
+                logoText: fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
+                ...brandingPatch,
+              },
+            };
+          }),
         })),
 
       assignMediaToChannel: (channelId, mediaId) =>
-        set((state) => ({
-          channels: state.channels.map((channel) =>
-            channel.id === channelId && !channel.mediaIds.includes(mediaId)
-              ? { ...channel, mediaIds: [...channel.mediaIds, mediaId] }
-              : channel
-          ),
-        })),
+        set((state) => {
+          const mediaExists = state.media.some((item) => item.id === mediaId);
+
+          if (!mediaExists) {
+            return state;
+          }
+
+          return {
+            channels: state.channels.map((channel) => {
+              if (channel.id !== channelId) {
+                return channel;
+              }
+
+              if (channel.mediaIds.includes(mediaId)) {
+                return channel;
+              }
+
+              return {
+                ...channel,
+                mediaIds: [...channel.mediaIds, mediaId],
+              };
+            }),
+          };
+        }),
 
       removeMediaFromChannel: (channelId, mediaId) =>
         set((state) => ({
@@ -196,14 +443,16 @@ export const useStore = create<AppState>()(
                   ...channel,
                   mediaIds: channel.mediaIds.filter((id) => id !== mediaId),
                 }
-              : channel
+              : channel,
           ),
         })),
 
       moveMediaInChannel: (channelId, fromIndex, toIndex) =>
         set((state) => ({
           channels: state.channels.map((channel) => {
-            if (channel.id !== channelId) return channel;
+            if (channel.id !== channelId) {
+              return channel;
+            }
 
             const mediaIds = [...channel.mediaIds];
 
@@ -211,57 +460,126 @@ export const useStore = create<AppState>()(
               fromIndex < 0 ||
               toIndex < 0 ||
               fromIndex >= mediaIds.length ||
-              toIndex >= mediaIds.length
+              toIndex >= mediaIds.length ||
+              fromIndex === toIndex
             ) {
               return channel;
             }
 
-            const [moved] = mediaIds.splice(fromIndex, 1);
-            mediaIds.splice(toIndex, 0, moved);
+            const [movedMediaId] = mediaIds.splice(fromIndex, 1);
 
-            return { ...channel, mediaIds };
+            if (!movedMediaId) {
+              return channel;
+            }
+
+            mediaIds.splice(toIndex, 0, movedMediaId);
+
+            return {
+              ...channel,
+              mediaIds,
+            };
           }),
         })),
 
-      setSidebarWidth: (width) => set({ sidebarWidth: width }),
-      setGuideHeight: (height) => set({ guideHeight: height }),
-      setAppMode: (mode) => set({ appMode: mode }),
-      setTheme: (themeId) => set({ themeId }),
+      setSidebarWidth: (width) =>
+        set({
+          sidebarWidth: clamp(width, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
+        }),
+
+      setGuideHeight: (height) =>
+        set({
+          guideHeight: clamp(height, MIN_GUIDE_HEIGHT, MAX_GUIDE_HEIGHT),
+        }),
+
+      setAppMode: (mode) =>
+        set({
+          appMode: getValidAppMode(mode),
+        }),
+
+      setTheme: (themeId) =>
+        set({
+          themeId: getValidThemeId(themeId),
+        }),
 
       unlockTheme: (themeId) =>
-        set((state) => ({
-          ownedPremiumThemes: state.ownedPremiumThemes.includes(themeId)
-            ? state.ownedPremiumThemes
-            : [...state.ownedPremiumThemes, themeId],
-        })),
+        set((state) => {
+          if (!isThemeId(themeId)) {
+            return state;
+          }
+
+          return {
+            ownedPremiumThemes: state.ownedPremiumThemes.includes(themeId)
+              ? state.ownedPremiumThemes
+              : [...state.ownedPremiumThemes, themeId],
+          };
+        }),
 
       toggleGuide: () =>
         set((state) => ({
           isGuideOpen: !state.isGuideOpen,
         })),
 
-      closeGuide: () => set({ isGuideOpen: false }),
+      closeGuide: () =>
+        set({
+          isGuideOpen: false,
+        }),
 
       resetProgramming: () =>
         set({
           media: defaultMedia,
           channels: defaultChannels,
           currentChannelId: "1",
+          isGuideOpen: false,
         }),
     }),
     {
-      name: "retro-tv-programming-v1",
-      version: 1,
+      name: STORE_NAME,
+      version: STORE_VERSION,
+
       merge: (persistedState, currentState) => {
         const saved = persistedState as Partial<AppState> | undefined;
+
+        const savedMedia = getValidSavedMedia(saved?.media);
+        const savedChannels = getValidSavedChannels(saved?.channels);
+
+        const mergedMedia = mergeById(defaultMedia, savedMedia);
+        const mergedChannels = mergeById(defaultChannels, savedChannels).map(
+          normalizeChannel,
+        );
+
+        const fallbackChannelId = mergedChannels[0]?.id ?? "1";
+        const savedChannelExists = mergedChannels.some(
+          (channel) => channel.id === saved?.currentChannelId,
+        );
 
         return {
           ...currentState,
           ...saved,
-          media: mergeById(defaultMedia, saved?.media),
-          channels: mergeById(defaultChannels, saved?.channels),
+          media: mergedMedia,
+          channels: mergedChannels,
+          currentChannelId: savedChannelExists
+            ? saved?.currentChannelId ?? fallbackChannelId
+            : fallbackChannelId,
+          isGuideOpen:
+            typeof saved?.isGuideOpen === "boolean"
+              ? saved.isGuideOpen
+              : currentState.isGuideOpen,
+          sidebarWidth: clamp(
+            Number(saved?.sidebarWidth ?? currentState.sidebarWidth),
+            MIN_SIDEBAR_WIDTH,
+            MAX_SIDEBAR_WIDTH,
+          ),
+          guideHeight: clamp(
+            Number(saved?.guideHeight ?? currentState.guideHeight),
+            MIN_GUIDE_HEIGHT,
+            MAX_GUIDE_HEIGHT,
+          ),
+          appMode: getValidAppMode(saved?.appMode),
+          themeId: getValidThemeId(saved?.themeId),
+          ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
         };
       },
+
       partialize: (state) => ({
         media: state.media,
         channels: state.channels,
@@ -273,6 +591,13 @@ export const useStore = create<AppState>()(
         themeId: state.themeId,
         ownedPremiumThemes: state.ownedPremiumThemes,
       }),
-    }
-  )
+    },
+  ),
 );
+
+export {
+  defaultChannels,
+  defaultMedia,
+  STORE_NAME as programmingStoreName,
+  STORE_VERSION as programmingStoreVersion,
+};

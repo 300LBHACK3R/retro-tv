@@ -7,25 +7,77 @@ export type LiveState = {
   remaining: number;
   offsetInLoop: number;
   totalDuration: number;
+
+  /**
+   * Program start position inside the loop, in seconds.
+   */
+  startsAt: number;
+
+  /**
+   * Program end position inside the loop, in seconds.
+   */
+  endsAt: number;
+
+  /**
+   * Current wall-clock timestamp used to calculate this state.
+   */
+  nowMs: number;
+
+  /**
+   * Fixed broadcast epoch used for deterministic live playback.
+   */
+  broadcastEpochMs: number;
 };
 
-const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
+/**
+ * Fixed shared broadcast epoch.
+ *
+ * Important:
+ * All clients using the same schedule and same epoch will calculate the same
+ * current program from wall-clock time.
+ */
+export const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
-function safeDuration(item: MediaItem) {
-  return Math.max(Math.floor(item.duration || 0), 1);
+export function getSafeDuration(item: MediaItem | null | undefined): number {
+  if (!item) {
+    return 1;
+  }
+
+  const duration = Number(item.duration);
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return 1;
+  }
+
+  return Math.max(Math.floor(duration), 1);
 }
 
-function totalDuration(schedule: MediaItem[]) {
-  return schedule.reduce((sum, item) => sum + safeDuration(item), 0);
+export function getScheduleTotalDuration(schedule: MediaItem[]): number {
+  return schedule.reduce((sum, item) => sum + getSafeDuration(item), 0);
+}
+
+export function getLoopOffsetSeconds(
+  totalDuration: number,
+  nowMs = Date.now(),
+  broadcastEpochMs = BROADCAST_EPOCH_MS,
+): number {
+  if (!Number.isFinite(totalDuration) || totalDuration <= 0) {
+    return 0;
+  }
+
+  const secondsSinceEpoch = Math.floor((nowMs - broadcastEpochMs) / 1000);
+
+  return ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
 }
 
 export function getLiveState(
   schedule: MediaItem[],
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  broadcastEpochMs = BROADCAST_EPOCH_MS,
 ): LiveState {
-  const total = totalDuration(schedule);
+  const totalDuration = getScheduleTotalDuration(schedule);
 
-  if (!schedule.length || total <= 0) {
+  if (schedule.length === 0 || totalDuration <= 0) {
     return {
       item: null,
       index: -1,
@@ -33,41 +85,77 @@ export function getLiveState(
       remaining: 0,
       offsetInLoop: 0,
       totalDuration: 0,
+      startsAt: 0,
+      endsAt: 0,
+      nowMs,
+      broadcastEpochMs,
     };
   }
 
-  const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
-  const offsetInLoop = ((secondsSinceEpoch % total) + total) % total;
+  const offsetInLoop = getLoopOffsetSeconds(
+    totalDuration,
+    nowMs,
+    broadcastEpochMs,
+  );
 
   let cursor = 0;
 
   for (let index = 0; index < schedule.length; index += 1) {
     const item = schedule[index];
-    const duration = safeDuration(item);
-    const end = cursor + duration;
 
-    if (offsetInLoop >= cursor && offsetInLoop < end) {
-      const elapsed = offsetInLoop - cursor;
+    if (!item) {
+      continue;
+    }
+
+    const duration = getSafeDuration(item);
+    const startsAt = cursor;
+    const endsAt = startsAt + duration;
+
+    if (offsetInLoop >= startsAt && offsetInLoop < endsAt) {
+      const elapsed = offsetInLoop - startsAt;
+      const remaining = Math.max(duration - elapsed, 0);
 
       return {
         item,
         index,
         elapsed,
-        remaining: duration - elapsed,
+        remaining,
         offsetInLoop,
-        totalDuration: total,
+        totalDuration,
+        startsAt,
+        endsAt,
+        nowMs,
+        broadcastEpochMs,
       };
     }
 
-    cursor = end;
+    cursor = endsAt;
   }
 
+  const fallbackItem = schedule[0] ?? null;
+  const fallbackDuration = getSafeDuration(fallbackItem);
+
   return {
-    item: schedule[0],
-    index: 0,
+    item: fallbackItem,
+    index: fallbackItem ? 0 : -1,
     elapsed: 0,
-    remaining: safeDuration(schedule[0]),
+    remaining: fallbackItem ? fallbackDuration : 0,
     offsetInLoop: 0,
-    totalDuration: total,
+    totalDuration,
+    startsAt: 0,
+    endsAt: fallbackItem ? fallbackDuration : 0,
+    nowMs,
+    broadcastEpochMs,
   };
+}
+
+export function getLivePlaybackOffset(schedule: MediaItem[], nowMs = Date.now()): number {
+  return getLiveState(schedule, nowMs).elapsed;
+}
+
+export function getCurrentLiveItem(
+  schedule: MediaItem[],
+  nowMs = Date.now(),
+): MediaItem | null {
+  return getLiveState(schedule, nowMs).item;
 }

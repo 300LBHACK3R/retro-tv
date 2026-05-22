@@ -1,34 +1,175 @@
 "use client";
 
-import { useRef } from "react";
-import { useStore } from "@/lib/store";
-import type { Channel, MediaItem, ThemeId } from "@/lib/types";
+import { useRef, useState } from "react";
+import { programmingStoreName, programmingStoreVersion } from "@/lib/store";
+import { isThemeId } from "@/lib/themes";
+import type { AppMode, Channel, MediaItem, ThemeId } from "@/lib/types";
 
 type ExportPayload = {
+  schemaVersion: 1;
+  exportedAt: string;
+  app: "tates-tv";
   media: MediaItem[];
   channels: Channel[];
   currentChannelId: string;
   sidebarWidth: number;
   guideHeight: number;
-  appMode: "viewer" | "admin";
+  appMode: AppMode;
   themeId: ThemeId;
   ownedPremiumThemes: ThemeId[];
 };
 
-export default function StationConfigPanel() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+type StoreSnapshot = {
+  media: MediaItem[];
+  channels: Channel[];
+  currentChannelId: string;
+  sidebarWidth: number;
+  guideHeight: number;
+  appMode: AppMode;
+  themeId: ThemeId;
+  ownedPremiumThemes: ThemeId[];
+};
 
-  const media = useStore((state) => state.media);
-  const channels = useStore((state) => state.channels);
-  const currentChannelId = useStore((state) => state.currentChannelId);
-  const sidebarWidth = useStore((state) => state.sidebarWidth);
-  const guideHeight = useStore((state) => state.guideHeight);
-  const appMode = useStore((state) => state.appMode);
-  const themeId = useStore((state) => state.themeId);
-  const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isMediaItem(value: unknown): value is MediaItem {
+  if (!isObject(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    typeof value.file === "string" &&
+    typeof value.duration === "number" &&
+    value.duration > 0 &&
+    ["show", "commercial", "movie", "bumper"].includes(String(value.type))
+  );
+}
+
+function isChannel(value: unknown): value is Channel {
+  if (!isObject(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    Array.isArray(value.mediaIds) &&
+    value.mediaIds.every((id) => typeof id === "string")
+  );
+}
+
+function getValidAppMode(value: unknown): AppMode {
+  return value === "admin" || value === "viewer" ? value : "viewer";
+}
+
+function getValidThemeId(value: unknown): ThemeId {
+  return isThemeId(value) ? value : "shaw-2006";
+}
+
+function getValidOwnedPremiumThemes(value: unknown): ThemeId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(value.filter((item): item is ThemeId => isThemeId(item))),
+  );
+}
+
+function getValidNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function buildExportPayload(snapshot: StoreSnapshot): ExportPayload {
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    app: "tates-tv",
+    ...snapshot,
+  };
+}
+
+function parseImportPayload(raw: unknown): StoreSnapshot {
+  if (!isObject(raw)) {
+    throw new Error("Invalid config file. Expected a JSON object.");
+  }
+
+  const media = Array.isArray(raw.media) ? raw.media.filter(isMediaItem) : [];
+  const channels = Array.isArray(raw.channels)
+    ? raw.channels.filter(isChannel)
+    : [];
+
+  if (media.length === 0) {
+    throw new Error("Import failed. No valid media entries were found.");
+  }
+
+  if (channels.length === 0) {
+    throw new Error("Import failed. No valid channels were found.");
+  }
+
+  const currentChannelId =
+    typeof raw.currentChannelId === "string" &&
+    channels.some((channel) => channel.id === raw.currentChannelId)
+      ? raw.currentChannelId
+      : channels[0]?.id ?? "1";
+
+  return {
+    media,
+    channels,
+    currentChannelId,
+    sidebarWidth: getValidNumber(raw.sidebarWidth, 420),
+    guideHeight: getValidNumber(raw.guideHeight, 290),
+    appMode: getValidAppMode(raw.appMode),
+    themeId: getValidThemeId(raw.themeId),
+    ownedPremiumThemes: getValidOwnedPremiumThemes(raw.ownedPremiumThemes),
+  };
+}
+
+function downloadJson(filename: string, payload: unknown): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener noreferrer";
+  anchor.click();
+
+  URL.revokeObjectURL(url);
+}
+
+interface StationConfigPanelProps {
+  media: MediaItem[];
+  channels: Channel[];
+  currentChannelId: string;
+  sidebarWidth: number;
+  guideHeight: number;
+  appMode: AppMode;
+  themeId: ThemeId;
+  ownedPremiumThemes: ThemeId[];
+}
+
+export default function StationConfigPanel({
+  media,
+  channels,
+  currentChannelId,
+  sidebarWidth,
+  guideHeight,
+  appMode,
+  themeId,
+  ownedPremiumThemes,
+}: StationConfigPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [message, setMessage] = useState(
+    "Export and restore channels, media metadata, layout, mode, and theme settings.",
+  );
+  const [isImporting, setIsImporting] = useState(false);
 
   const exportConfig = () => {
-    const payload: ExportPayload = {
+    const payload = buildExportPayload({
       media,
       channels,
       currentChannelId,
@@ -37,47 +178,50 @@ export default function StationConfigPanel() {
       appMode,
       themeId,
       ownedPremiumThemes,
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json",
     });
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tates-tv-station-config.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadJson("tates-tv-station-config.json", payload);
+    setMessage("Config exported successfully.");
   };
 
   const importConfig = async (file: File) => {
-    const text = await file.text();
-    const parsed = JSON.parse(text) as Partial<ExportPayload>;
+    try {
+      setIsImporting(true);
+      setMessage("Importing config...");
 
-    const existingRaw = localStorage.getItem("retro-tv-launch-v1");
-    const existing = existingRaw ? JSON.parse(existingRaw) : { state: {} };
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      const snapshot = parseImportPayload(parsed);
 
-    existing.state = {
-      ...existing.state,
-      media: parsed.media ?? existing.state.media ?? [],
-      channels: parsed.channels ?? existing.state.channels ?? [],
-      currentChannelId:
-        parsed.currentChannelId ?? existing.state.currentChannelId ?? "1",
-      sidebarWidth: parsed.sidebarWidth ?? existing.state.sidebarWidth ?? 420,
-      guideHeight: parsed.guideHeight ?? existing.state.guideHeight ?? 290,
-      appMode: parsed.appMode ?? existing.state.appMode ?? "viewer",
-      themeId: parsed.themeId ?? existing.state.themeId ?? "shaw-2006",
-      ownedPremiumThemes:
-        parsed.ownedPremiumThemes ?? existing.state.ownedPremiumThemes ?? [],
-    };
+      const zustandPayload = {
+        state: snapshot,
+        version: programmingStoreVersion,
+      };
 
-    localStorage.setItem("retro-tv-launch-v1", JSON.stringify(existing));
-    window.location.reload();
+      localStorage.setItem(programmingStoreName, JSON.stringify(zustandPayload));
+
+      setMessage("Config imported successfully. Reloading...");
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Import failed. Check the JSON file and try again.";
+
+      setMessage(errorMessage);
+    } finally {
+      setIsImporting(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
-    <div
+    <section
       className="rounded-2xl border p-4"
       style={{
         background: "var(--panel-bg)",
@@ -85,14 +229,18 @@ export default function StationConfigPanel() {
         color: "var(--text)",
       }}
     >
-      <div className="mb-3 text-sm font-semibold tracking-wide">
-        Station Config
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold tracking-wide">Station Config</h2>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+          Backup or restore this browser&apos;s Tate&apos;s TV programming setup.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <button
+          type="button"
           onClick={exportConfig}
-          className="rounded-lg px-3 py-2 text-sm font-medium transition"
+          className="rounded-lg px-3 py-2 text-sm font-medium transition hover:opacity-90"
           style={{
             background: "var(--button-bg)",
             color: "var(--text)",
@@ -102,31 +250,48 @@ export default function StationConfigPanel() {
         </button>
 
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded-lg px-3 py-2 text-sm font-medium transition"
+          disabled={isImporting}
+          className="rounded-lg px-3 py-2 text-sm font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background: "var(--button-bg)",
             color: "var(--text)",
           }}
         >
-          Import Config
+          {isImporting ? "Importing..." : "Import Config"}
         </button>
 
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/json"
+          accept="application/json,.json"
           className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void importConfig(file);
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+
+            if (file) {
+              void importConfig(file);
+            }
           }}
         />
       </div>
 
-      <div className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
-        Export and restore channels, media metadata, layout, mode, and theme settings.
+      <div
+        className="mt-3 rounded-lg border px-3 py-2 text-xs"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+          color: "var(--text-muted)",
+        }}
+      >
+        {message}
       </div>
-    </div>
+
+      <div className="mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
+        This only backs up programming metadata and Cloudflare/R2 URLs. It does
+        not export actual MP4 files.
+      </div>
+    </section>
   );
 }

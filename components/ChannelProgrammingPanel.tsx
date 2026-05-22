@@ -2,107 +2,369 @@
 
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
+import type { Channel, MediaItem } from "@/lib/types";
 
-function prettyDuration(seconds: number) {
-  if (seconds < 60) return `${seconds}s`;
-  const mins = Math.floor(seconds / 60);
-  const hours = Math.floor(mins / 60);
+type ProgrammedItem = {
+  mediaId: string;
+  item: MediaItem | null;
+  index: number;
+};
 
-  if (hours > 0) return `${hours}h ${mins % 60}m`;
-  return `${mins}m`;
+function prettyDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+
+  if (safeSeconds < 60) {
+    return `${safeSeconds}s`;
+  }
+
+  const minutes = Math.floor(safeSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  }
+
+  return `${minutes}m`;
+}
+
+function getChannelLabel(channel: Channel | undefined): string {
+  if (!channel) {
+    return "CH --";
+  }
+
+  return `CH ${channel.number ?? channel.id}`;
+}
+
+function getChannelName(channel: Channel | undefined): string {
+  if (!channel) {
+    return "No Channel";
+  }
+
+  return channel.branding?.displayName ?? channel.name;
+}
+
+function getProviderLabel(item: MediaItem): string {
+  if (item.provider === "cloudflare-r2") {
+    return "Cloudflare R2";
+  }
+
+  if (item.provider === "external-url") {
+    return "External URL";
+  }
+
+  if (item.provider === "local-dev") {
+    return "Local Dev";
+  }
+
+  if (item.file.includes(".r2.dev") || item.file.toLowerCase().includes("cloudflare")) {
+    return "Cloudflare R2";
+  }
+
+  if (item.file.startsWith("https://")) {
+    return "Remote URL";
+  }
+
+  if (item.file.startsWith("/")) {
+    return "Local Dev";
+  }
+
+  return "Unknown Source";
 }
 
 export default function ChannelProgrammingPanel() {
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
-  const removeMediaFromChannel = useStore(
-    (state) => state.removeMediaFromChannel
-  );
+  const removeMediaFromChannel = useStore((state) => state.removeMediaFromChannel);
   const moveMediaInChannel = useStore((state) => state.moveMediaInChannel);
 
-  const activeChannel = channels.find(
-    (channel) => channel.id === currentChannelId
+  const activeChannel = useMemo(
+    () => channels.find((channel) => channel.id === currentChannelId),
+    [channels, currentChannelId],
   );
 
-  const programmedItems = useMemo(() => {
-    if (!activeChannel) return [];
-    return activeChannel.mediaIds
-      .map((id) => media.find((item) => item.id === id))
-      .filter(Boolean);
-  }, [activeChannel, media]);
+  const mediaById = useMemo(() => {
+    return new Map(media.map((item) => [item.id, item]));
+  }, [media]);
+
+  const programmedItems = useMemo<ProgrammedItem[]>(() => {
+    if (!activeChannel) {
+      return [];
+    }
+
+    return activeChannel.mediaIds.map((mediaId, index) => ({
+      mediaId,
+      item: mediaById.get(mediaId) ?? null,
+      index,
+    }));
+  }, [activeChannel, mediaById]);
+
+  const validProgrammedItems = useMemo(
+    () => programmedItems.filter((entry) => entry.item),
+    [programmedItems],
+  );
+
+  const missingProgrammedItems = useMemo(
+    () => programmedItems.filter((entry) => !entry.item),
+    [programmedItems],
+  );
+
+  const totalRuntime = useMemo(
+    () =>
+      validProgrammedItems.reduce(
+        (sum, entry) => sum + Math.max(0, entry.item?.duration ?? 0),
+        0,
+      ),
+    [validProgrammedItems],
+  );
 
   return (
-    <div className="rounded border border-blue-700 bg-[#0a2a4a] p-4 text-white">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-sm font-semibold tracking-wide">
-          Channel Programming
+    <section
+      className="rounded-2xl border p-4"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+        color: "var(--text)",
+      }}
+    >
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold tracking-wide">
+            Channel Programming
+          </h2>
+
+          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+            Reorder or remove media assigned to the active channel.
+          </p>
         </div>
-        <div className="text-xs text-blue-200">
-          {activeChannel ? `CH ${activeChannel.id} • ${activeChannel.name}` : "No Channel"}
+
+        <div
+          className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--panel-alt-bg)",
+            color: "var(--text-muted)",
+          }}
+        >
+          {activeChannel
+            ? `${getChannelLabel(activeChannel)} • ${programmedItems.length} Slots`
+            : "No Channel"}
         </div>
       </div>
 
-      <div className="max-h-[340px] space-y-2 overflow-auto">
-        {!activeChannel || programmedItems.length === 0 ? (
-          <div className="text-xs text-blue-200">
-            No programmed items for this channel yet.
-          </div>
-        ) : (
-          programmedItems.map((item, index) => (
-            <div
-              key={`${item!.id}-${index}`}
-              className="rounded border border-blue-700 bg-[#11345a]/70 p-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">
-                    {item!.title}
-                  </div>
-                  <div className="mt-1 text-[11px] text-blue-200">
-                    {item!.type.toUpperCase()} • {prettyDuration(item!.duration)}
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-blue-200">
-                  Slot {index + 1}
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() =>
-                    moveMediaInChannel(currentChannelId, index, index - 1)
-                  }
-                  disabled={index === 0}
-                  className="rounded border border-blue-700 bg-[#0d3157] px-2 py-1 text-xs hover:bg-[#174675] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Move Up
-                </button>
-
-                <button
-                  onClick={() =>
-                    moveMediaInChannel(currentChannelId, index, index + 1)
-                  }
-                  disabled={index === programmedItems.length - 1}
-                  className="rounded border border-blue-700 bg-[#0d3157] px-2 py-1 text-xs hover:bg-[#174675] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Move Down
-                </button>
-
-                <button
-                  onClick={() =>
-                    removeMediaFromChannel(currentChannelId, item!.id)
-                  }
-                  className="rounded border border-red-700 bg-red-900/50 px-2 py-1 text-xs text-white hover:bg-red-800/70"
-                >
-                  Remove from Channel
-                </button>
-              </div>
+      <div
+        className="mb-3 rounded-xl border px-3 py-2"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">
+              {getChannelLabel(activeChannel)} • {getChannelName(activeChannel)}
             </div>
-          ))
+
+            <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+              {activeChannel?.branding?.callsign ?? activeChannel?.name ?? "No callsign"}
+            </div>
+          </div>
+
+          <div className="text-right text-[11px]" style={{ color: "var(--text-muted)" }}>
+            <div>Total runtime</div>
+            <div className="font-semibold" style={{ color: "var(--text)" }}>
+              {prettyDuration(totalRuntime)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {missingProgrammedItems.length > 0 ? (
+        <div
+          className="mb-3 rounded-xl border px-3 py-2 text-xs"
+          style={{
+            borderColor: "rgba(248, 113, 113, 0.35)",
+            background: "rgba(248, 113, 113, 0.08)",
+            color: "#fca5a5",
+          }}
+        >
+          {missingProgrammedItems.length} assigned media reference
+          {missingProgrammedItems.length === 1 ? "" : "s"} could not be found.
+          Remove the missing slot entries below to clean this channel.
+        </div>
+      ) : null}
+
+      <div className="max-h-[380px] space-y-2 overflow-auto pr-1">
+        {!activeChannel ? (
+          <EmptyState message="No active channel selected." />
+        ) : programmedItems.length === 0 ? (
+          <EmptyState message="No programmed items for this channel yet." />
+        ) : (
+          programmedItems.map(({ mediaId, item, index }) => {
+            const isFirst = index === 0;
+            const isLast = index === programmedItems.length - 1;
+
+            if (!item) {
+              return (
+                <article
+                  key={`${mediaId}-${index}`}
+                  className="rounded-xl border p-3"
+                  style={{
+                    background: "rgba(248, 113, 113, 0.08)",
+                    borderColor: "rgba(248, 113, 113, 0.35)",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-red-200">
+                        Missing Media
+                      </div>
+
+                      <div className="mt-1 truncate text-[11px] text-red-200/75">
+                        ID: {mediaId}
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-red-200/75">
+                      Slot {index + 1}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => removeMediaFromChannel(currentChannelId, mediaId)}
+                      className="rounded-lg px-2 py-1 text-xs font-semibold transition hover:opacity-90"
+                      style={{
+                        background: "#7f1d1d",
+                        color: "#fff",
+                      }}
+                    >
+                      Remove Missing Slot
+                    </button>
+                  </div>
+                </article>
+              );
+            }
+
+            return (
+              <article
+                key={`${item.id}-${index}`}
+                className="rounded-xl border p-3"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold" title={item.title}>
+                      {item.title}
+                    </div>
+
+                    <div
+                      className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <span>{item.type.toUpperCase()}</span>
+                      <span>•</span>
+                      <span>{prettyDuration(item.duration)}</span>
+                      <span>•</span>
+                      <span>{getProviderLabel(item)}</span>
+                    </div>
+
+                    <div
+                      className="mt-2 truncate text-[11px]"
+                      style={{ color: "var(--text-muted)" }}
+                      title={item.file}
+                    >
+                      {item.file}
+                    </div>
+                  </div>
+
+                  <div
+                    className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    style={{
+                      borderColor: "var(--border)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Slot {index + 1}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveMediaInChannel(currentChannelId, index, index - 1)}
+                    disabled={isFirst}
+                    className="rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{
+                      background: "var(--button-bg)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    Move Up
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => moveMediaInChannel(currentChannelId, index, index + 1)}
+                    disabled={isLast}
+                    className="rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{
+                      background: "var(--button-bg)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    Move Down
+                  </button>
+
+                  <a
+                    href={item.file}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-90"
+                    style={{
+                      background: "var(--button-bg)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    Test Source
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => removeMediaFromChannel(currentChannelId, item.id)}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold transition hover:opacity-90"
+                    style={{
+                      background: "#7f1d1d",
+                      color: "#fff",
+                    }}
+                  >
+                    Remove from Channel
+                  </button>
+                </div>
+              </article>
+            );
+          })
         )}
       </div>
+    </section>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div
+      className="rounded-xl border px-3 py-6 text-center text-xs"
+      style={{
+        background: "var(--panel-alt-bg)",
+        borderColor: "var(--border)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {message}
     </div>
   );
 }
