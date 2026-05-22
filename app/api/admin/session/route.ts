@@ -1,9 +1,8 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { isAdminRequestAuthorized } from "@/lib/server/adminAuth";
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const isAdmin = cookieStore.get("tates_tv_admin")?.value === "true";
-
-  return NextResponse.json({ ok: true, isAdmin });
+  return NextResponse.json({
+    isAdmin: await isAdminRequestAuthorized(),
+  });
 }

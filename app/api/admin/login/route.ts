@@ -1,40 +1,61 @@
 import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import {
+  ADMIN_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  createSessionToken,
+  getAdminPassword,
+  safeCompare,
+} from "@/lib/server/adminAuth";
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const submittedPassword = String(body?.password ?? "");
-    const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
+export async function POST(request: Request) {
+  const adminPassword = getAdminPassword();
 
-    if (!expectedPassword) {
-      return NextResponse.json(
-        { ok: false, error: "ADMIN_PASSWORD is not configured." },
-        { status: 500 }
-      );
-    }
-
-    if (submittedPassword !== expectedPassword) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid password." },
-        { status: 401 }
-      );
-    }
-
-    const cookieStore = await cookies();
-    cookieStore.set("tates_tv_admin", "true", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch {
+  if (!adminPassword) {
     return NextResponse.json(
-      { ok: false, error: "Invalid request." },
-      { status: 400 }
+      {
+        ok: false,
+        error:
+          "ADMIN_PASSWORD is missing or too short. Set it in Vercel environment variables.",
+      },
+      { status: 500 },
     );
   }
+
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid request body." },
+      { status: 400 },
+    );
+  }
+
+  const password =
+    body && typeof body === "object" && "password" in body
+      ? String(body.password)
+      : "";
+
+  if (!safeCompare(password, adminPassword)) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid admin password." },
+      { status: 401 },
+    );
+  }
+
+  const cookieStore = await cookies();
+
+  cookieStore.set({
+    name: ADMIN_COOKIE_NAME,
+    value: createSessionToken(adminPassword),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  });
+
+  return NextResponse.json({ ok: true });
 }

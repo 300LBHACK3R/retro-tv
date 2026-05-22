@@ -8,6 +8,7 @@ import type {
   MediaItem,
   ThemeId,
 } from "./types";
+import type { ProgrammingSnapshot } from "./programmingSnapshot";
 
 interface AppState {
   media: MediaItem[];
@@ -42,10 +43,12 @@ interface AppState {
   toggleGuide: () => void;
   closeGuide: () => void;
   resetProgramming: () => void;
+  replaceProgramming: (snapshot: ProgrammingSnapshot) => void;
+  exportProgrammingSnapshot: () => ProgrammingSnapshot;
 }
 
-const STORE_NAME = "retro-tv-programming-v1";
-const STORE_VERSION = 1;
+export const programmingStoreName = "retro-tv-programming-v1";
+export const programmingStoreVersion = 1;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -57,7 +60,7 @@ const DEFAULT_GUIDE_HEIGHT = 290;
 
 const DEFAULT_ACCENT_COLOR = "#2563eb";
 
-const defaultMedia: MediaItem[] = [
+export const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
     title: "Martin Mystery S01E01",
@@ -79,24 +82,6 @@ const defaultMedia: MediaItem[] = [
     provider: "cloudflare-r2",
   },
 ];
-
-const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, index) => {
-  const channelNumber = index + 1;
-
-  const branding = createDefaultChannelBranding(channelNumber);
-
-  return {
-    id: String(channelNumber),
-    number: channelNumber,
-    name: `Channel ${channelNumber}`,
-    mediaIds:
-      channelNumber === 1
-        ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
-        : [],
-    isEnabled: true,
-    branding,
-  };
-});
 
 function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
   if (channelNumber === 1) {
@@ -148,22 +133,43 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
   };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
+export const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, index) => {
+  const channelNumber = index + 1;
 
+  return {
+    id: String(channelNumber),
+    number: channelNumber,
+    name: `Channel ${channelNumber}`,
+    mediaIds:
+      channelNumber === 1
+        ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
+        : [],
+    isEnabled: true,
+    branding: createDefaultChannelBranding(channelNumber),
+  };
+});
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
   return Math.min(Math.max(value, min), max);
 }
 
 function normalizeText(value: unknown, fallback: string): string {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
+  if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
-
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function inferMediaProvider(file: string | undefined): MediaItem["provider"] {
+  if (!file) return "unknown";
+  if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
+    return "cloudflare-r2";
+  }
+  if (file.startsWith("/")) return "local-dev";
+  if (file.startsWith("http://") || file.startsWith("https://")) {
+    return "external-url";
+  }
+  return "unknown";
 }
 
 function normalizeMediaItem(item: MediaItem): MediaItem {
@@ -173,7 +179,6 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
     ...item,
     id: normalizeText(item.id, crypto.randomUUID()),
     title: normalizeText(item.title, "Untitled Media"),
-    type: item.type,
     duration: Math.max(1, Math.floor(Number(item.duration) || 1)),
     file: normalizeText(item.file, ""),
     mimeType: item.mimeType ?? "video/mp4",
@@ -181,58 +186,6 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
     createdAt: item.createdAt ?? now,
     updatedAt: now,
   };
-}
-
-function inferMediaProvider(file: string | undefined): MediaItem["provider"] {
-  if (!file) {
-    return "unknown";
-  }
-
-  if (file.includes(".r2.dev") || file.includes("cloudflare")) {
-    return "cloudflare-r2";
-  }
-
-  if (file.startsWith("/")) {
-    return "local-dev";
-  }
-
-  if (file.startsWith("http://") || file.startsWith("https://")) {
-    return "external-url";
-  }
-
-  return "unknown";
-}
-
-function isValidMediaItem(value: unknown): value is MediaItem {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const item = value as Partial<MediaItem>;
-
-  return (
-    typeof item.id === "string" &&
-    typeof item.title === "string" &&
-    typeof item.file === "string" &&
-    typeof item.duration === "number" &&
-    item.duration > 0 &&
-    ["show", "commercial", "movie", "bumper"].includes(String(item.type))
-  );
-}
-
-function isValidChannel(value: unknown): value is Channel {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const channel = value as Partial<Channel>;
-
-  return (
-    typeof channel.id === "string" &&
-    typeof channel.name === "string" &&
-    Array.isArray(channel.mediaIds) &&
-    channel.mediaIds.every((id) => typeof id === "string")
-  );
 }
 
 function dedupeStrings(values: string[]): string[] {
@@ -274,31 +227,10 @@ function normalizeChannel(channel: Channel): Channel {
 function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]): T[] {
   const map = new Map<string, T>();
 
-  defaults.forEach((item) => {
-    map.set(item.id, item);
-  });
-
-  saved?.forEach((item) => {
-    map.set(item.id, item);
-  });
+  defaults.forEach((item) => map.set(item.id, item));
+  saved?.forEach((item) => map.set(item.id, item));
 
   return Array.from(map.values());
-}
-
-function getValidSavedMedia(value: unknown): MediaItem[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(isValidMediaItem).map(normalizeMediaItem);
-}
-
-function getValidSavedChannels(value: unknown): Channel[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(isValidChannel).map(normalizeChannel);
 }
 
 function getValidThemeId(value: unknown): ThemeId {
@@ -306,10 +238,7 @@ function getValidThemeId(value: unknown): ThemeId {
 }
 
 function getValidOwnedThemes(value: unknown): ThemeId[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   return dedupeStrings(value).filter(isThemeId);
 }
 
@@ -346,13 +275,7 @@ export const useStore = create<AppState>()(
             media: mediaExists
               ? state.media.map((mediaItem) =>
                   mediaItem.id === normalizedItem.id
-                    ? {
-                        ...mediaItem,
-                        ...normalizedItem,
-                        createdAt:
-                          normalizedItem.createdAt ?? mediaItem.createdAt,
-                        updatedAt: new Date().toISOString(),
-                      }
+                    ? { ...mediaItem, ...normalizedItem }
                     : mediaItem,
                 )
               : [...state.media, normalizedItem],
@@ -372,9 +295,7 @@ export const useStore = create<AppState>()(
         set((state) => {
           const channelExists = state.channels.some((channel) => channel.id === id);
 
-          if (!channelExists) {
-            return state;
-          }
+          if (!channelExists) return state;
 
           return {
             currentChannelId: id,
@@ -385,9 +306,7 @@ export const useStore = create<AppState>()(
       updateChannelBranding: (channelId, brandingPatch) =>
         set((state) => ({
           channels: state.channels.map((channel) => {
-            if (channel.id !== channelId) {
-              return channel;
-            }
+            if (channel.id !== channelId) return channel;
 
             const fallbackBranding =
               channel.branding ??
@@ -413,19 +332,12 @@ export const useStore = create<AppState>()(
         set((state) => {
           const mediaExists = state.media.some((item) => item.id === mediaId);
 
-          if (!mediaExists) {
-            return state;
-          }
+          if (!mediaExists) return state;
 
           return {
             channels: state.channels.map((channel) => {
-              if (channel.id !== channelId) {
-                return channel;
-              }
-
-              if (channel.mediaIds.includes(mediaId)) {
-                return channel;
-              }
+              if (channel.id !== channelId) return channel;
+              if (channel.mediaIds.includes(mediaId)) return channel;
 
               return {
                 ...channel,
@@ -450,9 +362,7 @@ export const useStore = create<AppState>()(
       moveMediaInChannel: (channelId, fromIndex, toIndex) =>
         set((state) => ({
           channels: state.channels.map((channel) => {
-            if (channel.id !== channelId) {
-              return channel;
-            }
+            if (channel.id !== channelId) return channel;
 
             const mediaIds = [...channel.mediaIds];
 
@@ -468,16 +378,11 @@ export const useStore = create<AppState>()(
 
             const [movedMediaId] = mediaIds.splice(fromIndex, 1);
 
-            if (!movedMediaId) {
-              return channel;
-            }
+            if (!movedMediaId) return channel;
 
             mediaIds.splice(toIndex, 0, movedMediaId);
 
-            return {
-              ...channel,
-              mediaIds,
-            };
+            return { ...channel, mediaIds };
           }),
         })),
 
@@ -503,9 +408,7 @@ export const useStore = create<AppState>()(
 
       unlockTheme: (themeId) =>
         set((state) => {
-          if (!isThemeId(themeId)) {
-            return state;
-          }
+          if (!isThemeId(themeId)) return state;
 
           return {
             ownedPremiumThemes: state.ownedPremiumThemes.includes(themeId)
@@ -531,20 +434,60 @@ export const useStore = create<AppState>()(
           currentChannelId: "1",
           isGuideOpen: false,
         }),
+
+      replaceProgramming: (snapshot) =>
+        set({
+          media: mergeById(defaultMedia, snapshot.media.map(normalizeMediaItem)),
+          channels: mergeById(
+            defaultChannels,
+            snapshot.channels.map(normalizeChannel),
+          ),
+          currentChannelId: snapshot.currentChannelId,
+          sidebarWidth: clamp(
+            snapshot.sidebarWidth,
+            MIN_SIDEBAR_WIDTH,
+            MAX_SIDEBAR_WIDTH,
+          ),
+          guideHeight: clamp(
+            snapshot.guideHeight,
+            MIN_GUIDE_HEIGHT,
+            MAX_GUIDE_HEIGHT,
+          ),
+          appMode: "viewer",
+          themeId: getValidThemeId(snapshot.themeId),
+          ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
+        }),
+
+      exportProgrammingSnapshot: () => {
+        const state = get();
+
+        return {
+          media: state.media,
+          channels: state.channels,
+          currentChannelId: state.currentChannelId,
+          sidebarWidth: state.sidebarWidth,
+          guideHeight: state.guideHeight,
+          appMode: "viewer",
+          themeId: state.themeId,
+          ownedPremiumThemes: state.ownedPremiumThemes,
+          updatedAt: new Date().toISOString(),
+        };
+      },
     }),
     {
-      name: STORE_NAME,
-      version: STORE_VERSION,
+      name: programmingStoreName,
+      version: programmingStoreVersion,
 
       merge: (persistedState, currentState) => {
         const saved = persistedState as Partial<AppState> | undefined;
 
-        const savedMedia = getValidSavedMedia(saved?.media);
-        const savedChannels = getValidSavedChannels(saved?.channels);
+        const savedMedia = Array.isArray(saved?.media) ? saved.media : [];
+        const savedChannels = Array.isArray(saved?.channels) ? saved.channels : [];
 
-        const mergedMedia = mergeById(defaultMedia, savedMedia);
-        const mergedChannels = mergeById(defaultChannels, savedChannels).map(
-          normalizeChannel,
+        const mergedMedia = mergeById(defaultMedia, savedMedia.map(normalizeMediaItem));
+        const mergedChannels = mergeById(
+          defaultChannels,
+          savedChannels.map(normalizeChannel),
         );
 
         const fallbackChannelId = mergedChannels[0]?.id ?? "1";
@@ -560,10 +503,7 @@ export const useStore = create<AppState>()(
           currentChannelId: savedChannelExists
             ? saved?.currentChannelId ?? fallbackChannelId
             : fallbackChannelId,
-          isGuideOpen:
-            typeof saved?.isGuideOpen === "boolean"
-              ? saved.isGuideOpen
-              : currentState.isGuideOpen,
+          isGuideOpen: false,
           sidebarWidth: clamp(
             Number(saved?.sidebarWidth ?? currentState.sidebarWidth),
             MIN_SIDEBAR_WIDTH,
@@ -594,10 +534,3 @@ export const useStore = create<AppState>()(
     },
   ),
 );
-
-export {
-  defaultChannels,
-  defaultMedia,
-  STORE_NAME as programmingStoreName,
-  STORE_VERSION as programmingStoreVersion,
-};

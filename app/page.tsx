@@ -20,6 +20,7 @@ import ThemeButton from "@/components/ThemeButton";
 import UploadPanel from "@/components/UploadPanel";
 import ViewerHeader from "@/components/ViewerHeader";
 import type { Channel, MediaItem } from "@/lib/types";
+import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -192,6 +193,9 @@ export default function Home() {
         color: "var(--text)",
       }}
     >
+
+<GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
+
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div className="w-full xl:max-w-[360px]">
