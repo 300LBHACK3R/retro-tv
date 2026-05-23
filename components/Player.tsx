@@ -9,6 +9,13 @@ interface PlayerProps {
   schedule: BroadcastItem[];
 }
 
+type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "stalled" | "error";
+
+const SOFT_SYNC_THRESHOLD_SECONDS = 2.5;
+const HARD_SYNC_THRESHOLD_SECONDS = 8;
+const PLAY_RETRY_DELAY_MS = 650;
+const STALL_RECOVERY_DELAY_MS = 1400;
+
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -44,16 +51,26 @@ function getSafeTargetTime(item: BroadcastItem, sourceElapsed: number): number {
     return rawTarget;
   }
 
-  return Math.min(rawTarget, Math.max(sourceStart, sourceEnd - 1));
+  return Math.min(rawTarget, Math.max(sourceStart, sourceEnd - 0.35));
+}
+
+function isDocumentVisible(): boolean {
+  if (typeof document === "undefined") {
+    return true;
+  }
+
+  return document.visibilityState === "visible";
 }
 
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const currentPlaybackKeyRef = useRef<string>("empty");
-  const lastSeekSecondRef = useRef<number>(-1);
-  const playAttemptRef = useRef<number>(0);
+  const currentPlaybackKeyRef = useRef("empty");
+  const lastForcedSeekAtRef = useRef(0);
+  const playRetryTimerRef = useRef<number | null>(null);
+  const stallRecoveryTimerRef = useRef<number | null>(null);
+  const playAttemptRef = useRef(0);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -63,9 +80,104 @@ export default function Player({ schedule }: PlayerProps) {
   );
 
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [status, setStatus] = useState<PlaybackStatus>("idle");
   const [playbackError, setPlaybackError] = useState("");
   const [isFallbackExpanded, setIsFallbackExpanded] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
+
+  const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
+  const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+
+  const clearPlayRetry = () => {
+    if (playRetryTimerRef.current) {
+      window.clearTimeout(playRetryTimerRef.current);
+      playRetryTimerRef.current = null;
+    }
+  };
+
+  const clearStallRecovery = () => {
+    if (stallRecoveryTimerRef.current) {
+      window.clearTimeout(stallRecoveryTimerRef.current);
+      stallRecoveryTimerRef.current = null;
+    }
+  };
+
+  const applyAudioSettings = () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    video.volume = volume;
+    video.muted = muted || volume <= 0;
+  };
+
+  const safePlay = async () => {
+    const video = videoRef.current;
+
+    if (!video || !isDocumentVisible()) {
+      return;
+    }
+
+    playAttemptRef.current += 1;
+    const attemptId = playAttemptRef.current;
+
+    try {
+      applyAudioSettings();
+      await video.play();
+
+      if (attemptId === playAttemptRef.current) {
+        setStatus("playing");
+        setPlaybackError("");
+      }
+    } catch {
+      if (attemptId !== playAttemptRef.current) {
+        return;
+      }
+
+      setStatus("paused");
+      setPlaybackError("Playback paused by browser. Tap to resume.");
+
+      clearPlayRetry();
+      playRetryTimerRef.current = window.setTimeout(() => {
+        void safePlay();
+      }, PLAY_RETRY_DELAY_MS);
+    }
+  };
+
+  const syncVideoPosition = (mode: "soft" | "hard") => {
+    const video = videoRef.current;
+    const item = live.item;
+
+    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      return;
+    }
+
+    const targetTime = getSafeTargetTime(item, live.sourceElapsed);
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const safeTarget =
+      duration > 0 ? Math.min(targetTime, Math.max(duration - 0.35, 0)) : targetTime;
+
+    const drift = Math.abs(video.currentTime - safeTarget);
+    const threshold =
+      mode === "hard" ? SOFT_SYNC_THRESHOLD_SECONDS : HARD_SYNC_THRESHOLD_SECONDS;
+
+    const shouldSeek =
+      mode === "hard" ||
+      drift > threshold ||
+      video.currentTime < Math.max(0, (item.sourceStart ?? 0) - 1);
+
+    if (!shouldSeek) {
+      return;
+    }
+
+    try {
+      video.currentTime = safeTarget;
+      lastForcedSeekAtRef.current = Date.now();
+    } catch {
+      // Browser may temporarily reject seeking before metadata is stable.
+    }
+  };
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -77,8 +189,87 @@ export default function Player({ schedule }: PlayerProps) {
     };
   }, []);
 
-  const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
-  const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+  useEffect(() => {
+    applyAudioSettings();
+  }, [muted, volume]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const item = live.item;
+
+    if (!video || !item) {
+      return;
+    }
+
+    let cancelled = false;
+    const sourceChanged = currentPlaybackKeyRef.current !== playbackKey;
+
+    const loadCurrentSource = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setStatus("loading");
+      setPlaybackError("");
+      clearPlayRetry();
+      clearStallRecovery();
+
+      currentPlaybackKeyRef.current = playbackKey;
+
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+
+      applyAudioSettings();
+
+      video.preload = "auto";
+      video.src = item.file;
+      video.load();
+    };
+
+    const handleReady = () => {
+      if (cancelled) {
+        return;
+      }
+
+      syncVideoPosition("hard");
+      void safePlay();
+    };
+
+    const handleError = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setStatus("error");
+      setPlaybackError("Video failed to load. Test the media URL.");
+    };
+
+    if (sourceChanged) {
+      loadCurrentSource();
+
+      video.addEventListener("loadedmetadata", handleReady, { once: true });
+      video.addEventListener("canplay", handleReady, { once: true });
+      video.addEventListener("error", handleError, { once: true });
+
+      return () => {
+        cancelled = true;
+        video.removeEventListener("loadedmetadata", handleReady);
+        video.removeEventListener("canplay", handleReady);
+        video.removeEventListener("error", handleError);
+      };
+    }
+
+    syncVideoPosition("soft");
+
+    if (video.paused && !playbackError) {
+      void safePlay();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [live.item, live.sourceElapsed, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -87,126 +278,79 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    video.volume = volume;
-    video.muted = muted;
-  }, [muted, volume]);
+    const handlePlaying = () => {
+      setStatus("playing");
+      setPlaybackError("");
+      clearStallRecovery();
+    };
 
-  useEffect(() => {
-    const video = videoRef.current;
+    const handleWaiting = () => {
+      setStatus("stalled");
+      clearStallRecovery();
 
-    if (!video || !live.item) {
-      return;
-    }
+      stallRecoveryTimerRef.current = window.setTimeout(() => {
+        const currentVideo = videoRef.current;
 
-    const item = live.item;
-    const nextPlaybackKey = playbackKey;
-    const targetTime = getSafeTargetTime(item, live.sourceElapsed);
-    const targetSecond = Math.floor(targetTime);
-    const sourceChanged = currentPlaybackKeyRef.current !== nextPlaybackKey;
-
-    let cancelled = false;
-
-    const attemptPlay = async () => {
-      if (cancelled) {
-        return;
-      }
-
-      playAttemptRef.current += 1;
-      const attemptId = playAttemptRef.current;
-
-      try {
-        await video.play();
-
-        if (!cancelled && attemptId === playAttemptRef.current) {
-          setPlaybackError("");
-          setIsBuffering(false);
+        if (!currentVideo || !live.item) {
+          return;
         }
-      } catch {
-        if (!cancelled && attemptId === playAttemptRef.current) {
-          setPlaybackError("Playback is paused. Tap to resume.");
-          setIsBuffering(false);
-        }
+
+        syncVideoPosition("hard");
+        void safePlay();
+      }, STALL_RECOVERY_DELAY_MS);
+    };
+
+    const handleStalled = () => {
+      setStatus("stalled");
+      clearStallRecovery();
+
+      stallRecoveryTimerRef.current = window.setTimeout(() => {
+        syncVideoPosition("hard");
+        void safePlay();
+      }, STALL_RECOVERY_DELAY_MS);
+    };
+
+    const handlePause = () => {
+      if (!document.fullscreenElement && isDocumentVisible()) {
+        setStatus("paused");
       }
     };
 
-    const seekAndPlay = () => {
-      if (cancelled) {
-        return;
-      }
-
-      const duration = Number.isFinite(video.duration) ? video.duration : 0;
-      const safeTarget =
-        duration > 0
-          ? Math.min(targetTime, Math.max(duration - 0.25, 0))
-          : targetTime;
-
-      if (
-        sourceChanged ||
-        lastSeekSecondRef.current !== targetSecond ||
-        Math.abs(video.currentTime - safeTarget) > 2
-      ) {
-        try {
-          video.currentTime = safeTarget;
-          lastSeekSecondRef.current = targetSecond;
-        } catch {
-          // Some browsers can reject currentTime until metadata is fully ready.
-        }
-      }
-
-      void attemptPlay();
+    const handleError = () => {
+      setStatus("error");
+      setPlaybackError("Video playback error. Check URL or encoding.");
     };
 
-    setPlaybackError("");
-
-    if (sourceChanged) {
-      setIsBuffering(true);
-      currentPlaybackKeyRef.current = nextPlaybackKey;
-      lastSeekSecondRef.current = -1;
-
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-
-      video.src = item.file;
-      video.load();
-
-      const handleLoadedMetadata = () => {
-        seekAndPlay();
-      };
-
-      const handleCanPlay = () => {
-        seekAndPlay();
-      };
-
-      const handleError = () => {
-        if (!cancelled) {
-          setIsBuffering(false);
-          setPlaybackError("Video failed to load. Check the media URL.");
-        }
-      };
-
-      video.addEventListener("loadedmetadata", handleLoadedMetadata, {
-        once: true,
-      });
-      video.addEventListener("canplay", handleCanPlay, { once: true });
-      video.addEventListener("error", handleError, { once: true });
-
-      return () => {
-        cancelled = true;
-        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-        video.removeEventListener("canplay", handleCanPlay);
-        video.removeEventListener("error", handleError);
-      };
-    }
-
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      seekAndPlay();
-    }
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("stalled", handleStalled);
+    video.addEventListener("pause", handlePause);
+    video.addEventListener("error", handleError);
 
     return () => {
-      cancelled = true;
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("stalled", handleStalled);
+      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("error", handleError);
     };
-  }, [live.item, live.sourceElapsed, playbackKey]);
+  }, [live.item, live.sourceElapsed]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        setNowMs(Date.now());
+        syncVideoPosition("hard");
+        void safePlay();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [live.item, live.sourceElapsed]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -226,12 +370,7 @@ export default function Player({ schedule }: PlayerProps) {
           return;
         }
 
-        if (shell.requestFullscreen) {
-          await shell.requestFullscreen();
-          return;
-        }
-
-        setIsFallbackExpanded((value) => !value);
+        await shell.requestFullscreen();
       } catch {
         setIsFallbackExpanded((value) => !value);
       }
@@ -256,6 +395,9 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     return () => {
+      clearPlayRetry();
+      clearStallRecovery();
+
       const video = videoRef.current;
 
       if (video) {
@@ -293,8 +435,10 @@ export default function Player({ schedule }: PlayerProps) {
         ref={videoRef}
         playsInline
         autoPlay
-        muted={muted}
+        muted={muted || volume <= 0}
         preload="auto"
+        disablePictureInPicture
+        controls={false}
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -312,9 +456,9 @@ export default function Player({ schedule }: PlayerProps) {
         </div>
       </div>
 
-      {isBuffering ? (
+      {status === "loading" || status === "stalled" ? (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/70 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
-          Loading channel...
+          {status === "loading" ? "Loading channel..." : "Recovering stream..."}
         </div>
       ) : null}
 
@@ -322,13 +466,9 @@ export default function Player({ schedule }: PlayerProps) {
         <button
           type="button"
           onClick={() => {
-            const video = videoRef.current;
-
-            if (video) {
-              void video.play().catch(() => {});
-            }
-
             setPlaybackError("");
+            syncVideoPosition("hard");
+            void safePlay();
           }}
           className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/75 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
         >
