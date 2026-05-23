@@ -17,10 +17,43 @@ function formatTime(seconds: number): string {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function getPlaybackKey(item: BroadcastItem | null): string {
+  if (!item) {
+    return "empty";
+  }
+
+  return [
+    item.id,
+    item.file,
+    item.sourceStart ?? 0,
+    item.sourceEnd ?? item.duration,
+    item.duration,
+  ].join("|");
+}
+
+function getSafeTargetTime(item: BroadcastItem, sourceElapsed: number): number {
+  const sourceStart = Math.max(0, Math.floor(item.sourceStart ?? 0));
+  const sourceEnd =
+    typeof item.sourceEnd === "number"
+      ? Math.max(sourceStart + 1, Math.floor(item.sourceEnd))
+      : null;
+
+  const rawTarget = Math.max(sourceStart, Math.floor(sourceElapsed));
+
+  if (!sourceEnd) {
+    return rawTarget;
+  }
+
+  return Math.min(rawTarget, Math.max(sourceStart, sourceEnd - 1));
+}
+
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const currentSrcRef = useRef<string | null>(null);
+
+  const currentPlaybackKeyRef = useRef<string>("empty");
+  const lastSeekSecondRef = useRef<number>(-1);
+  const playAttemptRef = useRef<number>(0);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -32,6 +65,7 @@ export default function Player({ schedule }: PlayerProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [playbackError, setPlaybackError] = useState("");
   const [isFallbackExpanded, setIsFallbackExpanded] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -44,6 +78,7 @@ export default function Player({ schedule }: PlayerProps) {
   }, []);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
+  const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -63,42 +98,115 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    setPlaybackError("");
+    const item = live.item;
+    const nextPlaybackKey = playbackKey;
+    const targetTime = getSafeTargetTime(item, live.sourceElapsed);
+    const targetSecond = Math.floor(targetTime);
+    const sourceChanged = currentPlaybackKeyRef.current !== nextPlaybackKey;
 
-    const nextSrc = live.item.file;
-    const targetTime = Math.max(0, live.sourceElapsed);
+    let cancelled = false;
 
-    const syncVideoTime = () => {
-      const duration = Number.isFinite(video.duration) ? video.duration : 0;
-
-      const safeTarget =
-        duration > 0 ? Math.min(targetTime, Math.max(duration - 0.25, 0)) : targetTime;
-
-      if (Math.abs(video.currentTime - safeTarget) > 1.5) {
-        video.currentTime = safeTarget;
+    const attemptPlay = async () => {
+      if (cancelled) {
+        return;
       }
 
-      void video.play().catch(() => {
-        setPlaybackError("Playback is paused. Tap the video or remote controls.");
-      });
+      playAttemptRef.current += 1;
+      const attemptId = playAttemptRef.current;
+
+      try {
+        await video.play();
+
+        if (!cancelled && attemptId === playAttemptRef.current) {
+          setPlaybackError("");
+          setIsBuffering(false);
+        }
+      } catch {
+        if (!cancelled && attemptId === playAttemptRef.current) {
+          setPlaybackError("Playback is paused. Tap to resume.");
+          setIsBuffering(false);
+        }
+      }
     };
 
-    if (currentSrcRef.current !== nextSrc) {
-      currentSrcRef.current = nextSrc;
-      video.src = nextSrc;
+    const seekAndPlay = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const safeTarget =
+        duration > 0
+          ? Math.min(targetTime, Math.max(duration - 0.25, 0))
+          : targetTime;
+
+      if (
+        sourceChanged ||
+        lastSeekSecondRef.current !== targetSecond ||
+        Math.abs(video.currentTime - safeTarget) > 2
+      ) {
+        try {
+          video.currentTime = safeTarget;
+          lastSeekSecondRef.current = targetSecond;
+        } catch {
+          // Some browsers can reject currentTime until metadata is fully ready.
+        }
+      }
+
+      void attemptPlay();
+    };
+
+    setPlaybackError("");
+
+    if (sourceChanged) {
+      setIsBuffering(true);
+      currentPlaybackKeyRef.current = nextPlaybackKey;
+      lastSeekSecondRef.current = -1;
+
+      video.pause();
+      video.removeAttribute("src");
       video.load();
+
+      video.src = item.file;
+      video.load();
+
+      const handleLoadedMetadata = () => {
+        seekAndPlay();
+      };
+
+      const handleCanPlay = () => {
+        seekAndPlay();
+      };
+
+      const handleError = () => {
+        if (!cancelled) {
+          setIsBuffering(false);
+          setPlaybackError("Video failed to load. Check the media URL.");
+        }
+      };
+
+      video.addEventListener("loadedmetadata", handleLoadedMetadata, {
+        once: true,
+      });
+      video.addEventListener("canplay", handleCanPlay, { once: true });
+      video.addEventListener("error", handleError, { once: true });
+
+      return () => {
+        cancelled = true;
+        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+        video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("error", handleError);
+      };
     }
 
-    if (video.readyState >= 1) {
-      syncVideoTime();
-    } else {
-      video.onloadedmetadata = syncVideoTime;
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      seekAndPlay();
     }
 
     return () => {
-      video.onloadedmetadata = null;
+      cancelled = true;
     };
-  }, [live.item, live.sourceElapsed]);
+  }, [live.item, live.sourceElapsed, playbackKey]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -146,6 +254,18 @@ export default function Player({ schedule }: PlayerProps) {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      const video = videoRef.current;
+
+      if (video) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      }
+    };
+  }, []);
+
   if (!live.item) {
     return (
       <div
@@ -174,6 +294,7 @@ export default function Player({ schedule }: PlayerProps) {
         playsInline
         autoPlay
         muted={muted}
+        preload="auto"
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -191,11 +312,18 @@ export default function Player({ schedule }: PlayerProps) {
         </div>
       </div>
 
+      {isBuffering ? (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/70 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
+          Loading channel...
+        </div>
+      ) : null}
+
       {playbackError ? (
         <button
           type="button"
           onClick={() => {
             const video = videoRef.current;
+
             if (video) {
               void video.play().catch(() => {});
             }

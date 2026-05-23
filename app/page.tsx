@@ -328,8 +328,11 @@ export default function Home() {
               className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30"
               style={{ borderColor: "var(--border)" }}
             >
-              <Player schedule={activeSchedule} />
-              <Remote />
+             <Player
+  key={`${activeChannel?.id ?? "no-channel"}-${activeSchedule[0]?.id ?? "empty"}`}
+  schedule={activeSchedule}
+/>
+<Remote />
 
               {isGuideOpen ? (
                 <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
