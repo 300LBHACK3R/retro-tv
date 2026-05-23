@@ -27,6 +27,23 @@ export type ThemeDefinition = {
   colors: ThemeColors;
 };
 
+/**
+ * Theme access mode.
+ *
+ * all-unlocked:
+ * - Every theme is usable by every viewer.
+ *
+ * premium-locked:
+ * - Free themes are public.
+ * - Premium themes require admin preview or ownedPremiumThemes.
+ *
+ * Keep this as "all-unlocked" for now while the project is in active testing.
+ * Later, switch it back to "premium-locked" when you want paid themes again.
+ */
+export type ThemeAccessMode = "all-unlocked" | "premium-locked";
+
+export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
+
 export const DEFAULT_THEME_ID: ThemeId = "shaw-2006";
 
 export const THEMES = [
@@ -179,11 +196,22 @@ export function getPremiumThemes(): ThemeDefinition[] {
   return THEMES.filter((theme) => theme.isPremium);
 }
 
+/**
+ * Upgrade 1:
+ * Centralized theme lock logic.
+ *
+ * Right now, every theme is unlocked because THEME_ACCESS_MODE is "all-unlocked".
+ * Later, change THEME_ACCESS_MODE to "premium-locked" to restore premium gating.
+ */
 export function canUseTheme(
   themeId: ThemeId,
   ownedPremiumThemes: ThemeId[],
   isAdmin: boolean,
 ): boolean {
+  if (THEME_ACCESS_MODE === "all-unlocked") {
+    return true;
+  }
+
   const theme = getThemeById(themeId);
 
   if (!theme.isPremium) {
@@ -197,6 +225,13 @@ export function canUseTheme(
   return ownedPremiumThemes.includes(themeId);
 }
 
+/**
+ * Upgrade 2:
+ * Safe theme resolver that respects the current access mode.
+ *
+ * In all-unlocked mode, any valid theme can be used.
+ * In premium-locked mode, locked premium themes fall back to DEFAULT_THEME_ID.
+ */
 export function getSafeThemeId(
   requestedThemeId: unknown,
   ownedPremiumThemes: ThemeId[],
@@ -211,6 +246,34 @@ export function getSafeThemeId(
   }
 
   return requestedThemeId;
+}
+
+/**
+ * Helper for theme menus.
+ * Keeps labels clean while themes are temporarily free.
+ */
+export function getThemeAccessLabel(
+  theme: ThemeDefinition,
+  ownedPremiumThemes: ThemeId[],
+  isAdmin: boolean,
+): "Free" | "Unlocked" | "Owned" | "Preview" | "Premium" {
+  if (!theme.isPremium) {
+    return "Free";
+  }
+
+  if (THEME_ACCESS_MODE === "all-unlocked") {
+    return "Unlocked";
+  }
+
+  if (isAdmin) {
+    return "Preview";
+  }
+
+  if (ownedPremiumThemes.includes(theme.id)) {
+    return "Owned";
+  }
+
+  return "Premium";
 }
 
 export function createThemeCssVars(theme: ThemeDefinition): Record<string, string> {
