@@ -203,7 +203,6 @@ export default function Home() {
 
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start xl:w-auto xl:justify-end">
             <ThemeButton />
-            <Remote />
           </div>
         </header>
 
@@ -330,6 +329,7 @@ export default function Home() {
               style={{ borderColor: "var(--border)" }}
             >
               <Player schedule={activeSchedule} />
+              <Remote />
 
               {isGuideOpen ? (
                 <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
