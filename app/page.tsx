@@ -6,7 +6,6 @@ import { getThemeById } from "@/lib/themes";
 import { useStore } from "@/lib/store";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
-import ChannelOverlay from "@/components/ChannelOverlay";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
 import CRTOverlay from "@/components/CRTOverlay";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
@@ -327,9 +326,8 @@ export default function Home() {
               style={{ borderColor: "var(--border)" }}
             >
               <StaticTransition trigger={currentChannelId} />
-              <Player schedule={activeSchedule} />
-              <ChannelOverlay />
-              <CRTOverlay />
+<Player schedule={activeSchedule} />
+<CRTOverlay />
 
               {isGuideOpen ? (
                 <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
