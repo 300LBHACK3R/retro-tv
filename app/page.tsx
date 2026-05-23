@@ -7,19 +7,17 @@ import { useStore } from "@/lib/store";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
-import CRTOverlay from "@/components/CRTOverlay";
+import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
 import Remote from "@/components/Remote";
 import StationConfigPanel from "@/components/StationConfigPanel";
-import StaticTransition from "@/components/StaticTransition";
 import ThemeButton from "@/components/ThemeButton";
 import UploadPanel from "@/components/UploadPanel";
 import ViewerHeader from "@/components/ViewerHeader";
 import type { Channel, MediaItem } from "@/lib/types";
-import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -36,7 +34,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-function getMediaForChannel(channel: Channel | undefined, media: MediaItem[]): MediaItem[] {
+function getMediaForChannel(
+  channel: Channel | undefined,
+  media: MediaItem[],
+): MediaItem[] {
   if (!channel) {
     return [];
   }
@@ -192,8 +193,7 @@ export default function Home() {
         color: "var(--text)",
       }}
     >
-
-<GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
+      <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -254,7 +254,9 @@ export default function Home() {
                       min={340}
                       max={560}
                       value={sidebarWidth}
-                      onChange={(event) => setSidebarWidth(Number(event.target.value))}
+                      onChange={(event) =>
+                        setSidebarWidth(Number(event.target.value))
+                      }
                       className="w-full accent-current"
                     />
 
@@ -281,7 +283,9 @@ export default function Home() {
                       min={220}
                       max={560}
                       value={guideHeight}
-                      onChange={(event) => setGuideHeight(Number(event.target.value))}
+                      onChange={(event) =>
+                        setGuideHeight(Number(event.target.value))
+                      }
                       className="w-full accent-current"
                     />
 
@@ -325,9 +329,7 @@ export default function Home() {
               className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30"
               style={{ borderColor: "var(--border)" }}
             >
-              <StaticTransition trigger={currentChannelId} />
-<Player schedule={activeSchedule} />
-<CRTOverlay />
+              <Player schedule={activeSchedule} />
 
               {isGuideOpen ? (
                 <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
