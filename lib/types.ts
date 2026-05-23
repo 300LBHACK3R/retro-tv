@@ -5,7 +5,8 @@ export type ThemeId =
   | "shaw-2006"
   | "telus-2008-inspired"
   | "obsidian-gold"
-  | "midas-gold";
+  | "midas-gold"
+  | "halo-2008-inspired";
 
 export type MediaSourceProvider =
   | "cloudflare-r2"

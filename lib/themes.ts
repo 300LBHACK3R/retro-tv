@@ -125,6 +125,36 @@ export const THEMES = [
       guideCurrentBg: "#ffe27a",
     },
   },
+  {
+    id: "halo-2008-inspired",
+    name: "Halo 2008 Inspired",
+    description:
+      "Military sci-fi dashboard styling with olive armor tones, black glass panels, and plasma-blue HUD highlights.",
+    priceLabel: "$3",
+    isPremium: true,
+    colors: {
+      appBg:
+        "radial-gradient(circle at top left, rgba(72, 96, 48, 0.42), transparent 32%), radial-gradient(circle at bottom right, rgba(0, 180, 216, 0.18), transparent 34%), #050806",
+      panelBg:
+        "linear-gradient(135deg, rgba(7, 13, 8, 0.96), rgba(19, 29, 16, 0.92))",
+      panelAltBg:
+        "linear-gradient(135deg, rgba(16, 26, 14, 0.96), rgba(5, 10, 7, 0.94))",
+      border: "#31462b",
+      text: "#eef8df",
+      textMuted: "#a9bc8b",
+      buttonBg:
+        "linear-gradient(135deg, rgba(37, 54, 28, 0.96), rgba(12, 20, 11, 0.96))",
+      buttonHover:
+        "linear-gradient(135deg, rgba(60, 83, 42, 0.98), rgba(20, 33, 18, 0.98))",
+      primary: "#7da83d",
+      guideHeaderBg:
+        "linear-gradient(135deg, rgba(8, 16, 10, 0.98), rgba(32, 48, 24, 0.96))",
+      guideRowBg: "#071008",
+      guideRowAltBg: "#101b0e",
+      guideActiveBg: "#7da83d",
+      guideCurrentBg: "#9fd8ff",
+    },
+  },
 ] as const satisfies readonly ThemeDefinition[];
 
 export const THEME_IDS = THEMES.map((theme) => theme.id) as ThemeId[];
