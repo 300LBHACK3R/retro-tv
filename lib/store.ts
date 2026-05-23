@@ -5,7 +5,9 @@ import type {
   AppMode,
   Channel,
   ChannelBranding,
+  CommercialBreakMode,
   MediaItem,
+  ScheduleMode,
   ThemeId,
 } from "./types";
 import type { ProgrammingSnapshot } from "./programmingSnapshot";
@@ -20,10 +22,6 @@ interface AppState {
   appMode: AppMode;
   themeId: ThemeId;
   ownedPremiumThemes: ThemeId[];
-
-  /**
-   * Tombstones prevent hardcoded/default media from respawning after deletion.
-   */
   deletedMediaIds: string[];
 
   addMedia: (item: MediaItem) => void;
@@ -33,6 +31,14 @@ interface AppState {
   updateChannelBranding: (
     channelId: string,
     brandingPatch: Partial<ChannelBranding>,
+  ) => void;
+  updateChannelSettings: (
+    channelId: string,
+    patch: Partial<{
+      scheduleMode: ScheduleMode;
+      commercialBreakMode: CommercialBreakMode;
+      randomSeed: string;
+    }>,
   ) => void;
   assignMediaToChannel: (channelId: string, mediaId: string) => void;
   removeMediaFromChannel: (channelId: string, mediaId: string) => void;
@@ -55,7 +61,7 @@ interface AppState {
 }
 
 export const programmingStoreName = "retro-tv-programming-v1";
-export const programmingStoreVersion = 2;
+export const programmingStoreVersion = 3;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -152,6 +158,9 @@ export const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, index) 
         ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
         : [],
     isEnabled: true,
+    scheduleMode: "ordered",
+    commercialBreakMode: "none",
+    randomSeed: `channel-${channelNumber}`,
     branding: createDefaultChannelBranding(channelNumber),
   };
 });
@@ -199,6 +208,21 @@ function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function isValidScheduleMode(value: unknown): value is ScheduleMode {
+  return value === "ordered" || value === "daily-random";
+}
+
+function isValidCommercialBreakMode(
+  value: unknown,
+): value is CommercialBreakMode {
+  return (
+    value === "none" ||
+    value === "end-only" ||
+    value === "midpoint-and-end" ||
+    value === "classic-tv"
+  );
+}
+
 function normalizeChannel(channel: Channel): Channel {
   const channelNumber = Number(channel.number ?? channel.id);
   const fallbackBranding = createDefaultChannelBranding(
@@ -212,6 +236,16 @@ function normalizeChannel(channel: Channel): Channel {
     mediaIds: dedupeStrings(channel.mediaIds),
     number: Number.isFinite(channelNumber) ? channelNumber : undefined,
     isEnabled: channel.isEnabled ?? true,
+    scheduleMode: isValidScheduleMode(channel.scheduleMode)
+      ? channel.scheduleMode
+      : "ordered",
+    commercialBreakMode: isValidCommercialBreakMode(channel.commercialBreakMode)
+      ? channel.commercialBreakMode
+      : "none",
+    randomSeed: normalizeText(
+      channel.randomSeed,
+      `channel-${Number.isFinite(channelNumber) ? channelNumber : channel.id}`,
+    ),
     branding: {
       displayName:
         channel.branding?.displayName ??
@@ -240,14 +274,6 @@ function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]): T[] {
   return Array.from(map.values());
 }
 
-function removeDeletedDefaults(
-  media: MediaItem[],
-  deletedMediaIds: string[],
-): MediaItem[] {
-  const deletedSet = new Set(deletedMediaIds);
-  return media.filter((item) => !deletedSet.has(item.id));
-}
-
 function removeMediaIdsFromChannels(
   channels: Channel[],
   mediaIds: string[],
@@ -258,6 +284,14 @@ function removeMediaIdsFromChannels(
     ...channel,
     mediaIds: channel.mediaIds.filter((id) => !deleteSet.has(id)),
   }));
+}
+
+function removeDeletedDefaults(
+  media: MediaItem[],
+  deletedMediaIds: string[],
+): MediaItem[] {
+  const deletedSet = new Set(deletedMediaIds);
+  return media.filter((item) => !deletedSet.has(item.id));
 }
 
 function getValidThemeId(value: unknown): ThemeId {
@@ -375,6 +409,30 @@ export const useStore = create<AppState>()(
               },
             };
           }),
+        })),
+
+      updateChannelSettings: (channelId, patch) =>
+        set((state) => ({
+          channels: state.channels.map((channel) =>
+            channel.id === channelId
+              ? {
+                  ...channel,
+                  scheduleMode:
+                    patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
+                      ? patch.scheduleMode
+                      : channel.scheduleMode,
+                  commercialBreakMode:
+                    patch.commercialBreakMode &&
+                    isValidCommercialBreakMode(patch.commercialBreakMode)
+                      ? patch.commercialBreakMode
+                      : channel.commercialBreakMode,
+                  randomSeed:
+                    patch.randomSeed !== undefined
+                      ? normalizeText(patch.randomSeed, `channel-${channel.id}`)
+                      : channel.randomSeed,
+                }
+              : channel,
+          ),
         })),
 
       assignMediaToChannel: (channelId, mediaId) =>
@@ -499,12 +557,6 @@ export const useStore = create<AppState>()(
 
       replaceProgramming: (snapshot) =>
         set({
-          /**
-           * IMPORTANT:
-           * Do not merge defaultMedia here.
-           * Supabase snapshot is now the source of truth.
-           * This prevents deleted media from respawning after refresh.
-           */
           media: snapshot.media.map(normalizeMediaItem),
           channels: snapshot.channels.map(normalizeChannel),
           currentChannelId: snapshot.currentChannelId,

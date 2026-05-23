@@ -1,83 +1,38 @@
-import type { MediaItem } from "./types";
+import type { BroadcastItem } from "./types";
 
 export type LiveState = {
-  item: MediaItem | null;
+  item: BroadcastItem | null;
   index: number;
   elapsed: number;
   remaining: number;
   offsetInLoop: number;
   totalDuration: number;
-
-  /**
-   * Program start position inside the loop, in seconds.
-   */
-  startsAt: number;
-
-  /**
-   * Program end position inside the loop, in seconds.
-   */
-  endsAt: number;
-
-  /**
-   * Current wall-clock timestamp used to calculate this state.
-   */
-  nowMs: number;
-
-  /**
-   * Fixed broadcast epoch used for deterministic live playback.
-   */
-  broadcastEpochMs: number;
+  sourceElapsed: number;
 };
 
 /**
- * Fixed shared broadcast epoch.
+ * Shared broadcast clock anchor.
  *
- * Important:
- * All clients using the same schedule and same epoch will calculate the same
- * current program from wall-clock time.
+ * This must be exported because the guide and live engine need to calculate
+ * the same timeline from the same epoch.
  */
 export const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
-export function getSafeDuration(item: MediaItem | null | undefined): number {
-  if (!item) {
-    return 1;
-  }
-
-  const duration = Number(item.duration);
-
-  if (!Number.isFinite(duration) || duration <= 0) {
-    return 1;
-  }
-
-  return Math.max(Math.floor(duration), 1);
+function safeDuration(item: BroadcastItem): number {
+  return Math.max(Math.floor(item.duration || 0), 1);
 }
 
-export function getScheduleTotalDuration(schedule: MediaItem[]): number {
-  return schedule.reduce((sum, item) => sum + getSafeDuration(item), 0);
-}
-
-export function getLoopOffsetSeconds(
-  totalDuration: number,
-  nowMs = Date.now(),
-  broadcastEpochMs = BROADCAST_EPOCH_MS,
-): number {
-  if (!Number.isFinite(totalDuration) || totalDuration <= 0) {
-    return 0;
-  }
-
-  const secondsSinceEpoch = Math.floor((nowMs - broadcastEpochMs) / 1000);
-
-  return ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
+function totalDuration(schedule: BroadcastItem[]): number {
+  return schedule.reduce((sum, item) => sum + safeDuration(item), 0);
 }
 
 export function getLiveState(
-  schedule: MediaItem[],
+  schedule: BroadcastItem[],
   nowMs = Date.now(),
-  broadcastEpochMs = BROADCAST_EPOCH_MS,
 ): LiveState {
-  const totalDuration = getScheduleTotalDuration(schedule);
+  const total = totalDuration(schedule);
 
-  if (schedule.length === 0 || totalDuration <= 0) {
+  if (!schedule.length || total <= 0) {
     return {
       item: null,
       index: -1,
@@ -85,77 +40,49 @@ export function getLiveState(
       remaining: 0,
       offsetInLoop: 0,
       totalDuration: 0,
-      startsAt: 0,
-      endsAt: 0,
-      nowMs,
-      broadcastEpochMs,
+      sourceElapsed: 0,
     };
   }
 
-  const offsetInLoop = getLoopOffsetSeconds(
-    totalDuration,
-    nowMs,
-    broadcastEpochMs,
-  );
+  const secondsSinceEpoch = Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
+  const offsetInLoop = ((secondsSinceEpoch % total) + total) % total;
 
   let cursor = 0;
 
   for (let index = 0; index < schedule.length; index += 1) {
     const item = schedule[index];
+    const duration = safeDuration(item);
+    const end = cursor + duration;
 
-    if (!item) {
-      continue;
-    }
-
-    const duration = getSafeDuration(item);
-    const startsAt = cursor;
-    const endsAt = startsAt + duration;
-
-    if (offsetInLoop >= startsAt && offsetInLoop < endsAt) {
-      const elapsed = offsetInLoop - startsAt;
-      const remaining = Math.max(duration - elapsed, 0);
+    if (offsetInLoop >= cursor && offsetInLoop < end) {
+      const elapsed = offsetInLoop - cursor;
+      const sourceStart = Math.max(0, Math.floor(item.sourceStart ?? 0));
+      const sourceElapsed = sourceStart + elapsed;
 
       return {
         item,
         index,
         elapsed,
-        remaining,
+        remaining: duration - elapsed,
         offsetInLoop,
-        totalDuration,
-        startsAt,
-        endsAt,
-        nowMs,
-        broadcastEpochMs,
+        totalDuration: total,
+        sourceElapsed,
       };
     }
 
-    cursor = endsAt;
+    cursor = end;
   }
 
-  const fallbackItem = schedule[0] ?? null;
-  const fallbackDuration = getSafeDuration(fallbackItem);
+  const fallback = schedule[0];
+  const fallbackSourceStart = Math.max(0, Math.floor(fallback.sourceStart ?? 0));
 
   return {
-    item: fallbackItem,
-    index: fallbackItem ? 0 : -1,
+    item: fallback,
+    index: 0,
     elapsed: 0,
-    remaining: fallbackItem ? fallbackDuration : 0,
+    remaining: safeDuration(fallback),
     offsetInLoop: 0,
-    totalDuration,
-    startsAt: 0,
-    endsAt: fallbackItem ? fallbackDuration : 0,
-    nowMs,
-    broadcastEpochMs,
+    totalDuration: total,
+    sourceElapsed: fallbackSourceStart,
   };
-}
-
-export function getLivePlaybackOffset(schedule: MediaItem[], nowMs = Date.now()): number {
-  return getLiveState(schedule, nowMs).elapsed;
-}
-
-export function getCurrentLiveItem(
-  schedule: MediaItem[],
-  nowMs = Date.now(),
-): MediaItem | null {
-  return getLiveState(schedule, nowMs).item;
 }

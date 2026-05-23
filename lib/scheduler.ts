@@ -1,39 +1,34 @@
-import type { MediaItem } from "./types";
+import type {
+  BroadcastItem,
+  Channel,
+  CommercialBreakMode,
+  MediaItem,
+  ScheduleMode,
+} from "./types";
 
-const DEFAULT_COMMERCIAL_INSERTS_AFTER_SHOW = 0;
-
-export type ScheduleMode = "playlist" | "shuffle";
-
-export type ScheduleOptions = {
-  /**
-   * playlist = respect channel.mediaIds order exactly.
-   * shuffle = deterministic seeded shuffle.
-   */
-  mode?: ScheduleMode;
-
-  /**
-   * Used only in shuffle mode.
-   */
-  seed?: string;
-
-  /**
-   * Number of short-form items inserted after each show.
-   * Keep this 0 if you want exact show-after-show control.
-   */
-  commercialInsertsAfterShow?: number;
-
-  /**
-   * If true, short-form items can be inserted after movies too.
-   */
-  includeBumpersAfterMovies?: boolean;
+type BuildScheduleOptions = {
+  channel?: Channel;
+  now?: Date;
 };
 
-export type ProgramBlock = {
-  mediaId: string;
-  startsAt: number;
-  endsAt: number;
-  duration: number;
-};
+const DEFAULT_BREAK_ITEM_COUNT = 2;
+const MIN_SEGMENT_SECONDS = 120;
+
+function isLongForm(item: MediaItem): boolean {
+  return item.type === "show" || item.type === "movie";
+}
+
+function isShortForm(item: MediaItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
+function hasPlayableDuration(item: MediaItem): boolean {
+  return Number.isFinite(item.duration) && item.duration > 0 && item.file.trim().length > 0;
+}
+
+function getDateSeed(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
 
 function hashString(value: string): number {
   let hash = 2166136261;
@@ -61,114 +56,141 @@ function createSeededRandom(seed: string): () => number {
 }
 
 function seededShuffle<T>(items: T[], seed: string): T[] {
-  const arr = [...items];
+  const result = [...items];
   const random = createSeededRandom(seed);
 
-  for (let index = arr.length - 1; index > 0; index -= 1) {
+  for (let index = result.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
-    [arr[index], arr[swapIndex]] = [arr[swapIndex], arr[index]];
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
   }
 
-  return arr;
+  return result;
 }
 
-function isLongForm(item: MediaItem): boolean {
-  return item.type === "show" || item.type === "movie";
+function getScheduleMode(channel?: Channel): ScheduleMode {
+  return channel?.scheduleMode ?? "ordered";
 }
 
-function isShortForm(item: MediaItem): boolean {
-  return item.type === "commercial" || item.type === "bumper";
+function getCommercialBreakMode(channel?: Channel): CommercialBreakMode {
+  return channel?.commercialBreakMode ?? "none";
 }
 
-function hasPlayableDuration(item: MediaItem): boolean {
-  return Number.isFinite(item.duration) && item.duration > 0;
-}
+function createVirtualSegment(
+  item: MediaItem,
+  sourceStart: number,
+  duration: number,
+  segmentLabel: string,
+): BroadcastItem {
+  const safeStart = Math.max(0, Math.floor(sourceStart));
+  const safeDuration = Math.max(1, Math.floor(duration));
+  const safeEnd = safeStart + safeDuration;
 
-function normalizeScheduleOptions(
-  options?: ScheduleOptions,
-): Required<ScheduleOptions> {
   return {
-    mode: options?.mode ?? "playlist",
-    seed: options?.seed ?? "retro-tv-default-schedule",
-    commercialInsertsAfterShow:
-      options?.commercialInsertsAfterShow ?? DEFAULT_COMMERCIAL_INSERTS_AFTER_SHOW,
-    includeBumpersAfterMovies: options?.includeBumpersAfterMovies ?? false,
+    ...item,
+    id: `${item.id}:${safeStart}:${safeEnd}`,
+    parentMediaId: item.id,
+    sourceStart: safeStart,
+    sourceEnd: safeEnd,
+    duration: safeDuration,
+    title: `${item.title} ${segmentLabel}`,
+    segmentLabel,
+    isVirtualSegment: true,
   };
 }
 
-function rotateShortForm(shortForm: MediaItem[], cursor: number): MediaItem | null {
-  if (shortForm.length === 0) {
-    return null;
-  }
-
-  return shortForm[cursor % shortForm.length] ?? null;
-}
-
-/**
- * Builds the channel playback schedule.
- *
- * Important:
- * In playlist mode, this respects the exact channel programming order.
- * This is what makes "Slot 1 before Slot 2 before Slot 3" work properly.
- */
-export function buildSchedule(
-  media: MediaItem[],
-  options?: ScheduleOptions,
-): MediaItem[] {
-  const safeMedia = media.filter(
-    (item) => item.file.trim().length > 0 && hasPlayableDuration(item),
-  );
-
-  if (safeMedia.length === 0) {
+function takeBreakItems(
+  shortForm: MediaItem[],
+  count: number,
+  cursor: { value: number },
+): BroadcastItem[] {
+  if (shortForm.length === 0 || count <= 0) {
     return [];
   }
 
-  const normalizedOptions = normalizeScheduleOptions(options);
+  const items: BroadcastItem[] = [];
 
-  if (normalizedOptions.mode === "shuffle") {
-    return buildShuffledSchedule(safeMedia, normalizedOptions);
+  for (let index = 0; index < count; index += 1) {
+    const item = shortForm[cursor.value % shortForm.length];
+
+    if (item) {
+      items.push(item);
+      cursor.value += 1;
+    }
   }
 
-  return buildPlaylistSchedule(safeMedia, normalizedOptions);
+  return items;
 }
 
-function buildPlaylistSchedule(
-  media: MediaItem[],
-  options: Required<ScheduleOptions>,
-): MediaItem[] {
-  if (options.commercialInsertsAfterShow <= 0) {
-    return media;
+function getBreakCount(mode: CommercialBreakMode): number {
+  if (mode === "classic-tv") {
+    return 3;
   }
 
-  const shortForm = media.filter(isShortForm);
+  return DEFAULT_BREAK_ITEM_COUNT;
+}
 
-  if (shortForm.length === 0) {
-    return media;
+function shouldAddEndBreak(mode: CommercialBreakMode): boolean {
+  return mode === "end-only" || mode === "midpoint-and-end" || mode === "classic-tv";
+}
+
+function buildWithCommercialBreaks(
+  longFormItems: MediaItem[],
+  shortFormItems: MediaItem[],
+  mode: CommercialBreakMode,
+): BroadcastItem[] {
+  if (mode === "none" || shortFormItems.length === 0) {
+    return longFormItems;
   }
 
-  const schedule: MediaItem[] = [];
-  let shortFormCursor = 0;
+  const schedule: BroadcastItem[] = [];
+  const shortCursor = { value: 0 };
+  const breakItemCount = getBreakCount(mode);
 
-  for (const item of media) {
-    schedule.push(item);
+  for (const item of longFormItems) {
+    const duration = Math.max(1, Math.floor(item.duration));
 
-    const shouldInsertShortForm =
-      item.type === "show" || (item.type === "movie" && options.includeBumpersAfterMovies);
+    if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
+      schedule.push(item);
 
-    if (!shouldInsertShortForm) {
+      if (shouldAddEndBreak(mode)) {
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+      }
+
       continue;
     }
 
-    for (
-      let insertIndex = 0;
-      insertIndex < options.commercialInsertsAfterShow;
-      insertIndex += 1
-    ) {
-      const shortItem = rotateShortForm(shortForm, shortFormCursor);
+    if (mode === "midpoint-and-end") {
+      const firstHalf = Math.floor(duration / 2);
+      const secondHalf = duration - firstHalf;
 
-      if (shortItem) {
-        schedule.push(shortItem);
-        shortFormCursor += 1;
+      schedule.push(createVirtualSegment(item, 0, firstHalf, "Part 1"));
+      schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+      schedule.push(createVirtualSegment(item, firstHalf, secondHalf, "Part 2"));
+      schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+
+      continue;
+    }
+
+    if (mode === "classic-tv") {
+      if (duration >= 2400) {
+        const first = Math.floor(duration / 3);
+        const second = Math.floor(duration / 3);
+        const third = duration - first - second;
+
+        schedule.push(createVirtualSegment(item, 0, first, "Act 1"));
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+        schedule.push(createVirtualSegment(item, first, second, "Act 2"));
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+        schedule.push(createVirtualSegment(item, first + second, third, "Act 3"));
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+      } else {
+        const firstHalf = Math.floor(duration / 2);
+        const secondHalf = duration - firstHalf;
+
+        schedule.push(createVirtualSegment(item, 0, firstHalf, "Part 1"));
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
+        schedule.push(createVirtualSegment(item, firstHalf, secondHalf, "Part 2"));
+        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
       }
     }
   }
@@ -176,76 +198,66 @@ function buildPlaylistSchedule(
   return schedule;
 }
 
-function buildShuffledSchedule(
+/**
+ * Build a live channel schedule.
+ *
+ * ordered:
+ * - Uses the channel programming order.
+ *
+ * daily-random:
+ * - Randomizes long-form items once per day using a deterministic seed.
+ * - Every browser/device gets the same order on the same day.
+ *
+ * commercialBreakMode:
+ * - none: plays items normally
+ * - end-only: commercials after each show/movie
+ * - midpoint-and-end: splits shows into two virtual parts
+ * - classic-tv: 2-part sitcom breaks / 3-act long-form breaks
+ */
+export function buildSchedule(
   media: MediaItem[],
-  options: Required<ScheduleOptions>,
-): MediaItem[] {
-  const longForm = media.filter(isLongForm);
-  const shortForm = media.filter(isShortForm);
+  options: BuildScheduleOptions = {},
+): BroadcastItem[] {
+  const now = options.now ?? new Date();
+  const channel = options.channel;
+
+  const playableMedia = media.filter(hasPlayableDuration);
+
+  if (playableMedia.length === 0) {
+    return [];
+  }
+
+  const scheduleMode = getScheduleMode(channel);
+  const breakMode = getCommercialBreakMode(channel);
+
+  const longForm = playableMedia.filter(isLongForm);
+  const shortForm = playableMedia.filter(isShortForm);
 
   if (longForm.length === 0) {
-    return seededShuffle(media, `${options.seed}:fallback`);
+    return scheduleMode === "daily-random"
+      ? seededShuffle(playableMedia, `${channel?.id ?? "channel"}:${getDateSeed(now)}:fallback`)
+      : playableMedia;
   }
 
-  const shuffledLongForm = seededShuffle(longForm, `${options.seed}:long-form`);
-  const shuffledShortForm = seededShuffle(shortForm, `${options.seed}:short-form`);
+  const orderedLongForm =
+    scheduleMode === "daily-random"
+      ? seededShuffle(
+          longForm,
+          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(now)}:long-form`,
+        )
+      : longForm;
 
-  const schedule: MediaItem[] = [];
-  let shortFormCursor = 0;
+  const orderedShortForm =
+    scheduleMode === "daily-random"
+      ? seededShuffle(
+          shortForm,
+          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(now)}:short-form`,
+        )
+      : shortForm;
 
-  for (const item of shuffledLongForm) {
-    schedule.push(item);
-
-    const shouldInsertShortForm =
-      shortForm.length > 0 &&
-      (item.type === "show" || options.includeBumpersAfterMovies);
-
-    if (!shouldInsertShortForm || options.commercialInsertsAfterShow <= 0) {
-      continue;
-    }
-
-    const insertCount = Math.min(
-      options.commercialInsertsAfterShow,
-      shortForm.length,
-    );
-
-    for (let insertIndex = 0; insertIndex < insertCount; insertIndex += 1) {
-      const shortItem = shuffledShortForm[shortFormCursor % shortForm.length];
-
-      if (shortItem) {
-        schedule.push(shortItem);
-        shortFormCursor += 1;
-      }
-    }
-  }
-
-  return schedule;
+  return buildWithCommercialBreaks(orderedLongForm, orderedShortForm, breakMode);
 }
 
-export function getScheduleDuration(schedule: MediaItem[]): number {
-  return schedule.reduce((total, item) => {
-    if (!hasPlayableDuration(item)) {
-      return total;
-    }
-
-    return total + item.duration;
-  }, 0);
-}
-
-export function buildProgramBlocks(schedule: MediaItem[]): ProgramBlock[] {
-  let cursor = 0;
-
-  return schedule.filter(hasPlayableDuration).map((item) => {
-    const startsAt = cursor;
-    const endsAt = startsAt + item.duration;
-
-    cursor = endsAt;
-
-    return {
-      mediaId: item.id,
-      startsAt,
-      endsAt,
-      duration: item.duration,
-    };
-  });
+export function getScheduleDuration(schedule: BroadcastItem[]): number {
+  return schedule.reduce((sum, item) => sum + Math.max(1, Math.floor(item.duration)), 0);
 }

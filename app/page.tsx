@@ -120,9 +120,9 @@ export default function Home() {
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
-        seed: `channel-${activeChannel?.id ?? "unknown"}`,
+        channel: activeChannel,
       }),
-    [activeChannel?.id, activeChannelMedia],
+    [activeChannel, activeChannelMedia],
   );
 
   const channelSchedules = useMemo(() => {
@@ -132,7 +132,7 @@ export default function Home() {
       return {
         channel,
         schedule: buildSchedule(channelMedia, {
-          seed: `channel-${channel.id}`,
+          channel,
         }),
       };
     });

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import type { Channel, MediaItem } from "@/lib/types";
+import type { Channel, CommercialBreakMode, MediaItem, ScheduleMode } from "@/lib/types";
 
 type ProgrammedItem = {
   mediaId: string;
@@ -44,29 +44,16 @@ function getChannelName(channel: Channel | undefined): string {
 }
 
 function getProviderLabel(item: MediaItem): string {
-  if (item.provider === "cloudflare-r2") {
-    return "Cloudflare R2";
-  }
-
-  if (item.provider === "external-url") {
-    return "External URL";
-  }
-
-  if (item.provider === "local-dev") {
-    return "Local Dev";
-  }
+  if (item.provider === "cloudflare-r2") return "Cloudflare R2";
+  if (item.provider === "external-url") return "External URL";
+  if (item.provider === "local-dev") return "Local Dev";
 
   if (item.file.includes(".r2.dev") || item.file.toLowerCase().includes("cloudflare")) {
     return "Cloudflare R2";
   }
 
-  if (item.file.startsWith("https://")) {
-    return "Remote URL";
-  }
-
-  if (item.file.startsWith("/")) {
-    return "Local Dev";
-  }
+  if (item.file.startsWith("https://")) return "Remote URL";
+  if (item.file.startsWith("/")) return "Local Dev";
 
   return "Unknown Source";
 }
@@ -74,9 +61,7 @@ function getProviderLabel(item: MediaItem): string {
 function matchesQuery(entry: ProgrammedItem, query: string): boolean {
   const cleanQuery = query.trim().toLowerCase();
 
-  if (!cleanQuery) {
-    return true;
-  }
+  if (!cleanQuery) return true;
 
   if (!entry.item) {
     return entry.mediaId.toLowerCase().includes(cleanQuery);
@@ -100,11 +85,13 @@ export default function ChannelProgrammingPanel() {
   const currentChannelId = useStore((state) => state.currentChannelId);
   const removeMediaFromChannel = useStore((state) => state.removeMediaFromChannel);
   const moveMediaInChannel = useStore((state) => state.moveMediaInChannel);
+  const clearChannelMedia = useStore((state) => state.clearChannelMedia);
+  const updateChannelSettings = useStore((state) => state.updateChannelSettings);
 
   const [query, setQuery] = useState("");
   const [targetSlots, setTargetSlots] = useState<Record<string, string>>({});
   const [message, setMessage] = useState(
-    "Playback follows this slot order exactly.",
+    "Playback follows this channel configuration.",
   );
 
   const activeChannel = useMemo(
@@ -171,14 +158,17 @@ export default function ChannelProgrammingPanel() {
     setMessage(`Moved item from slot ${fromIndex + 1} to slot ${nextSlot}.`);
   };
 
-  const moveTop = (index: number) => {
-    moveMediaInChannel(currentChannelId, index, 0);
-    setMessage(`Moved slot ${index + 1} to the top.`);
-  };
+  const clearChannel = () => {
+    if (!activeChannel) return;
 
-  const moveBottom = (index: number) => {
-    moveMediaInChannel(currentChannelId, index, programmedItems.length - 1);
-    setMessage(`Moved slot ${index + 1} to the bottom.`);
+    const confirmed = window.confirm(
+      `Clear all programmed media from ${getChannelLabel(activeChannel)}? This does not delete media from the library.`,
+    );
+
+    if (!confirmed) return;
+
+    clearChannelMedia(activeChannel.id);
+    setMessage(`Cleared all programming from ${getChannelLabel(activeChannel)}.`);
   };
 
   return (
@@ -197,7 +187,7 @@ export default function ChannelProgrammingPanel() {
           </h2>
 
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            This is the exact playback order for the active channel.
+            Control order, randomization, and classic commercial breaks.
           </p>
         </div>
 
@@ -214,6 +204,90 @@ export default function ChannelProgrammingPanel() {
             : "No Channel"}
         </div>
       </div>
+
+      {activeChannel ? (
+        <div
+          className="mb-3 grid gap-3 rounded-xl border p-3 md:grid-cols-3"
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor: "var(--border)",
+          }}
+        >
+          <div>
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+              Schedule Mode
+            </label>
+
+            <select
+              value={activeChannel.scheduleMode ?? "ordered"}
+              onChange={(event) => {
+                updateChannelSettings(activeChannel.id, {
+                  scheduleMode: event.target.value as ScheduleMode,
+                });
+                setMessage("Schedule mode updated. Global sync will save it.");
+              }}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{
+                background: "var(--panel-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              <option value="ordered">Ordered Playlist</option>
+              <option value="daily-random">Daily Random</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+              Commercial Breaks
+            </label>
+
+            <select
+              value={activeChannel.commercialBreakMode ?? "none"}
+              onChange={(event) => {
+                updateChannelSettings(activeChannel.id, {
+                  commercialBreakMode: event.target.value as CommercialBreakMode,
+                });
+                setMessage("Commercial break mode updated. Global sync will save it.");
+              }}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{
+                background: "var(--panel-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              <option value="none">No Automatic Breaks</option>
+              <option value="end-only">End Breaks Only</option>
+              <option value="midpoint-and-end">Midpoint + End Breaks</option>
+              <option value="classic-tv">Classic TV Breaks</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+              Random Seed
+            </label>
+
+            <input
+              value={activeChannel.randomSeed ?? `channel-${activeChannel.id}`}
+              onChange={(event) => {
+                updateChannelSettings(activeChannel.id, {
+                  randomSeed: event.target.value,
+                });
+                setMessage("Random seed updated. Global sync will save it.");
+              }}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{
+                background: "var(--panel-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div
         className="mb-3 rounded-xl border px-3 py-2"
@@ -242,7 +316,7 @@ export default function ChannelProgrammingPanel() {
         </div>
       </div>
 
-      <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto]">
+      <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto_auto]">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -268,7 +342,20 @@ export default function ChannelProgrammingPanel() {
             color: "var(--text)",
           }}
         >
-          Clear
+          Clear Search
+        </button>
+
+        <button
+          type="button"
+          onClick={clearChannel}
+          disabled={!activeChannel || programmedItems.length === 0}
+          className="rounded-lg px-3 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: "#7f1d1d",
+            color: "#fff",
+          }}
+        >
+          Clear Channel
         </button>
       </div>
 
@@ -294,21 +381,6 @@ export default function ChannelProgrammingPanel() {
           {message}
         </div>
       </div>
-
-      {missingProgrammedItems.length > 0 ? (
-        <div
-          className="mb-3 rounded-xl border px-3 py-2 text-xs"
-          style={{
-            borderColor: "rgba(248, 113, 113, 0.35)",
-            background: "rgba(248, 113, 113, 0.08)",
-            color: "#fca5a5",
-          }}
-        >
-          {missingProgrammedItems.length} assigned media reference
-          {missingProgrammedItems.length === 1 ? "" : "s"} could not be found.
-          Remove the missing slot entries below to clean this channel.
-        </div>
-      ) : null}
 
       <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
         {!activeChannel ? (
@@ -421,7 +493,10 @@ export default function ChannelProgrammingPanel() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => moveTop(index)}
+                      onClick={() => {
+                        moveMediaInChannel(currentChannelId, index, 0);
+                        setMessage(`Moved slot ${index + 1} to the top.`);
+                      }}
                       disabled={isFirst}
                       className="rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
@@ -466,7 +541,14 @@ export default function ChannelProgrammingPanel() {
 
                     <button
                       type="button"
-                      onClick={() => moveBottom(index)}
+                      onClick={() => {
+                        moveMediaInChannel(
+                          currentChannelId,
+                          index,
+                          programmedItems.length - 1,
+                        );
+                        setMessage(`Moved slot ${index + 1} to the bottom.`);
+                      }}
                       disabled={isLast}
                       className="rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{

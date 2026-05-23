@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
-import type { Channel, MediaItem } from "@/lib/types";
+import type { BroadcastItem, Channel } from "@/lib/types";
 
 interface NowNextBarProps {
   channel: Channel | undefined;
-  schedule: MediaItem[];
+  schedule: BroadcastItem[];
 }
 
 function formatClock(seconds: number): string {
@@ -42,7 +42,10 @@ function getChannelName(channel: Channel): string {
   return channel.branding?.displayName ?? channel.name;
 }
 
-function getNextItem(schedule: MediaItem[], currentIndex: number): MediaItem | null {
+function getNextItem(
+  schedule: BroadcastItem[],
+  currentIndex: number,
+): BroadcastItem | null {
   if (schedule.length === 0 || currentIndex < 0) {
     return null;
   }
@@ -135,7 +138,10 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           </div>
 
           <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            {channel.branding?.callsign ?? channel.name}
+            {channel.scheduleMode === "daily-random"
+              ? "Daily Random"
+              : "Ordered"}{" "}
+            • {channel.commercialBreakMode ?? "none"}
           </div>
         </div>
 
@@ -147,7 +153,10 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             Now Playing
           </div>
 
-          <div className="mt-1 truncate text-base font-semibold" title={live.item.title}>
+          <div
+            className="mt-1 truncate text-base font-semibold"
+            title={live.item.title}
+          >
             {live.item.title}
           </div>
 
@@ -161,6 +170,15 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             <span style={{ color: "var(--text-muted)" }}>
               {formatLongClock(live.remaining)} left
             </span>
+
+            {live.item.segmentLabel ? (
+              <>
+                <span style={{ color: "var(--text-muted)" }}>•</span>
+                <span style={{ color: "var(--text-muted)" }}>
+                  {live.item.segmentLabel}
+                </span>
+              </>
+            ) : null}
           </div>
 
           <div
@@ -195,7 +213,9 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {nextItem.type.toUpperCase()} • {formatLongClock(nextItem.duration)}
+              {nextItem.type.toUpperCase()} •{" "}
+              {formatLongClock(nextItem.duration)}
+              {nextItem.segmentLabel ? ` • ${nextItem.segmentLabel}` : ""}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>

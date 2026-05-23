@@ -1,311 +1,181 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { probeVideoDuration } from "@/lib/mediaDuration";
 import { useStore } from "@/lib/store";
-import type { Channel, MediaItem, MediaType } from "@/lib/types";
+import type { MediaItem, MediaType } from "@/lib/types";
 
-const DEFAULT_DURATION_SECONDS = "1800";
-
-type PanelMessage = {
-  type: "idle" | "success" | "warning" | "error";
-  text: string;
-};
-
-const MEDIA_TYPE_OPTIONS: Array<{ value: MediaType; label: string }> = [
-  { value: "show", label: "Show" },
-  { value: "movie", label: "Movie" },
-  { value: "commercial", label: "Commercial" },
-  { value: "bumper", label: "Bumper" },
-];
-
-function makeId(title: string): string {
-  const safe = title
+function createMediaId(title: string): string {
+  const clean = title
     .toLowerCase()
     .trim()
     .replace(/['"]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${safe || "media"}-${crypto.randomUUID().slice(0, 8)}`;
-  }
+  const suffix =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().slice(0, 8)
+      : String(Date.now()).slice(-8);
 
-  return `${safe || "media"}-${Date.now()}`;
+  return `${clean || "media"}-${suffix}`;
 }
 
-function prettyDuration(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-
-  if (safeSeconds < 60) {
-    return `${safeSeconds}s`;
-  }
-
-  const minutes = Math.floor(safeSeconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  }
-
-  return `${minutes}m`;
-}
-
-function cleanUrl(value: string): string {
-  return value.trim().replace(/\s/g, "%20");
-}
-
-function isRemoteUrl(value: string): boolean {
-  return /^https:\/\/.+/i.test(value.trim());
-}
-
-function looksLikePlayableVideoUrl(value: string): boolean {
-  const cleanValue = value.trim().toLowerCase();
-
-  return (
-    cleanValue.endsWith(".mp4") ||
-    cleanValue.includes(".mp4?") ||
-    cleanValue.includes(".mp4#")
-  );
-}
-
-function getFileNameFromUrl(value: string): string {
-  try {
-    const url = new URL(value);
-    const pathname = decodeURIComponent(url.pathname);
-    const fileName = pathname.split("/").filter(Boolean).pop();
-
-    return fileName ?? "";
-  } catch {
-    return value.split("/").filter(Boolean).pop() ?? "";
-  }
-}
-
-function titleFromFilename(fileName: string): string {
-  return fileName
-    .replace(/\.[a-z0-9]+$/i, "")
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function getChannelLabel(channel: Channel): string {
-  return `CH ${channel.number ?? channel.id}`;
-}
-
-function getProviderLabel(file: string): string {
+function inferProvider(file: string): MediaItem["provider"] {
   if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
-    return "Cloudflare R2";
-  }
-
-  if (file.startsWith("https://")) {
-    return "Remote URL";
+    return "cloudflare-r2";
   }
 
   if (file.startsWith("/")) {
-    return "Local Dev";
+    return "local-dev";
   }
 
-  return "Unknown";
+  if (file.startsWith("http://") || file.startsWith("https://")) {
+    return "external-url";
+  }
+
+  return "unknown";
 }
 
-function getMessageStyles(type: PanelMessage["type"]) {
-  if (type === "success") {
-    return {
-      borderColor: "rgba(34, 197, 94, 0.35)",
-      background: "rgba(34, 197, 94, 0.08)",
-      color: "#86efac",
-    };
+function inferNameFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const lastPart = decodeURIComponent(
+      parsed.pathname.split("/").filter(Boolean).at(-1) ?? "",
+    );
+
+    return lastPart
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
+function formatDurationLabel(seconds: string): string {
+  const value = Number(seconds);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return "Duration not set";
   }
 
-  if (type === "warning") {
-    return {
-      borderColor: "rgba(250, 204, 21, 0.35)",
-      background: "rgba(250, 204, 21, 0.08)",
-      color: "#fde68a",
-    };
+  const total = Math.floor(value);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const remaining = total % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remaining}s`;
   }
 
-  if (type === "error") {
-    return {
-      borderColor: "rgba(248, 113, 113, 0.35)",
-      background: "rgba(248, 113, 113, 0.08)",
-      color: "#fca5a5",
-    };
-  }
-
-  return {
-    borderColor: "var(--border)",
-    background: "var(--panel-alt-bg)",
-    color: "var(--text-muted)",
-  };
+  return `${minutes}m ${remaining}s`;
 }
 
 export default function UploadPanel() {
   const channels = useStore((state) => state.channels);
-  const media = useStore((state) => state.media);
+  const currentChannelId = useStore((state) => state.currentChannelId);
   const addMedia = useStore((state) => state.addMedia);
-  const removeMedia = useStore((state) => state.removeMedia);
   const assignMediaToChannel = useStore((state) => state.assignMediaToChannel);
 
   const [title, setTitle] = useState("");
-  const [cloudUrl, setCloudUrl] = useState("");
-  const [duration, setDuration] = useState(DEFAULT_DURATION_SECONDS);
-  const [mediaType, setMediaType] = useState<MediaType>("show");
-  const [channelId, setChannelId] = useState("1");
-  const [message, setMessage] = useState<PanelMessage>({
-    type: "idle",
-    text: "Use Cloudflare R2 public MP4 URLs for live streaming media.",
-  });
-  const [isAdding, setIsAdding] = useState(false);
+  const [file, setFile] = useState("");
+  const [type, setType] = useState<MediaType>("show");
+  const [duration, setDuration] = useState("");
+  const [channelId, setChannelId] = useState(currentChannelId);
+  const [status, setStatus] = useState("");
+  const [durationStatus, setDurationStatus] = useState("");
+  const [isDetectingDuration, setIsDetectingDuration] = useState(false);
 
-  const finalPath = useMemo(() => cleanUrl(cloudUrl), [cloudUrl]);
-
-  const selectedChannel = useMemo(
-    () => channels.find((channel) => channel.id === channelId),
-    [channels, channelId],
+  const enabledChannels = useMemo(
+    () =>
+      channels
+        .filter((channel) => channel.isEnabled !== false)
+        .sort((a, b) => Number(a.number ?? a.id) - Number(b.number ?? b.id)),
+    [channels],
   );
 
-  const recentMedia = useMemo(() => [...media].slice(-10).reverse(), [media]);
+  const canAdd =
+    title.trim().length > 0 &&
+    file.trim().length > 0 &&
+    Number.isFinite(Number(duration)) &&
+    Number(duration) > 0 &&
+    channelId.trim().length > 0;
 
-  const detectedFileName = useMemo(
-    () => (finalPath ? getFileNameFromUrl(finalPath) : ""),
-    [finalPath],
-  );
+  const detectDuration = async (url: string) => {
+    const cleanUrl = url.trim();
 
-  const suggestedTitle = useMemo(
-    () => (detectedFileName ? titleFromFilename(detectedFileName) : ""),
-    [detectedFileName],
-  );
+    if (!cleanUrl) {
+      setDurationStatus("Paste a video URL first.");
+      return;
+    }
 
-  const parsedDuration = Number(duration);
-  const isDurationValid = Number.isFinite(parsedDuration) && parsedDuration > 0;
+    setIsDetectingDuration(true);
+    setDurationStatus("Reading video duration...");
 
-  const setPanelMessage = (type: PanelMessage["type"], text: string) => {
-    setMessage({ type, text });
+    try {
+      const result = await probeVideoDuration(cleanUrl);
+
+      setDuration(String(result.duration));
+      setDurationStatus(`Detected ${result.durationLabel}.`);
+    } catch (error) {
+      setDurationStatus(
+        error instanceof Error
+          ? error.message
+          : "Could not detect duration. Enter it manually.",
+      );
+    } finally {
+      setIsDetectingDuration(false);
+    }
   };
 
   const handleUrlChange = (value: string) => {
-    setCloudUrl(value);
+    setFile(value);
+    setStatus("");
 
-    const nextPath = cleanUrl(value);
-    const fileName = getFileNameFromUrl(nextPath);
-    const nextSuggestedTitle = titleFromFilename(fileName);
+    if (!title.trim()) {
+      const inferredTitle = inferNameFromUrl(value);
 
-    if (!title.trim() && nextSuggestedTitle) {
-      setTitle(nextSuggestedTitle);
+      if (inferredTitle) {
+        setTitle(inferredTitle);
+      }
     }
   };
 
-  const testPath = () => {
-    if (!finalPath) {
-      setPanelMessage("warning", "Paste a Cloudflare/R2 public URL first.");
+  const addItem = () => {
+    if (!canAdd) {
+      setStatus("Fill in title, URL, duration, and channel first.");
       return;
     }
-
-    if (!isRemoteUrl(finalPath)) {
-      setPanelMessage("error", "Test path must be a valid https:// URL.");
-      return;
-    }
-
-    window.open(finalPath, "_blank", "noopener,noreferrer");
-    setPanelMessage("success", "Opened media URL in a new tab for testing.");
-  };
-
-  const addHostedMedia = () => {
-    setPanelMessage("idle", "");
 
     const cleanTitle = title.trim();
-    const cleanPath = finalPath.trim();
+    const cleanFile = file.trim();
+    const cleanDuration = Math.max(1, Math.floor(Number(duration)));
+    const id = createMediaId(cleanTitle);
 
-    if (!cleanTitle) {
-      setPanelMessage("error", "Title is required.");
-      return;
-    }
+    const item: MediaItem = {
+      id,
+      title: cleanTitle,
+      type,
+      duration: cleanDuration,
+      file: cleanFile,
+      mimeType: "video/mp4",
+      originalName: cleanFile.split("/").at(-1) ?? cleanTitle,
+      provider: inferProvider(cleanFile),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (!cleanPath) {
-      setPanelMessage("error", "Cloudflare/R2 URL is required.");
-      return;
-    }
+    addMedia(item);
+    assignMediaToChannel(channelId, item.id);
 
-    if (!isRemoteUrl(cleanPath)) {
-      setPanelMessage("error", "Media URL must start with https://");
-      return;
-    }
-
-    if (!looksLikePlayableVideoUrl(cleanPath)) {
-      setPanelMessage(
-        "warning",
-        "This does not look like an MP4 URL. You can still add it only after confirming your browser can stream it.",
-      );
-      return;
-    }
-
-    if (!isDurationValid) {
-      setPanelMessage("error", "Duration must be a valid number of seconds.");
-      return;
-    }
-
-    const duplicate = media.find(
-      (item) => item.file.trim().toLowerCase() === cleanPath.toLowerCase(),
-    );
-
-    if (duplicate) {
-      assignMediaToChannel(channelId, duplicate.id);
-      setPanelMessage(
-        "success",
-        `Already existed. Assigned "${duplicate.title}" to ${
-          selectedChannel ? getChannelLabel(selectedChannel) : `CH ${channelId}`
-        }.`,
-      );
-      return;
-    }
-
-    try {
-      setIsAdding(true);
-
-      const now = new Date().toISOString();
-
-      const mediaItem: MediaItem = {
-        id: makeId(cleanTitle),
-        title: cleanTitle,
-        type: mediaType,
-        duration: Math.floor(parsedDuration),
-        file: cleanPath,
-        mimeType: "video/mp4",
-        originalName: detectedFileName || cleanTitle,
-        provider:
-          cleanPath.includes(".r2.dev") ||
-          cleanPath.toLowerCase().includes("cloudflare")
-            ? "cloudflare-r2"
-            : "external-url",
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      addMedia(mediaItem);
-      assignMediaToChannel(channelId, mediaItem.id);
-
-      setPanelMessage(
-        "success",
-        `Added "${mediaItem.title}" to ${
-          selectedChannel ? getChannelLabel(selectedChannel) : `CH ${channelId}`
-        }.`,
-      );
-
-      setTitle("");
-      setCloudUrl("");
-      setDuration(DEFAULT_DURATION_SECONDS);
-      setMediaType("show");
-    } catch (error) {
-      console.error(error);
-      setPanelMessage("error", "Failed to add media. Check the console.");
-    } finally {
-      setIsAdding(false);
-    }
+    setStatus(`Added "${item.title}" to CH ${channelId}.`);
+    setTitle("");
+    setFile("");
+    setDuration("");
+    setDurationStatus("");
   };
-
-  const messageStyles = getMessageStyles(message.type);
 
   return (
     <section
@@ -316,63 +186,38 @@ export default function UploadPanel() {
         color: "var(--text)",
       }}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold tracking-wide">Launch Media</h2>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Add Cloudflare R2-hosted videos to the local programming library.
-          </p>
+      <div className="mb-3">
+        <div
+          className="text-xs font-semibold uppercase tracking-[0.18em]"
+          style={{ color: "var(--primary)" }}
+        >
+          Add Media
         </div>
 
-        <div
-          className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
-          style={{
-            borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
-            color: "var(--text-muted)",
-          }}
-        >
-          Browser Saved
-        </div>
+        <h2 className="mt-1 text-sm font-semibold">
+          Cloudflare/R2 Video Entry
+        </h2>
+
+        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+          Paste a public video URL. Duration can be detected automatically from
+          the video metadata.
+        </p>
       </div>
 
       <div className="grid gap-3">
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
-          }}
-        >
-          <div
-            className="mb-1 text-xs font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Cloudflare R2 Source
-          </div>
-
-          <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            Upload the MP4 to Cloudflare R2 first, copy the public URL, then paste
-            it here. This saves programming metadata in this browser and assigns
-            the media to the selected channel.
-          </p>
-        </div>
-
         <div>
           <label
-            htmlFor="media-title"
-            className="mb-1 block text-xs font-medium"
+            className="mb-1 block text-xs"
             style={{ color: "var(--text-muted)" }}
           >
             Title
           </label>
 
           <input
-            id="media-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder={suggestedTitle || "Naruto EP01"}
-            className="w-full rounded-lg border px-3 py-2 outline-none transition focus:ring-2"
+            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+            placeholder="Naruto S01E01"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -383,19 +228,22 @@ export default function UploadPanel() {
 
         <div>
           <label
-            htmlFor="media-url"
-            className="mb-1 block text-xs font-medium"
+            className="mb-1 block text-xs"
             style={{ color: "var(--text-muted)" }}
           >
             Cloudflare/R2 Public URL
           </label>
 
           <input
-            id="media-url"
-            value={cloudUrl}
+            value={file}
             onChange={(event) => handleUrlChange(event.target.value)}
-            placeholder="https://pub-xxxx.r2.dev/naruto-s01e01.mp4"
-            className="w-full rounded-lg border px-3 py-2 outline-none transition focus:ring-2"
+            onBlur={(event) => {
+              if (!duration.trim()) {
+                void detectDuration(event.target.value);
+              }
+            }}
+            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+            placeholder="https://pub-xxxx.r2.dev/video.mp4"
             spellCheck={false}
             style={{
               background: "var(--panel-alt-bg)",
@@ -405,115 +253,99 @@ export default function UploadPanel() {
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="final-media-source"
-            className="mb-1 block text-xs font-medium"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Final media source
-          </label>
-
-          <input
-            id="final-media-source"
-            value={finalPath}
-            readOnly
-            className="w-full rounded-lg border px-3 py-2 text-xs outline-none"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-            }}
-          />
-
-          {detectedFileName ? (
-            <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              Detected file: {detectedFileName}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr]">
           <div>
             <label
-              htmlFor="media-type"
-              className="mb-1 block text-xs font-medium"
+              className="mb-1 block text-xs"
               style={{ color: "var(--text-muted)" }}
             >
               Type
             </label>
 
             <select
-              id="media-type"
-              value={mediaType}
-              onChange={(event) => setMediaType(event.target.value as MediaType)}
-              className="w-full rounded-lg border px-3 py-2 outline-none"
+              value={type}
+              onChange={(event) => setType(event.target.value as MediaType)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
               style={{
                 background: "var(--panel-alt-bg)",
                 borderColor: "var(--border)",
                 color: "var(--text)",
               }}
             >
-              {MEDIA_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              <option value="show">Show</option>
+              <option value="movie">Movie</option>
+              <option value="commercial">Commercial</option>
+              <option value="bumper">Bumper</option>
             </select>
           </div>
 
           <div>
             <label
-              htmlFor="media-duration"
-              className="mb-1 block text-xs font-medium"
+              className="mb-1 block text-xs"
               style={{ color: "var(--text-muted)" }}
             >
-              Duration seconds
+              Duration Seconds
             </label>
 
-            <input
-              id="media-duration"
-              value={duration}
-              inputMode="numeric"
-              onChange={(event) => setDuration(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 outline-none"
-              style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: isDurationValid ? "var(--border)" : "#f87171",
-                color: "var(--text)",
-              }}
-            />
+            <div className="flex gap-2">
+              <input
+                value={duration}
+                onChange={(event) =>
+                  setDuration(event.target.value.replace(/[^\d]/g, ""))
+                }
+                className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                placeholder="Auto"
+                inputMode="numeric"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
 
-            <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              {isDurationValid
-                ? prettyDuration(Math.floor(parsedDuration))
-                : "Enter duration in seconds."}
+              <button
+                type="button"
+                onClick={() => void detectDuration(file)}
+                disabled={isDetectingDuration || !file.trim()}
+                className="rounded-lg px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                {isDetectingDuration ? "..." : "Auto"}
+              </button>
+            </div>
+
+            <div
+              className="mt-1 text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {durationStatus || formatDurationLabel(duration)}
             </div>
           </div>
 
           <div>
             <label
-              htmlFor="media-channel"
-              className="mb-1 block text-xs font-medium"
+              className="mb-1 block text-xs"
               style={{ color: "var(--text-muted)" }}
             >
               Channel
             </label>
 
             <select
-              id="media-channel"
               value={channelId}
               onChange={(event) => setChannelId(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 outline-none"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
               style={{
                 background: "var(--panel-alt-bg)",
                 borderColor: "var(--border)",
                 color: "var(--text)",
               }}
             >
-              {channels.map((channel) => (
+              {enabledChannels.map((channel) => (
                 <option key={channel.id} value={channel.id}>
-                  {getChannelLabel(channel)} •{" "}
+                  CH {channel.number ?? channel.id} •{" "}
                   {channel.branding?.displayName ?? channel.name}
                 </option>
               ))}
@@ -521,147 +353,32 @@ export default function UploadPanel() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={testPath}
-            className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90"
-            style={{
-              background: "var(--button-bg)",
-              color: "var(--text)",
-            }}
-          >
-            Test Path
-          </button>
-
-          <button
-            type="button"
-            onClick={addHostedMedia}
-            disabled={isAdding}
-            className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{
-              background: "var(--primary)",
-              color: "var(--text)",
-            }}
-          >
-            {isAdding ? "Adding..." : "Add Media"}
-          </button>
-        </div>
-
-        <div
-          className="rounded-lg border px-3 py-2 text-xs"
-          style={messageStyles}
-          role={message.type === "error" ? "alert" : "status"}
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={!canAdd}
+          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
+            color: "var(--text)",
+          }}
         >
-          {message.text || "Ready."}
-        </div>
-      </div>
+          Add Media
+        </button>
 
-      <div
-        className="mt-4 rounded-xl border p-3"
-        style={{
-          background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        {status ? (
           <div
-            className="text-xs font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "var(--text-muted)" }}
+            className="rounded-xl border px-3 py-2 text-xs"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+            }}
           >
-            Recent Media
+            {status}
           </div>
-
-          <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            Showing latest {recentMedia.length} of {media.length}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {recentMedia.length === 0 ? (
-            <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-              No media yet.
-            </div>
-          ) : (
-            recentMedia.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border px-3 py-2"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium" title={item.title}>
-                      {item.title}
-                    </div>
-
-                    <div
-                      className="text-[11px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {item.type.toUpperCase()} • {prettyDuration(item.duration)} •{" "}
-                      {getProviderLabel(item.file)}
-                    </div>
-
-                    <div
-                      className="mt-1 truncate text-[11px]"
-                      style={{ color: "var(--text-muted)" }}
-                      title={item.file}
-                    >
-                      {item.file}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => removeMedia(item.id)}
-                    className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold transition hover:opacity-90"
-                    style={{
-                      background: "var(--button-bg)",
-                      color: "var(--text)",
-                    }}
-                    aria-label={`Remove ${item.title}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="mt-2 flex flex-wrap gap-3">
-                  <a
-                    href={item.file}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs underline"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    Test media path
-                  </a>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTitle(item.title);
-                      setCloudUrl(item.file);
-                      setDuration(String(item.duration));
-                      setMediaType(item.type);
-                      setPanelMessage(
-                        "success",
-                        `Loaded "${item.title}" into the form for review.`,
-                      );
-                    }}
-                    className="text-xs underline"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    Load into form
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        ) : null}
       </div>
     </section>
   );

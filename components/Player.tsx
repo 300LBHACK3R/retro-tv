@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
 import { usePlayerControls } from "@/lib/playerControls";
-import type { MediaItem } from "@/lib/types";
+import type { BroadcastItem } from "@/lib/types";
 
 interface PlayerProps {
-  schedule: MediaItem[];
+  schedule: BroadcastItem[];
 }
 
 function formatTime(seconds: number): string {
@@ -66,7 +66,7 @@ export default function Player({ schedule }: PlayerProps) {
     setPlaybackError("");
 
     const nextSrc = live.item.file;
-    const targetTime = Math.max(0, live.elapsed);
+    const targetTime = Math.max(0, live.sourceElapsed);
 
     const syncVideoTime = () => {
       const duration = Number.isFinite(video.duration) ? video.duration : 0;
@@ -98,7 +98,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       video.onloadedmetadata = null;
     };
-  }, [live.elapsed, live.item]);
+  }, [live.item, live.sourceElapsed]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -184,8 +184,10 @@ export default function Player({ schedule }: PlayerProps) {
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {live.item.title}
         </div>
+
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
+          {live.item.segmentLabel ? ` • ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
@@ -197,6 +199,7 @@ export default function Player({ schedule }: PlayerProps) {
             if (video) {
               void video.play().catch(() => {});
             }
+
             setPlaybackError("");
           }}
           className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/75 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
