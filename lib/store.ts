@@ -21,8 +21,14 @@ interface AppState {
   themeId: ThemeId;
   ownedPremiumThemes: ThemeId[];
 
+  /**
+   * Tombstones prevent hardcoded/default media from respawning after deletion.
+   */
+  deletedMediaIds: string[];
+
   addMedia: (item: MediaItem) => void;
   removeMedia: (mediaId: string) => void;
+  removeManyMedia: (mediaIds: string[]) => void;
   setChannel: (id: string) => void;
   updateChannelBranding: (
     channelId: string,
@@ -30,6 +36,7 @@ interface AppState {
   ) => void;
   assignMediaToChannel: (channelId: string, mediaId: string) => void;
   removeMediaFromChannel: (channelId: string, mediaId: string) => void;
+  clearChannelMedia: (channelId: string) => void;
   moveMediaInChannel: (
     channelId: string,
     fromIndex: number,
@@ -48,7 +55,7 @@ interface AppState {
 }
 
 export const programmingStoreName = "retro-tv-programming-v1";
-export const programmingStoreVersion = 1;
+export const programmingStoreVersion = 2;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -233,6 +240,26 @@ function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]): T[] {
   return Array.from(map.values());
 }
 
+function removeDeletedDefaults(
+  media: MediaItem[],
+  deletedMediaIds: string[],
+): MediaItem[] {
+  const deletedSet = new Set(deletedMediaIds);
+  return media.filter((item) => !deletedSet.has(item.id));
+}
+
+function removeMediaIdsFromChannels(
+  channels: Channel[],
+  mediaIds: string[],
+): Channel[] {
+  const deleteSet = new Set(mediaIds);
+
+  return channels.map((channel) => ({
+    ...channel,
+    mediaIds: channel.mediaIds.filter((id) => !deleteSet.has(id)),
+  }));
+}
+
 function getValidThemeId(value: unknown): ThemeId {
   return isThemeId(value) ? value : DEFAULT_THEME_ID;
 }
@@ -258,6 +285,7 @@ export const useStore = create<AppState>()(
       appMode: "viewer",
       themeId: DEFAULT_THEME_ID,
       ownedPremiumThemes: [],
+      deletedMediaIds: [],
 
       addMedia: (item) =>
         set((state) => {
@@ -272,6 +300,9 @@ export const useStore = create<AppState>()(
           );
 
           return {
+            deletedMediaIds: state.deletedMediaIds.filter(
+              (id) => id !== normalizedItem.id,
+            ),
             media: mediaExists
               ? state.media.map((mediaItem) =>
                   mediaItem.id === normalizedItem.id
@@ -284,12 +315,30 @@ export const useStore = create<AppState>()(
 
       removeMedia: (mediaId) =>
         set((state) => ({
+          deletedMediaIds: dedupeStrings([...state.deletedMediaIds, mediaId]),
           media: state.media.filter((item) => item.id !== mediaId),
-          channels: state.channels.map((channel) => ({
-            ...channel,
-            mediaIds: channel.mediaIds.filter((id) => id !== mediaId),
-          })),
+          channels: removeMediaIdsFromChannels(state.channels, [mediaId]),
         })),
+
+      removeManyMedia: (mediaIds) =>
+        set((state) => {
+          const cleanIds = dedupeStrings(mediaIds);
+
+          if (cleanIds.length === 0) {
+            return state;
+          }
+
+          const deleteSet = new Set(cleanIds);
+
+          return {
+            deletedMediaIds: dedupeStrings([
+              ...state.deletedMediaIds,
+              ...cleanIds,
+            ]),
+            media: state.media.filter((item) => !deleteSet.has(item.id)),
+            channels: removeMediaIdsFromChannels(state.channels, cleanIds),
+          };
+        }),
 
       setChannel: (id) =>
         set((state) => {
@@ -354,6 +403,18 @@ export const useStore = create<AppState>()(
               ? {
                   ...channel,
                   mediaIds: channel.mediaIds.filter((id) => id !== mediaId),
+                }
+              : channel,
+          ),
+        })),
+
+      clearChannelMedia: (channelId) =>
+        set((state) => ({
+          channels: state.channels.map((channel) =>
+            channel.id === channelId
+              ? {
+                  ...channel,
+                  mediaIds: [],
                 }
               : channel,
           ),
@@ -433,15 +494,19 @@ export const useStore = create<AppState>()(
           channels: defaultChannels,
           currentChannelId: "1",
           isGuideOpen: false,
+          deletedMediaIds: [],
         }),
 
       replaceProgramming: (snapshot) =>
         set({
-          media: mergeById(defaultMedia, snapshot.media.map(normalizeMediaItem)),
-          channels: mergeById(
-            defaultChannels,
-            snapshot.channels.map(normalizeChannel),
-          ),
+          /**
+           * IMPORTANT:
+           * Do not merge defaultMedia here.
+           * Supabase snapshot is now the source of truth.
+           * This prevents deleted media from respawning after refresh.
+           */
+          media: snapshot.media.map(normalizeMediaItem),
+          channels: snapshot.channels.map(normalizeChannel),
           currentChannelId: snapshot.currentChannelId,
           sidebarWidth: clamp(
             snapshot.sidebarWidth,
@@ -456,6 +521,7 @@ export const useStore = create<AppState>()(
           appMode: "viewer",
           themeId: getValidThemeId(snapshot.themeId),
           ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
+          deletedMediaIds: [],
         }),
 
       exportProgrammingSnapshot: () => {
@@ -481,13 +547,21 @@ export const useStore = create<AppState>()(
       merge: (persistedState, currentState) => {
         const saved = persistedState as Partial<AppState> | undefined;
 
+        const deletedMediaIds = Array.isArray(saved?.deletedMediaIds)
+          ? dedupeStrings(saved.deletedMediaIds)
+          : [];
+
         const savedMedia = Array.isArray(saved?.media) ? saved.media : [];
         const savedChannels = Array.isArray(saved?.channels) ? saved.channels : [];
 
-        const mergedMedia = mergeById(defaultMedia, savedMedia.map(normalizeMediaItem));
-        const mergedChannels = mergeById(
-          defaultChannels,
-          savedChannels.map(normalizeChannel),
+        const mergedMedia = removeDeletedDefaults(
+          mergeById(defaultMedia, savedMedia.map(normalizeMediaItem)),
+          deletedMediaIds,
+        );
+
+        const mergedChannels = removeMediaIdsFromChannels(
+          mergeById(defaultChannels, savedChannels.map(normalizeChannel)),
+          deletedMediaIds,
         );
 
         const fallbackChannelId = mergedChannels[0]?.id ?? "1";
@@ -517,6 +591,7 @@ export const useStore = create<AppState>()(
           appMode: getValidAppMode(saved?.appMode),
           themeId: getValidThemeId(saved?.themeId),
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
+          deletedMediaIds,
         };
       },
 
@@ -530,6 +605,7 @@ export const useStore = create<AppState>()(
         appMode: state.appMode,
         themeId: state.themeId,
         ownedPremiumThemes: state.ownedPremiumThemes,
+        deletedMediaIds: state.deletedMediaIds,
       }),
     },
   ),
