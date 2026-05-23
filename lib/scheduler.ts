@@ -1,11 +1,38 @@
-import type { MediaItem, ProgramBlock } from "./types";
+import type { MediaItem } from "./types";
 
-const DEFAULT_COMMERCIAL_INSERTS_AFTER_SHOW = 2;
+const DEFAULT_COMMERCIAL_INSERTS_AFTER_SHOW = 0;
 
-type ScheduleOptions = {
+export type ScheduleMode = "playlist" | "shuffle";
+
+export type ScheduleOptions = {
+  /**
+   * playlist = respect channel.mediaIds order exactly.
+   * shuffle = deterministic seeded shuffle.
+   */
+  mode?: ScheduleMode;
+
+  /**
+   * Used only in shuffle mode.
+   */
   seed?: string;
+
+  /**
+   * Number of short-form items inserted after each show.
+   * Keep this 0 if you want exact show-after-show control.
+   */
   commercialInsertsAfterShow?: number;
+
+  /**
+   * If true, short-form items can be inserted after movies too.
+   */
   includeBumpersAfterMovies?: boolean;
+};
+
+export type ProgramBlock = {
+  mediaId: string;
+  startsAt: number;
+  endsAt: number;
+  duration: number;
 };
 
 function hashString(value: string): number {
@@ -57,8 +84,11 @@ function hasPlayableDuration(item: MediaItem): boolean {
   return Number.isFinite(item.duration) && item.duration > 0;
 }
 
-function normalizeScheduleOptions(options?: ScheduleOptions): Required<ScheduleOptions> {
+function normalizeScheduleOptions(
+  options?: ScheduleOptions,
+): Required<ScheduleOptions> {
   return {
+    mode: options?.mode ?? "playlist",
     seed: options?.seed ?? "retro-tv-default-schedule",
     commercialInsertsAfterShow:
       options?.commercialInsertsAfterShow ?? DEFAULT_COMMERCIAL_INSERTS_AFTER_SHOW,
@@ -66,11 +96,28 @@ function normalizeScheduleOptions(options?: ScheduleOptions): Required<ScheduleO
   };
 }
 
+function rotateShortForm(shortForm: MediaItem[], cursor: number): MediaItem | null {
+  if (shortForm.length === 0) {
+    return null;
+  }
+
+  return shortForm[cursor % shortForm.length] ?? null;
+}
+
+/**
+ * Builds the channel playback schedule.
+ *
+ * Important:
+ * In playlist mode, this respects the exact channel programming order.
+ * This is what makes "Slot 1 before Slot 2 before Slot 3" work properly.
+ */
 export function buildSchedule(
   media: MediaItem[],
   options?: ScheduleOptions,
 ): MediaItem[] {
-  const safeMedia = media.filter(hasPlayableDuration);
+  const safeMedia = media.filter(
+    (item) => item.file.trim().length > 0 && hasPlayableDuration(item),
+  );
 
   if (safeMedia.length === 0) {
     return [];
@@ -78,22 +125,70 @@ export function buildSchedule(
 
   const normalizedOptions = normalizeScheduleOptions(options);
 
-  const longForm = safeMedia.filter(isLongForm);
-  const shortForm = safeMedia.filter(isShortForm);
-
-  if (longForm.length === 0) {
-    return seededShuffle(safeMedia, `${normalizedOptions.seed}:fallback`);
+  if (normalizedOptions.mode === "shuffle") {
+    return buildShuffledSchedule(safeMedia, normalizedOptions);
   }
 
-  const shuffledLongForm = seededShuffle(
-    longForm,
-    `${normalizedOptions.seed}:long-form`,
-  );
+  return buildPlaylistSchedule(safeMedia, normalizedOptions);
+}
 
-  const shuffledShortForm = seededShuffle(
-    shortForm,
-    `${normalizedOptions.seed}:short-form`,
-  );
+function buildPlaylistSchedule(
+  media: MediaItem[],
+  options: Required<ScheduleOptions>,
+): MediaItem[] {
+  if (options.commercialInsertsAfterShow <= 0) {
+    return media;
+  }
+
+  const shortForm = media.filter(isShortForm);
+
+  if (shortForm.length === 0) {
+    return media;
+  }
+
+  const schedule: MediaItem[] = [];
+  let shortFormCursor = 0;
+
+  for (const item of media) {
+    schedule.push(item);
+
+    const shouldInsertShortForm =
+      item.type === "show" || (item.type === "movie" && options.includeBumpersAfterMovies);
+
+    if (!shouldInsertShortForm) {
+      continue;
+    }
+
+    for (
+      let insertIndex = 0;
+      insertIndex < options.commercialInsertsAfterShow;
+      insertIndex += 1
+    ) {
+      const shortItem = rotateShortForm(shortForm, shortFormCursor);
+
+      if (shortItem) {
+        schedule.push(shortItem);
+        shortFormCursor += 1;
+      }
+    }
+  }
+
+  return schedule;
+}
+
+function buildShuffledSchedule(
+  media: MediaItem[],
+  options: Required<ScheduleOptions>,
+): MediaItem[] {
+  const longForm = media.filter(isLongForm);
+  const shortForm = media.filter(isShortForm);
+
+  if (longForm.length === 0) {
+    return seededShuffle(media, `${options.seed}:fallback`);
+  }
+
+  const shuffledLongForm = seededShuffle(longForm, `${options.seed}:long-form`);
+  const shuffledShortForm = seededShuffle(shortForm, `${options.seed}:short-form`);
 
   const schedule: MediaItem[] = [];
   let shortFormCursor = 0;
@@ -103,14 +198,14 @@ export function buildSchedule(
 
     const shouldInsertShortForm =
       shortForm.length > 0 &&
-      (item.type === "show" || normalizedOptions.includeBumpersAfterMovies);
+      (item.type === "show" || options.includeBumpersAfterMovies);
 
-    if (!shouldInsertShortForm) {
+    if (!shouldInsertShortForm || options.commercialInsertsAfterShow <= 0) {
       continue;
     }
 
     const insertCount = Math.min(
-      normalizedOptions.commercialInsertsAfterShow,
+      options.commercialInsertsAfterShow,
       shortForm.length,
     );
 
