@@ -130,30 +130,36 @@ export default function Remote() {
 
   return (
     <section
-      className="rounded-2xl border p-3 shadow-2xl shadow-black/20"
+      className="relative overflow-hidden rounded-2xl border p-4 shadow-2xl shadow-black/30"
       style={{
-        background: "var(--panel-bg)",
+        background:
+          "radial-gradient(circle at top right, rgba(212,175,55,0.12), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.9), rgba(18,18,18,0.78))",
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="TV remote controls"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div
+        className="absolute inset-x-0 top-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+      />
+
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div
-            className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
+            className="text-[11px] font-black uppercase tracking-[0.22em]"
+            style={{ color: "var(--primary)" }}
           >
             Remote
           </div>
 
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
-            <div className="text-sm font-semibold">
+            <div className="text-base font-semibold tracking-tight">
               {getChannelLabel(currentChannel)}
             </div>
 
             <div
-              className="max-w-[16rem] truncate text-xs"
+              className="max-w-[18rem] truncate text-xs"
               style={{ color: "var(--text-muted)" }}
               title={getChannelName(currentChannel)}
             >
@@ -163,10 +169,10 @@ export default function Remote() {
         </div>
 
         <div
-          className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+          className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
           style={{
             borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
+            background: "rgba(255,255,255,0.04)",
             color: "var(--text-muted)",
           }}
         >
@@ -174,12 +180,12 @@ export default function Remote() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
           onClick={goPrev}
           disabled={enabledChannels.length === 0}
-          className="rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl px-4 py-3 text-sm font-black tracking-wide transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background: "var(--button-bg)",
             color: "var(--text)",
@@ -193,7 +199,7 @@ export default function Remote() {
           type="button"
           onClick={goNext}
           disabled={enabledChannels.length === 0}
-          className="rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl px-4 py-3 text-sm font-black tracking-wide transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background: "var(--button-bg)",
             color: "var(--text)",
@@ -206,20 +212,22 @@ export default function Remote() {
         <button
           type="button"
           onClick={toggleGuide}
-          className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+          className="rounded-xl px-4 py-3 text-sm font-black tracking-wide transition hover:scale-[1.02] hover:opacity-95"
           style={{
-            background: isGuideOpen ? "var(--primary)" : "var(--button-bg)",
+            background: isGuideOpen
+              ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+              : "var(--button-bg)",
             color: "var(--text)",
+            boxShadow: isGuideOpen ? "0 0 22px rgba(212,175,55,0.22)" : "none",
           }}
           aria-pressed={isGuideOpen}
         >
-          {isGuideOpen ? "Close Guide" : "Open Guide"}
+          {isGuideOpen ? "Close" : "Guide"}
         </button>
       </div>
 
       <div className="mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
-        Keyboard: Arrow Up/Page Up for CH+, Arrow Down/Page Down for CH-, G for
-        guide.
+        Keyboard: ↑ / ↓ channel surf, G opens guide.
       </div>
     </section>
   );

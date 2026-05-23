@@ -15,7 +15,7 @@ function getThemeStatusLabel(
   }
 
   if (isAdminMode) {
-    return "Admin Preview";
+    return "Preview";
   }
 
   if (isOwned) {
@@ -86,14 +86,23 @@ export default function ThemeButton() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-90"
+        className="relative overflow-hidden rounded-2xl border px-5 py-3 text-sm font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/30 transition hover:scale-[1.02] hover:opacity-95"
         style={{
-          background: "var(--button-bg)",
+          background:
+            "linear-gradient(135deg, rgba(0,0,0,0.92), rgba(18,18,18,0.78))",
+          borderColor: "var(--border)",
           color: "var(--text)",
         }}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
+        <span
+          className="absolute inset-x-0 top-0 h-px"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--primary), transparent)",
+          }}
+        />
         Themes
       </button>
 
@@ -103,16 +112,17 @@ export default function ThemeButton() {
             type="button"
             aria-label="Close theme menu"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-[90] bg-black/55 backdrop-blur-sm md:hidden"
           />
 
           <div
             className="
               fixed inset-x-3 top-16 z-[100] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-2xl border p-3 shadow-2xl
-              md:absolute md:right-0 md:top-12 md:inset-x-auto md:max-h-[75vh] md:w-86
+              md:absolute md:right-0 md:top-14 md:inset-x-auto md:max-h-[75vh] md:w-96
             "
             style={{
-              background: "var(--panel-bg)",
+              background:
+                "radial-gradient(circle at top right, rgba(212,175,55,0.12), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.95), rgba(18,18,18,0.9))",
               borderColor: "var(--border)",
               color: "var(--text)",
             }}
@@ -122,14 +132,14 @@ export default function ThemeButton() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <div
-                  className="text-xs font-semibold uppercase tracking-[0.16em]"
-                  style={{ color: "var(--text-muted)" }}
+                  className="text-[11px] font-black uppercase tracking-[0.2em]"
+                  style={{ color: "var(--primary)" }}
                 >
                   Theme Library
                 </div>
 
                 <div
-                  className="mt-1 text-sm"
+                  className="mt-1 text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
                   Current:{" "}
@@ -142,7 +152,7 @@ export default function ThemeButton() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2 text-xs font-semibold transition hover:opacity-90 md:hidden"
+                className="rounded-xl px-3 py-2 text-xs font-semibold transition hover:opacity-90 md:hidden"
                 style={{
                   background: "var(--button-bg)",
                   color: "var(--text)",
@@ -151,20 +161,6 @@ export default function ThemeButton() {
                 Close
               </button>
             </div>
-
-            {isAdminMode ? (
-              <div
-                className="mb-3 rounded-lg border px-3 py-2 text-xs leading-relaxed"
-                style={{
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                  background: "var(--panel-alt-bg)",
-                }}
-              >
-                Admin mode can preview premium themes. Viewer mode still respects
-                ownership/lock rules.
-              </div>
-            ) : null}
 
             <div className="space-y-2">
               {sortedThemes.map((theme) => {
@@ -187,7 +183,7 @@ export default function ThemeButton() {
                     key={theme.id}
                     className="overflow-hidden rounded-xl border"
                     style={{
-                      background: "var(--panel-alt-bg)",
+                      background: "rgba(255,255,255,0.035)",
                       borderColor: isActive
                         ? theme.colors.primary
                         : "var(--border)",
@@ -216,7 +212,7 @@ export default function ThemeButton() {
                         </div>
 
                         <div
-                          className="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+                          className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
                           style={{
                             background: theme.isPremium
                               ? "rgba(245, 158, 11, 0.18)"
@@ -233,17 +229,14 @@ export default function ThemeButton() {
                           type="button"
                           onClick={() => applyTheme(theme)}
                           disabled={!unlocked || isActive}
-                          className="rounded-lg px-3 py-2 text-xs font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                           style={{
                             background: isActive
                               ? "var(--button-bg)"
                               : unlocked
-                                ? "var(--primary)"
+                                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
                                 : "var(--button-bg)",
-                            color:
-                              theme.id === "midas-gold" && !isActive
-                                ? "#f5d76e"
-                                : "var(--text)",
+                            color: "var(--text)",
                           }}
                         >
                           {isActive ? "Active" : unlocked ? "Apply" : "Locked"}
@@ -255,18 +248,6 @@ export default function ThemeButton() {
                         >
                           {theme.priceLabel}
                         </span>
-
-                        {theme.isPremium && !unlocked ? (
-                          <span
-                            className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
-                            style={{
-                              borderColor: "var(--border)",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            Locked
-                          </span>
-                        ) : null}
                       </div>
                     </div>
                   </article>
