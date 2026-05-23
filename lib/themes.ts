@@ -27,19 +27,6 @@ export type ThemeDefinition = {
   colors: ThemeColors;
 };
 
-/**
- * Theme access mode.
- *
- * all-unlocked:
- * - Every theme is usable by every viewer.
- *
- * premium-locked:
- * - Free themes are public.
- * - Premium themes require admin preview or ownedPremiumThemes.
- *
- * Keep this as "all-unlocked" for now while the project is in active testing.
- * Later, switch it back to "premium-locked" when you want paid themes again.
- */
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
 export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
@@ -97,7 +84,7 @@ export const THEMES = [
     id: "obsidian-gold",
     name: "Obsidian Gold",
     description: "Black broadcast interface with refined gold highlights.",
-    priceLabel: "$3",
+    priceLabel: "Free",
     isPremium: true,
     colors: {
       appBg: "#050505",
@@ -120,7 +107,7 @@ export const THEMES = [
     id: "midas-gold",
     name: "Midas Gold",
     description: "Full premium gold interface with deep black accents.",
-    priceLabel: "$3",
+    priceLabel: "Free",
     isPremium: true,
     colors: {
       appBg: "#b8860b",
@@ -143,33 +130,37 @@ export const THEMES = [
     },
   },
   {
+    /**
+     * Keep the old id for compatibility with saved user state.
+     * Visible name is now Original Xbox Inspired.
+     */
     id: "halo-2008-inspired",
-    name: "Halo 2008 Inspired",
+    name: "Original Xbox Inspired",
     description:
-      "Military sci-fi dashboard styling with olive armor tones, black glass panels, and plasma-blue HUD highlights.",
-    priceLabel: "$3",
+      "Early-2000s console dashboard feel with deep black glass, electric green glow, and chunky sci-fi panel contrast.",
+    priceLabel: "Free",
     isPremium: true,
     colors: {
       appBg:
-        "radial-gradient(circle at top left, rgba(72, 96, 48, 0.42), transparent 32%), radial-gradient(circle at bottom right, rgba(0, 180, 216, 0.18), transparent 34%), #050806",
+        "radial-gradient(circle at top left, rgba(141, 198, 63, 0.34), transparent 30%), radial-gradient(circle at bottom right, rgba(39, 255, 103, 0.18), transparent 34%), linear-gradient(135deg, #020502, #071007 48%, #000000)",
       panelBg:
-        "linear-gradient(135deg, rgba(7, 13, 8, 0.96), rgba(19, 29, 16, 0.92))",
+        "linear-gradient(135deg, rgba(3, 8, 3, 0.97), rgba(12, 24, 10, 0.94))",
       panelAltBg:
-        "linear-gradient(135deg, rgba(16, 26, 14, 0.96), rgba(5, 10, 7, 0.94))",
-      border: "#31462b",
-      text: "#eef8df",
-      textMuted: "#a9bc8b",
+        "linear-gradient(135deg, rgba(10, 22, 8, 0.98), rgba(2, 7, 2, 0.96))",
+      border: "#5f8f24",
+      text: "#f2ffe8",
+      textMuted: "#c7e99b",
       buttonBg:
-        "linear-gradient(135deg, rgba(37, 54, 28, 0.96), rgba(12, 20, 11, 0.96))",
+        "linear-gradient(135deg, rgba(41, 74, 20, 0.98), rgba(12, 22, 7, 0.98))",
       buttonHover:
-        "linear-gradient(135deg, rgba(60, 83, 42, 0.98), rgba(20, 33, 18, 0.98))",
-      primary: "#7da83d",
+        "linear-gradient(135deg, rgba(95, 143, 36, 0.98), rgba(22, 44, 12, 0.98))",
+      primary: "#8dc63f",
       guideHeaderBg:
-        "linear-gradient(135deg, rgba(8, 16, 10, 0.98), rgba(32, 48, 24, 0.96))",
-      guideRowBg: "#071008",
-      guideRowAltBg: "#101b0e",
-      guideActiveBg: "#7da83d",
-      guideCurrentBg: "#9fd8ff",
+        "linear-gradient(135deg, rgba(4, 12, 4, 0.99), rgba(33, 61, 16, 0.98))",
+      guideRowBg: "#030803",
+      guideRowAltBg: "#0a1507",
+      guideActiveBg: "#8dc63f",
+      guideCurrentBg: "#b7ff5a",
     },
   },
 ] as const satisfies readonly ThemeDefinition[];
@@ -196,13 +187,6 @@ export function getPremiumThemes(): ThemeDefinition[] {
   return THEMES.filter((theme) => theme.isPremium);
 }
 
-/**
- * Upgrade 1:
- * Centralized theme lock logic.
- *
- * Right now, every theme is unlocked because THEME_ACCESS_MODE is "all-unlocked".
- * Later, change THEME_ACCESS_MODE to "premium-locked" to restore premium gating.
- */
 export function canUseTheme(
   themeId: ThemeId,
   ownedPremiumThemes: ThemeId[],
@@ -225,13 +209,6 @@ export function canUseTheme(
   return ownedPremiumThemes.includes(themeId);
 }
 
-/**
- * Upgrade 2:
- * Safe theme resolver that respects the current access mode.
- *
- * In all-unlocked mode, any valid theme can be used.
- * In premium-locked mode, locked premium themes fall back to DEFAULT_THEME_ID.
- */
 export function getSafeThemeId(
   requestedThemeId: unknown,
   ownedPremiumThemes: ThemeId[],
@@ -248,10 +225,6 @@ export function getSafeThemeId(
   return requestedThemeId;
 }
 
-/**
- * Helper for theme menus.
- * Keeps labels clean while themes are temporarily free.
- */
 export function getThemeAccessLabel(
   theme: ThemeDefinition,
   ownedPremiumThemes: ThemeId[],
@@ -274,6 +247,14 @@ export function getThemeAccessLabel(
   }
 
   return "Premium";
+}
+
+export function getThemePriceLabel(theme: ThemeDefinition): string {
+  if (THEME_ACCESS_MODE === "all-unlocked") {
+    return "Free";
+  }
+
+  return theme.priceLabel;
 }
 
 export function createThemeCssVars(theme: ThemeDefinition): Record<string, string> {
