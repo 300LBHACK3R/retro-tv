@@ -5,6 +5,8 @@ import { probeVideoDuration } from "@/lib/mediaDuration";
 import { useStore } from "@/lib/store";
 import type { MediaItem, MediaType } from "@/lib/types";
 
+type DurationMode = "seconds" | "minutes";
+
 function createMediaId(title: string): string {
   const clean = title
     .toLowerCase()
@@ -37,9 +39,39 @@ function inferProvider(file: string): MediaItem["provider"] {
   return "unknown";
 }
 
+function normalizeUrl(value: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/\s/g, "%20");
+  }
+
+  if (trimmed.includes(".r2.dev/")) {
+    return `https://${trimmed}`.replace(/\s/g, "%20");
+  }
+
+  return trimmed.replace(/\s/g, "%20");
+}
+
+function isLikelyVideoUrl(value: string): boolean {
+  const clean = value.toLowerCase();
+
+  return (
+    clean.startsWith("https://") &&
+    (clean.includes(".mp4") ||
+      clean.includes(".webm") ||
+      clean.includes(".mov") ||
+      clean.includes(".m4v"))
+  );
+}
+
 function inferNameFromUrl(url: string): string {
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(normalizeUrl(url));
     const lastPart = decodeURIComponent(
       parsed.pathname.split("/").filter(Boolean).at(-1) ?? "",
     );
@@ -54,23 +86,81 @@ function inferNameFromUrl(url: string): string {
   }
 }
 
-function formatDurationLabel(seconds: string): string {
-  const value = Number(seconds);
+function titleCase(value: string): string {
+  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
-  if (!Number.isFinite(value) || value <= 0) {
-    return "Duration not set";
-  }
-
-  const total = Math.floor(value);
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const remaining = total % 60;
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
 
   if (hours > 0) {
-    return `${hours}h ${minutes}m ${remaining}s`;
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
 
-  return `${minutes}m ${remaining}s`;
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+
+  return `${remainingSeconds}s`;
+}
+
+function parseManualDuration(value: string, mode: DurationMode): number {
+  const clean = value.trim();
+
+  if (!clean) {
+    return 0;
+  }
+
+  // Supports:
+  // 22:19
+  // 1:22:19
+  // 22.5 minutes
+  // 1339 seconds
+  if (clean.includes(":")) {
+    const parts = clean
+      .split(":")
+      .map((part) => Number(part.trim()))
+      .filter((part) => Number.isFinite(part));
+
+    if (parts.length === 2) {
+      const [minutes, seconds] = parts;
+      return Math.floor(minutes * 60 + seconds);
+    }
+
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts;
+      return Math.floor(hours * 3600 + minutes * 60 + seconds);
+    }
+
+    return 0;
+  }
+
+  const numeric = Number(clean);
+
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 0;
+  }
+
+  if (mode === "minutes") {
+    return Math.round(numeric * 60);
+  }
+
+  return Math.round(numeric);
+}
+
+function getDurationHelperText(value: string, mode: DurationMode): string {
+  const seconds = parseManualDuration(value, mode);
+
+  if (seconds <= 0) {
+    return mode === "minutes"
+      ? "Type minutes, like 22.5, or use 22:19."
+      : "Type seconds, like 1339, or use 22:19.";
+  }
+
+  return formatDuration(seconds);
 }
 
 export default function UploadPanel() {
@@ -82,11 +172,20 @@ export default function UploadPanel() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState("");
   const [type, setType] = useState<MediaType>("show");
-  const [duration, setDuration] = useState("");
+  const [durationInput, setDurationInput] = useState("");
+  const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
   const [channelId, setChannelId] = useState(currentChannelId);
   const [status, setStatus] = useState("");
-  const [durationStatus, setDurationStatus] = useState("");
+  const [durationStatus, setDurationStatus] = useState(
+    "Auto-detect will try first. Manual duration always works.",
+  );
   const [isDetectingDuration, setIsDetectingDuration] = useState(false);
+
+  const normalizedFile = useMemo(() => normalizeUrl(file), [file]);
+  const parsedDurationSeconds = useMemo(
+    () => parseManualDuration(durationInput, durationMode),
+    [durationInput, durationMode],
+  );
 
   const enabledChannels = useMemo(
     () =>
@@ -98,16 +197,21 @@ export default function UploadPanel() {
 
   const canAdd =
     title.trim().length > 0 &&
-    file.trim().length > 0 &&
-    Number.isFinite(Number(duration)) &&
-    Number(duration) > 0 &&
+    normalizedFile.length > 0 &&
+    normalizedFile.startsWith("https://") &&
+    parsedDurationSeconds > 0 &&
     channelId.trim().length > 0;
 
   const detectDuration = async (url: string) => {
-    const cleanUrl = url.trim();
+    const cleanUrl = normalizeUrl(url);
 
     if (!cleanUrl) {
       setDurationStatus("Paste a video URL first.");
+      return;
+    }
+
+    if (!cleanUrl.startsWith("https://")) {
+      setDurationStatus("Use a full public https:// video URL.");
       return;
     }
 
@@ -117,13 +221,12 @@ export default function UploadPanel() {
     try {
       const result = await probeVideoDuration(cleanUrl);
 
-      setDuration(String(result.duration));
+      setDurationMode("seconds");
+      setDurationInput(String(result.duration));
       setDurationStatus(`Detected ${result.durationLabel}.`);
-    } catch (error) {
+    } catch {
       setDurationStatus(
-        error instanceof Error
-          ? error.message
-          : "Could not detect duration. Enter it manually.",
+        "Auto-detect failed. No problem — enter duration manually as seconds, minutes, or 22:19.",
       );
     } finally {
       setIsDetectingDuration(false);
@@ -131,38 +234,58 @@ export default function UploadPanel() {
   };
 
   const handleUrlChange = (value: string) => {
-    setFile(value);
+    const nextUrl = normalizeUrl(value);
+
+    setFile(nextUrl);
     setStatus("");
 
     if (!title.trim()) {
-      const inferredTitle = inferNameFromUrl(value);
+      const inferredTitle = inferNameFromUrl(nextUrl);
 
       if (inferredTitle) {
-        setTitle(inferredTitle);
+        setTitle(titleCase(inferredTitle));
       }
     }
   };
 
   const addItem = () => {
     if (!canAdd) {
+      if (!normalizedFile.startsWith("https://")) {
+        setStatus("Use a full public https:// video URL.");
+        return;
+      }
+
+      if (parsedDurationSeconds <= 0) {
+        setStatus("Enter a valid duration manually or use Auto.");
+        return;
+      }
+
       setStatus("Fill in title, URL, duration, and channel first.");
       return;
     }
 
+    if (!isLikelyVideoUrl(normalizedFile)) {
+      const confirmed = window.confirm(
+        "This URL does not clearly look like a video file. Add it anyway?",
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
     const cleanTitle = title.trim();
-    const cleanFile = file.trim();
-    const cleanDuration = Math.max(1, Math.floor(Number(duration)));
     const id = createMediaId(cleanTitle);
 
     const item: MediaItem = {
       id,
       title: cleanTitle,
       type,
-      duration: cleanDuration,
-      file: cleanFile,
+      duration: parsedDurationSeconds,
+      file: normalizedFile,
       mimeType: "video/mp4",
-      originalName: cleanFile.split("/").at(-1) ?? cleanTitle,
-      provider: inferProvider(cleanFile),
+      originalName: normalizedFile.split("/").at(-1) ?? cleanTitle,
+      provider: inferProvider(normalizedFile),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -170,11 +293,15 @@ export default function UploadPanel() {
     addMedia(item);
     assignMediaToChannel(channelId, item.id);
 
-    setStatus(`Added "${item.title}" to CH ${channelId}.`);
+    setStatus(
+      `Added "${item.title}" to CH ${channelId} • ${formatDuration(item.duration)}.`,
+    );
+
     setTitle("");
     setFile("");
-    setDuration("");
-    setDurationStatus("");
+    setDurationInput("");
+    setDurationMode("seconds");
+    setDurationStatus("Auto-detect will try first. Manual duration always works.");
   };
 
   return (
@@ -199,8 +326,8 @@ export default function UploadPanel() {
         </h2>
 
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Paste a public video URL. Duration can be detected automatically from
-          the video metadata.
+          Paste a public video URL. Auto-duration will try first, but manual
+          duration is always available.
         </p>
       </div>
 
@@ -217,7 +344,7 @@ export default function UploadPanel() {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            placeholder="Naruto S01E01"
+            placeholder="Corner Gas S04E18 Happy Campers"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -238,7 +365,7 @@ export default function UploadPanel() {
             value={file}
             onChange={(event) => handleUrlChange(event.target.value)}
             onBlur={(event) => {
-              if (!duration.trim()) {
+              if (!durationInput.trim()) {
                 void detectDuration(event.target.value);
               }
             }}
@@ -247,13 +374,25 @@ export default function UploadPanel() {
             spellCheck={false}
             style={{
               background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
+              borderColor:
+                normalizedFile && !normalizedFile.startsWith("https://")
+                  ? "#f87171"
+                  : "var(--border)",
               color: "var(--text)",
             }}
           />
+
+          {normalizedFile && normalizedFile !== file ? (
+            <div
+              className="mt-1 text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Normalized URL: {normalizedFile}
+            </div>
+          ) : null}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_1fr]">
           <div>
             <label
               className="mb-1 block text-xs"
@@ -284,29 +423,48 @@ export default function UploadPanel() {
               className="mb-1 block text-xs"
               style={{ color: "var(--text-muted)" }}
             >
-              Duration Seconds
+              Duration
             </label>
 
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2">
               <input
-                value={duration}
+                value={durationInput}
                 onChange={(event) =>
-                  setDuration(event.target.value.replace(/[^\d]/g, ""))
+                  setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
                 }
-                className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                placeholder="Auto"
-                inputMode="numeric"
+                className="min-w-0 rounded-lg border px-3 py-2 text-sm outline-none"
+                placeholder="Auto, 1339, 22.3, or 22:19"
+                inputMode="decimal"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor:
+                    durationInput && parsedDurationSeconds <= 0
+                      ? "#f87171"
+                      : "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
+
+              <select
+                value={durationMode}
+                onChange={(event) =>
+                  setDurationMode(event.target.value as DurationMode)
+                }
+                className="rounded-lg border px-2 py-2 text-xs outline-none"
                 style={{
                   background: "var(--panel-alt-bg)",
                   borderColor: "var(--border)",
                   color: "var(--text)",
                 }}
-              />
+              >
+                <option value="seconds">sec</option>
+                <option value="minutes">min</option>
+              </select>
 
               <button
                 type="button"
                 onClick={() => void detectDuration(file)}
-                disabled={isDetectingDuration || !file.trim()}
+                disabled={isDetectingDuration || !normalizedFile}
                 className="rounded-lg px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
                   background: "var(--button-bg)",
@@ -321,7 +479,7 @@ export default function UploadPanel() {
               className="mt-1 text-[11px]"
               style={{ color: "var(--text-muted)" }}
             >
-              {durationStatus || formatDurationLabel(duration)}
+              {durationStatus} • {getDurationHelperText(durationInput, durationMode)}
             </div>
           </div>
 
@@ -353,19 +511,34 @@ export default function UploadPanel() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={addItem}
-          disabled={!canAdd}
-          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
-            color: "var(--text)",
-          }}
-        >
-          Add Media
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => window.open(normalizedFile, "_blank", "noopener")}
+            disabled={!normalizedFile.startsWith("https://")}
+            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              background: "var(--button-bg)",
+              color: "var(--text)",
+            }}
+          >
+            Test URL
+          </button>
+
+          <button
+            type="button"
+            onClick={addItem}
+            disabled={!canAdd}
+            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
+              color: "var(--text)",
+            }}
+          >
+            Add Media
+          </button>
+        </div>
 
         {status ? (
           <div
