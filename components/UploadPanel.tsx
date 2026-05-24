@@ -7,6 +7,8 @@ import type { MediaItem, MediaType } from "@/lib/types";
 
 type DurationMode = "seconds" | "minutes";
 
+const SUPPORTED_VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".mkv"];
+
 function createMediaId(title: string): string {
   const clean = title
     .toLowerCase()
@@ -46,27 +48,37 @@ function normalizeUrl(value: string): string {
     return "";
   }
 
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed.replace(/\s/g, "%20");
-  }
+  const normalized = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : trimmed.includes(".r2.dev/")
+      ? `https://${trimmed}`
+      : trimmed;
 
-  if (trimmed.includes(".r2.dev/")) {
-    return `https://${trimmed}`.replace(/\s/g, "%20");
-  }
+  return normalized.replace(/\s/g, "%20");
+}
 
-  return trimmed.replace(/\s/g, "%20");
+function getCleanUrlPath(value: string): string {
+  return value.toLowerCase().split("?")[0] ?? "";
 }
 
 function isLikelyVideoUrl(value: string): boolean {
-  const clean = value.toLowerCase();
+  const clean = getCleanUrlPath(value);
 
   return (
     clean.startsWith("https://") &&
-    (clean.includes(".mp4") ||
-      clean.includes(".webm") ||
-      clean.includes(".mov") ||
-      clean.includes(".m4v"))
+    SUPPORTED_VIDEO_EXTENSIONS.some((extension) => clean.endsWith(extension))
   );
+}
+
+function inferMimeType(file: string): string {
+  const clean = getCleanUrlPath(file);
+
+  if (clean.endsWith(".webm")) return "video/webm";
+  if (clean.endsWith(".mov")) return "video/quicktime";
+  if (clean.endsWith(".m4v")) return "video/x-m4v";
+  if (clean.endsWith(".mkv")) return "video/x-matroska";
+
+  return "video/mp4";
 }
 
 function inferNameFromUrl(url: string): string {
@@ -114,11 +126,6 @@ function parseManualDuration(value: string, mode: DurationMode): number {
     return 0;
   }
 
-  // Supports:
-  // 22:19
-  // 1:22:19
-  // 22.5 minutes
-  // 1339 seconds
   if (clean.includes(":")) {
     const parts = clean
       .split(":")
@@ -182,6 +189,7 @@ export default function UploadPanel() {
   const [isDetectingDuration, setIsDetectingDuration] = useState(false);
 
   const normalizedFile = useMemo(() => normalizeUrl(file), [file]);
+
   const parsedDurationSeconds = useMemo(
     () => parseManualDuration(durationInput, durationMode),
     [durationInput, durationMode],
@@ -266,7 +274,7 @@ export default function UploadPanel() {
 
     if (!isLikelyVideoUrl(normalizedFile)) {
       const confirmed = window.confirm(
-        "This URL does not clearly look like a video file. Add it anyway?",
+        "This URL does not clearly look like a supported video file. Add it anyway?",
       );
 
       if (!confirmed) {
@@ -283,7 +291,7 @@ export default function UploadPanel() {
       type,
       duration: parsedDurationSeconds,
       file: normalizedFile,
-      mimeType: "video/mp4",
+      mimeType: inferMimeType(normalizedFile),
       originalName: normalizedFile.split("/").at(-1) ?? cleanTitle,
       provider: inferProvider(normalizedFile),
       createdAt: new Date().toISOString(),
@@ -294,7 +302,9 @@ export default function UploadPanel() {
     assignMediaToChannel(channelId, item.id);
 
     setStatus(
-      `Added "${item.title}" to CH ${channelId} • ${formatDuration(item.duration)}.`,
+      `Added "${item.title}" to CH ${channelId} • ${formatDuration(
+        item.duration,
+      )} • ${item.mimeType}.`,
     );
 
     setTitle("");
@@ -326,8 +336,8 @@ export default function UploadPanel() {
         </h2>
 
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Paste a public video URL. Auto-duration will try first, but manual
-          duration is always available.
+          Supports MP4, WebM, MOV, M4V, and MKV. Auto-duration tries first;
+          manual duration always works.
         </p>
       </div>
 
@@ -479,7 +489,8 @@ export default function UploadPanel() {
               className="mt-1 text-[11px]"
               style={{ color: "var(--text-muted)" }}
             >
-              {durationStatus} • {getDurationHelperText(durationInput, durationMode)}
+              {durationStatus} •{" "}
+              {getDurationHelperText(durationInput, durationMode)}
             </div>
           </div>
 
