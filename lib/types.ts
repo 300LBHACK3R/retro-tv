@@ -16,6 +16,15 @@ export type CommercialBreakMode =
   | "midpoint-and-end"
   | "classic-tv";
 
+export type Weekday =
+  | "sunday"
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday";
+
 export interface ChannelBranding {
   displayName: string;
   callsign: string;
@@ -37,6 +46,20 @@ export interface MediaItem {
   provider?: "cloudflare-r2" | "external-url" | "local-dev" | "unknown";
   createdAt?: string;
   updatedAt?: string;
+
+  /**
+   * Manual commercial break points in seconds.
+   * Example:
+   * 480 = 08:00
+   * 960 = 16:00
+   */
+  breakpoints?: number[];
+
+  /**
+   * Days this item is allowed to air.
+   * Empty/undefined means every day.
+   */
+  airDays?: Weekday[];
 }
 
 export interface Channel {
@@ -46,48 +69,15 @@ export interface Channel {
   mediaIds: string[];
   branding?: ChannelBranding;
   isEnabled?: boolean;
-
-  /**
-   * ordered = exact playlist order from Channel Programming.
-   * daily-random = deterministic random lineup that changes daily but stays synced across devices.
-   */
   scheduleMode?: ScheduleMode;
-
-  /**
-   * Controls commercial insertion style.
-   */
   commercialBreakMode?: CommercialBreakMode;
-
-  /**
-   * Optional custom seed for a channel. Useful if you want a channel to reshuffle differently.
-   */
   randomSeed?: string;
 }
 
 export type BroadcastItem = MediaItem & {
-  /**
-   * Where to start inside the source file.
-   * Used for "part 1 / part 2" commercial breaks without cutting the MP4.
-   */
   sourceStart?: number;
-
-  /**
-   * Where this segment ends inside the source file.
-   */
   sourceEnd?: number;
-
-  /**
-   * Original full media id when this is a virtual segment.
-   */
   parentMediaId?: string;
-
-  /**
-   * Human-readable segment label.
-   */
   segmentLabel?: string;
-
-  /**
-   * True when this item is a virtual broadcast segment.
-   */
   isVirtualSegment?: boolean;
 };

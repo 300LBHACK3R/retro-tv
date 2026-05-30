@@ -3,11 +3,21 @@
 import { useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
 import { useStore } from "@/lib/store";
-import type { MediaItem, MediaType } from "@/lib/types";
+import type { MediaItem, MediaType, Weekday } from "@/lib/types";
 
 type DurationMode = "seconds" | "minutes";
 
 const SUPPORTED_VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".mkv"];
+
+const WEEKDAYS: { id: Weekday; label: string }[] = [
+  { id: "sunday", label: "Sun" },
+  { id: "monday", label: "Mon" },
+  { id: "tuesday", label: "Tue" },
+  { id: "wednesday", label: "Wed" },
+  { id: "thursday", label: "Thu" },
+  { id: "friday", label: "Fri" },
+  { id: "saturday", label: "Sat" },
+];
 
 function createMediaId(title: string): string {
   const clean = title
@@ -30,9 +40,7 @@ function inferProvider(file: string): MediaItem["provider"] {
     return "cloudflare-r2";
   }
 
-  if (file.startsWith("/")) {
-    return "local-dev";
-  }
+  if (file.startsWith("/")) return "local-dev";
 
   if (file.startsWith("http://") || file.startsWith("https://")) {
     return "external-url";
@@ -44,9 +52,7 @@ function inferProvider(file: string): MediaItem["provider"] {
 function normalizeUrl(value: string): string {
   const trimmed = value.trim();
 
-  if (!trimmed) {
-    return "";
-  }
+  if (!trimmed) return "";
 
   const normalized = /^https?:\/\//i.test(trimmed)
     ? trimmed
@@ -108,23 +114,15 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor((safeSeconds % 3600) / 60);
   const remainingSeconds = safeSeconds % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${remainingSeconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-
+  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
   return `${remainingSeconds}s`;
 }
 
 function parseManualDuration(value: string, mode: DurationMode): number {
   const clean = value.trim();
 
-  if (!clean) {
-    return 0;
-  }
+  if (!clean) return 0;
 
   if (clean.includes(":")) {
     const parts = clean
@@ -147,15 +145,25 @@ function parseManualDuration(value: string, mode: DurationMode): number {
 
   const numeric = Number(clean);
 
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return 0;
-  }
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
 
-  if (mode === "minutes") {
-    return Math.round(numeric * 60);
-  }
+  return mode === "minutes" ? Math.round(numeric * 60) : Math.round(numeric);
+}
 
-  return Math.round(numeric);
+function parseBreakpoints(value: string, totalDuration: number): number[] {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((part) => parseManualDuration(part.trim(), "seconds"))
+        .filter(
+          (seconds) =>
+            seconds > 0 &&
+            seconds >= 60 &&
+            seconds <= Math.max(0, totalDuration - 60),
+        ),
+    ),
+  ).sort((a, b) => a - b);
 }
 
 function getDurationHelperText(value: string, mode: DurationMode): string {
@@ -170,6 +178,16 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
   return formatDuration(seconds);
 }
 
+function formatBreakpoints(value: string, totalDuration: number): string {
+  const points = parseBreakpoints(value, totalDuration);
+
+  if (points.length === 0) {
+    return "Optional. Example: 08:00, 16:00";
+  }
+
+  return points.map(formatDuration).join(", ");
+}
+
 export default function UploadPanel() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -181,6 +199,8 @@ export default function UploadPanel() {
   const [type, setType] = useState<MediaType>("show");
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
+  const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [selectedAirDays, setSelectedAirDays] = useState<Weekday[]>([]);
   const [channelId, setChannelId] = useState(currentChannelId);
   const [status, setStatus] = useState("");
   const [durationStatus, setDurationStatus] = useState(
@@ -193,6 +213,11 @@ export default function UploadPanel() {
   const parsedDurationSeconds = useMemo(
     () => parseManualDuration(durationInput, durationMode),
     [durationInput, durationMode],
+  );
+
+  const parsedBreakpoints = useMemo(
+    () => parseBreakpoints(breakpointsInput, parsedDurationSeconds),
+    [breakpointsInput, parsedDurationSeconds],
   );
 
   const enabledChannels = useMemo(
@@ -209,6 +234,18 @@ export default function UploadPanel() {
     normalizedFile.startsWith("https://") &&
     parsedDurationSeconds > 0 &&
     channelId.trim().length > 0;
+
+  const toggleAirDay = (day: Weekday) => {
+    setSelectedAirDays((current) =>
+      current.includes(day)
+        ? current.filter((item) => item !== day)
+        : [...current, day],
+    );
+  };
+
+  const selectEveryDay = () => {
+    setSelectedAirDays([]);
+  };
 
   const detectDuration = async (url: string) => {
     const cleanUrl = normalizeUrl(url);
@@ -234,7 +271,7 @@ export default function UploadPanel() {
       setDurationStatus(`Detected ${result.durationLabel}.`);
     } catch {
       setDurationStatus(
-        "Auto-detect failed. No problem — enter duration manually as seconds, minutes, or 22:19.",
+        "Auto-detect failed. Enter duration manually as seconds, minutes, or 22:19.",
       );
     } finally {
       setIsDetectingDuration(false);
@@ -277,9 +314,7 @@ export default function UploadPanel() {
         "This URL does not clearly look like a supported video file. Add it anyway?",
       );
 
-      if (!confirmed) {
-        return;
-      }
+      if (!confirmed) return;
     }
 
     const cleanTitle = title.trim();
@@ -294,6 +329,8 @@ export default function UploadPanel() {
       mimeType: inferMimeType(normalizedFile),
       originalName: normalizedFile.split("/").at(-1) ?? cleanTitle,
       provider: inferProvider(normalizedFile),
+      breakpoints: parsedBreakpoints,
+      airDays: selectedAirDays,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -304,13 +341,15 @@ export default function UploadPanel() {
     setStatus(
       `Added "${item.title}" to CH ${channelId} • ${formatDuration(
         item.duration,
-      )} • ${item.mimeType}.`,
+      )}.`,
     );
 
     setTitle("");
     setFile("");
     setDurationInput("");
     setDurationMode("seconds");
+    setBreakpointsInput("");
+    setSelectedAirDays([]);
     setDurationStatus("Auto-detect will try first. Manual duration always works.");
   };
 
@@ -336,106 +375,62 @@ export default function UploadPanel() {
         </h2>
 
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Supports MP4, WebM, MOV, M4V, and MKV. Auto-duration tries first;
-          manual duration always works.
+          Add video metadata, manual ad breakpoints, and optional airing days.
         </p>
       </div>
 
       <div className="grid gap-3">
-        <div>
-          <label
-            className="mb-1 block text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Title
-          </label>
+        <input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+          placeholder="Title"
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor: "var(--border)",
+            color: "var(--text)",
+          }}
+        />
 
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            placeholder="Corner Gas S04E18 Happy Campers"
+        <input
+          value={file}
+          onChange={(event) => handleUrlChange(event.target.value)}
+          onBlur={(event) => {
+            if (!durationInput.trim()) {
+              void detectDuration(event.target.value);
+            }
+          }}
+          className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+          placeholder="https://pub-xxxx.r2.dev/video.mp4"
+          spellCheck={false}
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor:
+              normalizedFile && !normalizedFile.startsWith("https://")
+                ? "#f87171"
+                : "var(--border)",
+            color: "var(--text)",
+          }}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_1fr]">
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value as MediaType)}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
               color: "var(--text)",
             }}
-          />
-        </div>
-
-        <div>
-          <label
-            className="mb-1 block text-xs"
-            style={{ color: "var(--text-muted)" }}
           >
-            Cloudflare/R2 Public URL
-          </label>
-
-          <input
-            value={file}
-            onChange={(event) => handleUrlChange(event.target.value)}
-            onBlur={(event) => {
-              if (!durationInput.trim()) {
-                void detectDuration(event.target.value);
-              }
-            }}
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            placeholder="https://pub-xxxx.r2.dev/video.mp4"
-            spellCheck={false}
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor:
-                normalizedFile && !normalizedFile.startsWith("https://")
-                  ? "#f87171"
-                  : "var(--border)",
-              color: "var(--text)",
-            }}
-          />
-
-          {normalizedFile && normalizedFile !== file ? (
-            <div
-              className="mt-1 text-[11px]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Normalized URL: {normalizedFile}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_1fr]">
-          <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Type
-            </label>
-
-            <select
-              value={type}
-              onChange={(event) => setType(event.target.value as MediaType)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            >
-              <option value="show">Show</option>
-              <option value="movie">Movie</option>
-              <option value="commercial">Commercial</option>
-              <option value="bumper">Bumper</option>
-            </select>
-          </div>
+            <option value="show">Show</option>
+            <option value="movie">Movie</option>
+            <option value="commercial">Commercial</option>
+            <option value="bumper">Bumper</option>
+          </select>
 
           <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Duration
-            </label>
-
             <div className="grid grid-cols-[1fr_auto_auto] gap-2">
               <input
                 value={durationInput}
@@ -443,14 +438,11 @@ export default function UploadPanel() {
                   setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
                 }
                 className="min-w-0 rounded-lg border px-3 py-2 text-sm outline-none"
-                placeholder="Auto, 1339, 22.3, or 22:19"
+                placeholder="Duration: 1339, 22.3, or 22:19"
                 inputMode="decimal"
                 style={{
                   background: "var(--panel-alt-bg)",
-                  borderColor:
-                    durationInput && parsedDurationSeconds <= 0
-                      ? "#f87171"
-                      : "var(--border)",
+                  borderColor: "var(--border)",
                   color: "var(--text)",
                 }}
               />
@@ -489,36 +481,104 @@ export default function UploadPanel() {
               className="mt-1 text-[11px]"
               style={{ color: "var(--text-muted)" }}
             >
-              {durationStatus} •{" "}
-              {getDurationHelperText(durationInput, durationMode)}
+              {durationStatus} • {getDurationHelperText(durationInput, durationMode)}
             </div>
           </div>
 
-          <div>
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Channel
-            </label>
+          <select
+            value={channelId}
+            onChange={(event) => setChannelId(event.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text)",
+            }}
+          >
+            {enabledChannels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                CH {channel.number ?? channel.id} •{" "}
+                {channel.branding?.displayName ?? channel.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-            <select
-              value={channelId}
-              onChange={(event) => setChannelId(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+        <div>
+          <label
+            className="mb-1 block text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Manual Commercial Breakpoints
+          </label>
+
+          <input
+            value={breakpointsInput}
+            onChange={(event) =>
+              setBreakpointsInput(event.target.value.replace(/[^\d:.,\s]/g, ""))
+            }
+            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+            placeholder="Example: 08:00, 16:00, 22:30"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text)",
+            }}
+          />
+
+          <div
+            className="mt-1 text-[11px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {formatBreakpoints(breakpointsInput, parsedDurationSeconds)}
+          </div>
+        </div>
+
+        <div>
+          <div
+            className="mb-2 flex items-center justify-between gap-2 text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span>Air Days</span>
+            <button
+              type="button"
+              onClick={selectEveryDay}
+              className="rounded-lg px-2 py-1 text-[11px] font-semibold"
               style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
+                background: "var(--button-bg)",
                 color: "var(--text)",
               }}
             >
-              {enabledChannels.map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  CH {channel.number ?? channel.id} •{" "}
-                  {channel.branding?.displayName ?? channel.name}
-                </option>
-              ))}
-            </select>
+              Every Day
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {WEEKDAYS.map((day) => {
+              const active = selectedAirDays.includes(day.id);
+
+              return (
+                <button
+                  key={day.id}
+                  type="button"
+                  onClick={() => toggleAirDay(day.id)}
+                  className="rounded-lg px-2 py-2 text-[11px] font-black uppercase tracking-[0.08em]"
+                  style={{
+                    background: active ? "var(--primary)" : "var(--button-bg)",
+                    color: "var(--text)",
+                  }}
+                >
+                  {day.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            className="mt-1 text-[11px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            No days selected means this media can air every day.
           </div>
         </div>
 
@@ -527,7 +587,7 @@ export default function UploadPanel() {
             type="button"
             onClick={() => window.open(normalizedFile, "_blank", "noopener")}
             disabled={!normalizedFile.startsWith("https://")}
-            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: "var(--button-bg)",
               color: "var(--text)",
@@ -540,7 +600,7 @@ export default function UploadPanel() {
             type="button"
             onClick={addItem}
             disabled={!canAdd}
-            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background:
                 "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",

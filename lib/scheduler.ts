@@ -4,6 +4,7 @@ import type {
   CommercialBreakMode,
   MediaItem,
   ScheduleMode,
+  Weekday,
 } from "./types";
 
 type BuildScheduleOptions = {
@@ -12,7 +13,22 @@ type BuildScheduleOptions = {
 };
 
 const DEFAULT_BREAK_ITEM_COUNT = 2;
+const CLASSIC_BREAK_ITEM_COUNT = 3;
 const MIN_SEGMENT_SECONDS = 120;
+
+const WEEKDAYS: Weekday[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+function getToday(now: Date): Weekday {
+  return WEEKDAYS[now.getDay()] ?? "sunday";
+}
 
 function isLongForm(item: MediaItem): boolean {
   return item.type === "show" || item.type === "movie";
@@ -23,7 +39,19 @@ function isShortForm(item: MediaItem): boolean {
 }
 
 function hasPlayableDuration(item: MediaItem): boolean {
-  return Number.isFinite(item.duration) && item.duration > 0 && item.file.trim().length > 0;
+  return (
+    Number.isFinite(item.duration) &&
+    item.duration > 0 &&
+    item.file.trim().length > 0
+  );
+}
+
+function canAirToday(item: MediaItem, now: Date): boolean {
+  if (!item.airDays || item.airDays.length === 0) {
+    return true;
+  }
+
+  return item.airDays.includes(getToday(now));
 }
 
 function getDateSeed(now: Date): string {
@@ -75,6 +103,23 @@ function getCommercialBreakMode(channel?: Channel): CommercialBreakMode {
   return channel?.commercialBreakMode ?? "none";
 }
 
+function normalizeBreakpoints(item: MediaItem): number[] {
+  const duration = Math.max(1, Math.floor(item.duration));
+
+  return Array.from(
+    new Set(
+      (item.breakpoints ?? [])
+        .map((value) => Math.floor(Number(value)))
+        .filter(
+          (value) =>
+            Number.isFinite(value) &&
+            value >= MIN_SEGMENT_SECONDS &&
+            value <= duration - MIN_SEGMENT_SECONDS,
+        ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
 function createVirtualSegment(
   item: MediaItem,
   sourceStart: number,
@@ -123,14 +168,116 @@ function takeBreakItems(
 
 function getBreakCount(mode: CommercialBreakMode): number {
   if (mode === "classic-tv") {
-    return 3;
+    return CLASSIC_BREAK_ITEM_COUNT;
   }
 
   return DEFAULT_BREAK_ITEM_COUNT;
 }
 
 function shouldAddEndBreak(mode: CommercialBreakMode): boolean {
-  return mode === "end-only" || mode === "midpoint-and-end" || mode === "classic-tv";
+  return (
+    mode === "end-only" ||
+    mode === "midpoint-and-end" ||
+    mode === "classic-tv"
+  );
+}
+
+function buildManualBreakpointSchedule(
+  item: MediaItem,
+  shortFormItems: MediaItem[],
+  mode: CommercialBreakMode,
+  shortCursor: { value: number },
+): BroadcastItem[] {
+  const breakpoints = normalizeBreakpoints(item);
+
+  if (mode === "none" || shortFormItems.length === 0 || breakpoints.length === 0) {
+    return [item];
+  }
+
+  const schedule: BroadcastItem[] = [];
+  const breakCount = getBreakCount(mode);
+  const points = [0, ...breakpoints, item.duration];
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index] ?? 0;
+    const end = points[index + 1] ?? item.duration;
+    const duration = end - start;
+
+    if (duration <= 0) {
+      continue;
+    }
+
+    const label =
+      points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
+
+    schedule.push(createVirtualSegment(item, start, duration, label));
+
+    const isLastSegment = index === points.length - 2;
+
+    if (!isLastSegment || shouldAddEndBreak(mode)) {
+      schedule.push(...takeBreakItems(shortFormItems, breakCount, shortCursor));
+    }
+  }
+
+  return schedule;
+}
+
+function buildAutomaticBreakSchedule(
+  item: MediaItem,
+  shortFormItems: MediaItem[],
+  mode: CommercialBreakMode,
+  shortCursor: { value: number },
+): BroadcastItem[] {
+  const duration = Math.max(1, Math.floor(item.duration));
+  const breakCount = getBreakCount(mode);
+
+  if (mode === "none" || shortFormItems.length === 0) {
+    return [item];
+  }
+
+  if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
+    return [
+      item,
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+    ];
+  }
+
+  if (mode === "midpoint-and-end") {
+    const firstHalf = Math.floor(duration / 2);
+    const secondHalf = duration - firstHalf;
+
+    return [
+      createVirtualSegment(item, 0, firstHalf, "Part 1"),
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+      createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+    ];
+  }
+
+  if (mode === "classic-tv" && duration >= 2400) {
+    const first = Math.floor(duration / 3);
+    const second = Math.floor(duration / 3);
+    const third = duration - first - second;
+
+    return [
+      createVirtualSegment(item, 0, first, "Act 1"),
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+      createVirtualSegment(item, first, second, "Act 2"),
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+      createVirtualSegment(item, first + second, third, "Act 3"),
+      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+    ];
+  }
+
+  const firstHalf = Math.floor(duration / 2);
+  const secondHalf = duration - firstHalf;
+
+  return [
+    createVirtualSegment(item, 0, firstHalf, "Part 1"),
+    ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+    createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
+    ...takeBreakItems(shortFormItems, breakCount, shortCursor),
+  ];
 }
 
 function buildWithCommercialBreaks(
@@ -138,81 +285,41 @@ function buildWithCommercialBreaks(
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
 ): BroadcastItem[] {
-  if (mode === "none" || shortFormItems.length === 0) {
-    return longFormItems;
-  }
-
   const schedule: BroadcastItem[] = [];
   const shortCursor = { value: 0 };
-  const breakItemCount = getBreakCount(mode);
 
   for (const item of longFormItems) {
-    const duration = Math.max(1, Math.floor(item.duration));
+    const manualBreakpoints = normalizeBreakpoints(item);
 
-    if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
-      schedule.push(item);
-
-      if (shouldAddEndBreak(mode)) {
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-      }
-
+    if (manualBreakpoints.length > 0) {
+      schedule.push(
+        ...buildManualBreakpointSchedule(
+          item,
+          shortFormItems,
+          mode,
+          shortCursor,
+        ),
+      );
       continue;
     }
 
-    if (mode === "midpoint-and-end") {
-      const firstHalf = Math.floor(duration / 2);
-      const secondHalf = duration - firstHalf;
-
-      schedule.push(createVirtualSegment(item, 0, firstHalf, "Part 1"));
-      schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-      schedule.push(createVirtualSegment(item, firstHalf, secondHalf, "Part 2"));
-      schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-
-      continue;
-    }
-
-    if (mode === "classic-tv") {
-      if (duration >= 2400) {
-        const first = Math.floor(duration / 3);
-        const second = Math.floor(duration / 3);
-        const third = duration - first - second;
-
-        schedule.push(createVirtualSegment(item, 0, first, "Act 1"));
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-        schedule.push(createVirtualSegment(item, first, second, "Act 2"));
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-        schedule.push(createVirtualSegment(item, first + second, third, "Act 3"));
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-      } else {
-        const firstHalf = Math.floor(duration / 2);
-        const secondHalf = duration - firstHalf;
-
-        schedule.push(createVirtualSegment(item, 0, firstHalf, "Part 1"));
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-        schedule.push(createVirtualSegment(item, firstHalf, secondHalf, "Part 2"));
-        schedule.push(...takeBreakItems(shortFormItems, breakItemCount, shortCursor));
-      }
-    }
+    schedule.push(
+      ...buildAutomaticBreakSchedule(item, shortFormItems, mode, shortCursor),
+    );
   }
 
   return schedule;
 }
 
 /**
- * Build a live channel schedule.
+ * Channel schedule builder.
  *
- * ordered:
- * - Uses the channel programming order.
- *
- * daily-random:
- * - Randomizes long-form items once per day using a deterministic seed.
- * - Every browser/device gets the same order on the same day.
- *
- * commercialBreakMode:
- * - none: plays items normally
- * - end-only: commercials after each show/movie
- * - midpoint-and-end: splits shows into two virtual parts
- * - classic-tv: 2-part sitcom breaks / 3-act long-form breaks
+ * Supports:
+ * - Ordered playback
+ * - Daily seeded random playback
+ * - Air-day filtering
+ * - Manual commercial breakpoints
+ * - Automatic commercial break modes
  */
 export function buildSchedule(
   media: MediaItem[],
@@ -221,7 +328,9 @@ export function buildSchedule(
   const now = options.now ?? new Date();
   const channel = options.channel;
 
-  const playableMedia = media.filter(hasPlayableDuration);
+  const playableMedia = media
+    .filter(hasPlayableDuration)
+    .filter((item) => canAirToday(item, now));
 
   if (playableMedia.length === 0) {
     return [];
@@ -235,7 +344,10 @@ export function buildSchedule(
 
   if (longForm.length === 0) {
     return scheduleMode === "daily-random"
-      ? seededShuffle(playableMedia, `${channel?.id ?? "channel"}:${getDateSeed(now)}:fallback`)
+      ? seededShuffle(
+          playableMedia,
+          `${channel?.id ?? "channel"}:${getDateSeed(now)}:fallback`,
+        )
       : playableMedia;
   }
 
@@ -243,7 +355,9 @@ export function buildSchedule(
     scheduleMode === "daily-random"
       ? seededShuffle(
           longForm,
-          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(now)}:long-form`,
+          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
+            now,
+          )}:long-form`,
         )
       : longForm;
 
@@ -251,7 +365,9 @@ export function buildSchedule(
     scheduleMode === "daily-random"
       ? seededShuffle(
           shortForm,
-          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(now)}:short-form`,
+          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
+            now,
+          )}:short-form`,
         )
       : shortForm;
 
@@ -259,5 +375,8 @@ export function buildSchedule(
 }
 
 export function getScheduleDuration(schedule: BroadcastItem[]): number {
-  return schedule.reduce((sum, item) => sum + Math.max(1, Math.floor(item.duration)), 0);
+  return schedule.reduce(
+    (sum, item) => sum + Math.max(1, Math.floor(item.duration)),
+    0,
+  );
 }
