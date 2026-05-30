@@ -9,6 +9,7 @@ import type {
   MediaItem,
   ScheduleMode,
   ThemeId,
+  Weekday,
 } from "./types";
 import type { ProgrammingSnapshot } from "./programmingSnapshot";
 
@@ -25,9 +26,13 @@ interface AppState {
   deletedMediaIds: string[];
 
   addMedia: (item: MediaItem) => void;
+  updateMedia: (mediaId: string, patch: Partial<MediaItem>) => void;
   removeMedia: (mediaId: string) => void;
   removeManyMedia: (mediaIds: string[]) => void;
+
   setChannel: (id: string) => void;
+  moveChannel: (channelId: string, direction: "up" | "down") => void;
+
   updateChannelBranding: (
     channelId: string,
     brandingPatch: Partial<ChannelBranding>,
@@ -40,6 +45,7 @@ interface AppState {
       randomSeed: string;
     }>,
   ) => void;
+
   assignMediaToChannel: (channelId: string, mediaId: string) => void;
   removeMediaFromChannel: (channelId: string, mediaId: string) => void;
   clearChannelMedia: (channelId: string) => void;
@@ -48,6 +54,7 @@ interface AppState {
     fromIndex: number,
     toIndex: number,
   ) => void;
+
   setSidebarWidth: (width: number) => void;
   setGuideHeight: (height: number) => void;
   setAppMode: (mode: AppMode) => void;
@@ -61,7 +68,7 @@ interface AppState {
 }
 
 export const programmingStoreName = "retro-tv-programming-v1";
-export const programmingStoreVersion = 3;
+export const programmingStoreVersion = 4;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -73,6 +80,16 @@ const DEFAULT_GUIDE_HEIGHT = 290;
 
 const DEFAULT_ACCENT_COLOR = "#2563eb";
 
+const VALID_WEEKDAYS: Weekday[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
 export const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
@@ -83,6 +100,8 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e01.mp4",
     provider: "cloudflare-r2",
+    breakpoints: [],
+    airDays: [],
   },
   {
     id: "martin-mystery-s01e02",
@@ -93,6 +112,8 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e02.mp4",
     provider: "cloudflare-r2",
+    breakpoints: [],
+    airDays: [],
   },
 ];
 
@@ -146,24 +167,27 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
   };
 }
 
-export const defaultChannels: Channel[] = Array.from({ length: 12 }, (_, index) => {
-  const channelNumber = index + 1;
+export const defaultChannels: Channel[] = Array.from(
+  { length: 12 },
+  (_, index) => {
+    const channelNumber = index + 1;
 
-  return {
-    id: String(channelNumber),
-    number: channelNumber,
-    name: `Channel ${channelNumber}`,
-    mediaIds:
-      channelNumber === 1
-        ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
-        : [],
-    isEnabled: true,
-    scheduleMode: "ordered",
-    commercialBreakMode: "none",
-    randomSeed: `channel-${channelNumber}`,
-    branding: createDefaultChannelBranding(channelNumber),
-  };
-});
+    return {
+      id: String(channelNumber),
+      number: channelNumber,
+      name: `Channel ${channelNumber}`,
+      mediaIds:
+        channelNumber === 1
+          ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
+          : [],
+      isEnabled: true,
+      scheduleMode: "ordered",
+      commercialBreakMode: "none",
+      randomSeed: `channel-${channelNumber}`,
+      branding: createDefaultChannelBranding(channelNumber),
+    };
+  },
+);
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -176,36 +200,85 @@ function normalizeText(value: unknown, fallback: string): string {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function isWeekday(value: unknown): value is Weekday {
+  return typeof value === "string" && VALID_WEEKDAYS.includes(value as Weekday);
+}
+
+function normalizeBreakpoints(value: unknown, duration: number): number[] {
+  if (!Array.isArray(value)) return [];
+
+  const safeDuration = Math.max(1, Math.floor(Number(duration) || 1));
+
+  return Array.from(
+    new Set(
+      value
+        .map((point) => Math.floor(Number(point)))
+        .filter(
+          (point) =>
+            Number.isFinite(point) &&
+            point > 0 &&
+            point < safeDuration,
+        ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+function normalizeAirDays(value: unknown): Weekday[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(new Set(value.filter(isWeekday)));
+}
+
 function inferMediaProvider(file: string | undefined): MediaItem["provider"] {
   if (!file) return "unknown";
+
   if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
     return "cloudflare-r2";
   }
+
   if (file.startsWith("/")) return "local-dev";
+
   if (file.startsWith("http://") || file.startsWith("https://")) {
     return "external-url";
   }
+
   return "unknown";
+}
+
+function inferMimeType(file: string, fallback?: string): string {
+  const clean = file.toLowerCase().split("?")[0] ?? "";
+
+  if (clean.endsWith(".webm")) return "video/webm";
+  if (clean.endsWith(".mov")) return "video/quicktime";
+  if (clean.endsWith(".m4v")) return "video/x-m4v";
+  if (clean.endsWith(".mkv")) return "video/x-matroska";
+  if (clean.endsWith(".mp4")) return "video/mp4";
+
+  return fallback ?? "video/mp4";
 }
 
 function normalizeMediaItem(item: MediaItem): MediaItem {
   const now = new Date().toISOString();
+  const duration = Math.max(1, Math.floor(Number(item.duration) || 1));
+  const file = normalizeText(item.file, "");
 
   return {
     ...item,
     id: normalizeText(item.id, crypto.randomUUID()),
     title: normalizeText(item.title, "Untitled Media"),
-    duration: Math.max(1, Math.floor(Number(item.duration) || 1)),
-    file: normalizeText(item.file, ""),
-    mimeType: item.mimeType ?? "video/mp4",
-    provider: item.provider ?? inferMediaProvider(item.file),
+    duration,
+    file,
+    mimeType: item.mimeType ?? inferMimeType(file),
+    provider: item.provider ?? inferMediaProvider(file),
+    breakpoints: normalizeBreakpoints(item.breakpoints, duration),
+    airDays: normalizeAirDays(item.airDays),
     createdAt: item.createdAt ?? now,
     updatedAt: now,
   };
-}
-
-function dedupeStrings(values: string[]): string[] {
-  return Array.from(new Set(values.filter(Boolean)));
 }
 
 function isValidScheduleMode(value: unknown): value is ScheduleMode {
@@ -307,6 +380,11 @@ function getValidAppMode(value: unknown): AppMode {
   return value === "admin" || value === "viewer" ? value : "viewer";
 }
 
+function getChannelSortNumber(channel: Channel): number {
+  const value = Number(channel.number ?? channel.id);
+  return Number.isFinite(value) ? value : 9999;
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -340,12 +418,26 @@ export const useStore = create<AppState>()(
             media: mediaExists
               ? state.media.map((mediaItem) =>
                   mediaItem.id === normalizedItem.id
-                    ? { ...mediaItem, ...normalizedItem }
+                    ? normalizeMediaItem({ ...mediaItem, ...normalizedItem })
                     : mediaItem,
                 )
               : [...state.media, normalizedItem],
           };
         }),
+
+      updateMedia: (mediaId, patch) =>
+        set((state) => ({
+          media: state.media.map((item) =>
+            item.id === mediaId
+              ? normalizeMediaItem({
+                  ...item,
+                  ...patch,
+                  id: item.id,
+                  updatedAt: new Date().toISOString(),
+                })
+              : item,
+          ),
+        })),
 
       removeMedia: (mediaId) =>
         set((state) => ({
@@ -376,13 +468,67 @@ export const useStore = create<AppState>()(
 
       setChannel: (id) =>
         set((state) => {
-          const channelExists = state.channels.some((channel) => channel.id === id);
+          const channelExists = state.channels.some(
+            (channel) => channel.id === id,
+          );
 
           if (!channelExists) return state;
 
           return {
             currentChannelId: id,
             isGuideOpen: false,
+          };
+        }),
+
+      moveChannel: (channelId, direction) =>
+        set((state) => {
+          const orderedChannels = [...state.channels].sort((a, b) => {
+            const numberSort = getChannelSortNumber(a) - getChannelSortNumber(b);
+
+            if (numberSort !== 0) return numberSort;
+
+            return a.id.localeCompare(b.id);
+          });
+
+          const currentIndex = orderedChannels.findIndex(
+            (channel) => channel.id === channelId,
+          );
+
+          if (currentIndex === -1) return state;
+
+          const targetIndex =
+            direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+          if (targetIndex < 0 || targetIndex >= orderedChannels.length) {
+            return state;
+          }
+
+          const currentChannel = orderedChannels[currentIndex];
+          const targetChannel = orderedChannels[targetIndex];
+
+          if (!currentChannel || !targetChannel) return state;
+
+          const currentNumber = getChannelSortNumber(currentChannel);
+          const targetNumber = getChannelSortNumber(targetChannel);
+
+          return {
+            channels: state.channels.map((channel) => {
+              if (channel.id === currentChannel.id) {
+                return {
+                  ...channel,
+                  number: targetNumber,
+                };
+              }
+
+              if (channel.id === targetChannel.id) {
+                return {
+                  ...channel,
+                  number: currentNumber,
+                };
+              }
+
+              return channel;
+            }),
           };
         }),
 
@@ -604,7 +750,9 @@ export const useStore = create<AppState>()(
           : [];
 
         const savedMedia = Array.isArray(saved?.media) ? saved.media : [];
-        const savedChannels = Array.isArray(saved?.channels) ? saved.channels : [];
+        const savedChannels = Array.isArray(saved?.channels)
+          ? saved.channels
+          : [];
 
         const mergedMedia = removeDeletedDefaults(
           mergeById(defaultMedia, savedMedia.map(normalizeMediaItem)),
