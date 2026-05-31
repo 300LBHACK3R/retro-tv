@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 import type {
@@ -6,9 +6,12 @@ import type {
   Channel,
   ChannelBranding,
   CommercialBreakMode,
+  CommercialStrategy,
   MediaItem,
+  PlayerViewMode,
   ScheduleMode,
   ThemeId,
+  ViewerSettings,
   Weekday,
 } from "./types";
 import type { ProgrammingSnapshot } from "./programmingSnapshot";
@@ -24,6 +27,7 @@ interface AppState {
   themeId: ThemeId;
   ownedPremiumThemes: ThemeId[];
   deletedMediaIds: string[];
+  viewerSettings: ViewerSettings;
 
   addMedia: (item: MediaItem) => void;
   updateMedia: (mediaId: string, patch: Partial<MediaItem>) => void;
@@ -37,12 +41,15 @@ interface AppState {
     channelId: string,
     brandingPatch: Partial<ChannelBranding>,
   ) => void;
+
   updateChannelSettings: (
     channelId: string,
     patch: Partial<{
       scheduleMode: ScheduleMode;
       commercialBreakMode: CommercialBreakMode;
       randomSeed: string;
+      defaultSlotLengthSeconds: number;
+      commercialStrategy: CommercialStrategy;
     }>,
   ) => void;
 
@@ -60,6 +67,14 @@ interface AppState {
   setAppMode: (mode: AppMode) => void;
   setTheme: (themeId: ThemeId) => void;
   unlockTheme: (themeId: ThemeId) => void;
+
+  setPlayerViewMode: (mode: PlayerViewMode) => void;
+  isSettingsOpen: boolean;
+  setSettingsOpen: (isOpen: boolean) => void;
+  setAdminAccessOpen: (isOpen: boolean) => void;
+  setGuideDensity: (density: ViewerSettings["guideDensity"]) => void;
+  setPreferReducedMotion: (enabled: boolean) => void;
+
   toggleGuide: () => void;
   closeGuide: () => void;
   resetProgramming: () => void;
@@ -68,7 +83,7 @@ interface AppState {
 }
 
 export const programmingStoreName = "retro-tv-programming-v1";
-export const programmingStoreVersion = 4;
+export const programmingStoreVersion = 5;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -90,6 +105,20 @@ const VALID_WEEKDAYS: Weekday[] = [
   "saturday",
 ];
 
+const VALID_COMMERCIAL_STRATEGIES: CommercialStrategy[] = [
+  "sequential",
+  "best-fit",
+  "random",
+];
+
+const defaultViewerSettings: ViewerSettings = {
+  playerViewMode: "normal",
+  isSettingsOpen: false,
+  isAdminAccessOpen: false,
+  guideDensity: "comfortable",
+  preferReducedMotion: false,
+};
+
 export const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
@@ -101,6 +130,10 @@ export const defaultMedia: MediaItem[] = [
     originalName: "martin-mystery-s01e01.mp4",
     provider: "cloudflare-r2",
     breakpoints: [],
+    breakDurations: [],
+    slotLengthSeconds: 1800,
+    fillSlotWithCommercials: false,
+    commercialStrategy: "best-fit",
     airDays: [],
   },
   {
@@ -113,6 +146,10 @@ export const defaultMedia: MediaItem[] = [
     originalName: "martin-mystery-s01e02.mp4",
     provider: "cloudflare-r2",
     breakpoints: [],
+    breakDurations: [],
+    slotLengthSeconds: 1800,
+    fillSlotWithCommercials: false,
+    commercialStrategy: "best-fit",
     airDays: [],
   },
 ];
@@ -184,6 +221,8 @@ export const defaultChannels: Channel[] = Array.from(
       scheduleMode: "ordered",
       commercialBreakMode: "none",
       randomSeed: `channel-${channelNumber}`,
+      defaultSlotLengthSeconds: 1800,
+      commercialStrategy: "best-fit",
       branding: createDefaultChannelBranding(channelNumber),
     };
   },
@@ -204,8 +243,31 @@ function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function createFallbackId(): string {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    "randomUUID" in globalThis.crypto
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `media-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function isWeekday(value: unknown): value is Weekday {
   return typeof value === "string" && VALID_WEEKDAYS.includes(value as Weekday);
+}
+
+function isCommercialStrategy(value: unknown): value is CommercialStrategy {
+  return (
+    typeof value === "string" &&
+    VALID_COMMERCIAL_STRATEGIES.includes(value as CommercialStrategy)
+  );
+}
+
+function normalizePositiveInteger(value: unknown, fallback = 0): number {
+  const numeric = Math.floor(Number(value));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
 function normalizeBreakpoints(value: unknown, duration: number): number[] {
@@ -225,6 +287,18 @@ function normalizeBreakpoints(value: unknown, duration: number): number[] {
         ),
     ),
   ).sort((a, b) => a - b);
+}
+
+function normalizeDurationList(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((point) => Math.floor(Number(point)))
+        .filter((point) => Number.isFinite(point) && point > 0),
+    ),
+  );
 }
 
 function normalizeAirDays(value: unknown): Weekday[] {
@@ -261,21 +335,45 @@ function inferMimeType(file: string, fallback?: string): string {
   return fallback ?? "video/mp4";
 }
 
+function normalizeCommercialCategory(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const clean = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_\s]/g, "")
+    .replace(/\s+/g, "-");
+
+  return clean || undefined;
+}
+
 function normalizeMediaItem(item: MediaItem): MediaItem {
   const now = new Date().toISOString();
   const duration = Math.max(1, Math.floor(Number(item.duration) || 1));
   const file = normalizeText(item.file, "");
+  const slotLengthSeconds = normalizePositiveInteger(item.slotLengthSeconds);
 
   return {
     ...item,
-    id: normalizeText(item.id, crypto.randomUUID()),
+    id: normalizeText(item.id, createFallbackId()),
     title: normalizeText(item.title, "Untitled Media"),
     duration,
     file,
     mimeType: item.mimeType ?? inferMimeType(file),
     provider: item.provider ?? inferMediaProvider(file),
     breakpoints: normalizeBreakpoints(item.breakpoints, duration),
+    breakDurations: normalizeDurationList(item.breakDurations),
+    slotLengthSeconds:
+      slotLengthSeconds > duration ? slotLengthSeconds : undefined,
+    fillSlotWithCommercials: Boolean(item.fillSlotWithCommercials),
+    commercialStrategy: isCommercialStrategy(item.commercialStrategy)
+      ? item.commercialStrategy
+      : "best-fit",
     airDays: normalizeAirDays(item.airDays),
+    airStartTime: normalizeText(item.airStartTime, ""),
+    allowCommercialSlicing:
+      item.allowCommercialSlicing ?? item.type === "commercial",
+    commercialCategory: normalizeCommercialCategory(item.commercialCategory),
     createdAt: item.createdAt ?? now,
     updatedAt: now,
   };
@@ -302,11 +400,15 @@ function normalizeChannel(channel: Channel): Channel {
     Number.isFinite(channelNumber) ? channelNumber : 1,
   );
 
+  const defaultSlotLengthSeconds = normalizePositiveInteger(
+    channel.defaultSlotLengthSeconds,
+  );
+
   return {
     ...channel,
     id: normalizeText(channel.id, String(channelNumber || 1)),
     name: normalizeText(channel.name, `Channel ${channelNumber || 1}`),
-    mediaIds: dedupeStrings(channel.mediaIds),
+    mediaIds: dedupeStrings(Array.isArray(channel.mediaIds) ? channel.mediaIds : []),
     number: Number.isFinite(channelNumber) ? channelNumber : undefined,
     isEnabled: channel.isEnabled ?? true,
     scheduleMode: isValidScheduleMode(channel.scheduleMode)
@@ -319,6 +421,11 @@ function normalizeChannel(channel: Channel): Channel {
       channel.randomSeed,
       `channel-${Number.isFinite(channelNumber) ? channelNumber : channel.id}`,
     ),
+    defaultSlotLengthSeconds:
+      defaultSlotLengthSeconds > 0 ? defaultSlotLengthSeconds : 1800,
+    commercialStrategy: isCommercialStrategy(channel.commercialStrategy)
+      ? channel.commercialStrategy
+      : "best-fit",
     branding: {
       displayName:
         channel.branding?.displayName ??
@@ -380,6 +487,31 @@ function getValidAppMode(value: unknown): AppMode {
   return value === "admin" || value === "viewer" ? value : "viewer";
 }
 
+function getValidPlayerViewMode(value: unknown): PlayerViewMode {
+  if (value === "mini" || value === "theater" || value === "normal") {
+    return value;
+  }
+
+  return "normal";
+}
+
+function normalizeViewerSettings(value: unknown): ViewerSettings {
+  if (!value || typeof value !== "object") {
+    return defaultViewerSettings;
+  }
+
+  const settings = value as Partial<ViewerSettings>;
+
+  return {
+    playerViewMode: getValidPlayerViewMode(settings.playerViewMode),
+    isSettingsOpen: false,
+    isAdminAccessOpen: false,
+    guideDensity:
+      settings.guideDensity === "compact" ? "compact" : "comfortable",
+    preferReducedMotion: Boolean(settings.preferReducedMotion),
+  };
+}
+
 function getChannelSortNumber(channel: Channel): number {
   const value = Number(channel.number ?? channel.id);
   return Number.isFinite(value) ? value : 9999;
@@ -395,9 +527,11 @@ export const useStore = create<AppState>()(
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       guideHeight: DEFAULT_GUIDE_HEIGHT,
       appMode: "viewer",
+      isSettingsOpen: false,
       themeId: DEFAULT_THEME_ID,
       ownedPremiumThemes: [],
       deletedMediaIds: [],
+      viewerSettings: defaultViewerSettings,
 
       addMedia: (item) =>
         set((state) => {
@@ -561,7 +695,7 @@ export const useStore = create<AppState>()(
         set((state) => ({
           channels: state.channels.map((channel) =>
             channel.id === channelId
-              ? {
+              ? normalizeChannel({
                   ...channel,
                   scheduleMode:
                     patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
@@ -576,7 +710,16 @@ export const useStore = create<AppState>()(
                     patch.randomSeed !== undefined
                       ? normalizeText(patch.randomSeed, `channel-${channel.id}`)
                       : channel.randomSeed,
-                }
+                  defaultSlotLengthSeconds:
+                    patch.defaultSlotLengthSeconds !== undefined
+                      ? patch.defaultSlotLengthSeconds
+                      : channel.defaultSlotLengthSeconds,
+                  commercialStrategy:
+                    patch.commercialStrategy &&
+                    isCommercialStrategy(patch.commercialStrategy)
+                      ? patch.commercialStrategy
+                      : channel.commercialStrategy,
+                })
               : channel,
           ),
         })),
@@ -682,6 +825,46 @@ export const useStore = create<AppState>()(
           };
         }),
 
+      setPlayerViewMode: (mode) =>
+        set((state) => ({
+          viewerSettings: {
+            ...state.viewerSettings,
+            playerViewMode: getValidPlayerViewMode(mode),
+          },
+        })),
+
+      setSettingsOpen: (isOpen) =>
+        set((state) => ({
+          viewerSettings: {
+            ...state.viewerSettings,
+            isSettingsOpen: isOpen,
+          },
+        })),
+
+      setAdminAccessOpen: (isOpen) =>
+        set((state) => ({
+          viewerSettings: {
+            ...state.viewerSettings,
+            isAdminAccessOpen: isOpen,
+          },
+        })),
+
+      setGuideDensity: (density) =>
+        set((state) => ({
+          viewerSettings: {
+            ...state.viewerSettings,
+            guideDensity: density === "compact" ? "compact" : "comfortable",
+          },
+        })),
+
+      setPreferReducedMotion: (enabled) =>
+        set((state) => ({
+          viewerSettings: {
+            ...state.viewerSettings,
+            preferReducedMotion: enabled,
+          },
+        })),
+
       toggleGuide: () =>
         set((state) => ({
           isGuideOpen: !state.isGuideOpen,
@@ -717,9 +900,11 @@ export const useStore = create<AppState>()(
             MAX_GUIDE_HEIGHT,
           ),
           appMode: "viewer",
-          themeId: getValidThemeId(snapshot.themeId),
+      isSettingsOpen: false,
+      themeId: getValidThemeId(snapshot.themeId),
           ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
           deletedMediaIds: [],
+          viewerSettings: defaultViewerSettings,
         }),
 
       exportProgrammingSnapshot: () => {
@@ -732,7 +917,8 @@ export const useStore = create<AppState>()(
           sidebarWidth: state.sidebarWidth,
           guideHeight: state.guideHeight,
           appMode: "viewer",
-          themeId: state.themeId,
+      isSettingsOpen: false,
+      themeId: state.themeId,
           ownedPremiumThemes: state.ownedPremiumThemes,
           updatedAt: new Date().toISOString(),
         };
@@ -792,6 +978,7 @@ export const useStore = create<AppState>()(
           themeId: getValidThemeId(saved?.themeId),
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
           deletedMediaIds,
+          viewerSettings: normalizeViewerSettings(saved?.viewerSettings),
         };
       },
 
@@ -806,7 +993,11 @@ export const useStore = create<AppState>()(
         themeId: state.themeId,
         ownedPremiumThemes: state.ownedPremiumThemes,
         deletedMediaIds: state.deletedMediaIds,
+        viewerSettings: state.viewerSettings,
       }),
     },
   ),
 );
+
+
+
