@@ -4,14 +4,22 @@ import { useState } from "react";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
+import QuickMediaEditorPanel from "@/components/QuickMediaEditorPanel";
 import StationConfigPanel from "@/components/StationConfigPanel";
 import UploadPanel from "@/components/UploadPanel";
 import { useStore } from "@/lib/store";
 
-type AdminTab = "add" | "programming" | "branding" | "library" | "config";
+type AdminTab =
+  | "add"
+  | "quick-edit"
+  | "programming"
+  | "branding"
+  | "library"
+  | "config";
 
 const TABS: { id: AdminTab; label: string }[] = [
   { id: "add", label: "Add" },
+  { id: "quick-edit", label: "Quick Edit" },
   { id: "programming", label: "Playlist" },
   { id: "branding", label: "Branding" },
   { id: "library", label: "Library" },
@@ -19,7 +27,7 @@ const TABS: { id: AdminTab; label: string }[] = [
 ];
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("add");
+  const [activeTab, setActiveTab] = useState<AdminTab>("quick-edit");
 
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
@@ -70,6 +78,7 @@ export default function AdminDashboard() {
       </section>
 
       {activeTab === "add" ? <UploadPanel /> : null}
+      {activeTab === "quick-edit" ? <QuickMediaEditorPanel /> : null}
       {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}
       {activeTab === "branding" ? <ChannelBrandingPanel /> : null}
       {activeTab === "library" ? <MediaLibraryPanel /> : null}
