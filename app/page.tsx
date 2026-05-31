@@ -13,6 +13,7 @@ import Player from "@/components/Player";
 import QuickTuneBar from "@/components/QuickTuneBar";
 import Remote from "@/components/Remote";
 import StaticTransition from "@/components/StaticTransition";
+import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
 import ViewerHeader from "@/components/ViewerHeader";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
@@ -292,25 +293,22 @@ export default function Home() {
         color: "var(--text)",
       }}
     >
+      <TextEncodingCleaner />
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
       <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div
-              className="text-[11px] font-black uppercase tracking-[0.24em]"
-              style={{ color: "var(--primary)" }}
-            >
-              Tate&apos;s Retro TV
-            </div>
-
-            <h1 className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
-              Live Cable Simulator
-            </h1>
+            <img
+              src="/retro-logo.png"
+              alt="Tate's Retro TV"
+              className="h-auto w-[min(280px,70vw)] max-w-full object-contain sm:w-[340px]"
+              draggable={false}
+            />
 
             <p
-              className="mt-1 max-w-2xl text-xs leading-5"
+              className="mt-2 max-w-2xl text-xs leading-5"
               style={{ color: "var(--text-muted)" }}
             >
               {activeChannel
@@ -564,6 +562,8 @@ export default function Home() {
     </main>
   );
 }
+
+
 
 
 

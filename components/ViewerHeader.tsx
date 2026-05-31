@@ -67,9 +67,12 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
             </div>
           </div>
 
-          <h1 className="mt-4 truncate text-4xl font-black tracking-tight sm:text-5xl">
-            {title}
-          </h1>
+          <img
+            src="/retro-logo.png"
+            alt={title}
+            className="mt-4 h-auto w-[min(320px,75vw)] max-w-full object-contain sm:w-[420px]"
+            draggable={false}
+          />
 
           <p
             className="mt-3 line-clamp-2 max-w-5xl text-sm leading-6 sm:text-base"
@@ -112,3 +115,4 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
     </header>
   );
 }
+
