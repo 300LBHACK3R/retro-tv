@@ -128,13 +128,13 @@ export default function Home() {
   const setAppMode = useStore((state) => state.setAppMode);
   const themeId = useStore((state) => state.themeId);
 
-  const isSettingsOpen = useStore((state) => state.isSettingsOpen);
-  const setSettingsOpen = useStore((state) => state.setSettingsOpen);
+  
   const playerViewMode = useStore(
     (state) => state.viewerSettings.playerViewMode,
   );
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
+  const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
@@ -243,9 +243,9 @@ export default function Home() {
         return;
       }
 
-      if (isSettingsOpen && event.key === "Escape") {
+      if (localSettingsOpen && event.key === "Escape") {
         event.preventDefault();
-        setSettingsOpen(false);
+        setLocalSettingsOpen(false);
       }
     };
 
@@ -254,7 +254,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeGuide, isGuideOpen, isSettingsOpen, setSettingsOpen]);
+  }, [closeGuide, isGuideOpen, localSettingsOpen]);
 
   const guideDock = (
     <MultiGuide
@@ -316,7 +316,7 @@ export default function Home() {
 
             <button
               type="button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setLocalSettingsOpen(true)}
               className="rounded-2xl border px-4 py-3 text-left text-xs font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/30 transition hover:scale-[1.02] hover:opacity-95"
               style={{
                 background: "var(--button-bg)",
@@ -488,39 +488,23 @@ export default function Home() {
                 </div>
               ) : null}
             </div>
-
-            {!isGuideOpen && playerViewMode !== "mini" ? (
-              <div
-                className="overflow-auto rounded-2xl border p-2 shadow-2xl shadow-black/20"
+            {!isGuideOpen ? (
+              <section
+                className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
                 style={{
-                  height: `${guideHeight}px`,
-                  minHeight: "220px",
                   background: "var(--panel-bg)",
                   borderColor: "var(--border)",
+                  color: "var(--text-muted)",
                 }}
               >
-                {guideDock}
-              </div>
-            ) : null}
-
-            {!isGuideOpen && playerViewMode === "mini" ? (
-              <div
-                className="overflow-auto rounded-2xl border p-2 shadow-2xl shadow-black/20"
-                style={{
-                  height: `${Math.max(guideHeight, 360)}px`,
-                  minHeight: "300px",
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                }}
-              >
-                {guideDock}
-              </div>
+                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the full live channel guide.
+              </section>
             ) : null}
           </section>
         </div>
       </div>
 
-      {isSettingsOpen ? (
+      {localSettingsOpen ? (
         <div
           className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
           role="dialog"
@@ -558,7 +542,7 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setSettingsOpen(false)}
+                onClick={() => setLocalSettingsOpen(false)}
                 className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
                 style={{
                   background: "var(--button-bg)",
@@ -590,3 +574,9 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
+
+
