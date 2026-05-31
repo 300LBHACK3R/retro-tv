@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
@@ -10,7 +10,7 @@ interface NowNextBarProps {
   schedule: BroadcastItem[];
 }
 
-const LIVE_TICK_MS = 1000;
+const LIVE_TICK_MS = 2_000;
 
 function formatClock(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -226,7 +226,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           </div>
 
           <div className="mt-1 truncate text-base font-black">
-            {getChannelLabel(channel)} • {getChannelName(channel)}
+            {getChannelLabel(channel)} â€¢ {getChannelName(channel)}
           </div>
 
           <div className="mt-1 flex flex-wrap gap-2 text-xs">
@@ -236,7 +236,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
                 : "Ordered"}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}>•</span>
+            <span style={{ color: "var(--text-muted)" }}>â€¢</span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {channel.commercialBreakMode ?? "none"}
@@ -282,7 +282,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               {formatClock(live.elapsed)} / {formatClock(live.item.duration)}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}>•</span>
+            <span style={{ color: "var(--text-muted)" }}>â€¢</span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {formatLongClock(live.remaining)} left
@@ -290,7 +290,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
             {!isCurrentHidden && live.item.segmentLabel ? (
               <>
-                <span style={{ color: "var(--text-muted)" }}>•</span>
+                <span style={{ color: "var(--text-muted)" }}>â€¢</span>
                 <span style={{ color: "var(--text-muted)" }}>
                   {live.item.segmentLabel}
                 </span>
@@ -337,7 +337,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} •{" "}
+              {getDisplayTypeLabel(nextVisibleItem)} â€¢{" "}
               {formatLongClock(nextVisibleItem.duration)}
             </div>
           ) : (

@@ -1,11 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getItemSourceEnd,
-  getItemSourceStart,
-  getLiveState,
-} from "@/lib/liveEngine";
+import { getLiveState } from "@/lib/liveEngine";
 import { usePlayerControls } from "@/lib/playerControls";
 import type { BroadcastItem } from "@/lib/types";
 
@@ -13,20 +9,11 @@ interface PlayerProps {
   schedule: BroadcastItem[];
 }
 
-type PlaybackStatus =
-  | "idle"
-  | "loading"
-  | "playing"
-  | "paused"
-  | "stalled"
-  | "error";
+type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
-const SOFT_SYNC_THRESHOLD_SECONDS = 2.5;
-const HARD_SYNC_THRESHOLD_SECONDS = 8;
-const PLAY_RETRY_DELAY_MS = 650;
-const STALL_RECOVERY_DELAY_MS = 1400;
 const LIVE_TICK_MS = 1000;
-const SOURCE_END_PADDING_SECONDS = 0.35;
+const HARD_SYNC_DRIFT_SECONDS = 18;
+const SOURCE_END_PADDING_SECONDS = 0.4;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -61,73 +48,73 @@ function getDisplayTitle(item: BroadcastItem): string {
   return item.sourceTitle?.trim() || item.title;
 }
 
-function getSafeTargetTime(item: BroadcastItem, sourceElapsed: number): number {
-  const sourceStart = getItemSourceStart(item);
-  const sourceEnd = getItemSourceEnd(item);
-  const rawTarget = Math.max(sourceStart, Math.floor(sourceElapsed));
-
-  if (!sourceEnd) {
-    return rawTarget;
-  }
-
-  return Math.min(rawTarget, Math.max(sourceStart, sourceEnd - SOURCE_END_PADDING_SECONDS));
+function getSourceStart(item: BroadcastItem): number {
+  return Math.max(0, Math.floor(item.sourceStart ?? 0));
 }
 
-function getSafeVideoTargetTime(
+function getSourceEnd(item: BroadcastItem): number | null {
+  if (typeof item.sourceEnd !== "number" || !Number.isFinite(item.sourceEnd)) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor(item.sourceEnd));
+}
+
+function getSafeTargetTime(
   video: HTMLVideoElement,
   item: BroadcastItem,
   sourceElapsed: number,
 ): number {
-  const targetTime = getSafeTargetTime(item, sourceElapsed);
+  const sourceStart = getSourceStart(item);
+  const sourceEnd = getSourceEnd(item);
   const videoDuration = Number.isFinite(video.duration) ? video.duration : 0;
 
-  if (videoDuration <= 0) {
-    return targetTime;
+  let target = Math.max(sourceStart, Math.floor(sourceElapsed));
+
+  if (sourceEnd && sourceEnd > sourceStart) {
+    target = Math.min(
+      target,
+      Math.max(sourceStart, sourceEnd - SOURCE_END_PADDING_SECONDS),
+    );
   }
 
-  return Math.min(targetTime, Math.max(videoDuration - SOURCE_END_PADDING_SECONDS, 0));
-}
-
-function isDocumentVisible(): boolean {
-  if (typeof document === "undefined") {
-    return true;
+  if (videoDuration > 0) {
+    target = Math.min(
+      target,
+      Math.max(0, videoDuration - SOURCE_END_PADDING_SECONDS),
+    );
   }
 
-  return document.visibilityState === "visible";
+  return Math.max(0, target);
 }
 
-function getMediaErrorMessage(video: HTMLVideoElement): string {
+function getErrorMessage(video: HTMLVideoElement): string {
   const code = video.error?.code;
 
-  if (code === MediaError.MEDIA_ERR_ABORTED) {
-    return "Playback was interrupted. Tap to resume.";
-  }
-
   if (code === MediaError.MEDIA_ERR_NETWORK) {
-    return "Network error while loading video. Check the media URL or connection.";
+    return "Network error loading this video. Check the R2 URL.";
   }
 
   if (code === MediaError.MEDIA_ERR_DECODE) {
-    return "Video decode error. Convert this file to MP4/H.264/AAC for best playback.";
+    return "Video decode issue. Convert it to MP4 H.264/AAC.";
   }
 
   if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
     return "This video format is not supported by this browser.";
   }
 
-  return "Video playback error. Check URL or encoding.";
+  if (code === MediaError.MEDIA_ERR_ABORTED) {
+    return "Playback was interrupted. Tap to resume.";
+  }
+
+  return "Playback failed. Check the video URL or encoding.";
 }
 
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  const currentPlaybackKeyRef = useRef("empty");
-  const playRetryTimerRef = useRef<number | null>(null);
-  const stallRecoveryTimerRef = useRef<number | null>(null);
-  const sourceLoadTimerRef = useRef<number | null>(null);
-  const playAttemptRef = useRef(0);
-  const lastSeekAtRef = useRef(0);
+  const lastPlaybackKeyRef = useRef("");
+  const lastHardSyncRef = useRef(0);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -138,35 +125,13 @@ export default function Player({ schedule }: PlayerProps) {
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [status, setStatus] = useState<PlaybackStatus>("idle");
-  const [playbackError, setPlaybackError] = useState("");
-  const [isFallbackExpanded, setIsFallbackExpanded] = useState(false);
-  const [resumeNonce, setResumeNonce] = useState(0);
+  const [message, setMessage] = useState("");
+  const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
 
-  const clearPlayRetry = useCallback(() => {
-    if (playRetryTimerRef.current) {
-      window.clearTimeout(playRetryTimerRef.current);
-      playRetryTimerRef.current = null;
-    }
-  }, []);
-
-  const clearStallRecovery = useCallback(() => {
-    if (stallRecoveryTimerRef.current) {
-      window.clearTimeout(stallRecoveryTimerRef.current);
-      stallRecoveryTimerRef.current = null;
-    }
-  }, []);
-
-  const clearSourceLoadTimer = useCallback(() => {
-    if (sourceLoadTimerRef.current) {
-      window.clearTimeout(sourceLoadTimerRef.current);
-      sourceLoadTimerRef.current = null;
-    }
-  }, []);
-
-  const applyAudioSettings = useCallback(() => {
+  const applyAudio = useCallback(() => {
     const video = videoRef.current;
 
     if (!video) {
@@ -177,143 +142,77 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = muted || volume <= 0;
   }, [muted, volume]);
 
-  const syncVideoPosition = useCallback(
-    (mode: "soft" | "hard") => {
-      const video = videoRef.current;
-      const item = live.item;
-
-      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-        return;
-      }
-
-      const safeTarget = getSafeVideoTargetTime(video, item, live.sourceElapsed);
-      const drift = Math.abs(video.currentTime - safeTarget);
-      const sourceStart = getItemSourceStart(item);
-      const sourceEnd = getItemSourceEnd(item);
-
-      const belowSegment = video.currentTime < Math.max(0, sourceStart - 1);
-      const aboveSegment =
-        typeof sourceEnd === "number" &&
-        sourceEnd > sourceStart &&
-        video.currentTime > sourceEnd + 1;
-
-      const shouldSeek =
-        mode === "hard" ||
-        drift > SOFT_SYNC_THRESHOLD_SECONDS ||
-        belowSegment ||
-        aboveSegment;
-
-      if (!shouldSeek) {
-        return;
-      }
-
-      const now = Date.now();
-
-      if (
-        mode === "soft" &&
-        now - lastSeekAtRef.current < HARD_SYNC_THRESHOLD_SECONDS * 1000
-      ) {
-        return;
-      }
-
-      try {
-        video.currentTime = safeTarget;
-        lastSeekAtRef.current = now;
-      } catch {
-        // Some browsers temporarily reject seeking before metadata stabilizes.
-      }
-    },
-    [live.item, live.sourceElapsed],
-  );
-
-  const safePlay = useCallback(async () => {
+  const hardSyncPosition = useCallback(() => {
     const video = videoRef.current;
+    const item = live.item;
 
-    if (!video || !isDocumentVisible()) {
+    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
       return;
     }
 
-    playAttemptRef.current += 1;
-    const attemptId = playAttemptRef.current;
+    const target = getSafeTargetTime(video, item, live.sourceElapsed);
+    const drift = Math.abs(video.currentTime - target);
+    const now = Date.now();
+
+    if (drift < HARD_SYNC_DRIFT_SECONDS && now - lastHardSyncRef.current < 8000) {
+      return;
+    }
 
     try {
-      applyAudioSettings();
-      await video.play();
-
-      if (attemptId === playAttemptRef.current) {
-        setStatus("playing");
-        setPlaybackError("");
-        clearPlayRetry();
-      }
+      video.currentTime = target;
+      lastHardSyncRef.current = now;
     } catch {
-      if (attemptId !== playAttemptRef.current) {
-        return;
-      }
-
-      setStatus("paused");
-      setPlaybackError("Playback paused by browser. Tap to resume.");
-
-      clearPlayRetry();
-
-      playRetryTimerRef.current = window.setTimeout(() => {
-        void safePlay();
-      }, PLAY_RETRY_DELAY_MS);
+      // Browser may reject seeking before metadata settles.
     }
-  }, [applyAudioSettings, clearPlayRetry]);
+  }, [live.item, live.sourceElapsed]);
 
-  const reloadCurrentSource = useCallback(() => {
+  const tryPlay = useCallback(async () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    try {
+      applyAudio();
+      await video.play();
+      setStatus("playing");
+      setMessage("");
+    } catch {
+      setStatus("paused");
+      setMessage("Tap to start playback.");
+    }
+  }, [applyAudio]);
+
+  const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
     const item = live.item;
 
     if (!video || !item?.file) {
+      setStatus("idle");
+      setMessage("");
       return;
     }
 
     setStatus("loading");
-    setPlaybackError("");
-    clearPlayRetry();
-    clearStallRecovery();
-    clearSourceLoadTimer();
+    setMessage("");
 
     try {
       video.pause();
-      video.removeAttribute("src");
-      video.load();
-
-      applyAudioSettings();
-
       video.preload = "auto";
       video.src = item.file;
       video.load();
-
-      sourceLoadTimerRef.current = window.setTimeout(() => {
-        const currentVideo = videoRef.current;
-
-        if (!currentVideo || currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          return;
-        }
-
-        setStatus("stalled");
-        setPlaybackError("This video is taking longer than expected. Tap to retry.");
-      }, 8000);
     } catch {
       setStatus("error");
-      setPlaybackError("Video failed to load. Test the media URL.");
+      setMessage("Could not load this media source.");
     }
-  }, [
-    applyAudioSettings,
-    clearPlayRetry,
-    clearSourceLoadTimer,
-    clearStallRecovery,
-    live.item,
-  ]);
+  }, [live.item]);
 
-  const recoverPlayback = useCallback(() => {
+  const resume = useCallback(() => {
     setNowMs(Date.now());
-    setPlaybackError("");
-    syncVideoPosition("hard");
-    void safePlay();
-  }, [safePlay, syncVideoPosition]);
+    hardSyncPosition();
+    void tryPlay();
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -326,8 +225,8 @@ export default function Player({ schedule }: PlayerProps) {
   }, []);
 
   useEffect(() => {
-    applyAudioSettings();
-  }, [applyAudioSettings]);
+    applyAudio();
+  }, [applyAudio]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -335,62 +234,15 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (!video || !item) {
       setStatus("idle");
+      setMessage("");
       return;
     }
 
-    let cancelled = false;
-    const sourceChanged = currentPlaybackKeyRef.current !== playbackKey;
-
-    const handleReady = () => {
-      if (cancelled) {
-        return;
-      }
-
-      clearSourceLoadTimer();
-      syncVideoPosition("hard");
-      void safePlay();
-    };
-
-    const handleError = () => {
-      if (cancelled) {
-        return;
-      }
-
-      clearSourceLoadTimer();
-      setStatus("error");
-      setPlaybackError(getMediaErrorMessage(video));
-    };
-
-    video.addEventListener("loadedmetadata", handleReady);
-    video.addEventListener("canplay", handleReady);
-    video.addEventListener("error", handleError);
-
-    if (sourceChanged) {
-      currentPlaybackKeyRef.current = playbackKey;
-      reloadCurrentSource();
-    } else {
-      syncVideoPosition("soft");
-
-      if (video.paused && !playbackError) {
-        void safePlay();
-      }
+    if (lastPlaybackKeyRef.current !== playbackKey) {
+      lastPlaybackKeyRef.current = playbackKey;
+      loadCurrentSource();
     }
-
-    return () => {
-      cancelled = true;
-      video.removeEventListener("loadedmetadata", handleReady);
-      video.removeEventListener("canplay", handleReady);
-      video.removeEventListener("error", handleError);
-    };
-  }, [
-    clearSourceLoadTimer,
-    live.item,
-    playbackError,
-    playbackKey,
-    reloadCurrentSource,
-    safePlay,
-    syncVideoPosition,
-  ]);
+  }, [live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -399,66 +251,66 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
+    const handleLoadedMetadata = () => {
+      hardSyncPosition();
+      void tryPlay();
+    };
+
+    const handleCanPlay = () => {
+      if (!video.paused) {
+        setStatus("playing");
+        setMessage("");
+      }
+    };
+
     const handlePlaying = () => {
-      clearSourceLoadTimer();
-      clearStallRecovery();
       setStatus("playing");
-      setPlaybackError("");
+      setMessage("");
     };
 
     const handleWaiting = () => {
-      setStatus("stalled");
-      clearStallRecovery();
-
-      stallRecoveryTimerRef.current = window.setTimeout(() => {
-        syncVideoPosition("hard");
-        void safePlay();
-      }, STALL_RECOVERY_DELAY_MS);
-    };
-
-    const handleStalled = () => {
-      setStatus("stalled");
-      clearStallRecovery();
-
-      stallRecoveryTimerRef.current = window.setTimeout(() => {
-        syncVideoPosition("hard");
-        void safePlay();
-      }, STALL_RECOVERY_DELAY_MS);
+      /**
+       * Do not show a big recovery overlay here.
+       * Some browsers fire waiting during normal stream buffering even while video is visibly progressing.
+       */
+      setStatus((current) => (current === "loading" ? "loading" : "playing"));
     };
 
     const handlePause = () => {
-      if (!document.fullscreenElement && isDocumentVisible()) {
+      if (document.visibilityState === "visible") {
         setStatus("paused");
       }
     };
 
-    const handleEnded = () => {
-      setNowMs(Date.now());
-      syncVideoPosition("hard");
-      void safePlay();
-    };
-
     const handleError = () => {
       setStatus("error");
-      setPlaybackError(getMediaErrorMessage(video));
+      setMessage(getErrorMessage(video));
     };
 
+    const handleEnded = () => {
+      setNowMs(Date.now());
+      hardSyncPosition();
+      void tryPlay();
+    };
+
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("waiting", handleWaiting);
-    video.addEventListener("stalled", handleStalled);
     video.addEventListener("pause", handlePause);
-    video.addEventListener("ended", handleEnded);
     video.addEventListener("error", handleError);
+    video.addEventListener("ended", handleEnded);
 
     return () => {
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("waiting", handleWaiting);
-      video.removeEventListener("stalled", handleStalled);
       video.removeEventListener("pause", handlePause);
-      video.removeEventListener("ended", handleEnded);
       video.removeEventListener("error", handleError);
+      video.removeEventListener("ended", handleEnded);
     };
-  }, [clearSourceLoadTimer, clearStallRecovery, safePlay, syncVideoPosition]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -467,27 +319,23 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    const sourceEnd = getItemSourceEnd(live.item);
+    const sourceEnd = getSourceEnd(live.item);
 
-    if (!sourceEnd) {
+    if (!sourceEnd || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       return;
     }
 
-    if (
-      video.readyState >= HTMLMediaElement.HAVE_METADATA &&
-      video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS
-    ) {
+    if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
-      syncVideoPosition("hard");
     }
-  }, [live.item, live.sourceElapsed, nowMs, syncVideoPosition]);
+  }, [live.item, nowMs]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setNowMs(Date.now());
-        syncVideoPosition("hard");
-        void safePlay();
+        hardSyncPosition();
+        void tryPlay();
       }
     };
 
@@ -496,7 +344,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [safePlay, syncVideoPosition]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -509,7 +357,7 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    const toggleFullscreen = async () => {
+    const run = async () => {
       try {
         if (document.fullscreenElement) {
           await document.exitFullscreen();
@@ -518,42 +366,26 @@ export default function Player({ schedule }: PlayerProps) {
 
         await shell.requestFullscreen();
       } catch {
-        setIsFallbackExpanded((value) => !value);
+        setFallbackFullscreen((value) => !value);
       }
     };
 
-    void toggleFullscreen();
+    void run();
   }, [fullscreenRequestId]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        setIsFallbackExpanded(false);
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      clearPlayRetry();
-      clearStallRecovery();
-      clearSourceLoadTimer();
-
       const video = videoRef.current;
 
-      if (video) {
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
+      if (!video) {
+        return;
       }
+
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
-  }, [clearPlayRetry, clearSourceLoadTimer, clearStallRecovery]);
+  }, []);
 
   if (!live.item) {
     return (
@@ -571,9 +403,8 @@ export default function Player({ schedule }: PlayerProps) {
     );
   }
 
-  const activeTitle = getDisplayTitle(live.item);
-  const activeSegmentLabel = live.item.segmentLabel;
-  const isHiddenPlayback =
+  const title = getDisplayTitle(live.item);
+  const isBreak =
     live.item.hiddenFromGuide ||
     live.item.type === "commercial" ||
     live.item.type === "bumper";
@@ -582,17 +413,16 @@ export default function Player({ schedule }: PlayerProps) {
     <div
       ref={shellRef}
       className={`ttv-player-shell relative h-full w-full bg-black ${
-        isFallbackExpanded ? "ttv-player-expanded" : ""
+        fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
     >
       <video
         ref={videoRef}
         playsInline
         autoPlay
-        muted={muted || volume <= 0}
         preload="auto"
-        disablePictureInPicture
         controls={false}
+        muted={muted || volume <= 0}
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -601,36 +431,36 @@ export default function Player({ schedule }: PlayerProps) {
 
       <button
         type="button"
-        onClick={recoverPlayback}
+        onClick={resume}
         className="absolute inset-0 z-[1] cursor-default"
         aria-label="Resume playback"
         tabIndex={-1}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/60 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
-          {isHiddenPlayback ? "Commercial Break" : activeTitle}
+          {isBreak ? "Commercial Break" : title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {activeSegmentLabel && !isHiddenPlayback ? ` • ${activeSegmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
-      {status === "loading" || status === "stalled" ? (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/70 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
-          {status === "loading" ? "Loading channel..." : "Recovering stream..."}
+      {status === "loading" ? (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
+          Loading channel...
         </div>
       ) : null}
 
-      {playbackError ? (
+      {message ? (
         <button
           type="button"
-          onClick={recoverPlayback}
-          className="absolute left-1/2 top-1/2 z-20 max-w-[min(22rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/75 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
+          onClick={resume}
+          className="absolute left-1/2 top-1/2 z-20 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/80 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
         >
-          {playbackError}
+          {message}
         </button>
       ) : null}
 

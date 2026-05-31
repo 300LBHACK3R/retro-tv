@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
@@ -13,7 +13,7 @@ const CHANNEL_COLUMN_WIDTH = 122;
 const MIN_SLOT_WIDTH = 156;
 const WINDOW_MINUTES = SLOT_MINUTES * SLOT_COUNT;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
-const LIVE_TICK_MS = 1000;
+const LIVE_TICK_MS = 15_000;
 
 type MultiGuideRow = {
   channel: Channel;
@@ -298,7 +298,7 @@ export default function MultiGuide({
         <div className="text-right">
           <div className="text-sm font-black">{formatTime(now)}</div>
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute window • commercials hidden
+            {WINDOW_MINUTES} minute window â€¢ commercials hidden
           </div>
         </div>
       </div>
@@ -518,14 +518,14 @@ function GuideRow({
                 color: isCurrentProgram ? "#0f172a" : "var(--text)",
                 boxShadow: isCurrentProgram ? `inset 0 0 0 1px ${accent}` : "none",
               }}
-              title={`${title} • ${formatDuration(duration)}`}
+              title={`${title} â€¢ ${formatDuration(duration)}`}
             >
               <div className="truncate font-black tracking-tight">
                 {title}
               </div>
 
               <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                {segment.item.type.toUpperCase()} • {formatDuration(duration)}
+                {segment.item.type.toUpperCase()} â€¢ {formatDuration(duration)}
               </div>
             </button>
           );

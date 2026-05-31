@@ -237,6 +237,12 @@ export default function Home() {
         return;
       }
 
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        setLocalSettingsOpen(true);
+        return;
+      }
+
       if (isGuideOpen && event.key === "Escape") {
         event.preventDefault();
         closeGuide();
@@ -313,19 +319,6 @@ export default function Home() {
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
-
-            <button
-              type="button"
-              onClick={() => setLocalSettingsOpen(true)}
-              className="rounded-2xl border px-4 py-3 text-left text-xs font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/30 transition hover:scale-[1.02] hover:opacity-95"
-              style={{
-                background: "var(--button-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            >
-              Settings
-            </button>
           </div>
         </header>
 
@@ -574,6 +567,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
