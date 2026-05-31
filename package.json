@@ -2,13 +2,17 @@
   "name": "retro-tv",
   "version": "0.1.0",
   "private": true,
+  "description": "A browser-based retro cable TV simulator built with Next.js, TypeScript, Tailwind CSS, Supabase, and Cloudflare R2.",
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "npm run clean && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run build",
+    "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
+    "audit:prod": "npm audit --omit=dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.0",
@@ -27,5 +31,8 @@
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

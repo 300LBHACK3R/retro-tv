@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import type { ProgrammingApiResponse } from "@/lib/programmingSnapshot";
+import type {
+  ProgrammingApiResponse,
+  ProgrammingSnapshot,
+} from "@/lib/programmingSnapshot";
 
 interface GlobalProgrammingSyncProps {
   isAdminAuthorized: boolean;
@@ -14,8 +17,27 @@ type SyncStatus =
   | "loaded"
   | "saving"
   | "saved"
+  | "dirty"
   | "fallback"
   | "error";
+
+const AUTO_SAVE_DEBOUNCE_MS = 900;
+const SAVED_MESSAGE_RESET_MS = 2500;
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function createStatusMessage(
+  prefix: string,
+  snapshot: ProgrammingSnapshot | null | undefined,
+): string {
+  if (!snapshot) {
+    return prefix;
+  }
+
+  return `${prefix} • ${snapshot.media.length} media • ${snapshot.channels.length} channels`;
+}
 
 export default function GlobalProgrammingSync({
   isAdminAuthorized,
@@ -31,40 +53,99 @@ export default function GlobalProgrammingSync({
   const hasHydratedRef = useRef(false);
   const skipNextSaveRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
+  const resetTimerRef = useRef<number | null>(null);
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const lastSavedAtRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
 
-  const saveProgramming = async () => {
-    try {
-      setStatus("saving");
-      setMessage("Saving global programming");
+  const clearSaveTimer = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+  }, []);
 
-      const snapshot = exportProgrammingSnapshot();
+  const clearResetTimer = useCallback(() => {
+    if (resetTimerRef.current) {
+      window.clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  }, []);
 
-      const response = await fetch("/api/admin/programming", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(snapshot),
-      });
-
-      const data = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string }
-        | null;
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || `Save failed with ${response.status}`);
+  const saveProgramming = useCallback(
+    async (reason: "auto" | "manual" = "auto") => {
+      if (!isAdminAuthorized) {
+        return;
       }
 
-      setStatus("saved");
-      setMessage(`Global saved • ${snapshot.media.length} media`);
-    } catch (error) {
-      console.error("Failed to save global programming:", error);
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Global save failed");
-    }
-  };
+      if (isSavingRef.current) {
+        pendingSaveRef.current = true;
+        return;
+      }
+
+      try {
+        isSavingRef.current = true;
+        pendingSaveRef.current = false;
+
+        clearResetTimer();
+
+        setStatus("saving");
+        setMessage(reason === "manual" ? "Saving now" : "Saving global programming");
+
+        const snapshot = exportProgrammingSnapshot();
+
+        const response = await fetch("/api/admin/programming", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(snapshot),
+        });
+
+        const data = (await response.json().catch(() => null)) as
+          | { ok?: boolean; error?: string }
+          | null;
+
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || `Save failed with ${response.status}`);
+        }
+
+        if (!mountedRef.current) {
+          return;
+        }
+
+        lastSavedAtRef.current = new Date().toISOString();
+        setStatus("saved");
+        setMessage(createStatusMessage("Global saved", snapshot));
+
+        resetTimerRef.current = window.setTimeout(() => {
+          if (mountedRef.current) {
+            setStatus("loaded");
+            setMessage("Global sync active");
+          }
+        }, SAVED_MESSAGE_RESET_MS);
+      } catch (error) {
+        console.error("Failed to save global programming:", error);
+
+        if (mountedRef.current) {
+          setStatus("error");
+          setMessage(getErrorMessage(error, "Global save failed"));
+        }
+      } finally {
+        isSavingRef.current = false;
+
+        if (pendingSaveRef.current && mountedRef.current) {
+          pendingSaveRef.current = false;
+          void saveProgramming("auto");
+        }
+      }
+    },
+    [clearResetTimer, exportProgrammingSnapshot, isAdminAuthorized],
+  );
 
   useEffect(() => {
+    mountedRef.current = true;
     let cancelled = false;
 
     const loadProgramming = async () => {
@@ -85,11 +166,17 @@ export default function GlobalProgrammingSync({
         }
 
         if (data.programming) {
+          /**
+           * This flag prevents the local replaceProgramming() hydration event
+           * from immediately saving the same data back to Supabase.
+           */
           skipNextSaveRef.current = true;
           replaceProgramming(data.programming);
           hasHydratedRef.current = true;
+          lastSavedAtRef.current = data.programming.updatedAt;
+
           setStatus("loaded");
-          setMessage(`Global loaded • ${data.programming.media.length} media`);
+          setMessage(createStatusMessage("Global loaded", data.programming));
           return;
         }
 
@@ -102,9 +189,7 @@ export default function GlobalProgrammingSync({
         if (!cancelled) {
           hasHydratedRef.current = true;
           setStatus("error");
-          setMessage(
-            error instanceof Error ? error.message : "Global load failed",
-          );
+          setMessage(getErrorMessage(error, "Global load failed"));
         }
       }
     };
@@ -113,6 +198,7 @@ export default function GlobalProgrammingSync({
 
     return () => {
       cancelled = true;
+      mountedRef.current = false;
     };
   }, [replaceProgramming]);
 
@@ -127,58 +213,75 @@ export default function GlobalProgrammingSync({
         return;
       }
 
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-      }
+      clearSaveTimer();
+      clearResetTimer();
+
+      setStatus("dirty");
+      setMessage("Unsaved programming changes");
 
       saveTimerRef.current = window.setTimeout(() => {
-        void saveProgramming();
-      }, 350);
+        void saveProgramming("auto");
+      }, AUTO_SAVE_DEBOUNCE_MS);
     });
 
     return () => {
       unsubscribe();
-
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-      }
+      clearSaveTimer();
+      clearResetTimer();
     };
-  }, [exportProgrammingSnapshot, isAdminAuthorized]);
+  }, [
+    clearResetTimer,
+    clearSaveTimer,
+    isAdminAuthorized,
+    saveProgramming,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearSaveTimer();
+      clearResetTimer();
+    };
+  }, [clearResetTimer, clearSaveTimer]);
 
   const isError = status === "error";
   const isSaving = status === "saving";
+  const isDirty = status === "dirty";
   const isFallback = status === "fallback";
 
   return (
     <div
-      className="fixed bottom-3 left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md"
+      className="fixed bottom-3 left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md"
       style={{
-        background: "rgba(0,0,0,0.72)",
+        background: "rgba(0,0,0,0.76)",
         borderColor: isError
-          ? "rgba(248,113,113,0.45)"
-          : isFallback
-            ? "rgba(250,204,21,0.45)"
+          ? "rgba(248,113,113,0.5)"
+          : isFallback || isDirty || isSaving
+            ? "rgba(250,204,21,0.5)"
             : "rgba(255,255,255,0.12)",
         color: isError
           ? "#fca5a5"
-          : isSaving
+          : isFallback || isDirty || isSaving
             ? "#fde68a"
-            : isFallback
-              ? "#fde68a"
-              : "#d1d5db",
+            : "#d1d5db",
       }}
-      title={message}
+      title={`${message}${
+        lastSavedAtRef.current ? ` • Last saved ${lastSavedAtRef.current}` : ""
+      }`}
       aria-live="polite"
     >
-      <span>{message}</span>
+      <span className="truncate">{message}</span>
 
       {isAdminAuthorized ? (
         <button
           type="button"
-          onClick={() => void saveProgramming()}
-          className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] transition hover:bg-white/10"
+          onClick={() => {
+            clearSaveTimer();
+            void saveProgramming("manual");
+          }}
+          disabled={isSaving}
+          className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Save Now
+          {isSaving ? "Saving" : "Save Now"}
         </button>
       ) : null}
     </div>

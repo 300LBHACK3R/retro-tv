@@ -1,5 +1,6 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -11,14 +12,46 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-export function createSupabaseAdminClient() {
-  const supabaseUrl = getRequiredEnv("SUPABASE_URL");
-  const serviceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+function getRequiredUrlEnv(name: string): string {
+  const value = getRequiredEnv(name);
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== "https:" && process.env.NODE_ENV === "production") {
+      throw new Error(`${name} must use HTTPS in production.`);
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    throw new Error(`${name} must be a valid URL.`);
+  }
+}
+
+function getSupabaseServiceRoleKey(): string {
+  const key = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (key.length < 32) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY appears invalid.");
+  }
+
+  return key;
+}
+
+export function createSupabaseAdminClient(): SupabaseClient {
+  const supabaseUrl = getRequiredUrlEnv("SUPABASE_URL");
+  const serviceRoleKey = getSupabaseServiceRoleKey();
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: {
+        "X-Client-Info": "tates-retro-tv-admin-server",
+      },
     },
   });
 }

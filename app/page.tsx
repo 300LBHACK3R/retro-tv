@@ -3,15 +3,19 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
+import AppModeToggle from "@/components/AppModeToggle";
+import ChannelOverlay from "@/components/ChannelOverlay";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
+import QuickTuneBar from "@/components/QuickTuneBar";
 import Remote from "@/components/Remote";
+import StaticTransition from "@/components/StaticTransition";
 import ThemeButton from "@/components/ThemeButton";
 import ViewerHeader from "@/components/ViewerHeader";
-import { buildSchedule } from "@/lib/scheduler";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
+import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
@@ -78,19 +82,57 @@ function sortChannelsByNumber(channels: Channel[]): Channel[] {
   });
 }
 
+function getChannelDisplayName(channel: Channel | undefined): string {
+  if (!channel) {
+    return "No channel";
+  }
+
+  return channel.branding?.displayName ?? channel.name;
+}
+
+function getPlayerFrameClass(playerViewMode: "normal" | "mini" | "theater"): string {
+  if (playerViewMode === "mini") {
+    return [
+      "fixed bottom-3 right-3 z-[70]",
+      "aspect-video w-[min(440px,calc(100vw-24px))]",
+      "overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/60",
+      "sm:bottom-4 sm:right-4",
+    ].join(" ");
+  }
+
+  if (playerViewMode === "theater") {
+    return [
+      "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/40",
+      "xl:max-h-[78vh]",
+    ].join(" ");
+  }
+
+  return "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30";
+}
+
 export default function Home() {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
+
   const isGuideOpen = useStore((state) => state.isGuideOpen);
   const closeGuide = useStore((state) => state.closeGuide);
+
   const sidebarWidth = useStore((state) => state.sidebarWidth);
   const guideHeight = useStore((state) => state.guideHeight);
   const setSidebarWidth = useStore((state) => state.setSidebarWidth);
   const setGuideHeight = useStore((state) => state.setGuideHeight);
+
   const appMode = useStore((state) => state.appMode);
+  const setAppMode = useStore((state) => state.setAppMode);
   const themeId = useStore((state) => state.themeId);
+
+  const isSettingsOpen = useStore((state) => state.isSettingsOpen);
+  const setSettingsOpen = useStore((state) => state.setSettingsOpen);
+  const playerViewMode = useStore(
+    (state) => state.viewerSettings.playerViewMode,
+  );
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
 
@@ -98,7 +140,10 @@ export default function Home() {
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
 
   const enabledChannels = useMemo(
-    () => sortChannelsByNumber(channels.filter((channel) => channel.isEnabled !== false)),
+    () =>
+      sortChannelsByNumber(
+        channels.filter((channel) => channel.isEnabled !== false),
+      ),
     [channels],
   );
 
@@ -114,6 +159,11 @@ export default function Home() {
     [activeChannel, media],
   );
 
+  /**
+   * Real playback schedule.
+   * This includes virtual show slices, commercials, bumpers, and hidden guide items.
+   * Player and Now/Next need this schedule so commercial breaks work correctly.
+   */
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
@@ -122,6 +172,10 @@ export default function Home() {
     [activeChannel, activeChannelMedia],
   );
 
+  /**
+   * Clean public guide schedule.
+   * This hides/merges commercials and bumpers into normal show blocks.
+   */
   const activeGuideSchedule = useMemo(
     () => buildGuideSchedule(activeSchedule),
     [activeSchedule],
@@ -131,16 +185,24 @@ export default function Home() {
     () =>
       enabledChannels.map((channel) => {
         const channelMedia = getMediaForChannel(channel, media);
+        const playbackSchedule = buildSchedule(channelMedia, { channel });
 
         return {
           channel,
-          schedule: buildGuideSchedule(buildSchedule(channelMedia, { channel })),
+          schedule: buildGuideSchedule(playbackSchedule),
         };
       }),
     [enabledChannels, media],
   );
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
+  const playerFrameClass = getPlayerFrameClass(playerViewMode);
+
+  useEffect(() => {
+    if (!isAdminAuthorized && appMode === "admin") {
+      setAppMode("viewer");
+    }
+  }, [appMode, isAdminAuthorized, setAppMode]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -160,8 +222,12 @@ export default function Home() {
   }, [channels, setChannel]);
 
   useEffect(() => {
-    if (!activeChannel && enabledChannels.length > 0) {
-      setChannel(enabledChannels[0].id);
+    if (!activeChannel) {
+      const firstEnabledChannel = enabledChannels[0];
+
+      if (firstEnabledChannel) {
+        setChannel(firstEnabledChannel.id);
+      }
     }
   }, [activeChannel, enabledChannels, setChannel]);
 
@@ -174,6 +240,12 @@ export default function Home() {
       if (isGuideOpen && event.key === "Escape") {
         event.preventDefault();
         closeGuide();
+        return;
+      }
+
+      if (isSettingsOpen && event.key === "Escape") {
+        event.preventDefault();
+        setSettingsOpen(false);
       }
     };
 
@@ -182,7 +254,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeGuide, isGuideOpen]);
+  }, [closeGuide, isGuideOpen, isSettingsOpen, setSettingsOpen]);
 
   const guideDock = (
     <MultiGuide
@@ -208,20 +280,52 @@ export default function Home() {
       className="min-h-screen overflow-x-hidden"
       style={{
         ...themeVars,
-        background: "var(--app-bg)",
+        background:
+          "radial-gradient(circle at top right, rgba(255,255,255,0.045), transparent 32%), var(--app-bg)",
         color: "var(--text)",
       }}
     >
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
-        <header className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="w-full xl:max-w-[360px]">
-            <AdminAccessPanel onAuthChange={setIsAdminAuthorized} />
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div
+              className="text-[11px] font-black uppercase tracking-[0.24em]"
+              style={{ color: "var(--primary)" }}
+            >
+              Tate&apos;s Retro TV
+            </div>
+
+            <h1 className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
+              Live Cable Simulator
+            </h1>
+
+            <p
+              className="mt-1 max-w-2xl text-xs leading-5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {activeChannel
+                ? `Watching ${getChannelDisplayName(activeChannel)} with a live broadcast clock.`
+                : "Load a channel to begin the live TV experience."}
+            </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start xl:w-auto xl:justify-end">
+          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
+
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="rounded-2xl border px-4 py-3 text-left text-xs font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/30 transition hover:scale-[1.02] hover:opacity-95"
+              style={{
+                background: "var(--button-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              Settings
+            </button>
           </div>
         </header>
 
@@ -327,12 +431,26 @@ export default function Home() {
             }`}
           >
             <ViewerHeader channel={activeChannel} />
-            <NowNextBar channel={activeChannel} schedule={activeGuideSchedule} />
 
-            <div
-              className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30"
-              style={{ borderColor: "var(--border)" }}
-            >
+            <NowNextBar channel={activeChannel} schedule={activeSchedule} />
+
+            <QuickTuneBar />
+
+            {playerViewMode === "mini" ? (
+              <section
+                className="rounded-2xl border p-4 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Mini-player is active. Use the floating player in the bottom
+                right, or switch back to Normal/Theater from the remote.
+              </section>
+            ) : null}
+
+            <div className={playerFrameClass} style={{ borderColor: "var(--border)" }}>
               <Player
                 key={`${activeChannel?.id ?? "no-channel"}-${
                   activeSchedule[0]?.id ?? "empty"
@@ -340,6 +458,8 @@ export default function Home() {
                 schedule={activeSchedule}
               />
 
+              <ChannelOverlay compact={playerViewMode === "mini"} />
+              <StaticTransition trigger={activeChannel?.id ?? ""} />
               <Remote />
 
               {isGuideOpen ? (
@@ -369,7 +489,7 @@ export default function Home() {
               ) : null}
             </div>
 
-            {!isGuideOpen ? (
+            {!isGuideOpen && playerViewMode !== "mini" ? (
               <div
                 className="overflow-auto rounded-2xl border p-2 shadow-2xl shadow-black/20"
                 style={{
@@ -382,14 +502,91 @@ export default function Home() {
                 {guideDock}
               </div>
             ) : null}
+
+            {!isGuideOpen && playerViewMode === "mini" ? (
+              <div
+                className="overflow-auto rounded-2xl border p-2 shadow-2xl shadow-black/20"
+                style={{
+                  height: `${Math.max(guideHeight, 360)}px`,
+                  minHeight: "300px",
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                {guideDock}
+              </div>
+            ) : null}
           </section>
         </div>
       </div>
+
+      {isSettingsOpen ? (
+        <div
+          className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings and admin access"
+        >
+          <div
+            className="mx-auto my-4 flex max-w-3xl flex-col gap-3 rounded-2xl border p-3 shadow-2xl sm:my-6 sm:p-4"
+            style={{
+              background: "var(--panel-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text)",
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div
+                  className="text-xs font-black uppercase tracking-[0.2em]"
+                  style={{ color: "var(--primary)" }}
+                >
+                  Settings
+                </div>
+
+                <h2 className="mt-1 text-lg font-black tracking-tight">
+                  Viewer & Admin Controls
+                </h2>
+
+                <p
+                  className="mt-1 text-xs leading-5"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Theme, viewer mode, admin unlock, and protected station tools.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <AdminAccessPanel onAuthChange={setIsAdminAuthorized} />
+
+            <AppModeToggle isAdminAuthorized={isAdminAuthorized} />
+
+            <div
+              className="rounded-xl border px-3 py-2 text-xs leading-5"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              Public viewers should only see the premium watching experience.
+              Admin tools stay locked unless the session is authorized.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
-
-
-
-
-

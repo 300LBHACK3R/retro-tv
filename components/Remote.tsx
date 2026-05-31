@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
-import type { Channel } from "@/lib/types";
+import type { Channel, PlayerViewMode } from "@/lib/types";
 
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
@@ -36,12 +36,38 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
+function sortChannels(channels: Channel[]): Channel[] {
+  return [...channels]
+    .filter((channel) => channel.isEnabled !== false)
+    .sort((a, b) => {
+      const aNumber = Number(a.number ?? a.id);
+      const bNumber = Number(b.number ?? b.id);
+
+      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+        return aNumber - bNumber;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+}
+
+function getViewModeLabel(mode: PlayerViewMode): string {
+  if (mode === "mini") return "Mini";
+  if (mode === "theater") return "Theater";
+  return "Normal";
+}
+
 export default function Remote() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const isGuideOpen = useStore((state) => state.isGuideOpen);
   const toggleGuide = useStore((state) => state.toggleGuide);
+  const playerViewMode = useStore(
+    (state) => state.viewerSettings.playerViewMode,
+  );
+  const setPlayerViewMode = useStore((state) => state.setPlayerViewMode);
+  const setSettingsOpen = useStore((state) => state.setSettingsOpen);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -56,23 +82,11 @@ export default function Remote() {
   const setRemoteMinimized = usePlayerControls(
     (state) => state.setRemoteMinimized,
   );
-
-  const enabledChannels = useMemo(
-    () =>
-      channels
-        .filter((channel) => channel.isEnabled !== false)
-        .sort((a, b) => {
-          const aNumber = Number(a.number ?? a.id);
-          const bNumber = Number(b.number ?? b.id);
-
-          if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-            return aNumber - bNumber;
-          }
-
-          return a.id.localeCompare(b.id);
-        }),
-    [channels],
+  const toggleRemoteMinimized = usePlayerControls(
+    (state) => state.toggleRemoteMinimized,
   );
+
+  const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
 
   const currentIndex = enabledChannels.findIndex(
     (channel) => channel.id === currentChannelId,
@@ -83,19 +97,20 @@ export default function Remote() {
     enabledChannels.find((channel) => channel.id === currentChannelId) ??
     enabledChannels[0];
 
-  const goPrev = () => {
+  const goPrev = useCallback(() => {
     if (enabledChannels.length === 0) return;
 
     const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextIndex = (safeIndex - 1 + enabledChannels.length) % enabledChannels.length;
+    const nextIndex =
+      (safeIndex - 1 + enabledChannels.length) % enabledChannels.length;
     const nextChannel = enabledChannels[nextIndex];
 
     if (nextChannel) {
       setChannel(nextChannel.id);
     }
-  };
+  }, [currentIndex, enabledChannels, setChannel]);
 
-  const goNext = () => {
+  const goNext = useCallback(() => {
     if (enabledChannels.length === 0) return;
 
     const safeIndex = currentIndex >= 0 ? currentIndex : 0;
@@ -105,40 +120,77 @@ export default function Remote() {
     if (nextChannel) {
       setChannel(nextChannel.id);
     }
-  };
+  }, [currentIndex, enabledChannels, setChannel]);
+
+  const setNormalMode = useCallback(() => {
+    setPlayerViewMode("normal");
+  }, [setPlayerViewMode]);
+
+  const toggleMiniMode = useCallback(() => {
+    setPlayerViewMode(playerViewMode === "mini" ? "normal" : "mini");
+  }, [playerViewMode, setPlayerViewMode]);
+
+  const toggleTheaterMode = useCallback(() => {
+    setPlayerViewMode(playerViewMode === "theater" ? "normal" : "theater");
+  }, [playerViewMode, setPlayerViewMode]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
 
+      const key = event.key.toLowerCase();
+
       if (event.key === "ArrowUp" || event.key === "PageUp") {
         event.preventDefault();
         goNext();
+        return;
       }
 
       if (event.key === "ArrowDown" || event.key === "PageDown") {
         event.preventDefault();
         goPrev();
+        return;
       }
 
-      if (event.key.toLowerCase() === "g") {
+      if (key === "g") {
         event.preventDefault();
         toggleGuide();
+        return;
       }
 
-      if (event.key.toLowerCase() === "m") {
+      if (key === "m") {
         event.preventDefault();
         toggleMuted();
+        return;
       }
 
-      if (event.key.toLowerCase() === "f") {
+      if (key === "f") {
         event.preventDefault();
         requestFullscreenToggle();
+        return;
       }
 
-      if (event.key.toLowerCase() === "r") {
+      if (key === "r") {
         event.preventDefault();
-        setRemoteMinimized(!remoteMinimized);
+        toggleRemoteMinimized();
+        return;
+      }
+
+      if (key === "p") {
+        event.preventDefault();
+        toggleMiniMode();
+        return;
+      }
+
+      if (key === "t") {
+        event.preventDefault();
+        toggleTheaterMode();
+        return;
+      }
+
+      if (key === "s") {
+        event.preventDefault();
+        setSettingsOpen(true);
       }
     };
 
@@ -148,13 +200,15 @@ export default function Remote() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [
-    currentIndex,
-    enabledChannels,
-    remoteMinimized,
+    goNext,
+    goPrev,
     requestFullscreenToggle,
-    setRemoteMinimized,
+    setSettingsOpen,
     toggleGuide,
+    toggleMiniMode,
     toggleMuted,
+    toggleRemoteMinimized,
+    toggleTheaterMode,
   ]);
 
   if (remoteMinimized) {
@@ -162,9 +216,9 @@ export default function Remote() {
       <button
         type="button"
         onClick={() => setRemoteMinimized(false)}
-        className="absolute bottom-4 right-4 z-30 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95"
+        className="fixed bottom-3 right-3 z-40 rounded-full border px-4 py-3 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95 sm:absolute sm:bottom-4 sm:right-4"
         style={{
-          background: "rgba(0,0,0,0.76)",
+          background: "rgba(0,0,0,0.78)",
           borderColor: "var(--border)",
           color: "var(--text)",
         }}
@@ -176,10 +230,13 @@ export default function Remote() {
 
   return (
     <section
-      className="absolute bottom-4 right-4 z-30 w-[min(420px,calc(100%-2rem))] overflow-hidden rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      className="
+        fixed inset-x-3 bottom-3 z-40 max-h-[58vh] overflow-y-auto rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl
+        sm:absolute sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(440px,calc(100%-2rem))]
+      "
       style={{
         background:
-          "radial-gradient(circle at top right, rgba(212,175,55,0.13), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.88), rgba(18,18,18,0.78))",
+          "radial-gradient(circle at top right, rgba(212,175,55,0.13), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.9), rgba(18,18,18,0.82))",
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
@@ -215,9 +272,26 @@ export default function Remote() {
               {getChannelName(currentChannel)}
             </div>
           </div>
+
+          <div className="mt-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
+            View: {getViewModeLabel(playerViewMode)}
+          </div>
         </div>
 
         <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
+            style={{
+              background: "var(--button-bg)",
+              color: "var(--text)",
+            }}
+            aria-label="Open settings"
+          >
+            ⚙
+          </button>
+
           <button
             type="button"
             onClick={() => setRemoteMinimized(true)}
@@ -238,7 +312,7 @@ export default function Remote() {
           type="button"
           onClick={goPrev}
           disabled={enabledChannels.length === 0}
-          className="rounded-xl px-3 py-2 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ background: "var(--button-bg)", color: "var(--text)" }}
         >
           CH-
@@ -248,7 +322,7 @@ export default function Remote() {
           type="button"
           onClick={goNext}
           disabled={enabledChannels.length === 0}
-          className="rounded-xl px-3 py-2 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ background: "var(--button-bg)", color: "var(--text)" }}
         >
           CH+
@@ -257,7 +331,7 @@ export default function Remote() {
         <button
           type="button"
           onClick={toggleGuide}
-          className="rounded-xl px-3 py-2 text-sm font-black transition hover:scale-[1.03] hover:opacity-95"
+          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95"
           style={{
             background: isGuideOpen
               ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
@@ -269,11 +343,58 @@ export default function Remote() {
         </button>
       </div>
 
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={setNormalMode}
+          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
+          style={{
+            background:
+              playerViewMode === "normal"
+                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+                : "var(--button-bg)",
+            color: "var(--text)",
+          }}
+        >
+          Normal
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleMiniMode}
+          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
+          style={{
+            background:
+              playerViewMode === "mini"
+                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+                : "var(--button-bg)",
+            color: "var(--text)",
+          }}
+        >
+          Mini
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleTheaterMode}
+          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
+          style={{
+            background:
+              playerViewMode === "theater"
+                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+                : "var(--button-bg)",
+            color: "var(--text)",
+          }}
+        >
+          Theater
+        </button>
+      </div>
+
       <div className="mt-2 grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
         <button
           type="button"
           onClick={toggleMuted}
-          className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
+          className="rounded-xl px-3 py-3 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
           style={{
             background: muted
               ? "rgba(127, 29, 29, 0.82)"
@@ -297,7 +418,7 @@ export default function Remote() {
         <button
           type="button"
           onClick={toggleFitMode}
-          className="rounded-xl px-3 py-2 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
+          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
           style={{ background: "var(--button-bg)", color: "var(--text)" }}
         >
           {fitMode === "contain" ? "Fit" : "Fill"}
@@ -306,15 +427,15 @@ export default function Remote() {
         <button
           type="button"
           onClick={requestFullscreenToggle}
-          className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
+          className="rounded-xl px-3 py-3 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
           style={{ background: "var(--button-bg)", color: "var(--text)" }}
         >
           Full
         </button>
       </div>
 
-      <div className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>
-        Keys: ↑/↓ channel • G guide • M mute • F fullscreen • R remote
+      <div className="mt-2 text-[10px] leading-4" style={{ color: "var(--text-muted)" }}>
+        Keys: ↑/↓ channel • G guide • M mute • F fullscreen • R remote • P mini • T theater • S settings
       </div>
     </section>
   );

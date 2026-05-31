@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import type { AppMode } from "@/lib/types";
 
@@ -10,23 +11,36 @@ interface AppModeToggleProps {
 const MODE_OPTIONS: Array<{
   value: AppMode;
   label: string;
+  badge: string;
   description: string;
 }> = [
   {
     value: "viewer",
     label: "Viewer",
-    description: "Public watching experience.",
+    badge: "Public",
+    description: "Clean watching experience for regular visitors.",
   },
   {
     value: "admin",
     label: "Admin",
-    description: "Programming, media, branding, and config tools.",
+    badge: "Protected",
+    description: "Programming, media, branding, sync, and station tools.",
   },
 ];
+
+function getModeLabel(mode: AppMode): string {
+  return mode === "admin" ? "Admin Mode" : "Viewer Mode";
+}
 
 export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps) {
   const appMode = useStore((state) => state.appMode);
   const setAppMode = useStore((state) => state.setAppMode);
+
+  useEffect(() => {
+    if (appMode === "admin" && !isAdminAuthorized) {
+      setAppMode("viewer");
+    }
+  }, [appMode, isAdminAuthorized, setAppMode]);
 
   const handleModeChange = (mode: AppMode) => {
     if (mode === "admin" && !isAdminAuthorized) {
@@ -38,42 +52,49 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
 
   return (
     <section
-      className="rounded-2xl border p-4 shadow-2xl shadow-black/20"
+      className="relative overflow-hidden rounded-2xl border p-3 shadow-2xl shadow-black/20 sm:p-4"
       style={{
-        background: "var(--panel-bg)",
+        background:
+          "linear-gradient(135deg, rgba(255,255,255,0.035), transparent 44%), var(--panel-bg)",
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="Application mode selector"
     >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div
+        className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full opacity-20 blur-3xl"
+        style={{ background: isAdminAuthorized ? "#22c55e" : "var(--primary)" }}
+        aria-hidden="true"
+      />
+
+      <div className="relative mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div
-            className="text-xs font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "var(--text-muted)" }}
+            className="text-xs font-black uppercase tracking-[0.18em]"
+            style={{ color: "var(--primary)" }}
           >
             Current Mode
           </div>
 
-          <div className="mt-1 text-sm font-semibold">
-            {appMode === "viewer" ? "Viewer Mode" : "Admin Mode"}
+          <div className="mt-1 text-base font-black tracking-tight">
+            {getModeLabel(appMode)}
           </div>
 
-          <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+          <div className="mt-1 max-w-2xl text-xs leading-5" style={{ color: "var(--text-muted)" }}>
             {isAdminAuthorized
-              ? "Admin mode is available for this session."
-              : "Admin tools remain locked until authorized."}
+              ? "Admin mode is unlocked for this session. Viewer mode remains the public-facing default."
+              : "Admin tools are locked. Authenticate first before switching into station management."}
           </div>
         </div>
 
         <div
-          className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+          className="rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
             borderColor: isAdminAuthorized
-              ? "rgba(34, 197, 94, 0.35)"
+              ? "rgba(34, 197, 94, 0.42)"
               : "var(--border)",
             background: isAdminAuthorized
-              ? "rgba(34, 197, 94, 0.10)"
+              ? "rgba(34, 197, 94, 0.12)"
               : "var(--panel-alt-bg)",
             color: isAdminAuthorized ? "#86efac" : "var(--text-muted)",
           }}
@@ -82,7 +103,7 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="relative grid gap-2 sm:grid-cols-2">
         {MODE_OPTIONS.map((option) => {
           const isActive = appMode === option.value;
           const isLocked = option.value === "admin" && !isAdminAuthorized;
@@ -93,41 +114,59 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
               type="button"
               onClick={() => handleModeChange(option.value)}
               disabled={isLocked}
-              className="rounded-xl border p-3 text-left transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
+              className="rounded-2xl border p-3 text-left transition hover:scale-[1.01] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
               style={{
-                background: isActive ? "var(--primary)" : "var(--panel-alt-bg)",
+                background: isActive
+                  ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+                  : "var(--panel-alt-bg)",
                 borderColor: isActive ? "var(--primary)" : "var(--border)",
-                color: isActive ? "var(--text)" : "var(--text)",
+                color: "var(--text)",
               }}
               aria-pressed={isActive}
+              aria-disabled={isLocked}
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold">{option.label}</div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-black">{option.label}</div>
 
-                {isActive ? (
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em]">
-                    Active
-                  </span>
-                ) : isLocked ? (
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-[0.14em]"
-                    style={{ color: "var(--text-muted)" }}
+                  <div
+                    className="mt-1 text-xs leading-5"
+                    style={{ color: isActive ? "inherit" : "var(--text-muted)" }}
                   >
-                    Locked
-                  </span>
-                ) : null}
-              </div>
+                    {option.description}
+                  </div>
+                </div>
 
-              <div
-                className="mt-1 text-xs leading-relaxed"
-                style={{ color: isActive ? "inherit" : "var(--text-muted)" }}
-              >
-                {option.description}
+                <div
+                  className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
+                  style={{
+                    borderColor: isActive
+                      ? "rgba(255,255,255,0.28)"
+                      : "var(--border)",
+                    color: isActive ? "var(--text)" : "var(--text-muted)",
+                  }}
+                >
+                  {isActive ? "Active" : isLocked ? "Locked" : option.badge}
+                </div>
               </div>
             </button>
           );
         })}
       </div>
+
+      {!isAdminAuthorized ? (
+        <div
+          className="relative mt-3 rounded-xl border px-3 py-2 text-xs leading-5"
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          Admin access should stay behind your hidden/settings authentication flow.
+          Do not expose admin tools directly on the public viewer page.
+        </div>
+      ) : null}
     </section>
   );
 }

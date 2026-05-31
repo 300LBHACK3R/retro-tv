@@ -2,169 +2,30 @@
 
 import { useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
+import {
+  createMediaItemFromUrl,
+  formatBreakpoints,
+  formatDuration,
+  formatDurationClock,
+  getDefaultSlotLengthForDuration,
+  getVideoCompatibilityWarning,
+  inferNameFromUrl,
+  isLikelyVideoUrl,
+  normalizeUrl,
+  parseBreakpoints,
+  parseDurationList,
+  parseManualDuration,
+  titleCase,
+  WEEKDAYS,
+} from "@/lib/mediaUtils";
 import { useStore } from "@/lib/store";
-import type { MediaItem, MediaType, Weekday } from "@/lib/types";
+import type {
+  CommercialStrategy,
+  MediaType,
+  Weekday,
+} from "@/lib/types";
 
 type DurationMode = "seconds" | "minutes";
-
-const SUPPORTED_VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".mkv"];
-
-const WEEKDAYS: { id: Weekday; label: string }[] = [
-  { id: "sunday", label: "Sun" },
-  { id: "monday", label: "Mon" },
-  { id: "tuesday", label: "Tue" },
-  { id: "wednesday", label: "Wed" },
-  { id: "thursday", label: "Thu" },
-  { id: "friday", label: "Fri" },
-  { id: "saturday", label: "Sat" },
-];
-
-function createMediaId(title: string): string {
-  const clean = title
-    .toLowerCase()
-    .trim()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-
-  const suffix =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : String(Date.now()).slice(-8);
-
-  return `${clean || "media"}-${suffix}`;
-}
-
-function inferProvider(file: string): MediaItem["provider"] {
-  if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
-    return "cloudflare-r2";
-  }
-
-  if (file.startsWith("/")) return "local-dev";
-
-  if (file.startsWith("http://") || file.startsWith("https://")) {
-    return "external-url";
-  }
-
-  return "unknown";
-}
-
-function normalizeUrl(value: string): string {
-  const trimmed = value.trim();
-
-  if (!trimmed) return "";
-
-  const normalized = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : trimmed.includes(".r2.dev/")
-      ? `https://${trimmed}`
-      : trimmed;
-
-  return normalized.replace(/\s/g, "%20");
-}
-
-function getCleanUrlPath(value: string): string {
-  return value.toLowerCase().split("?")[0] ?? "";
-}
-
-function isLikelyVideoUrl(value: string): boolean {
-  const clean = getCleanUrlPath(value);
-
-  return (
-    clean.startsWith("https://") &&
-    SUPPORTED_VIDEO_EXTENSIONS.some((extension) => clean.endsWith(extension))
-  );
-}
-
-function inferMimeType(file: string): string {
-  const clean = getCleanUrlPath(file);
-
-  if (clean.endsWith(".webm")) return "video/webm";
-  if (clean.endsWith(".mov")) return "video/quicktime";
-  if (clean.endsWith(".m4v")) return "video/x-m4v";
-  if (clean.endsWith(".mkv")) return "video/x-matroska";
-
-  return "video/mp4";
-}
-
-function inferNameFromUrl(url: string): string {
-  try {
-    const parsed = new URL(normalizeUrl(url));
-    const lastPart = decodeURIComponent(
-      parsed.pathname.split("/").filter(Boolean).at(-1) ?? "",
-    );
-
-    return lastPart
-      .replace(/\.[a-z0-9]+$/i, "")
-      .replace(/[-_]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  } catch {
-    return "";
-  }
-}
-
-function titleCase(value: string): string {
-  return value.replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatDuration(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const remainingSeconds = safeSeconds % 60;
-
-  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
-  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
-  return `${remainingSeconds}s`;
-}
-
-function parseManualDuration(value: string, mode: DurationMode): number {
-  const clean = value.trim();
-
-  if (!clean) return 0;
-
-  if (clean.includes(":")) {
-    const parts = clean
-      .split(":")
-      .map((part) => Number(part.trim()))
-      .filter((part) => Number.isFinite(part));
-
-    if (parts.length === 2) {
-      const [minutes, seconds] = parts;
-      return Math.floor(minutes * 60 + seconds);
-    }
-
-    if (parts.length === 3) {
-      const [hours, minutes, seconds] = parts;
-      return Math.floor(hours * 3600 + minutes * 60 + seconds);
-    }
-
-    return 0;
-  }
-
-  const numeric = Number(clean);
-
-  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
-
-  return mode === "minutes" ? Math.round(numeric * 60) : Math.round(numeric);
-}
-
-function parseBreakpoints(value: string, totalDuration: number): number[] {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((part) => parseManualDuration(part.trim(), "seconds"))
-        .filter(
-          (seconds) =>
-            seconds > 0 &&
-            seconds >= 60 &&
-            seconds <= Math.max(0, totalDuration - 60),
-        ),
-    ),
-  ).sort((a, b) => a - b);
-}
 
 function getDurationHelperText(value: string, mode: DurationMode): string {
   const seconds = parseManualDuration(value, mode);
@@ -175,17 +36,30 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
       : "Type seconds, like 1339, or use 22:19.";
   }
 
-  return formatDuration(seconds);
+  return `${formatDuration(seconds)} • ${formatDurationClock(seconds)}`;
 }
 
-function formatBreakpoints(value: string, totalDuration: number): string {
-  const points = parseBreakpoints(value, totalDuration);
-
-  if (points.length === 0) {
-    return "Optional. Example: 08:00, 16:00";
+function getSlotHelperText(
+  slotLengthSeconds: number,
+  durationSeconds: number,
+): string {
+  if (slotLengthSeconds <= 0) {
+    return "Optional. Example: 30:00 for a half-hour block.";
   }
 
-  return points.map(formatDuration).join(", ");
+  if (durationSeconds > 0 && slotLengthSeconds <= durationSeconds) {
+    return "Slot must be longer than the media runtime.";
+  }
+
+  return `${formatDuration(slotLengthSeconds)} broadcast block`;
+}
+
+function shouldShowBroadcastFields(type: MediaType): boolean {
+  return type === "show" || type === "movie";
+}
+
+function shouldShowCommercialFields(type: MediaType): boolean {
+  return type === "commercial" || type === "bumper";
 }
 
 export default function UploadPanel() {
@@ -197,11 +71,23 @@ export default function UploadPanel() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState("");
   const [type, setType] = useState<MediaType>("show");
+
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
+
   const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("");
+  const [slotLengthInput, setSlotLengthInput] = useState("");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
+  const [commercialStrategy, setCommercialStrategy] =
+    useState<CommercialStrategy>("best-fit");
+
+  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
+  const [commercialCategory, setCommercialCategory] = useState("");
+
   const [selectedAirDays, setSelectedAirDays] = useState<Weekday[]>([]);
   const [channelId, setChannelId] = useState(currentChannelId);
+
   const [status, setStatus] = useState("");
   const [durationStatus, setDurationStatus] = useState(
     "Auto-detect will try first. Manual duration always works.",
@@ -215,25 +101,53 @@ export default function UploadPanel() {
     [durationInput, durationMode],
   );
 
+  const parsedSlotLengthSeconds = useMemo(
+    () => parseManualDuration(slotLengthInput, "seconds"),
+    [slotLengthInput],
+  );
+
   const parsedBreakpoints = useMemo(
     () => parseBreakpoints(breakpointsInput, parsedDurationSeconds),
     [breakpointsInput, parsedDurationSeconds],
+  );
+
+  const parsedBreakDurations = useMemo(
+    () => parseDurationList(breakDurationsInput),
+    [breakDurationsInput],
+  );
+
+  const compatibilityWarning = useMemo(
+    () => (normalizedFile ? getVideoCompatibilityWarning(normalizedFile) : null),
+    [normalizedFile],
   );
 
   const enabledChannels = useMemo(
     () =>
       channels
         .filter((channel) => channel.isEnabled !== false)
-        .sort((a, b) => Number(a.number ?? a.id) - Number(b.number ?? b.id)),
+        .sort((a, b) => {
+          const aNumber = Number(a.number ?? a.id);
+          const bNumber = Number(b.number ?? b.id);
+
+          if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+            return aNumber - bNumber;
+          }
+
+          return a.id.localeCompare(b.id);
+        }),
     [channels],
   );
 
+  const normalizedTitle = title.trim();
+
   const canAdd =
-    title.trim().length > 0 &&
+    normalizedTitle.length > 0 &&
     normalizedFile.length > 0 &&
     normalizedFile.startsWith("https://") &&
     parsedDurationSeconds > 0 &&
-    channelId.trim().length > 0;
+    channelId.trim().length > 0 &&
+    (!fillSlotWithCommercials ||
+      parsedSlotLengthSeconds > parsedDurationSeconds);
 
   const toggleAirDay = (day: Weekday) => {
     setSelectedAirDays((current) =>
@@ -245,6 +159,33 @@ export default function UploadPanel() {
 
   const selectEveryDay = () => {
     setSelectedAirDays([]);
+  };
+
+  const applyCartoonPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("7:30, 15:00");
+    setBreakDurationsInput("2:00, 2:00");
+    setFillSlotWithCommercials(true);
+    setCommercialStrategy("best-fit");
+    setStatus("Applied 30-minute cartoon/anime broadcast preset.");
+  };
+
+  const applySitcomPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("11:00");
+    setBreakDurationsInput("3:00");
+    setFillSlotWithCommercials(true);
+    setCommercialStrategy("best-fit");
+    setStatus("Applied 30-minute sitcom broadcast preset.");
+  };
+
+  const applyDramaPreset = () => {
+    setSlotLengthInput("60:00");
+    setBreakpointsInput("12:00, 24:00, 36:00");
+    setBreakDurationsInput("3:00, 3:00, 3:00");
+    setFillSlotWithCommercials(true);
+    setCommercialStrategy("best-fit");
+    setStatus("Applied 60-minute drama broadcast preset.");
   };
 
   const detectDuration = async (url: string) => {
@@ -268,7 +209,24 @@ export default function UploadPanel() {
 
       setDurationMode("seconds");
       setDurationInput(String(result.duration));
-      setDurationStatus(`Detected ${result.durationLabel}.`);
+      setDurationStatus(
+        `Detected ${result.durationLabel} • ${formatDurationClock(
+          result.duration,
+        )}.`,
+      );
+
+      const defaultSlotLength = getDefaultSlotLengthForDuration(
+        result.duration,
+        type,
+      );
+
+      if (
+        defaultSlotLength &&
+        shouldShowBroadcastFields(type) &&
+        !slotLengthInput.trim()
+      ) {
+        setSlotLengthInput(formatDurationClock(defaultSlotLength));
+      }
     } catch {
       setDurationStatus(
         "Auto-detect failed. Enter duration manually as seconds, minutes, or 22:19.",
@@ -293,6 +251,32 @@ export default function UploadPanel() {
     }
   };
 
+  const handleTypeChange = (nextType: MediaType) => {
+    setType(nextType);
+
+    if (nextType === "commercial" || nextType === "bumper") {
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setSlotLengthInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(true);
+      return;
+    }
+
+    setAllowCommercialSlicing(false);
+
+    if (parsedDurationSeconds > 0 && !slotLengthInput.trim()) {
+      const defaultSlotLength = getDefaultSlotLengthForDuration(
+        parsedDurationSeconds,
+        nextType,
+      );
+
+      if (defaultSlotLength) {
+        setSlotLengthInput(formatDurationClock(defaultSlotLength));
+      }
+    }
+  };
+
   const addItem = () => {
     if (!canAdd) {
       if (!normalizedFile.startsWith("https://")) {
@@ -302,6 +286,14 @@ export default function UploadPanel() {
 
       if (parsedDurationSeconds <= 0) {
         setStatus("Enter a valid duration manually or use Auto.");
+        return;
+      }
+
+      if (
+        fillSlotWithCommercials &&
+        parsedSlotLengthSeconds <= parsedDurationSeconds
+      ) {
+        setStatus("Slot length must be longer than runtime. Example: 30:00.");
         return;
       }
 
@@ -317,23 +309,25 @@ export default function UploadPanel() {
       if (!confirmed) return;
     }
 
-    const cleanTitle = title.trim();
-    const id = createMediaId(cleanTitle);
-
-    const item: MediaItem = {
-      id,
-      title: cleanTitle,
+    const item = createMediaItemFromUrl({
+      url: normalizedFile,
+      title: normalizedTitle,
       type,
       duration: parsedDurationSeconds,
-      file: normalizedFile,
-      mimeType: inferMimeType(normalizedFile),
-      originalName: normalizedFile.split("/").at(-1) ?? cleanTitle,
-      provider: inferProvider(normalizedFile),
       breakpoints: parsedBreakpoints,
+      breakDurations: parsedBreakDurations,
+      slotLengthSeconds:
+        parsedSlotLengthSeconds > parsedDurationSeconds
+          ? parsedSlotLengthSeconds
+          : undefined,
+      fillSlotWithCommercials,
+      commercialStrategy,
+      allowCommercialSlicing: shouldShowCommercialFields(type)
+        ? allowCommercialSlicing
+        : false,
+      commercialCategory: commercialCategory.trim() || undefined,
       airDays: selectedAirDays,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
     addMedia(item);
     assignMediaToChannel(channelId, item.id);
@@ -346,16 +340,23 @@ export default function UploadPanel() {
 
     setTitle("");
     setFile("");
+    setType("show");
     setDurationInput("");
     setDurationMode("seconds");
     setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setSlotLengthInput("");
+    setFillSlotWithCommercials(false);
+    setCommercialStrategy("best-fit");
+    setAllowCommercialSlicing(true);
+    setCommercialCategory("");
     setSelectedAirDays([]);
     setDurationStatus("Auto-detect will try first. Manual duration always works.");
   };
 
   return (
     <section
-      className="rounded-2xl border p-4"
+      className="rounded-2xl border p-3 sm:p-4"
       style={{
         background: "var(--panel-bg)",
         borderColor: "var(--border)",
@@ -375,7 +376,8 @@ export default function UploadPanel() {
         </h2>
 
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Add video metadata, manual ad breakpoints, and optional airing days.
+          Add videos, commercials, runtime, broadcast slots, ad blocks, and
+          optional air days.
         </p>
       </div>
 
@@ -383,7 +385,7 @@ export default function UploadPanel() {
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+          className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
           placeholder="Title"
           style={{
             background: "var(--panel-alt-bg)",
@@ -400,7 +402,7 @@ export default function UploadPanel() {
               void detectDuration(event.target.value);
             }
           }}
-          className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+          className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
           placeholder="https://pub-xxxx.r2.dev/video.mp4"
           spellCheck={false}
           style={{
@@ -413,11 +415,24 @@ export default function UploadPanel() {
           }}
         />
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_1fr]">
+        {compatibilityWarning ? (
+          <div
+            className="rounded-xl border px-3 py-2 text-xs"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+            }}
+          >
+            {compatibilityWarning}
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 xl:grid-cols-[0.8fr_1.8fr_1fr]">
           <select
             value={type}
-            onChange={(event) => setType(event.target.value as MediaType)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            onChange={(event) => handleTypeChange(event.target.value as MediaType)}
+            className="w-full rounded-lg border px-3 py-3 text-base sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -437,7 +452,7 @@ export default function UploadPanel() {
                 onChange={(event) =>
                   setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
                 }
-                className="min-w-0 rounded-lg border px-3 py-2 text-sm outline-none"
+                className="min-w-0 rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
                 placeholder="Duration: 1339, 22.3, or 22:19"
                 inputMode="decimal"
                 style={{
@@ -452,7 +467,7 @@ export default function UploadPanel() {
                 onChange={(event) =>
                   setDurationMode(event.target.value as DurationMode)
                 }
-                className="rounded-lg border px-2 py-2 text-xs outline-none"
+                className="rounded-lg border px-2 py-3 text-sm outline-none"
                 style={{
                   background: "var(--panel-alt-bg)",
                   borderColor: "var(--border)",
@@ -467,7 +482,7 @@ export default function UploadPanel() {
                 type="button"
                 onClick={() => void detectDuration(file)}
                 disabled={isDetectingDuration || !normalizedFile}
-                className="rounded-lg px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg px-3 py-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
                   background: "var(--button-bg)",
                   color: "var(--text)",
@@ -488,7 +503,7 @@ export default function UploadPanel() {
           <select
             value={channelId}
             onChange={(event) => setChannelId(event.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-3 text-base sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -504,35 +519,253 @@ export default function UploadPanel() {
           </select>
         </div>
 
-        <div>
-          <label
-            className="mb-1 block text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Manual Commercial Breakpoints
-          </label>
-
-          <input
-            value={breakpointsInput}
-            onChange={(event) =>
-              setBreakpointsInput(event.target.value.replace(/[^\d:.,\s]/g, ""))
-            }
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            placeholder="Example: 08:00, 16:00, 22:30"
+        {shouldShowBroadcastFields(type) ? (
+          <div
+            className="rounded-xl border p-3"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
-              color: "var(--text)",
             }}
-          />
-
-          <div
-            className="mt-1 text-[11px]"
-            style={{ color: "var(--text-muted)" }}
           >
-            {formatBreakpoints(breakpointsInput, parsedDurationSeconds)}
+            <div
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: "var(--primary)" }}
+            >
+              Broadcast Slot / Commercial Logic
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <div>
+                <label
+                  className="mb-1 block text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Slot Length
+                </label>
+
+                <input
+                  value={slotLengthInput}
+                  onChange={(event) =>
+                    setSlotLengthInput(
+                      event.target.value.replace(/[^\d:.]/g, ""),
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                  placeholder="30:00"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor:
+                      fillSlotWithCommercials &&
+                      parsedSlotLengthSeconds <= parsedDurationSeconds
+                        ? "#f87171"
+                        : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+
+                <div
+                  className="mt-1 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {getSlotHelperText(
+                    parsedSlotLengthSeconds,
+                    parsedDurationSeconds,
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="mb-1 block text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Breakpoints
+                </label>
+
+                <input
+                  value={breakpointsInput}
+                  onChange={(event) =>
+                    setBreakpointsInput(
+                      event.target.value.replace(/[^\d:.,\s]/g, ""),
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                  placeholder="7:30, 15:00"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+
+                <div
+                  className="mt-1 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {formatBreakpoints(parsedBreakpoints)}
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="mb-1 block text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Ad Blocks
+                </label>
+
+                <input
+                  value={breakDurationsInput}
+                  onChange={(event) =>
+                    setBreakDurationsInput(
+                      event.target.value.replace(/[^\d:.,\s]/g, ""),
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                  placeholder="2:00, 2:00"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+
+                <div
+                  className="mt-1 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {formatBreakpoints(parsedBreakDurations) || "Auto 2:00 per break"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={applyCartoonPreset}
+                className="rounded-lg px-3 py-3 text-xs font-semibold"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                30m Cartoon
+              </button>
+
+              <button
+                type="button"
+                onClick={applySitcomPreset}
+                className="rounded-lg px-3 py-3 text-xs font-semibold"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                30m Sitcom
+              </button>
+
+              <button
+                type="button"
+                onClick={applyDramaPreset}
+                className="rounded-lg px-3 py-3 text-xs font-semibold"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                60m Drama
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label
+                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={fillSlotWithCommercials}
+                  onChange={(event) =>
+                    setFillSlotWithCommercials(event.target.checked)
+                  }
+                  className="h-5 w-5"
+                />
+                <span>Fill remaining slot time with commercials</span>
+              </label>
+
+              <select
+                value={commercialStrategy}
+                onChange={(event) =>
+                  setCommercialStrategy(
+                    event.target.value as CommercialStrategy,
+                  )
+                }
+                className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              >
+                <option value="best-fit">Best Fit Commercials</option>
+                <option value="sequential">Sequential Commercials</option>
+                <option value="random">Random Commercials</option>
+              </select>
+            </div>
           </div>
-        </div>
+        ) : null}
+
+        {shouldShowCommercialFields(type) ? (
+          <div
+            className="rounded-xl border p-3"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+            }}
+          >
+            <div
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: "var(--primary)" }}
+            >
+              Commercial Pool Settings
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label
+                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={allowCommercialSlicing}
+                  onChange={(event) =>
+                    setAllowCommercialSlicing(event.target.checked)
+                  }
+                  className="h-5 w-5"
+                />
+                <span>Allow this commercial to be sliced for exact ad blocks</span>
+              </label>
+
+              <input
+                value={commercialCategory}
+                onChange={(event) => setCommercialCategory(event.target.value)}
+                className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                placeholder="Category: general, kids, anime, gaming..."
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
 
         <div>
           <div
@@ -543,7 +776,7 @@ export default function UploadPanel() {
             <button
               type="button"
               onClick={selectEveryDay}
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold"
+              className="rounded-lg px-3 py-2 text-xs font-semibold"
               style={{
                 background: "var(--button-bg)",
                 color: "var(--text)",
@@ -562,7 +795,7 @@ export default function UploadPanel() {
                   key={day.id}
                   type="button"
                   onClick={() => toggleAirDay(day.id)}
-                  className="rounded-lg px-2 py-2 text-[11px] font-black uppercase tracking-[0.08em]"
+                  className="rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
                   style={{
                     background: active ? "var(--primary)" : "var(--button-bg)",
                     color: "var(--text)",
@@ -582,7 +815,7 @@ export default function UploadPanel() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             onClick={() => window.open(normalizedFile, "_blank", "noopener")}

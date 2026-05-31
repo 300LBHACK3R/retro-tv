@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 
 interface AdminAccessPanelProps {
@@ -9,6 +9,7 @@ interface AdminAccessPanelProps {
 
 type AdminSessionResponse = {
   isAdmin?: boolean;
+  error?: string;
 };
 
 type AdminLoginResponse = {
@@ -16,12 +17,27 @@ type AdminLoginResponse = {
   error?: string;
 };
 
+type AccessStatus = "checking" | "locked" | "authorized" | "error";
+
+const MAX_PASSWORD_LENGTH = 128;
+
 async function readJsonSafe<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
   } catch {
     return null;
   }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function getStatusCopy(status: AccessStatus, isAdminAuthorized: boolean): string {
+  if (status === "checking") return "Checking secure session...";
+  if (status === "error") return "Session check failed.";
+  if (isAdminAuthorized) return "Secure controls are available for this browser session.";
+  return "Viewer mode is public. Admin tools unlock after password entry.";
 }
 
 export default function AdminAccessPanel({
@@ -32,9 +48,12 @@ export default function AdminAccessPanel({
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [password, setPassword] = useState("");
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [status, setStatus] = useState<AccessStatus>("checking");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("Checking secure session...");
   const [error, setError] = useState("");
+
+  const cleanPassword = useMemo(() => password.trim(), [password]);
 
   const syncAuthorizedState = useCallback(
     (authorized: boolean) => {
@@ -44,56 +63,72 @@ export default function AdminAccessPanel({
       if (!authorized) {
         setAppMode("viewer");
       }
+
+      setStatus(authorized ? "authorized" : "locked");
+      setMessage(
+        authorized
+          ? "Authorized session active."
+          : "Admin tools are locked.",
+      );
     },
     [onAuthChange, setAppMode],
   );
 
+  const checkSession = useCallback(async () => {
+    setStatus("checking");
+    setMessage("Checking secure session...");
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
+      });
+
+      const data = await readJsonSafe<AdminSessionResponse>(response);
+      const authorized = Boolean(response.ok && data?.isAdmin);
+
+      syncAuthorizedState(authorized);
+
+      if (!authorized && data?.error) {
+        setMessage(data.error);
+      }
+    } catch (error) {
+      syncAuthorizedState(false);
+      setStatus("error");
+      setError(getErrorMessage(error, "Unable to verify admin session."));
+      setMessage("Unable to verify admin session.");
+    }
+  }, [syncAuthorizedState]);
+
   useEffect(() => {
     let cancelled = false;
 
-    const checkSession = async () => {
-      setIsCheckingSession(true);
-      setError("");
-
-      try {
-        const response = await fetch("/api/admin/session", {
-          cache: "no-store",
-        });
-
-        const data = await readJsonSafe<AdminSessionResponse>(response);
-
-        if (cancelled) {
-          return;
-        }
-
-        syncAuthorizedState(Boolean(response.ok && data?.isAdmin));
-      } catch {
-        if (!cancelled) {
-          syncAuthorizedState(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsCheckingSession(false);
-        }
-      }
+    const run = async () => {
+      if (cancelled) return;
+      await checkSession();
     };
 
-    void checkSession();
+    void run();
 
     return () => {
       cancelled = true;
     };
-  }, [syncAuthorizedState]);
+  }, [checkSession]);
+
+  useEffect(() => {
+    if (!isAdminAuthorized && appMode === "admin") {
+      setAppMode("viewer");
+    }
+  }, [appMode, isAdminAuthorized, setAppMode]);
 
   const login = async () => {
-    const cleanPassword = password.trim();
-
     if (!cleanPassword || isSubmitting) {
       return;
     }
 
     setIsSubmitting(true);
     setError("");
+    setMessage("Unlocking admin session...");
 
     try {
       const response = await fetch("/api/admin/login", {
@@ -107,15 +142,20 @@ export default function AdminAccessPanel({
       const data = await readJsonSafe<AdminLoginResponse>(response);
 
       if (!response.ok || !data?.ok) {
+        syncAuthorizedState(false);
         setError(data?.error ?? "Login failed. Check the admin password.");
+        setMessage("Admin unlock failed.");
         return;
       }
 
       setPassword("");
       syncAuthorizedState(true);
       setAppMode("admin");
-    } catch {
-      setError("Unable to log in. Check the connection and try again.");
+      setMessage("Admin unlocked.");
+    } catch (error) {
+      syncAuthorizedState(false);
+      setError(getErrorMessage(error, "Unable to log in. Check the connection and try again."));
+      setMessage("Unable to unlock admin.");
     } finally {
       setIsSubmitting(false);
     }
@@ -128,6 +168,7 @@ export default function AdminAccessPanel({
 
     setIsSubmitting(true);
     setError("");
+    setMessage("Signing out...");
 
     try {
       await fetch("/api/admin/logout", {
@@ -136,10 +177,24 @@ export default function AdminAccessPanel({
     } catch {
       setError("Unable to contact logout endpoint. Local session was still cleared.");
     } finally {
+      setPassword("");
       syncAuthorizedState(false);
+      setMessage("Signed out. Viewer mode restored.");
       setIsSubmitting(false);
     }
   };
+
+  const switchMode = (mode: "viewer" | "admin") => {
+    if (mode === "admin" && !isAdminAuthorized) {
+      setMessage("Admin mode is locked.");
+      return;
+    }
+
+    setAppMode(mode);
+    setMessage(mode === "admin" ? "Admin mode active." : "Viewer mode active.");
+  };
+
+  const isCheckingSession = status === "checking";
 
   if (isCheckingSession) {
     return (
@@ -151,10 +206,14 @@ export default function AdminAccessPanel({
           borderColor: "var(--border)",
           color: "var(--text)",
         }}
+        aria-live="polite"
       >
         <div
           className="absolute inset-x-0 top-0 h-px"
-          style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--primary), transparent)",
+          }}
         />
 
         <div
@@ -165,7 +224,7 @@ export default function AdminAccessPanel({
         </div>
 
         <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-          Checking secure session...
+          {getStatusCopy(status, isAdminAuthorized)}
         </div>
       </section>
     );
@@ -181,13 +240,17 @@ export default function AdminAccessPanel({
           borderColor: "var(--border)",
           color: "var(--text)",
         }}
+        aria-label="Authorized admin access panel"
       >
         <div
           className="absolute inset-x-0 top-0 h-px"
-          style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--primary), transparent)",
+          }}
         />
 
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div
               className="text-[11px] font-black uppercase tracking-[0.22em]"
@@ -196,12 +259,12 @@ export default function AdminAccessPanel({
               Admin Access
             </div>
 
-            <div className="mt-1 text-base font-semibold tracking-tight">
+            <div className="mt-1 text-base font-black tracking-tight">
               Authorized Session
             </div>
 
-            <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              Secure controls are available for this browser session.
+            <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+              {message || getStatusCopy(status, isAdminAuthorized)}
             </div>
           </div>
 
@@ -217,11 +280,11 @@ export default function AdminAccessPanel({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <button
             type="button"
-            onClick={() => setAppMode("viewer")}
-            className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:scale-[1.02] hover:opacity-95"
+            onClick={() => switchMode("viewer")}
+            className="rounded-xl px-3 py-3 text-sm font-black uppercase tracking-[0.1em] transition hover:scale-[1.02] hover:opacity-95"
             style={{
               background:
                 appMode === "viewer"
@@ -240,8 +303,8 @@ export default function AdminAccessPanel({
 
           <button
             type="button"
-            onClick={() => setAppMode("admin")}
-            className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:scale-[1.02] hover:opacity-95"
+            onClick={() => switchMode("admin")}
+            className="rounded-xl px-3 py-3 text-sm font-black uppercase tracking-[0.1em] transition hover:scale-[1.02] hover:opacity-95"
             style={{
               background:
                 appMode === "admin"
@@ -262,18 +325,18 @@ export default function AdminAccessPanel({
             type="button"
             onClick={logout}
             disabled={isSubmitting}
-            className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl px-3 py-3 text-sm font-black uppercase tracking-[0.1em] transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               background: "var(--button-bg)",
               color: "var(--text)",
             }}
           >
-            {isSubmitting ? "..." : "Sign Out"}
+            {isSubmitting ? "Signing Out" : "Sign Out"}
           </button>
         </div>
 
         {error ? (
-          <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">
             {error}
           </div>
         ) : null}
@@ -290,13 +353,17 @@ export default function AdminAccessPanel({
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
+      aria-label="Locked admin access panel"
     >
       <div
         className="absolute inset-x-0 top-0 h-px"
-        style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, var(--primary), transparent)",
+        }}
       />
 
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div
             className="text-[11px] font-black uppercase tracking-[0.22em]"
@@ -305,12 +372,12 @@ export default function AdminAccessPanel({
             Admin Access
           </div>
 
-          <div className="mt-1 text-base font-semibold tracking-tight">
+          <div className="mt-1 text-base font-black tracking-tight">
             Locked
           </div>
 
-          <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Viewer mode is public. Admin tools unlock after password entry.
+          <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+            {message || getStatusCopy(status, isAdminAuthorized)}
           </div>
         </div>
 
@@ -335,14 +402,15 @@ export default function AdminAccessPanel({
           Admin Password
         </label>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             id="admin-password"
             type="password"
             value={password}
             onChange={(event) => {
-              setPassword(event.target.value);
+              setPassword(event.target.value.slice(0, MAX_PASSWORD_LENGTH));
               setError("");
+              setMessage("Enter password to unlock admin tools.");
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -351,7 +419,7 @@ export default function AdminAccessPanel({
             }}
             placeholder="Enter password"
             autoComplete="current-password"
-            className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2"
+            className="min-w-0 flex-1 rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "rgba(255,255,255,0.045)",
               borderColor: "var(--border)",
@@ -362,20 +430,21 @@ export default function AdminAccessPanel({
           <button
             type="button"
             onClick={login}
-            disabled={!password.trim() || isSubmitting}
-            className="rounded-xl px-4 py-2 text-sm font-semibold transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!cleanPassword || isSubmitting}
+            className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.1em] transition hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
-              background: "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
+              background:
+                "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
               color: "var(--text)",
             }}
           >
-            {isSubmitting ? "..." : "Unlock"}
+            {isSubmitting ? "Unlocking" : "Unlock"}
           </button>
         </div>
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+        <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">
           {error}
         </div>
       ) : null}

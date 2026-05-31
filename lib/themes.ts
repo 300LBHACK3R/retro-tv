@@ -18,17 +18,31 @@ export type ThemeColorToken =
 
 export type ThemeColors = Record<ThemeColorToken, string>;
 
+export type ThemeCategory =
+  | "classic"
+  | "console"
+  | "premium"
+  | "cartoon"
+  | "arcade";
+
 export type ThemeDefinition = {
   id: ThemeId;
   name: string;
   description: string;
   priceLabel: string;
   isPremium: boolean;
+  category: ThemeCategory;
+  previewGradient: string;
+  recommendedFor: string[];
   colors: ThemeColors;
 };
 
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
+/**
+ * Keep all unlocked while the product is being built/tested.
+ * Switch to "premium-locked" later when payment/unlock flow exists.
+ */
 export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 
 export const DEFAULT_THEME_ID: ThemeId = "shaw-2006";
@@ -40,6 +54,10 @@ export const THEMES = [
     description: "Classic nostalgic cable box styling.",
     priceLabel: "Free",
     isPremium: false,
+    category: "classic",
+    previewGradient:
+      "linear-gradient(135deg, #020617, #0f172a 52%, #2563eb)",
+    recommendedFor: ["classic cable", "main TV", "default viewing"],
     colors: {
       appBg: "#020617",
       panelBg: "rgba(2, 6, 23, 0.88)",
@@ -63,6 +81,10 @@ export const THEMES = [
     description: "A light telecom-era inspired menu feel.",
     priceLabel: "Free",
     isPremium: false,
+    category: "classic",
+    previewGradient:
+      "linear-gradient(135deg, #e9eff3, #ffffff 48%, #4c9aff)",
+    recommendedFor: ["light mode", "family viewing", "clean guide"],
     colors: {
       appBg: "#e9eff3",
       panelBg: "rgba(255, 255, 255, 0.94)",
@@ -84,8 +106,12 @@ export const THEMES = [
     id: "obsidian-gold",
     name: "Obsidian Gold",
     description: "Black broadcast interface with refined gold highlights.",
-    priceLabel: "Free",
+    priceLabel: "$2.99",
     isPremium: true,
+    category: "premium",
+    previewGradient:
+      "linear-gradient(135deg, #050505, #17130a 52%, #d4af37)",
+    recommendedFor: ["premium viewing", "movie channels", "night mode"],
     colors: {
       appBg: "#050505",
       panelBg: "rgba(8, 8, 8, 0.95)",
@@ -107,8 +133,12 @@ export const THEMES = [
     id: "midas-gold",
     name: "Midas Gold",
     description: "Full premium gold interface with deep black accents.",
-    priceLabel: "Free",
+    priceLabel: "$2.99",
     isPremium: true,
+    category: "premium",
+    previewGradient:
+      "linear-gradient(135deg, #050505, #b8860b 42%, #ffe27a)",
+    recommendedFor: ["premium theme pack", "collector mode", "showcase"],
     colors: {
       appBg: "#b8860b",
       panelBg:
@@ -138,8 +168,12 @@ export const THEMES = [
     name: "Original Xbox Inspired",
     description:
       "Early-2000s console dashboard feel with deep black glass, electric green glow, and chunky sci-fi panel contrast.",
-    priceLabel: "Free",
+    priceLabel: "$2.99",
     isPremium: true,
+    category: "console",
+    previewGradient:
+      "radial-gradient(circle at top left, #8dc63f, transparent 35%), linear-gradient(135deg, #020502, #071007 48%, #000000)",
+    recommendedFor: ["gaming", "action", "anime", "late night"],
     colors: {
       appBg:
         "radial-gradient(circle at top left, rgba(141, 198, 63, 0.34), transparent 30%), radial-gradient(circle at bottom right, rgba(39, 255, 103, 0.18), transparent 34%), linear-gradient(135deg, #020502, #071007 48%, #000000)",
@@ -161,6 +195,74 @@ export const THEMES = [
       guideRowAltBg: "#0a1507",
       guideActiveBg: "#8dc63f",
       guideCurrentBg: "#b7ff5a",
+    },
+  },
+  {
+    id: "neon-arcade-2005",
+    name: "Neon Arcade 2005",
+    description:
+      "A premium mid-2000s arcade/gaming interface with neon green, cyan, purple glow, and dark glass panels.",
+    priceLabel: "$2.99",
+    isPremium: true,
+    category: "arcade",
+    previewGradient:
+      "radial-gradient(circle at top left, rgba(57, 255, 20, 0.55), transparent 34%), radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.45), transparent 36%), linear-gradient(135deg, #020617, #050014 52%, #061b12)",
+    recommendedFor: ["gaming", "anime", "action", "tech", "late night"],
+    colors: {
+      appBg:
+        "radial-gradient(circle at top left, rgba(57, 255, 20, 0.22), transparent 32%), radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.22), transparent 36%), linear-gradient(135deg, #020617, #050014 52%, #061b12)",
+      panelBg:
+        "linear-gradient(135deg, rgba(2, 6, 23, 0.94), rgba(8, 13, 32, 0.92))",
+      panelAltBg:
+        "linear-gradient(135deg, rgba(7, 18, 34, 0.96), rgba(18, 8, 34, 0.92))",
+      border: "#22d3ee",
+      text: "#f8fbff",
+      textMuted: "#a7f3d0",
+      buttonBg:
+        "linear-gradient(135deg, rgba(6, 95, 70, 0.9), rgba(30, 27, 75, 0.92))",
+      buttonHover:
+        "linear-gradient(135deg, rgba(20, 184, 166, 0.95), rgba(126, 34, 206, 0.92))",
+      primary: "#39ff14",
+      guideHeaderBg:
+        "linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(30, 27, 75, 0.96))",
+      guideRowBg: "#030712",
+      guideRowAltBg: "#080f1f",
+      guideActiveBg: "#39ff14",
+      guideCurrentBg: "#22d3ee",
+    },
+  },
+  {
+    id: "saturday-morning-max",
+    name: "Saturday Morning Max",
+    description:
+      "A bright premium cartoon-TV theme with chunky colours, playful panels, and early-2000s weekend energy.",
+    priceLabel: "$2.99",
+    isPremium: true,
+    category: "cartoon",
+    previewGradient:
+      "radial-gradient(circle at top left, rgba(251, 146, 60, 0.65), transparent 34%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.55), transparent 36%), linear-gradient(135deg, #312e81, #7c3aed 45%, #84cc16)",
+    recommendedFor: ["cartoons", "kids", "anime", "Saturday morning", "family"],
+    colors: {
+      appBg:
+        "radial-gradient(circle at top left, rgba(251, 146, 60, 0.34), transparent 32%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.28), transparent 36%), linear-gradient(135deg, #1e1b4b, #5b21b6 48%, #365314)",
+      panelBg:
+        "linear-gradient(135deg, rgba(49, 46, 129, 0.95), rgba(124, 58, 237, 0.9))",
+      panelAltBg:
+        "linear-gradient(135deg, rgba(30, 64, 175, 0.9), rgba(190, 24, 93, 0.86))",
+      border: "#f97316",
+      text: "#ffffff",
+      textMuted: "#fde68a",
+      buttonBg:
+        "linear-gradient(135deg, rgba(249, 115, 22, 0.94), rgba(236, 72, 153, 0.9))",
+      buttonHover:
+        "linear-gradient(135deg, rgba(132, 204, 22, 0.96), rgba(14, 165, 233, 0.92))",
+      primary: "#fb923c",
+      guideHeaderBg:
+        "linear-gradient(135deg, rgba(67, 56, 202, 0.98), rgba(219, 39, 119, 0.94))",
+      guideRowBg: "#312e81",
+      guideRowAltBg: "#4c1d95",
+      guideActiveBg: "#fb923c",
+      guideCurrentBg: "#bef264",
     },
   },
 ] as const satisfies readonly ThemeDefinition[];
@@ -185,6 +287,10 @@ export function getFreeThemes(): ThemeDefinition[] {
 
 export function getPremiumThemes(): ThemeDefinition[] {
   return THEMES.filter((theme) => theme.isPremium);
+}
+
+export function getThemesByCategory(category: ThemeCategory): ThemeDefinition[] {
+  return THEMES.filter((theme) => theme.category === category);
 }
 
 export function canUseTheme(

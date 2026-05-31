@@ -1,4 +1,9 @@
-import type { MediaItem, MediaType, Weekday } from "./types";
+import type {
+  CommercialStrategy,
+  MediaItem,
+  MediaType,
+  Weekday,
+} from "./types";
 
 export type DurationMode = "seconds" | "minutes";
 
@@ -8,7 +13,9 @@ export const SUPPORTED_VIDEO_EXTENSIONS = [
   ".mov",
   ".m4v",
   ".mkv",
-];
+] as const;
+
+export const BROWSER_SAFE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v"] as const;
 
 export const WEEKDAYS: { id: Weekday; label: string; longLabel: string }[] = [
   { id: "sunday", label: "Sun", longLabel: "Sunday" },
@@ -20,6 +27,19 @@ export const WEEKDAYS: { id: Weekday; label: string; longLabel: string }[] = [
   { id: "saturday", label: "Sat", longLabel: "Saturday" },
 ];
 
+function getRandomSuffix(): string {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    "randomUUID" in globalThis.crypto
+  ) {
+    return globalThis.crypto.randomUUID().slice(0, 8);
+  }
+
+  return `${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 6)}`;
+}
+
 export function createMediaId(title: string): string {
   const clean = title
     .toLowerCase()
@@ -28,39 +48,78 @@ export function createMediaId(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-  const suffix =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : String(Date.now()).slice(-8);
-
-  return `${clean || "media"}-${suffix}`;
+  return `${clean || "media"}-${getRandomSuffix()}`;
 }
 
 export function normalizeUrl(value: string): string {
   const trimmed = value.trim();
 
-  if (!trimmed) return "";
+  if (!trimmed) {
+    return "";
+  }
 
-  const normalized = /^https?:\/\//i.test(trimmed)
+  const withProtocol = /^https?:\/\//i.test(trimmed)
     ? trimmed
     : trimmed.includes(".r2.dev/")
       ? `https://${trimmed}`
       : trimmed;
 
-  return normalized.replace(/\s/g, "%20");
+  return withProtocol.replace(/\s/g, "%20");
 }
 
 export function getCleanUrlPath(value: string): string {
-  return value.toLowerCase().split("?")[0] ?? "";
+  return normalizeUrl(value).toLowerCase().split("?")[0] ?? "";
+}
+
+export function getFileExtension(value: string): string {
+  const clean = getCleanUrlPath(value);
+  const match = clean.match(/\.[a-z0-9]+$/i);
+
+  return match?.[0] ?? "";
+}
+
+export function isSupportedVideoUrl(value: string): boolean {
+  const clean = getCleanUrlPath(value);
+
+  return SUPPORTED_VIDEO_EXTENSIONS.some((extension) =>
+    clean.endsWith(extension),
+  );
+}
+
+export function isBrowserSafeVideoUrl(value: string): boolean {
+  const clean = getCleanUrlPath(value);
+
+  return BROWSER_SAFE_VIDEO_EXTENSIONS.some((extension) =>
+    clean.endsWith(extension),
+  );
 }
 
 export function isLikelyVideoUrl(value: string): boolean {
-  const clean = getCleanUrlPath(value);
+  const normalized = normalizeUrl(value);
+  const clean = getCleanUrlPath(normalized);
 
   return (
-    clean.startsWith("https://") &&
-    SUPPORTED_VIDEO_EXTENSIONS.some((extension) => clean.endsWith(extension))
+    (clean.startsWith("https://") || clean.startsWith("/")) &&
+    isSupportedVideoUrl(normalized)
   );
+}
+
+export function getVideoCompatibilityWarning(value: string): string | null {
+  const extension = getFileExtension(value);
+
+  if (!extension) {
+    return "Could not detect a video file extension.";
+  }
+
+  if (!SUPPORTED_VIDEO_EXTENSIONS.includes(extension as never)) {
+    return "This file extension is not in the supported video list.";
+  }
+
+  if (!BROWSER_SAFE_VIDEO_EXTENSIONS.includes(extension as never)) {
+    return "This format may not play reliably in all browsers. MP4/H.264/AAC is recommended for launch.";
+  }
+
+  return null;
 }
 
 export function inferMimeType(file: string): string {
@@ -75,13 +134,16 @@ export function inferMimeType(file: string): string {
 }
 
 export function inferProvider(file: string): MediaItem["provider"] {
-  if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
+  const normalized = normalizeUrl(file);
+  const lower = normalized.toLowerCase();
+
+  if (lower.includes(".r2.dev") || lower.includes("cloudflare")) {
     return "cloudflare-r2";
   }
 
-  if (file.startsWith("/")) return "local-dev";
+  if (normalized.startsWith("/")) return "local-dev";
 
-  if (file.startsWith("http://") || file.startsWith("https://")) {
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
     return "external-url";
   }
 
@@ -106,7 +168,10 @@ export function inferNameFromUrl(url: string): string {
 }
 
 export function titleCase(value: string): string {
-  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (char) => char.toUpperCase());
 }
 
 export function formatDuration(seconds: number): string {
@@ -118,6 +183,21 @@ export function formatDuration(seconds: number): string {
   if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
   if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
   return `${remainingSeconds}s`;
+}
+
+export function formatDurationClock(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(
+      remainingSeconds,
+    ).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 export function parseManualDuration(
@@ -135,12 +215,12 @@ export function parseManualDuration(
       .filter((part) => Number.isFinite(part));
 
     if (parts.length === 2) {
-      const [minutes, seconds] = parts;
+      const [minutes = 0, seconds = 0] = parts;
       return Math.floor(minutes * 60 + seconds);
     }
 
     if (parts.length === 3) {
-      const [hours, minutes, seconds] = parts;
+      const [hours = 0, minutes = 0, seconds = 0] = parts;
       return Math.floor(hours * 3600 + minutes * 60 + seconds);
     }
 
@@ -154,7 +234,16 @@ export function parseManualDuration(
   return mode === "minutes" ? Math.round(numeric * 60) : Math.round(numeric);
 }
 
+export function parseDurationList(value: string): number[] {
+  return value
+    .split(",")
+    .map((part) => parseManualDuration(part.trim(), "seconds"))
+    .filter((seconds) => seconds > 0);
+}
+
 export function parseBreakpoints(value: string, totalDuration: number): number[] {
+  const safeDuration = Math.max(1, Math.floor(totalDuration));
+
   return Array.from(
     new Set(
       value
@@ -164,7 +253,7 @@ export function parseBreakpoints(value: string, totalDuration: number): number[]
           (seconds) =>
             seconds > 0 &&
             seconds >= 60 &&
-            seconds <= Math.max(0, totalDuration - 60),
+            seconds <= Math.max(0, safeDuration - 60),
         ),
     ),
   ).sort((a, b) => a - b);
@@ -172,7 +261,7 @@ export function parseBreakpoints(value: string, totalDuration: number): number[]
 
 export function formatBreakpoints(points: number[] | undefined): string {
   if (!points || points.length === 0) return "";
-  return points.map(formatDuration).join(", ");
+  return points.map(formatDurationClock).join(", ");
 }
 
 export function isValidAirStartTime(value: string): boolean {
@@ -195,12 +284,65 @@ export function isValidAirStartTime(value: string): boolean {
   );
 }
 
+export function normalizeAirStartTime(value: string): string | undefined {
+  if (!isValidAirStartTime(value)) {
+    return undefined;
+  }
+
+  const clean = value.trim();
+
+  if (!clean) {
+    return undefined;
+  }
+
+  const [hours = "0", minutes = "00"] = clean.split(":");
+
+  return `${String(Number(hours)).padStart(2, "0")}:${String(
+    Number(minutes),
+  ).padStart(2, "0")}`;
+}
+
+export function sanitizeCommercialCategory(value: string): string | undefined {
+  const clean = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_\s]/g, "")
+    .replace(/\s+/g, "-");
+
+  return clean || undefined;
+}
+
+export function getDefaultSlotLengthForDuration(
+  duration: number,
+  type: MediaType,
+): number | undefined {
+  if (type === "movie" || type === "commercial" || type === "bumper") {
+    return undefined;
+  }
+
+  if (duration > 0 && duration <= 30 * 60) {
+    return 30 * 60;
+  }
+
+  if (duration > 30 * 60 && duration <= 60 * 60) {
+    return 60 * 60;
+  }
+
+  return undefined;
+}
+
 export function createMediaItemFromUrl(input: {
   url: string;
   title?: string;
   type: MediaType;
   duration: number;
   breakpoints?: number[];
+  breakDurations?: number[];
+  slotLengthSeconds?: number;
+  fillSlotWithCommercials?: boolean;
+  commercialStrategy?: CommercialStrategy;
+  allowCommercialSlicing?: boolean;
+  commercialCategory?: string;
   airDays?: Weekday[];
   airStartTime?: string;
 }): MediaItem {
@@ -208,18 +350,40 @@ export function createMediaItemFromUrl(input: {
   const title =
     input.title?.trim() || titleCase(inferNameFromUrl(file)) || "Untitled Media";
 
+  const duration = Math.max(1, Math.floor(input.duration));
+  const defaultSlotLength = getDefaultSlotLengthForDuration(duration, input.type);
+  const slotLengthSeconds =
+    input.slotLengthSeconds && input.slotLengthSeconds > duration
+      ? input.slotLengthSeconds
+      : defaultSlotLength;
+
   return {
     id: createMediaId(title),
     title,
     type: input.type,
-    duration: Math.max(1, Math.floor(input.duration)),
+    duration,
     file,
     mimeType: inferMimeType(file),
     originalName: file.split("/").at(-1) ?? title,
     provider: inferProvider(file),
+
     breakpoints: input.breakpoints ?? [],
+    breakDurations: input.breakDurations ?? [],
+    slotLengthSeconds,
+    fillSlotWithCommercials: Boolean(input.fillSlotWithCommercials),
+    commercialStrategy: input.commercialStrategy ?? "best-fit",
+
+    allowCommercialSlicing:
+      input.allowCommercialSlicing ?? input.type === "commercial",
+    commercialCategory: input.commercialCategory
+      ? sanitizeCommercialCategory(input.commercialCategory)
+      : undefined,
+
     airDays: input.airDays ?? [],
-    airStartTime: input.airStartTime?.trim() || undefined,
+    airStartTime: input.airStartTime
+      ? normalizeAirStartTime(input.airStartTime)
+      : undefined,
+
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

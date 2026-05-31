@@ -5,6 +5,19 @@ import { useStore } from "@/lib/store";
 import type { Channel, ChannelBranding } from "@/lib/types";
 
 const DEFAULT_ACCENT_COLOR = "#2563eb";
+const MAX_CALLSIGN_LENGTH = 12;
+const MAX_LOGO_TEXT_LENGTH = 32;
+const MAX_DISPLAY_NAME_LENGTH = 48;
+const MAX_DESCRIPTION_LENGTH = 120;
+
+const COLOR_PRESETS = [
+  { label: "Blue", value: "#2563eb" },
+  { label: "Gold", value: "#d4af37" },
+  { label: "Purple", value: "#7c3aed" },
+  { label: "Red", value: "#dc2626" },
+  { label: "Green", value: "#16a34a" },
+  { label: "Cyan", value: "#0891b2" },
+] as const;
 
 type BrandingDraft = ChannelBranding;
 
@@ -26,15 +39,60 @@ function isValidHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
 
-function normalizeDraft(draft: BrandingDraft, fallback: ChannelBranding): ChannelBranding {
+function normalizeHexColor(value: string, fallback = DEFAULT_ACCENT_COLOR): string {
+  const clean = value.trim();
+
+  if (isValidHexColor(clean)) {
+    return clean.toLowerCase();
+  }
+
+  const withoutHash = clean.replace(/^#/, "");
+
+  if (/^[0-9a-f]{6}$/i.test(withoutHash)) {
+    return `#${withoutHash.toLowerCase()}`;
+  }
+
+  return fallback;
+}
+
+function normalizeCallsign(value: string, fallback: string): string {
+  const clean = value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9 -]/g, "")
+    .replace(/\s+/g, " ")
+    .slice(0, MAX_CALLSIGN_LENGTH);
+
+  return clean || fallback.slice(0, MAX_CALLSIGN_LENGTH).toUpperCase();
+}
+
+function normalizeText(value: string, fallback: string, maxLength: number): string {
+  const clean = value.trim().replace(/\s+/g, " ").slice(0, maxLength);
+
+  return clean || fallback.slice(0, maxLength);
+}
+
+function normalizeDescription(value: string): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, MAX_DESCRIPTION_LENGTH);
+}
+
+function normalizeDraft(
+  draft: BrandingDraft,
+  fallback: ChannelBranding,
+): ChannelBranding {
   return {
-    displayName: draft.displayName.trim() || fallback.displayName,
-    callsign: draft.callsign.trim().toUpperCase() || fallback.callsign,
-    logoText: draft.logoText.trim() || fallback.logoText,
-    description: draft.description.trim(),
-    accentColor: isValidHexColor(draft.accentColor)
-      ? draft.accentColor
-      : fallback.accentColor || DEFAULT_ACCENT_COLOR,
+    displayName: normalizeText(
+      draft.displayName,
+      fallback.displayName,
+      MAX_DISPLAY_NAME_LENGTH,
+    ),
+    callsign: normalizeCallsign(draft.callsign, fallback.callsign),
+    logoText: normalizeText(draft.logoText, fallback.logoText, MAX_LOGO_TEXT_LENGTH),
+    description: normalizeDescription(draft.description),
+    accentColor: normalizeHexColor(
+      draft.accentColor,
+      fallback.accentColor || DEFAULT_ACCENT_COLOR,
+    ),
   };
 }
 
@@ -46,6 +104,22 @@ function areBrandingValuesEqual(a: ChannelBranding, b: ChannelBranding): boolean
     a.description === b.description &&
     a.accentColor.toLowerCase() === b.accentColor.toLowerCase()
   );
+}
+
+function getInitials(value: string): string {
+  const clean = value.trim();
+
+  if (!clean) {
+    return "CH";
+  }
+
+  const words = clean.split(/\s+/).filter(Boolean);
+
+  if (words.length >= 2) {
+    return `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`.toUpperCase();
+  }
+
+  return clean.slice(0, 4).toUpperCase();
 }
 
 export default function ChannelBrandingPanel() {
@@ -67,7 +141,9 @@ export default function ChannelBrandingPanel() {
   }, [activeChannel]);
 
   const [draft, setDraft] = useState<BrandingDraft | null>(savedBranding);
-  const [message, setMessage] = useState("Edit the fields, then click Save Changes.");
+  const [message, setMessage] = useState(
+    "Edit the fields, then click Save Changes.",
+  );
 
   useEffect(() => {
     if (!savedBranding) {
@@ -97,14 +173,13 @@ export default function ChannelBrandingPanel() {
     );
   }
 
-  const accentColor = isValidHexColor(draft.accentColor)
-    ? draft.accentColor
-    : DEFAULT_ACCENT_COLOR;
-
   const normalizedDraft = normalizeDraft(draft, savedBranding);
+  const normalizedSavedBranding = normalizeDraft(savedBranding, savedBranding);
+  const accentColor = normalizeHexColor(draft.accentColor);
+
   const hasUnsavedChanges = !areBrandingValuesEqual(
     normalizedDraft,
-    normalizeDraft(savedBranding, savedBranding),
+    normalizedSavedBranding,
   );
 
   const updateDraft = (patch: Partial<BrandingDraft>) => {
@@ -136,25 +211,46 @@ export default function ChannelBrandingPanel() {
     setMessage("Changes reset.");
   };
 
+  const applyPreset = (color: string) => {
+    updateDraft({
+      accentColor: color,
+    });
+  };
+
+  const displayNameCount = draft.displayName.length;
+  const logoTextCount = draft.logoText.length;
+  const descriptionCount = draft.description.length;
+
   return (
     <section
-      className="rounded-2xl border p-4"
+      className="rounded-2xl border p-3 sm:p-4"
       style={{
         background: "var(--panel-bg)",
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
     >
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-sm font-semibold tracking-wide">Channel Branding</h2>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Customize the active channel identity, overlay label, and guide accent.
+          <div
+            className="text-xs font-semibold uppercase tracking-[0.18em]"
+            style={{ color: "var(--primary)" }}
+          >
+            Branding
+          </div>
+
+          <h2 className="mt-1 text-sm font-semibold tracking-wide">
+            Channel Branding
+          </h2>
+
+          <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+            Customize the active channel identity, viewer overlay, guide accent,
+            callsign, logo label, and channel description.
           </p>
         </div>
 
         <div
-          className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+          className="rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
             borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
@@ -166,66 +262,91 @@ export default function ChannelBrandingPanel() {
       </div>
 
       <div
-        className="mb-4 overflow-hidden rounded-xl border"
+        className="mb-4 overflow-hidden rounded-2xl border shadow-2xl"
         style={{
           borderColor: accentColor,
           background:
-            "linear-gradient(135deg, rgba(0,0,0,0.72), rgba(0,0,0,0.38))",
-          boxShadow: `0 0 24px ${accentColor}22`,
+            "radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.82), rgba(0,0,0,0.42))",
+          boxShadow: `0 0 26px ${accentColor}30, 0 18px 55px rgba(0,0,0,0.35)`,
         }}
       >
-        <div className="flex items-center gap-3 px-4 py-4">
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
-            style={{
-              background: accentColor,
-              boxShadow: `0 0 18px ${accentColor}66`,
-            }}
-          >
-            {draft.callsign.slice(0, 4) || "CH"}
+        <div
+          className="h-px w-full"
+          style={{
+            background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+          }}
+        />
+
+        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
+              style={{
+                background: accentColor,
+                boxShadow: `0 0 20px ${accentColor}70`,
+              }}
+            >
+              {getInitials(draft.callsign || draft.logoText || activeChannel.name)}
+            </div>
+
+            <div className="min-w-0">
+              <div className="truncate text-base font-black uppercase tracking-[0.13em] text-white">
+                {draft.logoText || draft.displayName || activeChannel.name}
+              </div>
+
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/72">
+                <span>{draft.callsign || activeChannel.name}</span>
+                <span className="text-white/35">•</span>
+                <span>{getChannelLabel(activeChannel)}</span>
+                <span className="text-white/35">•</span>
+                <span>Live</span>
+              </div>
+
+              {draft.description ? (
+                <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/58">
+                  {draft.description}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <div className="min-w-0">
-            <div className="truncate text-base font-bold uppercase tracking-[0.12em] text-white">
-              {draft.logoText || draft.displayName || activeChannel.name}
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
-              <span>{draft.callsign || activeChannel.name}</span>
-              <span className="text-white/35">•</span>
-              <span>{getChannelLabel(activeChannel)}</span>
-              <span className="text-white/35">•</span>
-              <span>Live</span>
-            </div>
-
-            {draft.description ? (
-              <div className="mt-1 truncate text-xs text-white/60">
-                {draft.description}
-              </div>
-            ) : null}
+          <div
+            className="rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/70"
+            style={{
+              borderColor: `${accentColor}88`,
+              background: "rgba(0,0,0,0.28)",
+            }}
+          >
+            Preview
           </div>
         </div>
       </div>
 
       <div className="grid gap-3">
         <div>
-          <label
-            htmlFor="channel-display-name"
-            className="mb-1 block text-xs font-medium"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Display Name
-          </label>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label
+              htmlFor="channel-display-name"
+              className="block text-xs font-medium"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Display Name
+            </label>
+
+            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              {displayNameCount}/{MAX_DISPLAY_NAME_LENGTH}
+            </span>
+          </div>
 
           <input
             id="channel-display-name"
             value={draft.displayName}
             onChange={(event) =>
               updateDraft({
-                displayName: event.target.value,
+                displayName: event.target.value.slice(0, MAX_DISPLAY_NAME_LENGTH),
               })
             }
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
+            className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -249,11 +370,14 @@ export default function ChannelBrandingPanel() {
               value={draft.callsign}
               onChange={(event) =>
                 updateDraft({
-                  callsign: event.target.value.toUpperCase(),
+                  callsign: event.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9 -]/g, "")
+                    .slice(0, MAX_CALLSIGN_LENGTH),
                 })
               }
-              className="w-full rounded-lg border px-3 py-2 text-sm uppercase outline-none transition focus:ring-2"
-              maxLength={12}
+              className="w-full rounded-xl border px-3 py-3 text-base uppercase outline-none transition focus:ring-2 sm:text-sm"
+              maxLength={MAX_CALLSIGN_LENGTH}
               style={{
                 background: "var(--panel-alt-bg)",
                 borderColor: "var(--border)",
@@ -263,23 +387,29 @@ export default function ChannelBrandingPanel() {
           </div>
 
           <div>
-            <label
-              htmlFor="channel-logo-text"
-              className="mb-1 block text-xs font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Logo Text
-            </label>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <label
+                htmlFor="channel-logo-text"
+                className="block text-xs font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Logo Text
+              </label>
+
+              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                {logoTextCount}/{MAX_LOGO_TEXT_LENGTH}
+              </span>
+            </div>
 
             <input
               id="channel-logo-text"
               value={draft.logoText}
               onChange={(event) =>
                 updateDraft({
-                  logoText: event.target.value,
+                  logoText: event.target.value.slice(0, MAX_LOGO_TEXT_LENGTH),
                 })
               }
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
+              className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
               style={{
                 background: "var(--panel-alt-bg)",
                 borderColor: "var(--border)",
@@ -290,24 +420,30 @@ export default function ChannelBrandingPanel() {
         </div>
 
         <div>
-          <label
-            htmlFor="channel-description"
-            className="mb-1 block text-xs font-medium"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Description
-          </label>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label
+              htmlFor="channel-description"
+              className="block text-xs font-medium"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Description
+            </label>
+
+            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              {descriptionCount}/{MAX_DESCRIPTION_LENGTH}
+            </span>
+          </div>
 
           <textarea
             id="channel-description"
             value={draft.description}
             onChange={(event) =>
               updateDraft({
-                description: event.target.value,
+                description: event.target.value.slice(0, MAX_DESCRIPTION_LENGTH),
               })
             }
             rows={3}
-            className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
+            className="w-full resize-none rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
@@ -325,7 +461,7 @@ export default function ChannelBrandingPanel() {
             Accent Color
           </label>
 
-          <div className="flex items-center gap-2">
+          <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
             <input
               id="channel-accent-color"
               type="color"
@@ -335,7 +471,7 @@ export default function ChannelBrandingPanel() {
                   accentColor: event.target.value,
                 })
               }
-              className="h-10 w-14 shrink-0 cursor-pointer rounded-lg border"
+              className="h-12 w-full shrink-0 cursor-pointer rounded-xl border sm:w-16"
               style={{
                 borderColor: "var(--border)",
                 background: "var(--panel-alt-bg)",
@@ -349,11 +485,19 @@ export default function ChannelBrandingPanel() {
                   accentColor: event.target.value.trim(),
                 })
               }
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
+              onBlur={() =>
+                updateDraft({
+                  accentColor: normalizeHexColor(
+                    draft.accentColor,
+                    savedBranding.accentColor,
+                  ),
+                })
+              }
+              className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
               placeholder="#2563eb"
               style={{
                 background: "var(--panel-alt-bg)",
-                borderColor: isValidHexColor(draft.accentColor)
+                borderColor: isValidHexColor(normalizeHexColor(draft.accentColor))
                   ? "var(--border)"
                   : "#f87171",
                 color: "var(--text)",
@@ -361,7 +505,31 @@ export default function ChannelBrandingPanel() {
             />
           </div>
 
-          {!isValidHexColor(draft.accentColor) ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {COLOR_PRESETS.map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => applyPreset(preset.value)}
+                className="rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition hover:scale-[1.02]"
+                style={{
+                  background:
+                    draft.accentColor.toLowerCase() === preset.value
+                      ? preset.value
+                      : "var(--button-bg)",
+                  borderColor: preset.value,
+                  color:
+                    draft.accentColor.toLowerCase() === preset.value
+                      ? "#fff"
+                      : "var(--text)",
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {!isValidHexColor(normalizeHexColor(draft.accentColor)) ? (
             <div className="mt-1 text-[11px] text-red-300">
               Use a valid 6-digit hex color like #2563eb.
             </div>
@@ -370,7 +538,7 @@ export default function ChannelBrandingPanel() {
       </div>
 
       <div
-        className="mt-4 rounded-xl border px-3 py-2 text-xs"
+        className="mt-4 rounded-xl border px-3 py-2 text-xs leading-5"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: hasUnsavedChanges
@@ -382,14 +550,15 @@ export default function ChannelBrandingPanel() {
         {message}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button
           type="button"
           onClick={saveChanges}
-          disabled={!hasUnsavedChanges || !isValidHexColor(draft.accentColor)}
-          className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!hasUnsavedChanges}
+          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
-            background: "var(--primary)",
+            background:
+              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
             color: "var(--text)",
           }}
         >
@@ -400,7 +569,7 @@ export default function ChannelBrandingPanel() {
           type="button"
           onClick={resetChanges}
           disabled={!hasUnsavedChanges}
-          className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background: "var(--button-bg)",
             color: "var(--text)",

@@ -2,21 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
-import type { MediaItem } from "@/lib/types";
+import { isHiddenGuideItem } from "@/lib/guideSchedule";
+import type { BroadcastItem } from "@/lib/types";
 
 const PX_PER_MINUTE = 5;
 const SLOT_MINUTES = 30;
 const AXIS_SLOTS = 6;
 const WINDOW_MINUTES = SLOT_MINUTES * AXIS_SLOTS;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
-const MIN_ITEM_WIDTH = 48;
+const MIN_ITEM_WIDTH = 56;
+const LIVE_TICK_MS = 1000;
 
 type GuideSegment = {
-  item: MediaItem;
+  item: BroadcastItem;
   startSec: number;
   endSec: number;
   scheduleIndex: number;
 };
+
+interface GuideGridProps {
+  schedule: BroadcastItem[];
+}
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString([], {
@@ -52,18 +58,33 @@ function floorToHalfHour(date: Date): Date {
   return nextDate;
 }
 
-function getSafeDuration(item: MediaItem): number {
-  const duration = Number(item.duration);
-
-  if (!Number.isFinite(duration) || duration <= 0) {
-    return 1;
-  }
-
-  return Math.max(Math.floor(duration), 1);
+function getGuideTitle(item: BroadcastItem): string {
+  return item.sourceTitle?.trim() || item.title;
 }
 
-function getTotalScheduleDuration(schedule: MediaItem[]): number {
-  return schedule.reduce((sum, item) => sum + getSafeDuration(item), 0);
+function getGuideDuration(item: BroadcastItem): number {
+  const guideDuration = Math.floor(Number(item.guideDuration));
+
+  if (Number.isFinite(guideDuration) && guideDuration > 0) {
+    return guideDuration;
+  }
+
+  const duration = Math.floor(Number(item.duration));
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 1;
+}
+
+function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
+  return schedule.filter(
+    (item) =>
+      item.file &&
+      getGuideDuration(item) > 0 &&
+      !isHiddenGuideItem(item),
+  );
+}
+
+function getTotalScheduleDuration(schedule: BroadcastItem[]): number {
+  return schedule.reduce((sum, item) => sum + getGuideDuration(item), 0);
 }
 
 function getSecondsSinceBroadcastEpoch(dateMs: number): number {
@@ -71,7 +92,7 @@ function getSecondsSinceBroadcastEpoch(dateMs: number): number {
 }
 
 function getScheduleOffsetAtBroadcastSecond(
-  schedule: MediaItem[],
+  schedule: BroadcastItem[],
   broadcastSeconds: number,
 ): number {
   const total = getTotalScheduleDuration(schedule);
@@ -84,31 +105,37 @@ function getScheduleOffsetAtBroadcastSecond(
 }
 
 function buildGuideSegments(
-  schedule: MediaItem[],
+  schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
 ): GuideSegment[] {
-  const playableSchedule = schedule.filter((item) => item.file && item.duration > 0);
+  const visibleSchedule = getVisibleSchedule(schedule);
 
-  if (playableSchedule.length === 0) {
+  if (visibleSchedule.length === 0) {
     return [];
   }
 
-  const totalDuration = getTotalScheduleDuration(playableSchedule);
+  const totalDuration = getTotalScheduleDuration(visibleSchedule);
 
   if (totalDuration <= 0) {
     return [];
   }
 
   const offset = getScheduleOffsetAtBroadcastSecond(
-    playableSchedule,
+    visibleSchedule,
     windowStartBroadcastSeconds,
   );
 
   let scheduleIndex = 0;
   let accumulated = 0;
 
-  for (let index = 0; index < playableSchedule.length; index += 1) {
-    const duration = getSafeDuration(playableSchedule[index]);
+  for (let index = 0; index < visibleSchedule.length; index += 1) {
+    const item = visibleSchedule[index];
+
+    if (!item) {
+      continue;
+    }
+
+    const duration = getGuideDuration(item);
     const end = accumulated + duration;
 
     if (offset >= accumulated && offset < end) {
@@ -124,13 +151,13 @@ function buildGuideSegments(
   const segments: GuideSegment[] = [];
 
   while (cursor < WINDOW_SECONDS) {
-    const item = playableSchedule[scheduleIndex];
+    const item = visibleSchedule[scheduleIndex];
 
     if (!item) {
       break;
     }
 
-    const itemDuration = getSafeDuration(item);
+    const itemDuration = getGuideDuration(item);
     const remainingInItem = Math.max(itemDuration - offsetInsideCurrent, 1);
     const segmentDuration = Math.min(remainingInItem, WINDOW_SECONDS - cursor);
 
@@ -142,14 +169,21 @@ function buildGuideSegments(
     });
 
     cursor += segmentDuration;
-    scheduleIndex = (scheduleIndex + 1) % playableSchedule.length;
+    scheduleIndex = (scheduleIndex + 1) % visibleSchedule.length;
     offsetInsideCurrent = 0;
   }
 
   return segments;
 }
 
-export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
+function getDisplayType(item: BroadcastItem): string {
+  if (item.type === "movie") return "MOVIE";
+  if (item.type === "show") return "SHOW";
+  if (item.type === "bumper") return "BUMPER";
+  return "COMMERCIAL";
+}
+
+export default function GuideGrid({ schedule }: GuideGridProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -159,7 +193,7 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
 
     const interval = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 1000);
+    }, LIVE_TICK_MS);
 
     return () => {
       window.clearInterval(interval);
@@ -170,6 +204,8 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
   const windowStart = useMemo(() => floorToHalfHour(now), [now]);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
+
+  const visibleSchedule = useMemo(() => getVisibleSchedule(schedule), [schedule]);
 
   const windowStartBroadcastSeconds = useMemo(
     () => getSecondsSinceBroadcastEpoch(windowStart.getTime()),
@@ -193,7 +229,7 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
     return null;
   }
 
-  if (!schedule.length || !live.item) {
+  if (!schedule.length || !live.item || visibleSchedule.length === 0) {
     return (
       <section
         className="rounded-2xl border p-4"
@@ -205,7 +241,7 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
       >
         <div className="text-sm font-semibold">No schedule loaded.</div>
         <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Assign media to this channel to generate a guide.
+          Assign shows or movies to this channel to generate public listings.
         </div>
       </section>
     );
@@ -225,24 +261,25 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
         className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-sm"
         style={{
           borderColor: "var(--border)",
-          background: "var(--guide-header-bg)",
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 44%), var(--guide-header-bg)",
         }}
       >
         <div>
           <div
-            className="text-[11px] font-bold uppercase tracking-[0.2em]"
+            className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            Tate&apos;s TV
+            Tate&apos;s Retro TV
           </div>
 
-          <div className="mt-1 font-semibold">Listings</div>
+          <div className="mt-1 font-black">Listings</div>
         </div>
 
         <div className="text-right">
-          <div className="font-semibold">{formatTime(now)}</div>
+          <div className="font-black">{formatTime(now)}</div>
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute view
+            {WINDOW_MINUTES} minute view • commercials hidden
           </div>
         </div>
       </div>
@@ -264,7 +301,7 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
               return (
                 <div
                   key={tickTime.toISOString()}
-                  className="border-r px-2 last:border-r-0"
+                  className="border-r px-2 font-black last:border-r-0"
                   style={{
                     width: `${SLOT_MINUTES * PX_PER_MINUTE}px`,
                     borderColor: "var(--border)",
@@ -277,7 +314,7 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
           </div>
 
           <div
-            className="relative h-[68px] overflow-hidden rounded-xl border"
+            className="relative h-[72px] overflow-hidden rounded-xl border"
             style={{
               borderColor: "var(--border)",
               background: "var(--guide-row-bg)",
@@ -317,6 +354,9 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
                 segment.startSec <= secondsSinceWindowStart &&
                 segment.endSec > secondsSinceWindowStart;
 
+              const title = getGuideTitle(segment.item);
+              const duration = getGuideDuration(segment.item);
+
               return (
                 <button
                   key={`${segment.item.id}-${segment.startSec}-${index}`}
@@ -325,23 +365,23 @@ export default function GuideGrid({ schedule }: { schedule: MediaItem[] }) {
                   style={{
                     left: `${left}px`,
                     width: `${width}px`,
-                    borderColor: "var(--border)",
+                    borderColor: isCurrent ? "var(--primary)" : "var(--border)",
                     background: isCurrent
                       ? "var(--guide-current-bg)"
                       : "var(--panel-alt-bg)",
                     color: isCurrent ? "#0f172a" : "var(--text)",
+                    boxShadow: isCurrent
+                      ? "inset 0 0 0 1px var(--primary)"
+                      : "none",
                   }}
-                  title={`${segment.item.title} • ${formatDuration(
-                    segment.item.duration,
-                  )}`}
+                  title={`${title} • ${formatDuration(duration)}`}
                 >
-                  <div className="truncate font-semibold tracking-tight">
-                    {segment.item.title}
+                  <div className="truncate font-black tracking-tight">
+                    {title}
                   </div>
 
                   <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                    {segment.item.type.toUpperCase()} •{" "}
-                    {formatDuration(segment.item.duration)}
+                    {getDisplayType(segment.item)} • {formatDuration(duration)}
                   </div>
                 </button>
               );

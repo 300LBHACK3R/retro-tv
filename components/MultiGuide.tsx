@@ -2,29 +2,31 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
+import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { useStore } from "@/lib/store";
-import type { Channel, MediaItem } from "@/lib/types";
+import type { BroadcastItem, Channel } from "@/lib/types";
 
-const ROW_HEIGHT = 56;
+const ROW_HEIGHT = 58;
 const SLOT_MINUTES = 30;
 const SLOT_COUNT = 6;
-const CHANNEL_COLUMN_WIDTH = 118;
-const MIN_SLOT_WIDTH = 150;
+const CHANNEL_COLUMN_WIDTH = 122;
+const MIN_SLOT_WIDTH = 156;
 const WINDOW_MINUTES = SLOT_MINUTES * SLOT_COUNT;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
+const LIVE_TICK_MS = 1000;
 
 type MultiGuideRow = {
   channel: Channel;
-  schedule: MediaItem[];
+  schedule: BroadcastItem[];
 };
 
 interface MultiGuideProps {
   data: MultiGuideRow[];
-  onProgramSelect?: (payload: { channel: Channel; item: MediaItem }) => void;
+  onProgramSelect?: (payload: { channel: Channel; item: BroadcastItem }) => void;
 }
 
 type TimelineSegment = {
-  item: MediaItem;
+  item: BroadcastItem;
   startSec: number;
   endSec: number;
 };
@@ -72,16 +74,24 @@ function getChannelName(channel: Channel): string {
   return channel.branding?.displayName ?? channel.name;
 }
 
-function getTotalScheduleDuration(schedule: MediaItem[]): number {
-  return schedule.reduce((sum, item) => {
-    const duration = Number(item.duration);
+function getGuideTitle(item: BroadcastItem): string {
+  return item.sourceTitle?.trim() || item.title;
+}
 
-    if (!Number.isFinite(duration) || duration <= 0) {
-      return sum + 1;
-    }
+function getGuideDuration(item: BroadcastItem): number {
+  const guideDuration = Math.floor(Number(item.guideDuration));
 
-    return sum + Math.max(Math.floor(duration), 1);
-  }, 0);
+  if (Number.isFinite(guideDuration) && guideDuration > 0) {
+    return guideDuration;
+  }
+
+  const duration = Math.floor(Number(item.duration));
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 1;
+}
+
+function getTotalScheduleDuration(schedule: BroadcastItem[]): number {
+  return schedule.reduce((sum, item) => sum + getGuideDuration(item), 0);
 }
 
 function getSecondsSinceBroadcastEpoch(dateMs: number): number {
@@ -89,7 +99,7 @@ function getSecondsSinceBroadcastEpoch(dateMs: number): number {
 }
 
 function getScheduleOffsetAtBroadcastSecond(
-  schedule: MediaItem[],
+  schedule: BroadcastItem[],
   broadcastSeconds: number,
 ): number {
   const total = getTotalScheduleDuration(schedule);
@@ -101,33 +111,48 @@ function getScheduleOffsetAtBroadcastSecond(
   return ((broadcastSeconds % total) + total) % total;
 }
 
+function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
+  return schedule.filter(
+    (item) =>
+      item.file &&
+      getGuideDuration(item) > 0 &&
+      !isHiddenGuideItem(item),
+  );
+}
+
 function buildVisibleTimeline(
-  schedule: MediaItem[],
+  schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
   windowDurationSeconds: number,
 ): TimelineSegment[] {
-  const playableSchedule = schedule.filter((item) => item.file && item.duration > 0);
+  const visibleSchedule = getVisibleSchedule(schedule);
 
-  if (playableSchedule.length === 0) {
+  if (visibleSchedule.length === 0) {
     return [];
   }
 
-  const total = getTotalScheduleDuration(playableSchedule);
+  const total = getTotalScheduleDuration(visibleSchedule);
 
   if (total <= 0) {
     return [];
   }
 
   const scheduleOffset = getScheduleOffsetAtBroadcastSecond(
-    playableSchedule,
+    visibleSchedule,
     windowStartBroadcastSeconds,
   );
 
   let scheduleIndex = 0;
   let accumulated = 0;
 
-  for (let index = 0; index < playableSchedule.length; index += 1) {
-    const duration = Math.max(Math.floor(playableSchedule[index]?.duration ?? 1), 1);
+  for (let index = 0; index < visibleSchedule.length; index += 1) {
+    const item = visibleSchedule[index];
+
+    if (!item) {
+      continue;
+    }
+
+    const duration = getGuideDuration(item);
     const end = accumulated + duration;
 
     if (scheduleOffset >= accumulated && scheduleOffset < end) {
@@ -143,13 +168,13 @@ function buildVisibleTimeline(
   const segments: TimelineSegment[] = [];
 
   while (cursor < windowDurationSeconds) {
-    const item = playableSchedule[scheduleIndex];
+    const item = visibleSchedule[scheduleIndex];
 
     if (!item) {
       break;
     }
 
-    const itemDuration = Math.max(Math.floor(item.duration), 1);
+    const itemDuration = getGuideDuration(item);
     const remainingInItem = Math.max(itemDuration - offsetInsideCurrent, 1);
     const segmentDuration = Math.min(
       remainingInItem,
@@ -163,11 +188,26 @@ function buildVisibleTimeline(
     });
 
     cursor += segmentDuration;
-    scheduleIndex = (scheduleIndex + 1) % playableSchedule.length;
+    scheduleIndex = (scheduleIndex + 1) % visibleSchedule.length;
     offsetInsideCurrent = 0;
   }
 
   return segments;
+}
+
+function sortRows(data: MultiGuideRow[]): MultiGuideRow[] {
+  return [...data]
+    .filter(({ channel }) => channel.isEnabled !== false)
+    .sort((a, b) => {
+      const aNumber = Number(a.channel.number ?? a.channel.id);
+      const bNumber = Number(b.channel.number ?? b.channel.id);
+
+      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+        return aNumber - bNumber;
+      }
+
+      return a.channel.id.localeCompare(b.channel.id);
+    });
 }
 
 export default function MultiGuide({
@@ -176,6 +216,7 @@ export default function MultiGuide({
 }: MultiGuideProps) {
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
+  const guideDensity = useStore((state) => state.viewerSettings.guideDensity);
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
@@ -186,29 +227,14 @@ export default function MultiGuide({
 
     const interval = window.setInterval(() => {
       setNow(new Date());
-    }, 1000);
+    }, LIVE_TICK_MS);
 
     return () => {
       window.clearInterval(interval);
     };
   }, []);
 
-  const enabledRows = useMemo(
-    () =>
-      data
-        .filter(({ channel }) => channel.isEnabled !== false)
-        .sort((a, b) => {
-          const aNumber = Number(a.channel.number ?? a.channel.id);
-          const bNumber = Number(b.channel.number ?? b.channel.id);
-
-          if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-            return aNumber - bNumber;
-          }
-
-          return a.channel.id.localeCompare(b.channel.id);
-        }),
-    [data],
-  );
+  const enabledRows = useMemo(() => sortRows(data), [data]);
 
   const windowStart = useMemo(() => {
     if (!now) {
@@ -222,6 +248,8 @@ export default function MultiGuide({
     return null;
   }
 
+  const rowHeight = guideDensity === "compact" ? 48 : ROW_HEIGHT;
+
   const secondsSinceWindowStart = Math.min(
     WINDOW_SECONDS,
     Math.max(0, Math.floor((now.getTime() - windowStart.getTime()) / 1000)),
@@ -232,6 +260,7 @@ export default function MultiGuide({
   );
 
   const timelineGridTemplate = `repeat(${SLOT_COUNT}, minmax(${MIN_SLOT_WIDTH}px, 1fr))`;
+
   const nowLinePercent = Math.min(
     100,
     Math.max(0, (secondsSinceWindowStart / WINDOW_SECONDS) * 100),
@@ -251,24 +280,25 @@ export default function MultiGuide({
         className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
         style={{
           borderColor: "var(--border)",
-          background: "var(--guide-header-bg)",
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 44%), var(--guide-header-bg)",
         }}
       >
         <div>
           <div
-            className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+            className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            Tate&apos;s TV
+            Tate&apos;s Retro TV
           </div>
 
-          <div className="mt-1 text-sm font-semibold">Live Guide</div>
+          <div className="mt-1 text-sm font-black">Live Guide</div>
         </div>
 
         <div className="text-right">
-          <div className="text-sm font-semibold">{formatTime(now)}</div>
+          <div className="text-sm font-black">{formatTime(now)}</div>
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute window
+            {WINDOW_MINUTES} minute window • commercials hidden
           </div>
         </div>
       </div>
@@ -283,7 +313,7 @@ export default function MultiGuide({
           }}
         >
           <div
-            className="border-r border-b px-3 py-3 text-xs font-medium"
+            className="border-r border-b px-3 py-3 text-xs font-black uppercase tracking-[0.12em]"
             style={{
               borderColor: "var(--border)",
               background: "var(--panel-alt-bg)",
@@ -309,7 +339,7 @@ export default function MultiGuide({
               return (
                 <div
                   key={tickTime.toISOString()}
-                  className="border-r px-3 py-3 text-xs last:border-r-0"
+                  className="border-r px-3 py-3 text-xs font-black last:border-r-0"
                   style={{
                     borderColor: "var(--border)",
                     color: "var(--text-muted)",
@@ -331,7 +361,7 @@ export default function MultiGuide({
           ) : (
             enabledRows.map(({ channel, schedule }, rowIndex) => {
               const isActive = channel.id === currentChannelId;
-              const accent = channel.branding?.accentColor || "#2563eb";
+              const accent = channel.branding?.accentColor || "var(--primary)";
 
               const visibleSegments = buildVisibleTimeline(
                 schedule,
@@ -346,6 +376,7 @@ export default function MultiGuide({
                   isActive={isActive}
                   accent={accent}
                   rowIndex={rowIndex}
+                  rowHeight={rowHeight}
                   visibleSegments={visibleSegments}
                   nowLinePercent={nowLinePercent}
                   onProgramSelect={(payload) => {
@@ -367,6 +398,7 @@ function GuideRow({
   isActive,
   accent,
   rowIndex,
+  rowHeight,
   visibleSegments,
   nowLinePercent,
   onProgramSelect,
@@ -375,9 +407,10 @@ function GuideRow({
   isActive: boolean;
   accent: string;
   rowIndex: number;
+  rowHeight: number;
   visibleSegments: TimelineSegment[];
   nowLinePercent: number;
-  onProgramSelect?: (payload: { channel: Channel; item: MediaItem }) => void;
+  onProgramSelect?: (payload: { channel: Channel; item: BroadcastItem }) => void;
 }) {
   const rowBg = isActive
     ? "var(--guide-active-bg)"
@@ -389,31 +422,38 @@ function GuideRow({
 
   return (
     <>
-      <div
-        className="flex flex-col justify-center border-r border-b px-3"
+      <button
+        type="button"
+        onClick={() =>
+          onProgramSelect?.({
+            channel,
+            item: visibleSegments[0]?.item as BroadcastItem,
+          })
+        }
+        className="flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
         style={{
-          height: `${ROW_HEIGHT}px`,
+          height: `${rowHeight}px`,
           borderColor: "var(--border)",
           background: isActive ? "var(--guide-active-bg)" : "var(--panel-alt-bg)",
           borderLeft: `3px solid ${isActive ? accent : "transparent"}`,
           color: activeTextColor,
         }}
       >
-        <div className="text-[13px] font-semibold">{getChannelLabel(channel)}</div>
+        <div className="text-[13px] font-black">{getChannelLabel(channel)}</div>
 
         <div
-          className="truncate text-[10px] uppercase tracking-[0.16em]"
+          className="truncate text-[10px] font-semibold uppercase tracking-[0.16em]"
           style={{ opacity: 0.8 }}
           title={getChannelName(channel)}
         >
           {channel.branding?.callsign || getChannelName(channel)}
         </div>
-      </div>
+      </button>
 
       <div
         className="relative border-b"
         style={{
-          height: `${ROW_HEIGHT}px`,
+          height: `${rowHeight}px`,
           borderColor: "var(--border)",
           background: rowBg,
         }}
@@ -448,9 +488,13 @@ function GuideRow({
           const widthPercent =
             ((segment.endSec - segment.startSec) / WINDOW_SECONDS) * 100;
 
+          const nowSeconds = (nowLinePercent / 100) * WINDOW_SECONDS;
+
           const isCurrentProgram =
-            segment.startSec <= (nowLinePercent / 100) * WINDOW_SECONDS &&
-            segment.endSec > (nowLinePercent / 100) * WINDOW_SECONDS;
+            segment.startSec <= nowSeconds && segment.endSec > nowSeconds;
+
+          const title = getGuideTitle(segment.item);
+          const duration = getGuideDuration(segment.item);
 
           return (
             <button
@@ -466,24 +510,22 @@ function GuideRow({
               style={{
                 left: `${leftPercent}%`,
                 width: `${Math.max(widthPercent, 1.25)}%`,
-                height: `${ROW_HEIGHT}px`,
+                height: `${rowHeight}px`,
                 background: isCurrentProgram
                   ? "var(--guide-current-bg)"
                   : "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
+                borderColor: isCurrentProgram ? accent : "var(--border)",
                 color: isCurrentProgram ? "#0f172a" : "var(--text)",
+                boxShadow: isCurrentProgram ? `inset 0 0 0 1px ${accent}` : "none",
               }}
-              title={`${segment.item.title} • ${formatDuration(
-                segment.item.duration,
-              )}`}
+              title={`${title} • ${formatDuration(duration)}`}
             >
-              <div className="truncate font-medium tracking-tight">
-                {segment.item.title}
+              <div className="truncate font-black tracking-tight">
+                {title}
               </div>
 
               <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                {segment.item.type.toUpperCase()} •{" "}
-                {formatDuration(segment.item.duration)}
+                {segment.item.type.toUpperCase()} • {formatDuration(duration)}
               </div>
             </button>
           );

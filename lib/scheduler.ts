@@ -2,6 +2,7 @@
   BroadcastItem,
   Channel,
   CommercialBreakMode,
+  CommercialStrategy,
   MediaItem,
   ScheduleMode,
   Weekday,
@@ -17,6 +18,13 @@ type CommercialCursor = {
   sourceOffsets: Record<string, number>;
 };
 
+type SlotSettings = {
+  slotLengthSeconds: number;
+  breakDurations: number[];
+  fillSlotWithCommercials: boolean;
+  commercialStrategy: CommercialStrategy;
+};
+
 const DEFAULT_BREAK_ITEM_COUNT = 1;
 const CLASSIC_BREAK_ITEM_COUNT = 2;
 const MIN_SEGMENT_SECONDS = 90;
@@ -24,6 +32,7 @@ const DEFAULT_30_MIN_SLOT_SECONDS = 30 * 60;
 const DEFAULT_60_MIN_SLOT_SECONDS = 60 * 60;
 const DEFAULT_INTERNAL_BREAK_SECONDS = 2 * 60;
 const COMMERCIAL_MATCH_TOLERANCE_SECONDS = 12;
+const MAX_COMMERCIAL_SEGMENTS_PER_BLOCK = 40;
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -99,7 +108,15 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 
   for (let index = result.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+    const current = result[index];
+    const swap = result[swapIndex];
+
+    if (current === undefined || swap === undefined) {
+      continue;
+    }
+
+    result[index] = swap;
+    result[swapIndex] = current;
   }
 
   return result;
@@ -113,12 +130,23 @@ function getCommercialBreakMode(channel?: Channel): CommercialBreakMode {
   return channel?.commercialBreakMode ?? "none";
 }
 
+function getCommercialStrategy(
+  item: MediaItem,
+  channel?: Channel,
+): CommercialStrategy {
+  return item.commercialStrategy ?? channel?.commercialStrategy ?? "best-fit";
+}
+
 function parseAirStartTime(value: string | undefined): number {
-  if (!value) return Number.POSITIVE_INFINITY;
+  if (!value) {
+    return Number.POSITIVE_INFINITY;
+  }
 
   const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
 
-  if (!match) return Number.POSITIVE_INFINITY;
+  if (!match) {
+    return Number.POSITIVE_INFINITY;
+  }
 
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -181,11 +209,17 @@ function normalizeBreakDurations(item: MediaItem, breakCount: number): number[] 
   });
 }
 
-function getSlotLength(item: MediaItem): number {
-  const saved = Math.floor(Number(item.slotLengthSeconds));
+function getSlotLength(item: MediaItem, channel?: Channel): number {
+  const savedItemSlot = Math.floor(Number(item.slotLengthSeconds));
 
-  if (Number.isFinite(saved) && saved > item.duration) {
-    return saved;
+  if (Number.isFinite(savedItemSlot) && savedItemSlot > item.duration) {
+    return savedItemSlot;
+  }
+
+  const savedChannelSlot = Math.floor(Number(channel?.defaultSlotLengthSeconds));
+
+  if (Number.isFinite(savedChannelSlot) && savedChannelSlot > item.duration) {
+    return savedChannelSlot;
   }
 
   if (item.type === "movie") {
@@ -201,6 +235,21 @@ function getSlotLength(item: MediaItem): number {
   }
 
   return 0;
+}
+
+function getSlotSettings(
+  item: MediaItem,
+  channel: Channel | undefined,
+  breakpoints: number[],
+): SlotSettings {
+  const slotLengthSeconds = getSlotLength(item, channel);
+
+  return {
+    slotLengthSeconds,
+    breakDurations: normalizeBreakDurations(item, breakpoints.length),
+    fillSlotWithCommercials: Boolean(item.fillSlotWithCommercials),
+    commercialStrategy: getCommercialStrategy(item, channel),
+  };
 }
 
 function createVirtualSegment(
@@ -224,6 +273,7 @@ function createVirtualSegment(
     title: `${item.title} ${segmentLabel}`,
     segmentLabel,
     isVirtualSegment: true,
+    hiddenFromGuide: false,
   };
 }
 
@@ -234,13 +284,19 @@ function createCommercialSegment(
 ): BroadcastItem {
   const requestedDuration = Math.max(1, Math.floor(duration));
   const sourceDuration = Math.max(1, Math.floor(item.duration));
+  const allowSlicing = item.allowCommercialSlicing !== false;
 
-  if (requestedDuration >= sourceDuration - COMMERCIAL_MATCH_TOLERANCE_SECONDS) {
+  if (
+    !allowSlicing ||
+    requestedDuration >= sourceDuration - COMMERCIAL_MATCH_TOLERANCE_SECONDS
+  ) {
     return {
       ...item,
       id: `${item.id}:break:${cursor.index}`,
+      duration: sourceDuration,
       hiddenFromGuide: true,
       sourceTitle: item.title,
+      isVirtualSegment: false,
     };
   }
 
@@ -266,7 +322,49 @@ function createCommercialSegment(
   };
 }
 
-function pickBestCommercial(
+function getRotatedCommercialPool(
+  shortForm: MediaItem[],
+  cursor: CommercialCursor,
+): MediaItem[] {
+  if (shortForm.length === 0) {
+    return [];
+  }
+
+  const startIndex = cursor.index % shortForm.length;
+
+  return [...shortForm.slice(startIndex), ...shortForm.slice(0, startIndex)];
+}
+
+function pickSequentialCommercial(
+  shortForm: MediaItem[],
+  cursor: CommercialCursor,
+): MediaItem | undefined {
+  if (shortForm.length === 0) {
+    return undefined;
+  }
+
+  return shortForm[cursor.index % shortForm.length];
+}
+
+function pickRandomCommercial(
+  shortForm: MediaItem[],
+  targetSeconds: number,
+  cursor: CommercialCursor,
+): MediaItem | undefined {
+  if (shortForm.length === 0) {
+    return undefined;
+  }
+
+  const seed = `${targetSeconds}:${cursor.index}:${shortForm
+    .map((item) => item.id)
+    .join("|")}`;
+  const random = createSeededRandom(seed);
+  const index = Math.floor(random() * shortForm.length);
+
+  return shortForm[index] ?? shortForm[0];
+}
+
+function pickBestFitCommercial(
   shortForm: MediaItem[],
   targetSeconds: number,
   cursor: CommercialCursor,
@@ -276,31 +374,59 @@ function pickBestCommercial(
   }
 
   const remaining = Math.max(1, Math.floor(targetSeconds));
-  const rotated = [...shortForm.slice(cursor.index % shortForm.length), ...shortForm.slice(0, cursor.index % shortForm.length)];
+  const rotated = getRotatedCommercialPool(shortForm, cursor);
 
   const nearExact = rotated
-    .filter((item) => Math.abs(item.duration - remaining) <= COMMERCIAL_MATCH_TOLERANCE_SECONDS)
-    .sort((a, b) => Math.abs(a.duration - remaining) - Math.abs(b.duration - remaining))[0];
+    .filter(
+      (item) =>
+        Math.abs(Math.floor(item.duration) - remaining) <=
+        COMMERCIAL_MATCH_TOLERANCE_SECONDS,
+    )
+    .sort(
+      (a, b) =>
+        Math.abs(Math.floor(a.duration) - remaining) -
+        Math.abs(Math.floor(b.duration) - remaining),
+    )[0];
 
   if (nearExact) {
     return nearExact;
   }
 
   const underOrEqual = rotated
-    .filter((item) => item.duration <= remaining)
-    .sort((a, b) => b.duration - a.duration)[0];
+    .filter((item) => Math.floor(item.duration) <= remaining)
+    .sort((a, b) => Math.floor(b.duration) - Math.floor(a.duration))[0];
 
   if (underOrEqual) {
     return underOrEqual;
   }
 
-  return rotated.sort((a, b) => a.duration - b.duration)[0];
+  return rotated.sort(
+    (a, b) => Math.floor(a.duration) - Math.floor(b.duration),
+  )[0];
+}
+
+function pickCommercial(
+  shortForm: MediaItem[],
+  targetSeconds: number,
+  cursor: CommercialCursor,
+  strategy: CommercialStrategy,
+): MediaItem | undefined {
+  if (strategy === "sequential") {
+    return pickSequentialCommercial(shortForm, cursor);
+  }
+
+  if (strategy === "random") {
+    return pickRandomCommercial(shortForm, targetSeconds, cursor);
+  }
+
+  return pickBestFitCommercial(shortForm, targetSeconds, cursor);
 }
 
 function fillCommercialDuration(
   shortForm: MediaItem[],
   targetSeconds: number,
   cursor: CommercialCursor,
+  strategy: CommercialStrategy,
 ): BroadcastItem[] {
   const target = Math.max(0, Math.floor(targetSeconds));
 
@@ -312,8 +438,8 @@ function fillCommercialDuration(
   let remaining = target;
   let guard = 0;
 
-  while (remaining > 0 && guard < 30) {
-    const selected = pickBestCommercial(shortForm, remaining, cursor);
+  while (remaining > 0 && guard < MAX_COMMERCIAL_SEGMENTS_PER_BLOCK) {
+    const selected = pickCommercial(shortForm, remaining, cursor, strategy);
 
     if (!selected) {
       break;
@@ -343,6 +469,7 @@ function takeBreakItems(
   shortForm: MediaItem[],
   count: number,
   cursor: CommercialCursor,
+  strategy: CommercialStrategy,
 ): BroadcastItem[] {
   if (shortForm.length === 0 || count <= 0) {
     return [];
@@ -351,7 +478,7 @@ function takeBreakItems(
   const items: BroadcastItem[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const item = shortForm[cursor.index % shortForm.length];
+    const item = pickCommercial(shortForm, Number.MAX_SAFE_INTEGER, cursor, strategy);
 
     if (item) {
       items.push(createCommercialSegment(item, item.duration, cursor));
@@ -378,15 +505,15 @@ function shouldAddEndBreak(mode: CommercialBreakMode): boolean {
 function buildSlotFillerSchedule(
   item: MediaItem,
   shortFormItems: MediaItem[],
+  channel: Channel | undefined,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const breakpoints = normalizeBreakpoints(item);
-  const breakDurations = normalizeBreakDurations(item, breakpoints.length);
-  const slotLength = getSlotLength(item);
+  const settings = getSlotSettings(item, channel, breakpoints);
 
   if (
-    !item.fillSlotWithCommercials ||
-    slotLength <= 0 ||
+    !settings.fillSlotWithCommercials ||
+    settings.slotLengthSeconds <= 0 ||
     breakpoints.length === 0 ||
     shortFormItems.length === 0
   ) {
@@ -408,28 +535,40 @@ function buildSlotFillerSchedule(
     }
 
     const label = points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
+    const isLastSegment = index === points.length - 2;
 
     schedule.push(createVirtualSegment(item, start, segmentDuration, label));
 
-    const isLastSegment = index === points.length - 2;
-
     if (!isLastSegment) {
-      const requestedBreakDuration = breakDurations[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
+      const requestedBreakDuration =
+        settings.breakDurations[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
+
       insertedCommercialSeconds += requestedBreakDuration;
+
       schedule.push(
-        ...fillCommercialDuration(shortFormItems, requestedBreakDuration, cursor),
+        ...fillCommercialDuration(
+          shortFormItems,
+          requestedBreakDuration,
+          cursor,
+          settings.commercialStrategy,
+        ),
       );
     }
   }
 
   const remainingSlotSeconds = Math.max(
     0,
-    slotLength - item.duration - insertedCommercialSeconds,
+    settings.slotLengthSeconds - item.duration - insertedCommercialSeconds,
   );
 
   if (remainingSlotSeconds > 0) {
     schedule.push(
-      ...fillCommercialDuration(shortFormItems, remainingSlotSeconds, cursor),
+      ...fillCommercialDuration(
+        shortFormItems,
+        remainingSlotSeconds,
+        cursor,
+        settings.commercialStrategy,
+      ),
     );
   }
 
@@ -440,9 +579,15 @@ function buildManualBreakpointSchedule(
   item: MediaItem,
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
+  channel: Channel | undefined,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
-  const slotSchedule = buildSlotFillerSchedule(item, shortFormItems, cursor);
+  const slotSchedule = buildSlotFillerSchedule(
+    item,
+    shortFormItems,
+    channel,
+    cursor,
+  );
 
   if (slotSchedule.length > 0) {
     return slotSchedule;
@@ -454,6 +599,8 @@ function buildManualBreakpointSchedule(
     return [item];
   }
 
+  const strategy = getCommercialStrategy(item, channel);
+  const breakDurations = normalizeBreakDurations(item, breakpoints.length);
   const schedule: BroadcastItem[] = [];
   const points = [0, ...breakpoints, item.duration];
 
@@ -462,7 +609,9 @@ function buildManualBreakpointSchedule(
     const end = points[index + 1] ?? item.duration;
     const duration = end - start;
 
-    if (duration <= 0) continue;
+    if (duration <= 0) {
+      continue;
+    }
 
     const label = points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
     const isLastSegment = index === points.length - 2;
@@ -470,8 +619,17 @@ function buildManualBreakpointSchedule(
     schedule.push(createVirtualSegment(item, start, duration, label));
 
     if (!isLastSegment || shouldAddEndBreak(mode)) {
-      const breakDuration = normalizeBreakDurations(item, breakpoints.length)[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
-      schedule.push(...fillCommercialDuration(shortFormItems, breakDuration, cursor));
+      const breakDuration =
+        breakDurations[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
+
+      schedule.push(
+        ...fillCommercialDuration(
+          shortFormItems,
+          breakDuration,
+          cursor,
+          strategy,
+        ),
+      );
     }
   }
 
@@ -482,9 +640,11 @@ function buildAutomaticBreakSchedule(
   item: MediaItem,
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
+  channel: Channel | undefined,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const duration = Math.max(1, Math.floor(item.duration));
+  const strategy = getCommercialStrategy(item, channel);
 
   if (mode === "none" || shortFormItems.length === 0) {
     return [item];
@@ -493,7 +653,10 @@ function buildAutomaticBreakSchedule(
   const breakCount = getBreakCount(mode);
 
   if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
-    return [item, ...takeBreakItems(shortFormItems, breakCount, cursor)];
+    return [
+      item,
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+    ];
   }
 
   if (mode === "midpoint-and-end") {
@@ -502,9 +665,9 @@ function buildAutomaticBreakSchedule(
 
     return [
       createVirtualSegment(item, 0, firstHalf, "Part 1"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor),
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
       createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor),
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
     ];
   }
 
@@ -515,21 +678,25 @@ function buildAutomaticBreakSchedule(
 
     return [
       createVirtualSegment(item, 0, first, "Act 1"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor),
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
       createVirtualSegment(item, first, second, "Act 2"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor),
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
       createVirtualSegment(item, first + second, third, "Act 3"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor),
+      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
     ];
   }
 
-  return [item, ...takeBreakItems(shortFormItems, breakCount, cursor)];
+  return [
+    item,
+    ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+  ];
 }
 
 function buildWithCommercialBreaks(
   longFormItems: MediaItem[],
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
+  channel?: Channel,
 ): BroadcastItem[] {
   const schedule: BroadcastItem[] = [];
   const cursor: CommercialCursor = {
@@ -542,13 +709,25 @@ function buildWithCommercialBreaks(
 
     if (manualBreakpoints.length > 0) {
       schedule.push(
-        ...buildManualBreakpointSchedule(item, shortFormItems, mode, cursor),
+        ...buildManualBreakpointSchedule(
+          item,
+          shortFormItems,
+          mode,
+          channel,
+          cursor,
+        ),
       );
       continue;
     }
 
     schedule.push(
-      ...buildAutomaticBreakSchedule(item, shortFormItems, mode, cursor),
+      ...buildAutomaticBreakSchedule(
+        item,
+        shortFormItems,
+        mode,
+        channel,
+        cursor,
+      ),
     );
   }
 
@@ -566,7 +745,9 @@ export function buildSchedule(
     .filter(hasPlayableDuration)
     .filter((item) => canAirToday(item, now));
 
-  if (playableMedia.length === 0) return [];
+  if (playableMedia.length === 0) {
+    return [];
+  }
 
   const scheduleMode = getScheduleMode(channel);
   const breakMode = getCommercialBreakMode(channel);
@@ -605,7 +786,12 @@ export function buildSchedule(
         )
       : shortForm;
 
-  return buildWithCommercialBreaks(orderedLongForm, orderedShortForm, breakMode);
+  return buildWithCommercialBreaks(
+    orderedLongForm,
+    orderedShortForm,
+    breakMode,
+    channel,
+  );
 }
 
 export function getScheduleDuration(schedule: BroadcastItem[]): number {
