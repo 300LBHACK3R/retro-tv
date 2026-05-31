@@ -136,3 +136,22 @@ a {
     transition-duration: 0.001ms !important;
   }
 }
+/* Mobile admin polish */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  main {
+    touch-action: manipulation;
+  }
+
+  .admin-mobile-scroll {
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

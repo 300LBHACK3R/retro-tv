@@ -32,9 +32,7 @@ function formatDuration(seconds: number): string {
 function parseDuration(value: string): number {
   const clean = value.trim();
 
-  if (!clean) {
-    return 0;
-  }
+  if (!clean) return 0;
 
   if (clean.includes(":")) {
     const parts = clean
@@ -56,12 +54,14 @@ function parseDuration(value: string): number {
   }
 
   const numeric = Number(clean);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 0;
+}
 
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return 0;
-  }
-
-  return Math.floor(numeric);
+function parseDurationList(value: string): number[] {
+  return value
+    .split(",")
+    .map((part) => parseDuration(part.trim()))
+    .filter((seconds) => seconds > 0);
 }
 
 function parseBreakpoints(value: string, duration: number): number[] {
@@ -72,21 +72,13 @@ function parseBreakpoints(value: string, duration: number): number[] {
       value
         .split(",")
         .map((part) => parseDuration(part.trim()))
-        .filter(
-          (seconds) =>
-            Number.isFinite(seconds) &&
-            seconds > 0 &&
-            seconds < safeDuration - 30,
-        ),
+        .filter((seconds) => seconds > 0 && seconds < safeDuration - 30),
     ),
   ).sort((a, b) => a - b);
 }
 
 function formatBreakpoints(points: number[] | undefined): string {
-  if (!points || points.length === 0) {
-    return "";
-  }
-
+  if (!points || points.length === 0) return "";
   return points.map(formatDuration).join(", ");
 }
 
@@ -100,15 +92,10 @@ function getMediaSearchLabel(item: MediaItem): string {
 }
 
 function isValidAirTime(value: string): boolean {
-  if (!value.trim()) {
-    return true;
-  }
+  if (!value.trim()) return true;
 
   const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
-
-  if (!match) {
-    return false;
-  }
+  if (!match) return false;
 
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -138,6 +125,9 @@ export default function QuickMediaEditorPanel() {
   const [type, setType] = useState<MediaType>("show");
   const [durationInput, setDurationInput] = useState("");
   const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("");
+  const [slotLengthInput, setSlotLengthInput] = useState("");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
   const [airStartTime, setAirStartTime] = useState("");
   const [airDays, setAirDays] = useState<Weekday[]>([]);
   const [targetChannelId, setTargetChannelId] = useState(currentChannelId);
@@ -166,9 +156,7 @@ export default function QuickMediaEditorPanel() {
   );
 
   const assignedChannelIds = useMemo(() => {
-    if (!selectedMedia) {
-      return [];
-    }
+    if (!selectedMedia) return [];
 
     return channels
       .filter((channel) => channel.mediaIds.includes(selectedMedia.id))
@@ -177,37 +165,38 @@ export default function QuickMediaEditorPanel() {
 
   const filteredMedia = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
-
     const sorted = [...media].sort((a, b) => a.title.localeCompare(b.title));
 
-    if (!cleanSearch) {
-      return sorted;
-    }
+    if (!cleanSearch) return sorted;
 
-    return sorted.filter((item) =>
-      getMediaSearchLabel(item).includes(cleanSearch),
-    );
+    return sorted.filter((item) => getMediaSearchLabel(item).includes(cleanSearch));
   }, [media, search]);
 
-  const parsedDuration = useMemo(
-    () => parseDuration(durationInput),
-    [durationInput],
-  );
-
+  const parsedDuration = useMemo(() => parseDuration(durationInput), [durationInput]);
   const parsedBreakpoints = useMemo(
     () => parseBreakpoints(breakpointsInput, parsedDuration),
     [breakpointsInput, parsedDuration],
   );
+  const parsedBreakDurations = useMemo(
+    () => parseDurationList(breakDurationsInput),
+    [breakDurationsInput],
+  );
+  const parsedSlotLength = useMemo(() => parseDuration(slotLengthInput), [slotLengthInput]);
 
   useEffect(() => {
-    if (!selectedMedia) {
-      return;
-    }
+    if (!selectedMedia) return;
 
     setTitle(selectedMedia.title);
     setType(selectedMedia.type);
     setDurationInput(formatDuration(selectedMedia.duration));
     setBreakpointsInput(formatBreakpoints(selectedMedia.breakpoints));
+    setBreakDurationsInput(formatBreakpoints(selectedMedia.breakDurations));
+    setSlotLengthInput(
+      selectedMedia.slotLengthSeconds
+        ? formatDuration(selectedMedia.slotLengthSeconds)
+        : "",
+    );
+    setFillSlotWithCommercials(Boolean(selectedMedia.fillSlotWithCommercials));
     setAirStartTime(selectedMedia.airStartTime ?? "");
     setAirDays(selectedMedia.airDays ?? []);
 
@@ -226,49 +215,30 @@ export default function QuickMediaEditorPanel() {
     );
   };
 
-  const clearAirDays = () => {
-    setAirDays([]);
+  const clearAirDays = () => setAirDays([]);
+
+  const applyMartinMysteryPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("7:30, 15:00");
+    setBreakDurationsInput("2:00, 2:00");
+    setFillSlotWithCommercials(true);
+    setMessage("Applied 30-minute cartoon/anime slot preset.");
   };
 
-  const generateOneBreak = () => {
-    if (parsedDuration <= 0) {
-      setMessage("Enter a valid duration first.");
-      return;
-    }
-
-    const midpoint = Math.round(parsedDuration / 2 / 30) * 30;
-    setBreakpointsInput(formatDuration(midpoint));
-    setMessage("Generated one middle commercial break.");
+  const applySitcomPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("11:00");
+    setBreakDurationsInput("3:00");
+    setFillSlotWithCommercials(true);
+    setMessage("Applied 30-minute sitcom slot preset.");
   };
 
-  const generateThirtyMinuteStyleBreak = () => {
-    if (parsedDuration <= 0) {
-      setMessage("Enter a valid duration first.");
-      return;
-    }
-
-    if (parsedDuration >= 1200 && parsedDuration <= 1800) {
-      const breakPoint = Math.round(parsedDuration / 2 / 30) * 30;
-      setBreakpointsInput(formatDuration(breakPoint));
-      setMessage("Generated one 20–30 minute show break.");
-      return;
-    }
-
-    if (parsedDuration > 1800 && parsedDuration <= 3600) {
-      const first = Math.round(parsedDuration / 3 / 30) * 30;
-      const second = Math.round((parsedDuration * 2) / 3 / 30) * 30;
-      setBreakpointsInput(`${formatDuration(first)}, ${formatDuration(second)}`);
-      setMessage("Generated longer show breakpoints.");
-      return;
-    }
-
-    const movieBreaks: number[] = [];
-    for (let point = 20 * 60; point < parsedDuration - 10 * 60; point += 20 * 60) {
-      movieBreaks.push(point);
-    }
-
-    setBreakpointsInput(formatBreakpoints(movieBreaks));
-    setMessage("Generated movie-style breakpoints.");
+  const applyDramaPreset = () => {
+    setSlotLengthInput("60:00");
+    setBreakpointsInput("12:00, 24:00, 36:00");
+    setBreakDurationsInput("3:00, 3:00, 3:00");
+    setFillSlotWithCommercials(true);
+    setMessage("Applied 60-minute drama slot preset.");
   };
 
   const saveChanges = () => {
@@ -292,8 +262,8 @@ export default function QuickMediaEditorPanel() {
       return;
     }
 
-    if (!targetChannelId) {
-      setMessage("Choose a target channel.");
+    if (fillSlotWithCommercials && parsedSlotLength <= parsedDuration) {
+      setMessage("Slot length must be longer than the runtime. Example: 30:00.");
       return;
     }
 
@@ -302,6 +272,9 @@ export default function QuickMediaEditorPanel() {
       type,
       duration: parsedDuration,
       breakpoints: parsedBreakpoints,
+      breakDurations: parsedBreakDurations,
+      slotLengthSeconds: parsedSlotLength > 0 ? parsedSlotLength : undefined,
+      fillSlotWithCommercials,
       airDays,
       airStartTime: airStartTime.trim() || undefined,
       updatedAt: new Date().toISOString(),
@@ -334,7 +307,7 @@ export default function QuickMediaEditorPanel() {
 
   return (
     <section
-      className="rounded-2xl border p-4"
+      className="rounded-2xl border p-3 sm:p-4"
       style={{
         background: "var(--panel-bg)",
         borderColor: "var(--border)",
@@ -352,8 +325,8 @@ export default function QuickMediaEditorPanel() {
         <h2 className="mt-1 text-sm font-semibold">Edit Loaded Shows</h2>
 
         <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Edit runtime, commercial breaks, air days, title, type, and channel
-          without deleting or re-uploading.
+          Edit runtime, commercial blocks, 30-minute slots, air days, title, type,
+          and channel without deleting or re-uploading.
         </p>
       </div>
 
@@ -362,7 +335,7 @@ export default function QuickMediaEditorPanel() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search loaded media..."
-          className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+          className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
@@ -370,8 +343,8 @@ export default function QuickMediaEditorPanel() {
           }}
         />
 
-        <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="max-h-[460px] space-y-2 overflow-auto pr-1">
+        <div className="grid gap-3 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className="max-h-[360px] space-y-2 overflow-auto pr-1 xl:max-h-[640px]">
             {filteredMedia.length === 0 ? (
               <div
                 className="rounded-xl border px-3 py-6 text-center text-xs"
@@ -405,10 +378,7 @@ export default function QuickMediaEditorPanel() {
                       color: "var(--text)",
                     }}
                   >
-                    <div className="truncate text-sm font-semibold">
-                      {item.title}
-                    </div>
-
+                    <div className="truncate text-sm font-semibold">{item.title}</div>
                     <div
                       className="mt-1 truncate text-[11px]"
                       style={{ color: "var(--text-muted)" }}
@@ -434,222 +404,194 @@ export default function QuickMediaEditorPanel() {
                 className="flex min-h-[320px] items-center justify-center text-center text-sm"
                 style={{ color: "var(--text-muted)" }}
               >
-                Select a media item from the left.
+                Select a media item from the list.
               </div>
             ) : (
               <div className="grid gap-3">
-                <div>
-                  <div
-                    className="mb-1 text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Title
-                  </div>
-
-                  <input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-                </div>
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <div
-                      className="mb-1 text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Type
-                    </div>
-
-                    <select
-                      value={type}
-                      onChange={(event) =>
-                        setType(event.target.value as MediaType)
-                      }
-                      className="w-full rounded-lg border px-3 py-2 text-sm"
-                      style={{
-                        background: "var(--panel-bg)",
-                        borderColor: "var(--border)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      <option value="show">Show</option>
-                      <option value="movie">Movie</option>
-                      <option value="commercial">Commercial</option>
-                      <option value="bumper">Bumper</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <div
-                      className="mb-1 text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Runtime
-                    </div>
-
-                    <input
-                      value={durationInput}
-                      onChange={(event) =>
-                        setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
-                      }
-                      placeholder="21:57"
-                      className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                      style={{
-                        background: "var(--panel-bg)",
-                        borderColor:
-                          durationInput && parsedDuration <= 0
-                            ? "#ef4444"
-                            : "var(--border)",
-                        color: "var(--text)",
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <div
-                      className="mb-1 text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Move To
-                    </div>
-
-                    <select
-                      value={targetChannelId}
-                      onChange={(event) => setTargetChannelId(event.target.value)}
-                      className="w-full rounded-lg border px-3 py-2 text-sm"
-                      style={{
-                        background: "var(--panel-bg)",
-                        borderColor: "var(--border)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      {enabledChannels.map((channel) => (
-                        <option key={channel.id} value={channel.id}>
-                          CH {channel.number ?? channel.id} •{" "}
-                          {channel.branding?.displayName ?? channel.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <div
-                    className="mb-1 text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Commercial Breakpoints
-                  </div>
-
-                  <input
-                    value={breakpointsInput}
-                    onChange={(event) =>
-                      setBreakpointsInput(
-                        event.target.value.replace(/[^\d:.,\s]/g, ""),
-                      )
-                    }
-                    placeholder="Example: 11:00"
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  <select
+                    value={type}
+                    onChange={(event) => setType(event.target.value as MediaType)}
+                    className="w-full rounded-lg border px-3 py-3 text-base sm:text-sm"
                     style={{
                       background: "var(--panel-bg)",
                       borderColor: "var(--border)",
                       color: "var(--text)",
                     }}
-                  />
-
-                  <div
-                    className="mt-1 text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
                   >
-                    Parsed: {formatBreakpoints(parsedBreakpoints) || "none"} •
-                    Current channel: {selectedChannelLabel}
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={generateOneBreak}
-                      className="rounded-lg px-3 py-2 text-xs font-semibold"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      One Middle Break
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={generateThirtyMinuteStyleBreak}
-                      className="rounded-lg px-3 py-2 text-xs font-semibold"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      Auto Breaks
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setBreakpointsInput("")}
-                      className="rounded-lg px-3 py-2 text-xs font-semibold"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      Clear Breaks
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div
-                    className="mb-1 text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Optional Air Time / Order
-                  </div>
+                    <option value="show">Show</option>
+                    <option value="movie">Movie</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="bumper">Bumper</option>
+                  </select>
 
                   <input
-                    value={airStartTime}
+                    value={durationInput}
                     onChange={(event) =>
-                      setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                      setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
                     }
-                    placeholder="16:00"
-                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                    placeholder="Runtime 21:57"
+                    className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
                     style={{
                       background: "var(--panel-bg)",
                       borderColor:
-                        airStartTime && !isValidAirTime(airStartTime)
+                        durationInput && parsedDuration <= 0
                           ? "#ef4444"
                           : "var(--border)",
                       color: "var(--text)",
                     }}
                   />
+
+                  <select
+                    value={targetChannelId}
+                    onChange={(event) => setTargetChannelId(event.target.value)}
+                    className="w-full rounded-lg border px-3 py-3 text-base sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {enabledChannels.map((channel) => (
+                      <option key={channel.id} value={channel.id}>
+                        CH {channel.number ?? channel.id} •{" "}
+                        {channel.branding?.displayName ?? channel.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    value={slotLengthInput}
+                    onChange={(event) =>
+                      setSlotLengthInput(event.target.value.replace(/[^\d:.]/g, ""))
+                    }
+                    placeholder="Slot 30:00"
+                    className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+
+                  <input
+                    value={breakpointsInput}
+                    onChange={(event) =>
+                      setBreakpointsInput(event.target.value.replace(/[^\d:.,\s]/g, ""))
+                    }
+                    placeholder="Breakpoints 7:30, 15:00"
+                    className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+
+                  <input
+                    value={breakDurationsInput}
+                    onChange={(event) =>
+                      setBreakDurationsInput(
+                        event.target.value.replace(/[^\d:.,\s]/g, ""),
+                      )
+                    }
+                    placeholder="Ad blocks 2:00, 2:00"
+                    className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+                </div>
+
+                <label
+                  className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={fillSlotWithCommercials}
+                    onChange={(event) =>
+                      setFillSlotWithCommercials(event.target.checked)
+                    }
+                    className="h-5 w-5"
+                  />
+                  <span>Fill remaining slot time with commercials</span>
+                </label>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={applyMartinMysteryPreset}
+                    className="rounded-lg px-3 py-3 text-xs font-semibold"
+                    style={{ background: "var(--button-bg)", color: "var(--text)" }}
+                  >
+                    30m Cartoon
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={applySitcomPreset}
+                    className="rounded-lg px-3 py-3 text-xs font-semibold"
+                    style={{ background: "var(--button-bg)", color: "var(--text)" }}
+                  >
+                    30m Sitcom
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={applyDramaPreset}
+                    className="rounded-lg px-3 py-3 text-xs font-semibold"
+                    style={{ background: "var(--button-bg)", color: "var(--text)" }}
+                  >
+                    60m Drama
+                  </button>
+                </div>
+
+                <input
+                  value={airStartTime}
+                  onChange={(event) =>
+                    setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                  }
+                  placeholder="Optional air time/order 16:00"
+                  className="w-full rounded-lg border px-3 py-3 text-base outline-none sm:text-sm"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor:
+                      airStartTime && !isValidAirTime(airStartTime)
+                        ? "#ef4444"
+                        : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
 
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <div
-                      className="text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
+                    <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                       Air Days
                     </div>
 
                     <button
                       type="button"
                       onClick={clearAirDays}
-                      className="rounded-lg px-2 py-1 text-[11px] font-semibold"
+                      className="rounded-lg px-3 py-2 text-xs font-semibold"
                       style={{
                         background: "var(--button-bg)",
                         color: "var(--text)",
@@ -668,7 +610,7 @@ export default function QuickMediaEditorPanel() {
                           key={day.id}
                           type="button"
                           onClick={() => toggleAirDay(day.id)}
-                          className="rounded-lg px-2 py-2 text-[11px] font-black uppercase tracking-[0.08em]"
+                          className="rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
                           style={{
                             background: active
                               ? "var(--primary)"
@@ -681,19 +623,27 @@ export default function QuickMediaEditorPanel() {
                       );
                     })}
                   </div>
+                </div>
 
-                  <div
-                    className="mt-1 text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    No selected days means this media airs every day.
-                  </div>
+                <div
+                  className="rounded-xl border px-3 py-2 text-xs"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Slot: {parsedSlotLength > 0 ? formatDuration(parsedSlotLength) : "none"} •
+                  Runtime: {parsedDuration > 0 ? formatDuration(parsedDuration) : "invalid"} •
+                  Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} •
+                  Ad blocks: {formatBreakpoints(parsedBreakDurations) || "auto"} •
+                  Current channel: {selectedChannelLabel}
                 </div>
 
                 <button
                   type="button"
                   onClick={saveChanges}
-                  className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                  className="rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
                   style={{
                     background:
                       "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",

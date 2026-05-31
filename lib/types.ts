@@ -64,6 +64,23 @@ export interface MediaItem {
    * This helps organize weekly schedules.
    */
   airStartTime?: string;
+
+  /**
+   * Optional broadcast slot length in seconds.
+   * Example: 1800 = 30-minute TV block.
+   */
+  slotLengthSeconds?: number;
+
+  /**
+   * Target commercial duration after each breakpoint.
+   * Example: [120, 120] = two 2-minute breaks.
+   */
+  breakDurations?: number[];
+
+  /**
+   * If true, scheduler fills remaining slot time with commercials/fillers.
+   */
+  fillSlotWithCommercials?: boolean;
 }
 
 export interface Channel {
@@ -85,4 +102,6 @@ export type BroadcastItem = MediaItem & {
   segmentLabel?: string;
   isVirtualSegment?: boolean;
   hiddenFromGuide?: boolean;
+  sourceTitle?: string;
 };
+
