@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
@@ -11,7 +11,7 @@ const AXIS_SLOTS = 6;
 const WINDOW_MINUTES = SLOT_MINUTES * AXIS_SLOTS;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
 const MIN_ITEM_WIDTH = 56;
-const LIVE_TICK_MS = 1000;
+const LIVE_TICK_MS = 15_000;
 
 type GuideSegment = {
   item: BroadcastItem;
@@ -279,7 +279,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
         <div className="text-right">
           <div className="font-black">{formatTime(now)}</div>
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute view • commercials hidden
+            {WINDOW_MINUTES} minute view â€¢ commercials hidden
           </div>
         </div>
       </div>
@@ -374,14 +374,14 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
                       ? "inset 0 0 0 1px var(--primary)"
                       : "none",
                   }}
-                  title={`${title} • ${formatDuration(duration)}`}
+                  title={`${title} â€¢ ${formatDuration(duration)}`}
                 >
                   <div className="truncate font-black tracking-tight">
                     {title}
                   </div>
 
                   <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                    {getDisplayType(segment.item)} • {formatDuration(duration)}
+                    {getDisplayType(segment.item)} â€¢ {formatDuration(duration)}
                   </div>
                 </button>
               );

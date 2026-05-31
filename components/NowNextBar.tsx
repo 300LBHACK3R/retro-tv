@@ -350,3 +350,5 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     </section>
   );
 }
+
+
