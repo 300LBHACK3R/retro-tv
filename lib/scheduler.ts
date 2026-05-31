@@ -103,6 +103,43 @@ function getCommercialBreakMode(channel?: Channel): CommercialBreakMode {
   return channel?.commercialBreakMode ?? "none";
 }
 
+function parseAirStartTime(value: string | undefined): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!match) return Number.POSITIVE_INFINITY;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function sortByAirStartTime(items: MediaItem[]): MediaItem[] {
+  return [...items].sort((a, b) => {
+    const aTime = parseAirStartTime(a.airStartTime);
+    const bTime = parseAirStartTime(b.airStartTime);
+
+    if (aTime !== bTime) {
+      return aTime - bTime;
+    }
+
+    return a.title.localeCompare(b.title);
+  });
+}
+
 function normalizeBreakpoints(item: MediaItem): number[] {
   const duration = Math.max(1, Math.floor(item.duration));
 
@@ -167,10 +204,7 @@ function takeBreakItems(
 }
 
 function getBreakCount(mode: CommercialBreakMode): number {
-  if (mode === "classic-tv") {
-    return CLASSIC_BREAK_ITEM_COUNT;
-  }
-
+  if (mode === "classic-tv") return CLASSIC_BREAK_ITEM_COUNT;
   return DEFAULT_BREAK_ITEM_COUNT;
 }
 
@@ -190,7 +224,11 @@ function buildManualBreakpointSchedule(
 ): BroadcastItem[] {
   const breakpoints = normalizeBreakpoints(item);
 
-  if (mode === "none" || shortFormItems.length === 0 || breakpoints.length === 0) {
+  if (
+    mode === "none" ||
+    shortFormItems.length === 0 ||
+    breakpoints.length === 0
+  ) {
     return [item];
   }
 
@@ -203,12 +241,9 @@ function buildManualBreakpointSchedule(
     const end = points[index + 1] ?? item.duration;
     const duration = end - start;
 
-    if (duration <= 0) {
-      continue;
-    }
+    if (duration <= 0) continue;
 
-    const label =
-      points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
+    const label = points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
 
     schedule.push(createVirtualSegment(item, start, duration, label));
 
@@ -236,10 +271,7 @@ function buildAutomaticBreakSchedule(
   }
 
   if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
-    return [
-      item,
-      ...takeBreakItems(shortFormItems, breakCount, shortCursor),
-    ];
+    return [item, ...takeBreakItems(shortFormItems, breakCount, shortCursor)];
   }
 
   if (mode === "midpoint-and-end") {
@@ -311,16 +343,6 @@ function buildWithCommercialBreaks(
   return schedule;
 }
 
-/**
- * Channel schedule builder.
- *
- * Supports:
- * - Ordered playback
- * - Daily seeded random playback
- * - Air-day filtering
- * - Manual commercial breakpoints
- * - Automatic commercial break modes
- */
 export function buildSchedule(
   media: MediaItem[],
   options: BuildScheduleOptions = {},
@@ -332,9 +354,7 @@ export function buildSchedule(
     .filter(hasPlayableDuration)
     .filter((item) => canAirToday(item, now));
 
-  if (playableMedia.length === 0) {
-    return [];
-  }
+  if (playableMedia.length === 0) return [];
 
   const scheduleMode = getScheduleMode(channel);
   const breakMode = getCommercialBreakMode(channel);
@@ -348,18 +368,20 @@ export function buildSchedule(
           playableMedia,
           `${channel?.id ?? "channel"}:${getDateSeed(now)}:fallback`,
         )
-      : playableMedia;
+      : sortByAirStartTime(playableMedia);
   }
+
+  const timeSortedLongForm = sortByAirStartTime(longForm);
 
   const orderedLongForm =
     scheduleMode === "daily-random"
       ? seededShuffle(
-          longForm,
+          timeSortedLongForm,
           `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
             now,
           )}:long-form`,
         )
-      : longForm;
+      : timeSortedLongForm;
 
   const orderedShortForm =
     scheduleMode === "daily-random"

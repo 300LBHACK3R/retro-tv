@@ -1,22 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { buildSchedule } from "@/lib/scheduler";
-import { getThemeById } from "@/lib/themes";
-import { useStore } from "@/lib/store";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
-import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
-import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
+import AdminDashboard from "@/components/AdminDashboard";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
-import MediaLibraryPanel from "@/components/MediaLibraryPanel";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
 import Remote from "@/components/Remote";
-import StationConfigPanel from "@/components/StationConfigPanel";
 import ThemeButton from "@/components/ThemeButton";
-import UploadPanel from "@/components/UploadPanel";
 import ViewerHeader from "@/components/ViewerHeader";
+import { buildSchedule } from "@/lib/scheduler";
+import { useStore } from "@/lib/store";
+import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -68,6 +64,19 @@ function createThemeVars(theme: ReturnType<typeof getThemeById>): CSSProperties 
   } as CSSProperties;
 }
 
+function sortChannelsByNumber(channels: Channel[]): Channel[] {
+  return [...channels].sort((a, b) => {
+    const aNumber = Number(a.number ?? a.id);
+    const bNumber = Number(b.number ?? b.id);
+
+    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+      return aNumber - bNumber;
+    }
+
+    return a.id.localeCompare(b.id);
+  });
+}
+
 export default function Home() {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
@@ -81,7 +90,6 @@ export default function Home() {
   const setGuideHeight = useStore((state) => state.setGuideHeight);
   const appMode = useStore((state) => state.appMode);
   const themeId = useStore((state) => state.themeId);
-  const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
 
@@ -89,19 +97,7 @@ export default function Home() {
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
 
   const enabledChannels = useMemo(
-    () =>
-      channels
-        .filter((channel) => channel.isEnabled !== false)
-        .sort((a, b) => {
-          const aNumber = Number(a.number ?? a.id);
-          const bNumber = Number(b.number ?? b.id);
-
-          if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-            return aNumber - bNumber;
-          }
-
-          return a.id.localeCompare(b.id);
-        }),
+    () => sortChannelsByNumber(channels.filter((channel) => channel.isEnabled !== false)),
     [channels],
   );
 
@@ -125,20 +121,39 @@ export default function Home() {
     [activeChannel, activeChannelMedia],
   );
 
-  const channelSchedules = useMemo(() => {
-    return enabledChannels.map((channel) => {
-      const channelMedia = getMediaForChannel(channel, media);
+  const channelSchedules = useMemo(
+    () =>
+      enabledChannels.map((channel) => {
+        const channelMedia = getMediaForChannel(channel, media);
 
-      return {
-        channel,
-        schedule: buildSchedule(channelMedia, {
+        return {
           channel,
-        }),
-      };
-    });
-  }, [enabledChannels, media]);
+          schedule: buildSchedule(channelMedia, {
+            channel,
+          }),
+        };
+      }),
+    [enabledChannels, media],
+  );
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedChannel = params.get("ch");
+
+    if (!requestedChannel) {
+      return;
+    }
+
+    const channelExists = channels.some(
+      (channel) => channel.id === requestedChannel,
+    );
+
+    if (channelExists) {
+      setChannel(requestedChannel);
+    }
+  }, [channels, setChannel]);
 
   useEffect(() => {
     if (!activeChannel && enabledChannels.length > 0) {
@@ -298,21 +313,7 @@ export default function Home() {
                 </div>
               </section>
 
-              <UploadPanel />
-              <ChannelBrandingPanel />
-              <ChannelProgrammingPanel />
-              <MediaLibraryPanel />
-
-              <StationConfigPanel
-                media={media}
-                channels={channels}
-                currentChannelId={currentChannelId}
-                sidebarWidth={sidebarWidth}
-                guideHeight={guideHeight}
-                appMode={appMode}
-                themeId={themeId}
-                ownedPremiumThemes={ownedPremiumThemes}
-              />
+              <AdminDashboard />
             </aside>
           ) : null}
 
@@ -328,11 +329,14 @@ export default function Home() {
               className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30"
               style={{ borderColor: "var(--border)" }}
             >
-             <Player
-  key={`${activeChannel?.id ?? "no-channel"}-${activeSchedule[0]?.id ?? "empty"}`}
-  schedule={activeSchedule}
-/>
-<Remote />
+              <Player
+                key={`${activeChannel?.id ?? "no-channel"}-${
+                  activeSchedule[0]?.id ?? "empty"
+                }`}
+                schedule={activeSchedule}
+              />
+
+              <Remote />
 
               {isGuideOpen ? (
                 <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">

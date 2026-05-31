@@ -48,18 +48,22 @@ export interface MediaItem {
   updatedAt?: string;
 
   /**
-   * Manual commercial break points in seconds.
-   * Example:
-   * 480 = 08:00
-   * 960 = 16:00
+   * Manual ad/commercial cut points in seconds.
+   * Example: 480, 960 = 08:00 and 16:00.
    */
   breakpoints?: number[];
 
   /**
-   * Days this item is allowed to air.
    * Empty/undefined means every day.
    */
   airDays?: Weekday[];
+
+  /**
+   * Optional planned schedule label/order time.
+   * Format: HH:mm, example: 16:00.
+   * This helps organize weekly schedules.
+   */
+  airStartTime?: string;
 }
 
 export interface Channel {
