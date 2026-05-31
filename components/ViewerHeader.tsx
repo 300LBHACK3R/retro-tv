@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { cleanDisplayText } from "@/lib/textClean";
 import type { Channel } from "@/lib/types";
 
 interface ViewerHeaderProps {
@@ -67,18 +68,15 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
             </div>
           </div>
 
-          <img
-            src="/retro-logo.png"
-            alt={title}
-            className="mt-4 h-auto w-[min(320px,75vw)] max-w-full object-contain sm:w-[420px]"
-            draggable={false}
-          />
+          <h1 className="mt-4 truncate text-4xl font-black tracking-tight sm:text-5xl">
+            {cleanDisplayText(title)}
+          </h1>
 
           <p
             className="mt-3 line-clamp-2 max-w-5xl text-sm leading-6 sm:text-base"
             style={{ color: "var(--text-muted)" }}
           >
-            {subtitle}
+            {cleanDisplayText(subtitle)}
           </p>
         </div>
 
@@ -105,9 +103,9 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
             <div
               className="mt-1 max-w-[14rem] truncate text-xs font-black uppercase tracking-[0.16em]"
               style={{ color: "var(--text-muted)" }}
-              title={callsign}
+              title={cleanDisplayText(callsign)}
             >
-              {callsign}
+              {cleanDisplayText(callsign)}
             </div>
           </aside>
         ) : null}
@@ -115,4 +113,6 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
     </header>
   );
 }
+
+
 

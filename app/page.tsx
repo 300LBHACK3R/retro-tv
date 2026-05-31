@@ -303,7 +303,7 @@ export default function Home() {
             <img
               src="/retro-logo.png"
               alt="Tate's Retro TV"
-              className="h-auto w-[min(280px,70vw)] max-w-full object-contain sm:w-[340px]"
+              className="h-auto w-[min(220px,62vw)] max-w-full object-contain sm:w-[260px]"
               draggable={false}
             />
 
@@ -562,6 +562,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
+import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
 interface NowNextBarProps {
@@ -350,6 +351,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     </section>
   );
 }
+
 
 
 
