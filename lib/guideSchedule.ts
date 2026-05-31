@@ -1,5 +1,13 @@
 ﻿import type { BroadcastItem } from "./types";
 
+function isHiddenGuideItem(item: BroadcastItem): boolean {
+  return (
+    item.hiddenFromGuide === true ||
+    item.type === "commercial" ||
+    item.type === "bumper"
+  );
+}
+
 function getGuideGroupKey(item: BroadcastItem): string {
   return item.parentMediaId ?? item.id;
 }
@@ -12,7 +20,10 @@ function getCleanTitle(item: BroadcastItem): string {
   return item.title.replace(new RegExp(`\\s+${item.segmentLabel}$`), "");
 }
 
-function createVisibleGuideItem(item: BroadcastItem, groupKey: string): BroadcastItem {
+function createVisibleGuideItem(
+  item: BroadcastItem,
+  groupKey: string,
+): BroadcastItem {
   return {
     ...item,
     id: `guide:${groupKey}`,
@@ -41,7 +52,7 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   };
 
   for (const item of schedule) {
-    if (item.hiddenFromGuide) {
+    if (isHiddenGuideItem(item)) {
       if (activeItem) {
         activeItem = {
           ...activeItem,

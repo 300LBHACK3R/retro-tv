@@ -122,6 +122,11 @@ export default function Home() {
     [activeChannel, activeChannelMedia],
   );
 
+  const activeGuideSchedule = useMemo(
+    () => buildGuideSchedule(activeSchedule),
+    [activeSchedule],
+  );
+
   const channelSchedules = useMemo(
     () =>
       enabledChannels.map((channel) => {
@@ -322,7 +327,7 @@ export default function Home() {
             }`}
           >
             <ViewerHeader channel={activeChannel} />
-            <NowNextBar channel={activeChannel} schedule={activeSchedule} />
+            <NowNextBar channel={activeChannel} schedule={activeGuideSchedule} />
 
             <div
               className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30"
@@ -383,4 +388,8 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
 
