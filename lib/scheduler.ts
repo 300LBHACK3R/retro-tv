@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BroadcastItem,
   Channel,
   CommercialBreakMode,
@@ -12,9 +12,9 @@ type BuildScheduleOptions = {
   now?: Date;
 };
 
-const DEFAULT_BREAK_ITEM_COUNT = 2;
-const CLASSIC_BREAK_ITEM_COUNT = 3;
-const MIN_SEGMENT_SECONDS = 120;
+const DEFAULT_BREAK_ITEM_COUNT = 1;
+const CLASSIC_BREAK_ITEM_COUNT = 2;
+const MIN_SEGMENT_SECONDS = 90;
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -42,6 +42,7 @@ function hasPlayableDuration(item: MediaItem): boolean {
   return (
     Number.isFinite(item.duration) &&
     item.duration > 0 &&
+    typeof item.file === "string" &&
     item.file.trim().length > 0
   );
 }
@@ -195,7 +196,10 @@ function takeBreakItems(
     const item = shortForm[cursor.value % shortForm.length];
 
     if (item) {
-      items.push(item);
+      items.push({
+        ...item,
+        id: `${item.id}:break:${cursor.value}`,
+      });
       cursor.value += 1;
     }
   }
@@ -203,12 +207,24 @@ function takeBreakItems(
   return items;
 }
 
-function getBreakCount(mode: CommercialBreakMode): number {
+function getBreakCount(mode: CommercialBreakMode, forceManualBreaks: boolean): number {
   if (mode === "classic-tv") return CLASSIC_BREAK_ITEM_COUNT;
+
+  if (forceManualBreaks) {
+    return DEFAULT_BREAK_ITEM_COUNT;
+  }
+
   return DEFAULT_BREAK_ITEM_COUNT;
 }
 
-function shouldAddEndBreak(mode: CommercialBreakMode): boolean {
+function shouldAddEndBreak(
+  mode: CommercialBreakMode,
+  forceManualBreaks: boolean,
+): boolean {
+  if (forceManualBreaks) {
+    return true;
+  }
+
   return (
     mode === "end-only" ||
     mode === "midpoint-and-end" ||
@@ -224,16 +240,13 @@ function buildManualBreakpointSchedule(
 ): BroadcastItem[] {
   const breakpoints = normalizeBreakpoints(item);
 
-  if (
-    mode === "none" ||
-    shortFormItems.length === 0 ||
-    breakpoints.length === 0
-  ) {
+  if (breakpoints.length === 0 || shortFormItems.length === 0) {
     return [item];
   }
 
+  const forceManualBreaks = true;
+  const breakCount = getBreakCount(mode, forceManualBreaks);
   const schedule: BroadcastItem[] = [];
-  const breakCount = getBreakCount(mode);
   const points = [0, ...breakpoints, item.duration];
 
   for (let index = 0; index < points.length - 1; index += 1) {
@@ -244,12 +257,11 @@ function buildManualBreakpointSchedule(
     if (duration <= 0) continue;
 
     const label = points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
+    const isLastSegment = index === points.length - 2;
 
     schedule.push(createVirtualSegment(item, start, duration, label));
 
-    const isLastSegment = index === points.length - 2;
-
-    if (!isLastSegment || shouldAddEndBreak(mode)) {
+    if (!isLastSegment || shouldAddEndBreak(mode, forceManualBreaks)) {
       schedule.push(...takeBreakItems(shortFormItems, breakCount, shortCursor));
     }
   }
@@ -264,11 +276,12 @@ function buildAutomaticBreakSchedule(
   shortCursor: { value: number },
 ): BroadcastItem[] {
   const duration = Math.max(1, Math.floor(item.duration));
-  const breakCount = getBreakCount(mode);
 
   if (mode === "none" || shortFormItems.length === 0) {
     return [item];
   }
+
+  const breakCount = getBreakCount(mode, false);
 
   if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
     return [item, ...takeBreakItems(shortFormItems, breakCount, shortCursor)];
@@ -301,15 +314,7 @@ function buildAutomaticBreakSchedule(
     ];
   }
 
-  const firstHalf = Math.floor(duration / 2);
-  const secondHalf = duration - firstHalf;
-
-  return [
-    createVirtualSegment(item, 0, firstHalf, "Part 1"),
-    ...takeBreakItems(shortFormItems, breakCount, shortCursor),
-    createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
-    ...takeBreakItems(shortFormItems, breakCount, shortCursor),
-  ];
+  return [item, ...takeBreakItems(shortFormItems, breakCount, shortCursor)];
 }
 
 function buildWithCommercialBreaks(
