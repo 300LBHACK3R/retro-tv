@@ -306,15 +306,6 @@ export default function Home() {
               className="h-auto w-[min(220px,62vw)] max-w-full object-contain sm:w-[260px]"
               draggable={false}
             />
-
-            <p
-              className="mt-2 max-w-2xl text-xs leading-5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {activeChannel
-                ? `Watching ${getChannelDisplayName(activeChannel)} with a live broadcast clock.`
-                : "Load a channel to begin the live TV experience."}
-            </p>
           </div>
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
@@ -562,6 +553,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 

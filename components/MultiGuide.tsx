@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { useStore } from "@/lib/store";
+import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
 const ROW_HEIGHT = 58;
@@ -298,7 +299,7 @@ export default function MultiGuide({
         <div className="text-right">
           <div className="text-sm font-black">{formatTime(now)}</div>
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute window â€¢ commercials hidden
+            {WINDOW_MINUTES} minute window  /  commercials hidden
           </div>
         </div>
       </div>
@@ -518,14 +519,14 @@ function GuideRow({
                 color: isCurrentProgram ? "#0f172a" : "var(--text)",
                 boxShadow: isCurrentProgram ? `inset 0 0 0 1px ${accent}` : "none",
               }}
-              title={`${title} â€¢ ${formatDuration(duration)}`}
+              title={`${title}  /  ${formatDuration(duration)}`}
             >
               <div className="truncate font-black tracking-tight">
                 {title}
               </div>
 
               <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                {segment.item.type.toUpperCase()} â€¢ {formatDuration(duration)}
+                {segment.item.type.toUpperCase()}  /  {formatDuration(duration)}
               </div>
             </button>
           );
@@ -542,3 +543,5 @@ function GuideRow({
     </>
   );
 }
+
+

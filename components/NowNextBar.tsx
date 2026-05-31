@@ -227,7 +227,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           </div>
 
           <div className="mt-1 truncate text-base font-black">
-            {getChannelLabel(channel)} â€¢ {getChannelName(channel)}
+            {getChannelLabel(channel)}  /  {getChannelName(channel)}
           </div>
 
           <div className="mt-1 flex flex-wrap gap-2 text-xs">
@@ -237,7 +237,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
                 : "Ordered"}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}>â€¢</span>
+            <span style={{ color: "var(--text-muted)" }}> / </span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {channel.commercialBreakMode ?? "none"}
@@ -283,7 +283,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               {formatClock(live.elapsed)} / {formatClock(live.item.duration)}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}>â€¢</span>
+            <span style={{ color: "var(--text-muted)" }}> / </span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {formatLongClock(live.remaining)} left
@@ -291,7 +291,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
             {!isCurrentHidden && live.item.segmentLabel ? (
               <>
-                <span style={{ color: "var(--text-muted)" }}>â€¢</span>
+                <span style={{ color: "var(--text-muted)" }}> / </span>
                 <span style={{ color: "var(--text-muted)" }}>
                   {live.item.segmentLabel}
                 </span>
@@ -338,7 +338,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} â€¢{" "}
+              {getDisplayTypeLabel(nextVisibleItem)}  / {" "}
               {formatLongClock(nextVisibleItem.duration)}
             </div>
           ) : (
@@ -351,6 +351,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     </section>
   );
 }
+
 
 
 
