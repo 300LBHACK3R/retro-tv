@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
@@ -11,6 +11,7 @@ import Remote from "@/components/Remote";
 import ThemeButton from "@/components/ThemeButton";
 import ViewerHeader from "@/components/ViewerHeader";
 import { buildSchedule } from "@/lib/scheduler";
+import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { useStore } from "@/lib/store";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
@@ -128,9 +129,7 @@ export default function Home() {
 
         return {
           channel,
-          schedule: buildSchedule(channelMedia, {
-            channel,
-          }),
+          schedule: buildGuideSchedule(buildSchedule(channelMedia, { channel })),
         };
       }),
     [enabledChannels, media],
@@ -384,3 +383,4 @@ export default function Home() {
     </main>
   );
 }
+

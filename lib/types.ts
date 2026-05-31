@@ -1,4 +1,4 @@
-export type MediaType = "show" | "commercial" | "movie" | "bumper";
+﻿export type MediaType = "show" | "commercial" | "movie" | "bumper";
 export type AppMode = "viewer" | "admin";
 
 export type ThemeId =
@@ -84,4 +84,5 @@ export type BroadcastItem = MediaItem & {
   parentMediaId?: string;
   segmentLabel?: string;
   isVirtualSegment?: boolean;
+  hiddenFromGuide?: boolean;
 };

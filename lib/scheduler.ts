@@ -407,3 +407,4 @@ export function getScheduleDuration(schedule: BroadcastItem[]): number {
     0,
   );
 }
+
