@@ -473,3 +473,5 @@ export default function Player({ schedule }: PlayerProps) {
     </div>
   );
 }
+
+

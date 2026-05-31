@@ -6,6 +6,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
+import MediaPreloader from "@/components/MediaPreloader";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
@@ -292,6 +293,7 @@ export default function Home() {
       }}
     >
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
+      <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -444,12 +446,7 @@ export default function Home() {
             ) : null}
 
             <div className={playerFrameClass} style={{ borderColor: "var(--border)" }}>
-              <Player
-                key={`${activeChannel?.id ?? "no-channel"}-${
-                  activeSchedule[0]?.id ?? "empty"
-                }`}
-                schedule={activeSchedule}
-              />
+              <Player schedule={activeSchedule} />
 
               <ChannelOverlay compact={playerViewMode === "mini"} />
               <StaticTransition trigger={activeChannel?.id ?? ""} />
@@ -567,6 +564,9 @@ export default function Home() {
     </main>
   );
 }
+
+
+
 
 
 
