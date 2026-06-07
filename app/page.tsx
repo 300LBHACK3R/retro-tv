@@ -12,6 +12,7 @@ import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
 import QuickTuneBar from "@/components/QuickTuneBar";
 import Remote from "@/components/Remote";
+import ShowLibrary from "@/components/ShowLibrary";
 import StaticTransition from "@/components/StaticTransition";
 import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
@@ -310,6 +311,7 @@ export default function Home() {
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
+            <ShowLibrary />
           </div>
         </header>
 
@@ -553,6 +555,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
