@@ -487,6 +487,32 @@ export default function Home() {
             ) : null}
           </section>
         </div>
+        <footer
+          className="rounded-2xl border px-4 py-4 text-center text-xs shadow-2xl shadow-black/20 sm:px-5"
+          style={{
+            background: "var(--panel-bg)",
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          <div className="font-semibold uppercase tracking-[0.16em]">
+            Tate&apos;s TV
+          </div>
+
+          <div className="mt-2 leading-5">
+            Built, managed, and maintained by{" "}
+            <a
+              href="https://lltechsolutions.ca"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-black transition hover:opacity-80"
+              style={{ color: "var(--primary)" }}
+            >
+              L&amp;L Tech Solutions
+            </a>
+            .
+          </div>
+        </footer>
       </div>
 
       {localSettingsOpen ? (
@@ -559,6 +585,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
