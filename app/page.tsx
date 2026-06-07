@@ -303,14 +303,14 @@ export default function Home() {
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
            <Image
-  src="/retro-logo.png
-  alt="TatesTv"
-  width={260}
-  height={90}
-  className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
-  draggable={false}
-  priority
-/>
+              src="/retro-logo.png"
+              alt="TatesTv"
+              width={260}
+              height={90}
+              className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
+              draggable={false}
+              priority
+            />
           </div>
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
@@ -559,6 +559,8 @@ export default function Home() {
     </main>
   );
 }
+
+
 
 
 
