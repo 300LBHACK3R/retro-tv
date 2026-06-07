@@ -20,6 +20,7 @@ import ViewerHeader from "@/components/ViewerHeader";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
+import Image from "next/image";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
@@ -301,12 +302,15 @@ export default function Home() {
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <img
-              src="/retro-logo.png"
-              alt="Tate's Retro TV"
-              className="h-auto w-[min(220px,62vw)] max-w-full object-contain sm:w-[260px]"
-              draggable={false}
-            />
+            <Image
+  src="/retro-logo.png"
+  alt="TatesTv"
+  width={260}
+  height={90}
+  className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
+  draggable={false}
+  priority
+/>
           </div>
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
