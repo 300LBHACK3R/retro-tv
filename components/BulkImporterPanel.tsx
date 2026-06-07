@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import {
@@ -87,9 +87,9 @@ export default function BulkImporterPanel() {
 
   const [defaultDuration, setDefaultDuration] = useState("22:00");
   const [slotLengthInput, setSlotLengthInput] = useState("30:00");
-  const [breakpointsInput, setBreakpointsInput] = useState("");
-  const [breakDurationsInput, setBreakDurationsInput] = useState("");
-  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
+  const [breakpointsInput, setBreakpointsInput] = useState("7:30, 15:00");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("2:00, 2:00");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(true);
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
@@ -392,7 +392,7 @@ export default function BulkImporterPanel() {
           >
             {enabledChannels.map((channel) => (
               <option key={channel.id} value={channel.id}>
-                CH {channel.number ?? channel.id} •{" "}
+                CH {channel.number ?? channel.id} â€¢{" "}
                 {channel.branding?.displayName ?? channel.name}
               </option>
             ))}
@@ -691,12 +691,12 @@ export default function BulkImporterPanel() {
             color: "var(--text-muted)",
           }}
         >
-          URLs: {validUrls.length} valid / {lines.length} total • Invalid:{" "}
-          {invalidUrls.length} • Questionable: {questionableUrls.length} •
+          URLs: {validUrls.length} valid / {lines.length} total â€¢ Invalid:{" "}
+          {invalidUrls.length} â€¢ Questionable: {questionableUrls.length} â€¢
           Duration: {parsedDuration > 0 ? formatDuration(parsedDuration) : "unset"}{" "}
-          • Slot:{" "}
+          â€¢ Slot:{" "}
           {parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}{" "}
-          • Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} • Ads:{" "}
+          â€¢ Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} â€¢ Ads:{" "}
           {formatBreakpoints(parsedBreakDurations) || "auto"}
         </div>
 
@@ -728,3 +728,4 @@ export default function BulkImporterPanel() {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
@@ -36,7 +36,7 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
       : "Type seconds, like 1339, or use 22:19.";
   }
 
-  return `${formatDuration(seconds)} • ${formatDurationClock(seconds)}`;
+  return `${formatDuration(seconds)} â€¢ ${formatDurationClock(seconds)}`;
 }
 
 function getSlotHelperText(
@@ -75,10 +75,10 @@ export default function UploadPanel() {
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
 
-  const [breakpointsInput, setBreakpointsInput] = useState("");
-  const [breakDurationsInput, setBreakDurationsInput] = useState("");
-  const [slotLengthInput, setSlotLengthInput] = useState("");
-  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
+  const [breakpointsInput, setBreakpointsInput] = useState("7:30, 15:00");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("2:00, 2:00");
+  const [slotLengthInput, setSlotLengthInput] = useState("30:00");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(true);
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
@@ -210,7 +210,7 @@ export default function UploadPanel() {
       setDurationMode("seconds");
       setDurationInput(String(result.duration));
       setDurationStatus(
-        `Detected ${result.durationLabel} • ${formatDurationClock(
+        `Detected ${result.durationLabel} â€¢ ${formatDurationClock(
           result.duration,
         )}.`,
       );
@@ -333,7 +333,7 @@ export default function UploadPanel() {
     assignMediaToChannel(channelId, item.id);
 
     setStatus(
-      `Added "${item.title}" to CH ${channelId} • ${formatDuration(
+      `Added "${item.title}" to CH ${channelId} â€¢ ${formatDuration(
         item.duration,
       )}.`,
     );
@@ -496,7 +496,7 @@ export default function UploadPanel() {
               className="mt-1 text-[11px]"
               style={{ color: "var(--text-muted)" }}
             >
-              {durationStatus} • {getDurationHelperText(durationInput, durationMode)}
+              {durationStatus} â€¢ {getDurationHelperText(durationInput, durationMode)}
             </div>
           </div>
 
@@ -512,7 +512,7 @@ export default function UploadPanel() {
           >
             {enabledChannels.map((channel) => (
               <option key={channel.id} value={channel.id}>
-                CH {channel.number ?? channel.id} •{" "}
+                CH {channel.number ?? channel.id} â€¢{" "}
                 {channel.branding?.displayName ?? channel.name}
               </option>
             ))}

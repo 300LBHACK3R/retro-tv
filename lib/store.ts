@@ -1,6 +1,10 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
+import {
+  getThirtyMinuteBroadcastPatch,
+  shouldUseThirtyMinuteBroadcastStandard,
+} from "./broadcastSlots";
 import type {
   AppMode,
   Channel,
@@ -129,10 +133,10 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e01.mp4",
     provider: "cloudflare-r2",
-    breakpoints: [],
-    breakDurations: [],
+    breakpoints: [450, 900],
+    breakDurations: [120, 120],
     slotLengthSeconds: 1800,
-    fillSlotWithCommercials: false,
+    fillSlotWithCommercials: true,
     commercialStrategy: "best-fit",
     airDays: [],
   },
@@ -145,10 +149,10 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e02.mp4",
     provider: "cloudflare-r2",
-    breakpoints: [],
-    breakDurations: [],
+    breakpoints: [450, 900],
+    breakDurations: [120, 120],
     slotLengthSeconds: 1800,
-    fillSlotWithCommercials: false,
+    fillSlotWithCommercials: true,
     commercialStrategy: "best-fit",
     airDays: [],
   },
@@ -998,6 +1002,8 @@ export const useStore = create<AppState>()(
     },
   ),
 );
+
+
 
 
 
