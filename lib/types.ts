@@ -13,6 +13,13 @@ export type ThemeId =
   | "saturday-morning-max"
   | "electric-blue-live";
 
+export type ThemeLayoutMode =
+  | "classic"
+  | "modern"
+  | "electric"
+  | "cinematic"
+  | "compact";
+
 export type ScheduleMode = "ordered" | "daily-random";
 
 export type CommercialBreakMode =
@@ -25,6 +32,20 @@ export type CommercialStrategy =
   | "sequential"
   | "best-fit"
   | "random";
+
+export type MediaProvider =
+  | "cloudflare-r2"
+  | "external-url"
+  | "local-dev"
+  | "indexed-db"
+  | "unknown";
+
+export type MediaUploadStatus =
+  | "ready"
+  | "processing"
+  | "failed"
+  | "missing"
+  | "local-only";
 
 export type Weekday =
   | "sunday"
@@ -41,6 +62,39 @@ export interface ChannelBranding {
   description: string;
   accentColor: string;
   logoText: string;
+
+  /**
+   * Optional future image logo support.
+   * Text-based branding still works normally without this.
+   */
+  logoUrl?: string;
+  posterUrl?: string;
+}
+
+export interface MediaLibraryMeta {
+  /**
+   * Optional grouping for on-demand browsing.
+   *
+   * Example:
+   * seriesTitle = "Martin Mystery"
+   * seasonNumber = 1
+   * episodeNumber = 4
+   */
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeCode?: string;
+
+  /**
+   * Optional clean title for the library card.
+   * If missing, the library can still infer from title/file.
+   */
+  libraryTitle?: string;
+
+  /**
+   * Optional sorting override.
+   */
+  sortKey?: string | number;
 }
 
 export interface MediaItem {
@@ -48,15 +102,47 @@ export interface MediaItem {
   title: string;
   type: MediaType;
   duration: number;
+
+  /**
+   * Main playable source.
+   *
+   * This can be:
+   * - Cloudflare/R2 public URL
+   * - external https URL
+   * - local dev path
+   * - blob/object URL generated at runtime
+   */
   file: string;
 
   mimeType?: string;
   originalName?: string;
   poster?: string;
   description?: string;
-  provider?: "cloudflare-r2" | "external-url" | "local-dev" | "unknown";
+
+  provider?: MediaProvider;
+  uploadStatus?: MediaUploadStatus;
+
+  /**
+   * Used for local IndexedDB-backed files.
+   * The actual Blob lives in IndexedDB; metadata lives in app state.
+   */
+  storageKey?: string;
+  localObjectUrl?: string;
+
+  /**
+   * Optional remote storage metadata.
+   */
+  bucketKey?: string;
+  publicUrl?: string;
+
   createdAt?: string;
   updatedAt?: string;
+
+  /**
+   * Optional on-demand library metadata.
+   * Existing title parsing can still work without this.
+   */
+  library?: MediaLibraryMeta;
 
   /**
    * Manual show cut points in seconds.
@@ -98,7 +184,7 @@ export interface MediaItem {
    *
    * sequential = rotate through commercial pool in order.
    * best-fit = prefer commercials close to the needed duration.
-   * random = future random pool support.
+   * random = randomized pool support.
    */
   commercialStrategy?: CommercialStrategy;
 
@@ -156,6 +242,19 @@ export interface Channel {
    * Optional default commercial strategy for this channel.
    */
   commercialStrategy?: CommercialStrategy;
+
+  /**
+   * Optional channel-safe commercial categories.
+   *
+   * Example:
+   * VORTEX can use ["kids", "anime", "gaming", "general"]
+   */
+  commercialCategories?: string[];
+
+  /**
+   * Optional layout hint for future per-channel experiences.
+   */
+  layoutMode?: ThemeLayoutMode;
 }
 
 export type BroadcastItem = MediaItem & {
@@ -182,6 +281,11 @@ export type BroadcastItem = MediaItem & {
    * playback secretly contains show parts + commercials.
    */
   guideDuration?: number;
+
+  /**
+   * Useful for debugging generated schedules without exposing it in UI.
+   */
+  generatedBy?: "scheduler" | "commercial-fill" | "manual" | "guide";
 };
 
 export interface ViewerSettings {
@@ -191,7 +295,3 @@ export interface ViewerSettings {
   guideDensity: "compact" | "comfortable";
   preferReducedMotion: boolean;
 }
-
-
-
-

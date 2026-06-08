@@ -14,9 +14,10 @@ interface PreviewPlayerProps {
   compact?: boolean;
 }
 
-const SEEK_TOLERANCE_SECONDS = 1.5;
-const END_LOOP_PADDING_SECONDS = 0.2;
-const AUTOPLAY_RETRY_DELAY_MS = 450;
+const SEEK_TOLERANCE_SECONDS = 1.25;
+const END_LOOP_PADDING_SECONDS = 0.25;
+const AUTOPLAY_RETRY_DELAY_MS = 500;
+const LOADING_OVERLAY_DELAY_MS = 450;
 
 function formatDuration(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -47,14 +48,20 @@ function getSafePreviewTime(
       : null;
 
   if (safeEndAt) {
-    return Math.min(targetTime, Math.max(safeEndAt - END_LOOP_PADDING_SECONDS, 0));
+    return Math.min(
+      targetTime,
+      Math.max(safeEndAt - END_LOOP_PADDING_SECONDS, 0),
+    );
   }
 
   if (!Number.isFinite(video.duration) || video.duration <= 0) {
     return targetTime;
   }
 
-  return Math.min(targetTime, Math.max(video.duration - END_LOOP_PADDING_SECONDS, 0));
+  return Math.min(
+    targetTime,
+    Math.max(video.duration - END_LOOP_PADDING_SECONDS, 0),
+  );
 }
 
 function getPreviewEndTime(
@@ -88,7 +95,41 @@ function getStatusLabel(status: PreviewStatus): string {
 function getStatusColor(status: PreviewStatus): string {
   if (status === "error") return "#fca5a5";
   if (status === "ready") return "var(--primary)";
+  if (status === "loading") return "#fde68a";
   return "var(--text-muted)";
+}
+
+function getErrorMessage(video: HTMLVideoElement): string {
+  const code = video.error?.code;
+
+  if (code === MediaError.MEDIA_ERR_NETWORK) {
+    return "Network error. Test the media URL.";
+  }
+
+  if (code === MediaError.MEDIA_ERR_DECODE) {
+    return "Decode issue. Re-encode as MP4 H.264/AAC.";
+  }
+
+  if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+    return "Unsupported video format.";
+  }
+
+  return "Preview failed. Test the media source.";
+}
+
+function getPreviewMeta(item: MediaItem | null): string {
+  if (!item) {
+    return "No item selected";
+  }
+
+  return `${item.type.toUpperCase()} • ${formatDuration(item.duration)}`;
+}
+
+function clearTimer(timerRef: React.MutableRefObject<number | null>): void {
+  if (timerRef.current) {
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
 }
 
 export default function PreviewPlayer({
@@ -102,35 +143,43 @@ export default function PreviewPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const currentSrcRef = useRef<string | null>(null);
   const retryTimerRef = useRef<number | null>(null);
+  const loadingTimerRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<PreviewStatus>(
     item ? "loading" : "idle",
   );
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
 
-  const previewMeta = useMemo(() => {
-    if (!item) {
-      return "No item selected";
-    }
-
-    return `${item.type.toUpperCase()} • ${formatDuration(item.duration)}`;
-  }, [item]);
+  const previewMeta = useMemo(() => getPreviewMeta(item), [item]);
 
   useEffect(() => {
     const video = videoRef.current;
 
     if (!video || !item?.file) {
       setStatus("idle");
+      setErrorMessage("");
+      setShowLoadingOverlay(false);
       currentSrcRef.current = null;
       return;
     }
 
     let cancelled = false;
 
-    const clearRetry = () => {
-      if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
+    const clearRetry = () => clearTimer(retryTimerRef);
+    const clearLoading = () => {
+      clearTimer(loadingTimerRef);
+      setShowLoadingOverlay(false);
+    };
+
+    const startLoadingOverlayDelay = () => {
+      clearLoading();
+
+      loadingTimerRef.current = window.setTimeout(() => {
+        if (!cancelled) {
+          setShowLoadingOverlay(true);
+        }
+      }, LOADING_OVERLAY_DELAY_MS);
     };
 
     const safeSeek = () => {
@@ -156,7 +205,9 @@ export default function PreviewPlayer({
         .play()
         .then(() => {
           if (!cancelled) {
+            clearLoading();
             setStatus("ready");
+            setErrorMessage("");
           }
         })
         .catch(() => {
@@ -164,6 +215,7 @@ export default function PreviewPlayer({
             return;
           }
 
+          clearLoading();
           setStatus("paused");
 
           clearRetry();
@@ -185,7 +237,17 @@ export default function PreviewPlayer({
 
     const handleCanPlay = () => {
       if (!cancelled && !video.paused) {
+        clearLoading();
         setStatus("ready");
+        setErrorMessage("");
+      }
+    };
+
+    const handlePlaying = () => {
+      if (!cancelled) {
+        clearLoading();
+        setStatus("ready");
+        setErrorMessage("");
       }
     };
 
@@ -202,6 +264,7 @@ export default function PreviewPlayer({
 
       if (video.currentTime >= previewEndTime - END_LOOP_PADDING_SECONDS) {
         safeSeek();
+
         void video.play().catch(() => {
           if (!cancelled) {
             setStatus("paused");
@@ -212,12 +275,16 @@ export default function PreviewPlayer({
 
     const handleError = () => {
       if (!cancelled) {
+        clearLoading();
         setStatus("error");
+        setErrorMessage(getErrorMessage(video));
       }
     };
 
     clearRetry();
+    startLoadingOverlayDelay();
     setStatus("loading");
+    setErrorMessage("");
 
     video.muted = true;
     video.playsInline = true;
@@ -226,6 +293,7 @@ export default function PreviewPlayer({
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
     video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("playing", handlePlaying);
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("error", handleError);
 
@@ -241,9 +309,11 @@ export default function PreviewPlayer({
     return () => {
       cancelled = true;
       clearRetry();
+      clearLoading();
 
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("error", handleError);
     };
@@ -251,12 +321,10 @@ export default function PreviewPlayer({
 
   useEffect(() => {
     return () => {
-      const video = videoRef.current;
+      clearTimer(retryTimerRef);
+      clearTimer(loadingTimerRef);
 
-      if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
+      const video = videoRef.current;
 
       if (!video) {
         return;
@@ -277,25 +345,29 @@ export default function PreviewPlayer({
     }
 
     setStatus("loading");
+    setErrorMessage("");
 
     void video
       .play()
-      .then(() => setStatus("ready"))
-      .catch(() => setStatus("paused"));
+      .then(() => {
+        setStatus("ready");
+        setErrorMessage("");
+      })
+      .catch(() => {
+        setStatus("paused");
+      });
   };
 
   if (!item) {
     return (
       <section
-        className="overflow-hidden rounded-xl border shadow-xl"
+        className="ttv-glass-panel overflow-hidden rounded-2xl shadow-xl"
         style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
           color: "var(--text)",
         }}
       >
         <div
-          className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]"
+          className="border-b px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
           style={{
             borderColor: "var(--border)",
             color: "var(--text-muted)",
@@ -316,10 +388,8 @@ export default function PreviewPlayer({
 
   return (
     <section
-      className="overflow-hidden rounded-xl border shadow-xl"
+      className="ttv-glass-panel overflow-hidden rounded-2xl shadow-xl"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
         color: "var(--text)",
       }}
     >
@@ -329,7 +399,7 @@ export default function PreviewPlayer({
       >
         <div className="min-w-0">
           <div
-            className="truncate text-xs font-semibold uppercase tracking-[0.16em]"
+            className="truncate text-xs font-black uppercase tracking-[0.16em]"
             style={{ color: "var(--text-muted)" }}
             title={title}
           >
@@ -348,7 +418,7 @@ export default function PreviewPlayer({
         </div>
 
         <div
-          className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+          className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
           style={{
             borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
@@ -360,7 +430,9 @@ export default function PreviewPlayer({
       </div>
 
       <div
-        className={`relative ${compact ? "aspect-[16/10]" : "aspect-video"} bg-black`}
+        className={`relative ${
+          compact ? "aspect-[16/10]" : "aspect-video"
+        } bg-black`}
       >
         <video
           ref={videoRef}
@@ -372,9 +444,9 @@ export default function PreviewPlayer({
           className="h-full w-full object-cover"
         />
 
-        {status === "loading" ? (
+        {status === "loading" && showLoadingOverlay ? (
           <div
-            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-semibold uppercase tracking-[0.16em]"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-black uppercase tracking-[0.16em]"
             style={{ color: "var(--text-muted)" }}
           >
             Loading Preview
@@ -393,14 +465,14 @@ export default function PreviewPlayer({
         ) : null}
 
         {status === "error" ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70 px-4 text-center text-xs text-red-200">
-            Preview failed. Test the Cloudflare/R2 media URL.
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70 px-4 text-center text-xs leading-5 text-red-200">
+            {errorMessage || "Preview failed. Test the Cloudflare/R2 media URL."}
           </div>
         ) : null}
       </div>
 
       <div className="px-3 py-2">
-        <div className="truncate text-sm font-semibold" title={item.title}>
+        <div className="truncate text-sm font-black" title={item.title}>
           {item.title}
         </div>
 

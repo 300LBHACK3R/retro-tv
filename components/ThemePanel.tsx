@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 
 import type { ThemeId } from "@/lib/types";
@@ -81,7 +81,7 @@ function getThemeSearchText(theme: ThemeDefinition): string {
 
 function isThemeOwned(
   theme: ThemeDefinition,
-  ownedPremiumThemes: readonly ThemeId[],
+  ownedPremiumThemes: ThemeId[],
   isAdmin: boolean,
 ): boolean {
   if (!theme.isPremium) {
@@ -103,7 +103,7 @@ function matchesFilter({
 }: {
   theme: ThemeDefinition;
   filter: ThemeFilter;
-  ownedPremiumThemes: readonly ThemeId[];
+  ownedPremiumThemes: ThemeId[];
   isAdmin: boolean;
 }): boolean {
   const unlocked = canUseTheme(theme.id, ownedPremiumThemes, isAdmin);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   programmingStoreName,
   programmingStoreVersion,
@@ -28,7 +28,14 @@ type StoreSnapshot = {
   ownedPremiumThemes: ThemeId[];
 };
 
+type ConfigStat = {
+  label: string;
+  value: string | number;
+  helper: string;
+};
+
 const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const RELOAD_DELAY_MS = 500;
 
 function buildExportPayload(snapshot: StoreSnapshot): ExportPayload {
   return {
@@ -58,7 +65,7 @@ function parseImportPayload(raw: unknown): ProgrammingSnapshot {
 
   if (!sanitized) {
     throw new Error(
-      "Import failed. This JSON file does not contain valid Tate's TV programming data.",
+      "Import failed. This JSON file does not contain valid TatesTv programming data.",
     );
   }
 
@@ -75,7 +82,7 @@ function createExportFilename(): string {
     .replace(/[:.]/g, "-")
     .slice(0, 19);
 
-  return `tates-tv-station-config-${stamp}.json`;
+  return `tatestv-station-config-${stamp}.json`;
 }
 
 function downloadJson(filename: string, payload: unknown): void {
@@ -117,6 +124,85 @@ function buildZustandPayload(snapshot: ProgrammingSnapshot) {
   };
 }
 
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("en-CA", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function getEnabledChannelCount(channels: Channel[]): number {
+  return channels.filter((channel) => channel.isEnabled !== false).length;
+}
+
+function getCurrentChannelLabel(
+  channels: Channel[],
+  currentChannelId: string,
+): string {
+  const channel = channels.find((item) => item.id === currentChannelId);
+
+  if (!channel) {
+    return currentChannelId || "none";
+  }
+
+  return `CH ${channel.number ?? channel.id}`;
+}
+
+function getFileValidationError(file: File): string | null {
+  if (!file.name.toLowerCase().endsWith(".json")) {
+    return "Import failed. Please select a .json station config file.";
+  }
+
+  if (file.size <= 0) {
+    return "Import failed. The selected file is empty.";
+  }
+
+  if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
+    return "Import failed. Config file is too large.";
+  }
+
+  return null;
+}
+
+async function readJsonFile(file: File): Promise<unknown> {
+  const text = await file.text();
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("Import failed. The selected file is not valid JSON.");
+  }
+}
+
+function StatCard({ stat }: { stat: ConfigStat }) {
+  return (
+    <div
+      className="rounded-2xl border p-3"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <div className="truncate text-lg font-black tracking-tight">
+        {stat.value}
+      </div>
+
+      <div
+        className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {stat.label}
+      </div>
+
+      <div
+        className="mt-2 line-clamp-2 text-[11px] leading-4"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {stat.helper}
+      </div>
+    </div>
+  );
+}
+
 interface StationConfigPanelProps {
   media: MediaItem[];
   channels: Channel[];
@@ -145,6 +231,42 @@ export default function StationConfigPanel({
   );
   const [isImporting, setIsImporting] = useState(false);
 
+  const configStats = useMemo<ConfigStat[]>(
+    () => [
+      {
+        label: "Media Items",
+        value: formatCompactNumber(media.length),
+        helper: "Saved metadata records and video URLs.",
+      },
+      {
+        label: "Channels",
+        value: formatCompactNumber(channels.length),
+        helper: "Total channel records in this station.",
+      },
+      {
+        label: "Enabled",
+        value: formatCompactNumber(getEnabledChannelCount(channels)),
+        helper: "Channels visible to public viewers.",
+      },
+      {
+        label: "Current",
+        value: getCurrentChannelLabel(channels, currentChannelId),
+        helper: "Default active channel after restore.",
+      },
+      {
+        label: "Theme",
+        value: themeId,
+        helper: "Active visual theme saved with config.",
+      },
+      {
+        label: "Owned Themes",
+        value: formatCompactNumber(ownedPremiumThemes.length),
+        helper: "Premium/unlocked theme IDs in this browser config.",
+      },
+    ],
+    [channels, currentChannelId, media.length, ownedPremiumThemes.length, themeId],
+  );
+
   const exportConfig = () => {
     const payload = buildExportPayload({
       media,
@@ -158,6 +280,7 @@ export default function StationConfigPanel({
     });
 
     downloadJson(createExportFilename(), payload);
+
     setMessage(
       `Config exported: ${payload.media.length} media items and ${payload.channels.length} channels.`,
     );
@@ -168,12 +291,22 @@ export default function StationConfigPanel({
       setIsImporting(true);
       setMessage("Importing config...");
 
-      if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
-        throw new Error("Import failed. Config file is too large.");
+      const validationError = getFileValidationError(file);
+
+      if (validationError) {
+        throw new Error(validationError);
       }
 
-      const text = await file.text();
-      const parsed = JSON.parse(text) as unknown;
+      const confirmed = window.confirm(
+        "Importing this config will replace the station programming saved in this browser. Continue?",
+      );
+
+      if (!confirmed) {
+        setMessage("Import cancelled.");
+        return;
+      }
+
+      const parsed = await readJsonFile(file);
       const snapshot = parseImportPayload(parsed);
       const zustandPayload = buildZustandPayload(snapshot);
 
@@ -185,7 +318,7 @@ export default function StationConfigPanel({
 
       window.setTimeout(() => {
         window.location.reload();
-      }, 400);
+      }, RELOAD_DELAY_MS);
     } catch (error) {
       console.error(error);
 
@@ -206,57 +339,87 @@ export default function StationConfigPanel({
 
   return (
     <section
-      className="rounded-2xl border p-3 sm:p-4"
-      style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
+      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
+      style={{ color: "var(--text)" }}
     >
-      <div className="mb-3">
-        <div
-          className="text-xs font-semibold uppercase tracking-[0.18em]"
-          style={{ color: "var(--primary)" }}
-        >
-          Station Backup
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div
+            className="text-xs font-black uppercase tracking-[0.18em]"
+            style={{ color: "var(--primary)" }}
+          >
+            Station Backup
+          </div>
+
+          <h2 className="mt-1 text-base font-black tracking-tight">
+            Station Config
+          </h2>
+
+          <p
+            className="mt-1 max-w-3xl text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Backup or restore this browser&apos;s TatesTv programming setup,
+            including channels, R2 URLs, themes, layout, breakpoints, slot
+            lengths, and commercial settings.
+          </p>
         </div>
 
-        <h2 className="mt-1 text-sm font-semibold tracking-wide">
-          Station Config
-        </h2>
-
-        <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
-          Backup or restore this browser&apos;s Tate&apos;s TV programming setup,
-          including channels, R2 URLs, themes, layout, breakpoints, slot lengths,
-          and commercial settings.
-        </p>
+        <div
+          className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--panel-alt-bg)",
+            color: "var(--text-muted)",
+          }}
+        >
+          Local Config
+        </div>
       </div>
 
       <div
-        className="grid gap-2 rounded-xl border p-3 sm:grid-cols-3"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
         }}
       >
-        <div>
-          <div className="text-lg font-black">{media.length}</div>
-          <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Media Items
-          </div>
+        {configStats.map((stat) => (
+          <StatCard key={stat.label} stat={stat} />
+        ))}
+      </div>
+
+      <div
+        className="rounded-2xl border p-3"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <div
+          className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
+          style={{ color: "var(--primary)" }}
+        >
+          Layout Snapshot
         </div>
 
-        <div>
-          <div className="text-lg font-black">{channels.length}</div>
-          <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Channels
+        <div
+          className="grid gap-2 text-xs sm:grid-cols-3"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <div>
+            Sidebar Width:{" "}
+            <span style={{ color: "var(--text)" }}>{sidebarWidth}px</span>
           </div>
-        </div>
 
-        <div>
-          <div className="truncate text-lg font-black">{themeId}</div>
-          <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Active Theme
+          <div>
+            Guide Height:{" "}
+            <span style={{ color: "var(--text)" }}>{guideHeight}px</span>
+          </div>
+
+          <div>
+            Current Mode:{" "}
+            <span style={{ color: "var(--text)" }}>{appMode}</span>
           </div>
         </div>
       </div>
@@ -265,11 +428,8 @@ export default function StationConfigPanel({
         <button
           type="button"
           onClick={exportConfig}
-          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
-          style={{
-            background: "var(--button-bg)",
-            color: "var(--text)",
-          }}
+          disabled={isImporting}
+          className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Export Config
         </button>
@@ -278,10 +438,10 @@ export default function StationConfigPanel({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isImporting}
-          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+          className="ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background:
-              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
+              "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
             color: "var(--text)",
           }}
         >
@@ -304,17 +464,29 @@ export default function StationConfigPanel({
       </div>
 
       <div
-        className="mt-3 rounded-xl border px-3 py-2 text-xs leading-5"
+        className="mt-3 rounded-2xl border px-3 py-2 text-xs leading-5"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: message.toLowerCase().includes("failed")
+            ? "rgba(248, 113, 113, 0.45)"
+            : "var(--border)",
+          color: message.toLowerCase().includes("failed")
+            ? "#fecaca"
+            : "var(--text-muted)",
+        }}
+        aria-live="polite"
+      >
+        {message}
+      </div>
+
+      <div
+        className="mt-3 rounded-2xl border px-3 py-2 text-[11px] leading-5"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
           color: "var(--text-muted)",
         }}
       >
-        {message}
-      </div>
-
-      <div className="mt-3 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
         This backs up programming metadata and Cloudflare/R2 URLs only. It does
         not export actual MP4 files. Imported configs always restore in viewer
         mode; admin access must be re-authenticated.

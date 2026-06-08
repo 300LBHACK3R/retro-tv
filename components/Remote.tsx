@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
+import { cleanDisplayText } from "@/lib/textClean";
 import type { Channel, PlayerViewMode } from "@/lib/types";
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -18,7 +19,15 @@ function getChannelName(channel: Channel | undefined): string {
     return "No Channel";
   }
 
-  return channel.branding?.displayName ?? channel.name;
+  return cleanDisplayText(channel.branding?.displayName ?? channel.name);
+}
+
+function getChannelCallsign(channel: Channel | undefined): string {
+  if (!channel) {
+    return "LIVE";
+  }
+
+  return cleanDisplayText(channel.branding?.callsign || channel.name || "LIVE");
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -57,6 +66,64 @@ function getViewModeLabel(mode: PlayerViewMode): string {
   return "Normal";
 }
 
+function getNextChannelIndex(
+  currentIndex: number,
+  channelCount: number,
+  direction: "previous" | "next",
+): number {
+  if (channelCount <= 0) {
+    return -1;
+  }
+
+  const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+
+  if (direction === "previous") {
+    return (safeIndex - 1 + channelCount) % channelCount;
+  }
+
+  return (safeIndex + 1) % channelCount;
+}
+
+function RemoteButton({
+  children,
+  onClick,
+  disabled,
+  active = false,
+  danger = false,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className="ttv-touch-target rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.08em] transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        background: danger
+          ? "rgba(127, 29, 29, 0.86)"
+          : active
+            ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))"
+            : "var(--button-bg)",
+        border: active ? "1px solid var(--primary)" : "1px solid transparent",
+        color: "var(--text)",
+        boxShadow: active
+          ? "0 0 22px color-mix(in srgb, var(--primary) 22%, transparent)"
+          : "none",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function Remote() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -67,7 +134,6 @@ export default function Remote() {
     (state) => state.viewerSettings.playerViewMode,
   );
   const setPlayerViewMode = useStore((state) => state.setPlayerViewMode);
-  const setSettingsOpen = useStore((state) => state.setSettingsOpen);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -98,11 +164,12 @@ export default function Remote() {
     enabledChannels[0];
 
   const goPrev = useCallback(() => {
-    if (enabledChannels.length === 0) return;
+    const nextIndex = getNextChannelIndex(
+      currentIndex,
+      enabledChannels.length,
+      "previous",
+    );
 
-    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextIndex =
-      (safeIndex - 1 + enabledChannels.length) % enabledChannels.length;
     const nextChannel = enabledChannels[nextIndex];
 
     if (nextChannel) {
@@ -111,10 +178,12 @@ export default function Remote() {
   }, [currentIndex, enabledChannels, setChannel]);
 
   const goNext = useCallback(() => {
-    if (enabledChannels.length === 0) return;
+    const nextIndex = getNextChannelIndex(
+      currentIndex,
+      enabledChannels.length,
+      "next",
+    );
 
-    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextIndex = (safeIndex + 1) % enabledChannels.length;
     const nextChannel = enabledChannels[nextIndex];
 
     if (nextChannel) {
@@ -185,12 +254,6 @@ export default function Remote() {
       if (key === "t") {
         event.preventDefault();
         toggleTheaterMode();
-        return;
-      }
-
-      if (key === "s") {
-        event.preventDefault();
-        setSettingsOpen(true);
       }
     };
 
@@ -203,7 +266,6 @@ export default function Remote() {
     goNext,
     goPrev,
     requestFullscreenToggle,
-    setSettingsOpen,
     toggleGuide,
     toggleMiniMode,
     toggleMuted,
@@ -216,7 +278,7 @@ export default function Remote() {
       <button
         type="button"
         onClick={() => setRemoteMinimized(false)}
-        className="fixed bottom-3 right-3 z-40 rounded-full border px-4 py-3 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95 sm:absolute sm:bottom-4 sm:right-4"
+        className="fixed bottom-[calc(5.75rem+var(--safe-bottom))] right-3 z-40 rounded-full border px-4 py-3 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95 sm:absolute sm:bottom-4 sm:right-4"
         style={{
           background: "rgba(0,0,0,0.78)",
           borderColor: "var(--border)",
@@ -230,13 +292,13 @@ export default function Remote() {
 
   return (
     <section
-      className="
-        fixed inset-x-3 bottom-3 z-40 max-h-[58vh] overflow-y-auto rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl
-        sm:absolute sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(440px,calc(100%-2rem))]
-      "
+      className={[
+        "fixed inset-x-3 bottom-[calc(5.75rem+var(--safe-bottom))] z-40 max-h-[46vh] overflow-y-auto rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl",
+        "sm:absolute sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(430px,calc(100%-2rem))]",
+      ].join(" ")}
       style={{
         background:
-          "radial-gradient(circle at top right, rgba(212,175,55,0.13), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.9), rgba(18,18,18,0.82))",
+          "radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 18%, transparent), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.91), rgba(15,23,42,0.86))",
         borderColor: "var(--border)",
         color: "var(--text)",
       }}
@@ -248,6 +310,7 @@ export default function Remote() {
           background:
             "linear-gradient(90deg, transparent, var(--primary), transparent)",
         }}
+        aria-hidden="true"
       />
 
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -273,137 +336,73 @@ export default function Remote() {
             </div>
           </div>
 
-          <div className="mt-1 text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            View: {getViewModeLabel(playerViewMode)}
+          <div
+            className="mt-1 truncate text-[10px] uppercase tracking-[0.14em]"
+            style={{ color: "var(--text-muted)" }}
+            title={getChannelCallsign(currentChannel)}
+          >
+            {getChannelCallsign(currentChannel)} / View:{" "}
+            {getViewModeLabel(playerViewMode)}
           </div>
         </div>
 
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
-            style={{
-              background: "var(--button-bg)",
-              color: "var(--text)",
-            }}
-            aria-label="Open settings"
-          >
-            ⚙
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRemoteMinimized(true)}
-            className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
-            style={{
-              background: "var(--button-bg)",
-              color: "var(--text)",
-            }}
-            aria-label="Minimize remote"
-          >
-            —
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setRemoteMinimized(true)}
+          className="ttv-touch-target rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
+          style={{
+            background: "var(--button-bg)",
+            color: "var(--text)",
+          }}
+          aria-label="Minimize remote"
+        >
+          —
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <button
-          type="button"
+        <RemoteButton
           onClick={goPrev}
           disabled={enabledChannels.length === 0}
-          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ background: "var(--button-bg)", color: "var(--text)" }}
+          ariaLabel="Previous channel"
         >
           CH-
-        </button>
+        </RemoteButton>
 
-        <button
-          type="button"
+        <RemoteButton
           onClick={goNext}
           disabled={enabledChannels.length === 0}
-          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ background: "var(--button-bg)", color: "var(--text)" }}
+          ariaLabel="Next channel"
         >
           CH+
-        </button>
+        </RemoteButton>
 
-        <button
-          type="button"
-          onClick={toggleGuide}
-          className="rounded-xl px-3 py-3 text-sm font-black transition hover:scale-[1.03] hover:opacity-95"
-          style={{
-            background: isGuideOpen
-              ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
-              : "var(--button-bg)",
-            color: "var(--text)",
-          }}
-        >
+        <RemoteButton onClick={toggleGuide} active={isGuideOpen}>
           {isGuideOpen ? "Close" : "Guide"}
-        </button>
+        </RemoteButton>
       </div>
 
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={setNormalMode}
-          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
-          style={{
-            background:
-              playerViewMode === "normal"
-                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
-                : "var(--button-bg)",
-            color: "var(--text)",
-          }}
-        >
+        <RemoteButton onClick={setNormalMode} active={playerViewMode === "normal"}>
           Normal
-        </button>
+        </RemoteButton>
 
-        <button
-          type="button"
-          onClick={toggleMiniMode}
-          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
-          style={{
-            background:
-              playerViewMode === "mini"
-                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
-                : "var(--button-bg)",
-            color: "var(--text)",
-          }}
-        >
+        <RemoteButton onClick={toggleMiniMode} active={playerViewMode === "mini"}>
           Mini
-        </button>
+        </RemoteButton>
 
-        <button
-          type="button"
+        <RemoteButton
           onClick={toggleTheaterMode}
-          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
-          style={{
-            background:
-              playerViewMode === "theater"
-                ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
-                : "var(--button-bg)",
-            color: "var(--text)",
-          }}
+          active={playerViewMode === "theater"}
         >
           Theater
-        </button>
+        </RemoteButton>
       </div>
 
       <div className="mt-2 grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
-        <button
-          type="button"
-          onClick={toggleMuted}
-          className="rounded-xl px-3 py-3 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
-          style={{
-            background: muted
-              ? "rgba(127, 29, 29, 0.82)"
-              : "var(--button-bg)",
-            color: "var(--text)",
-          }}
-        >
+        <RemoteButton onClick={toggleMuted} danger={muted}>
           {muted ? "Muted" : "Mute"}
-        </button>
+        </RemoteButton>
 
         <input
           aria-label="Volume"
@@ -415,27 +414,19 @@ export default function Remote() {
           className="w-full accent-current"
         />
 
-        <button
-          type="button"
-          onClick={toggleFitMode}
-          className="rounded-xl px-3 py-3 text-xs font-black uppercase transition hover:scale-[1.03] hover:opacity-95"
-          style={{ background: "var(--button-bg)", color: "var(--text)" }}
-        >
+        <RemoteButton onClick={toggleFitMode}>
           {fitMode === "contain" ? "Fit" : "Fill"}
-        </button>
+        </RemoteButton>
 
-        <button
-          type="button"
-          onClick={requestFullscreenToggle}
-          className="rounded-xl px-3 py-3 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
-          style={{ background: "var(--button-bg)", color: "var(--text)" }}
-        >
-          Full
-        </button>
+        <RemoteButton onClick={requestFullscreenToggle}>Full</RemoteButton>
       </div>
 
-      <div className="mt-2 text-[10px] leading-4" style={{ color: "var(--text-muted)" }}>
-        Keys: ↑/↓ channel • G guide • M mute • F fullscreen • R remote • P mini • T theater • S settings
+      <div
+        className="mt-2 text-[10px] leading-4"
+        style={{ color: "var(--text-muted)" }}
+      >
+        Keys: ↑/↓ channel / G guide / M mute / F fullscreen / R remote / P mini
+        / T theater
       </div>
     </section>
   );

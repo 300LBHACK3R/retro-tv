@@ -1,4 +1,4 @@
-﻿import type { ThemeId } from "./types";
+﻿import type { ThemeId, ThemeLayoutMode } from "./types";
 
 export type ThemeColorToken =
   | "appBg"
@@ -32,6 +32,7 @@ export type ThemeDefinition = {
   priceLabel: string;
   isPremium: boolean;
   category: ThemeCategory;
+  layoutMode: ThemeLayoutMode;
   previewGradient: string;
   recommendedFor: string[];
   colors: ThemeColors;
@@ -40,8 +41,11 @@ export type ThemeDefinition = {
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
 /**
- * Keep all unlocked while the product is being built/tested.
- * Switch to "premium-locked" later when payment/unlock flow exists.
+ * Development mode:
+ * - "all-unlocked" lets you test every theme immediately.
+ *
+ * Production paid-theme mode:
+ * - switch to "premium-locked" once payment/unlock flow exists.
  */
 export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 
@@ -55,6 +59,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "classic",
+    layoutMode: "classic",
     previewGradient:
       "linear-gradient(135deg, #020617, #0f172a 52%, #2563eb)",
     recommendedFor: ["classic cable", "main TV", "default viewing"],
@@ -82,6 +87,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "classic",
+    layoutMode: "classic",
     previewGradient:
       "linear-gradient(135deg, #e9eff3, #ffffff 48%, #4c9aff)",
     recommendedFor: ["light mode", "family viewing", "clean guide"],
@@ -109,6 +115,7 @@ export const THEMES = [
     priceLabel: "$2.99",
     isPremium: true,
     category: "premium",
+    layoutMode: "cinematic",
     previewGradient:
       "linear-gradient(135deg, #050505, #17130a 52%, #d4af37)",
     recommendedFor: ["premium viewing", "movie channels", "night mode"],
@@ -136,6 +143,7 @@ export const THEMES = [
     priceLabel: "$2.99",
     isPremium: true,
     category: "premium",
+    layoutMode: "cinematic",
     previewGradient:
       "linear-gradient(135deg, #050505, #b8860b 42%, #ffe27a)",
     recommendedFor: ["premium theme pack", "collector mode", "showcase"],
@@ -171,6 +179,7 @@ export const THEMES = [
     priceLabel: "$2.99",
     isPremium: true,
     category: "console",
+    layoutMode: "modern",
     previewGradient:
       "radial-gradient(circle at top left, #8dc63f, transparent 35%), linear-gradient(135deg, #020502, #071007 48%, #000000)",
     recommendedFor: ["gaming", "action", "anime", "late night"],
@@ -205,6 +214,7 @@ export const THEMES = [
     priceLabel: "$2.99",
     isPremium: true,
     category: "arcade",
+    layoutMode: "modern",
     previewGradient:
       "radial-gradient(circle at top left, rgba(57, 255, 20, 0.55), transparent 34%), radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.45), transparent 36%), linear-gradient(135deg, #020617, #050014 52%, #061b12)",
     recommendedFor: ["gaming", "anime", "action", "tech", "late night"],
@@ -239,6 +249,7 @@ export const THEMES = [
     priceLabel: "$2.99",
     isPremium: true,
     category: "cartoon",
+    layoutMode: "classic",
     previewGradient:
       "radial-gradient(circle at top left, rgba(251, 146, 60, 0.65), transparent 34%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.55), transparent 36%), linear-gradient(135deg, #312e81, #7c3aed 45%, #84cc16)",
     recommendedFor: ["cartoons", "kids", "anime", "Saturday morning", "family"],
@@ -273,6 +284,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "classic",
+    layoutMode: "electric",
     previewGradient:
       "linear-gradient(135deg, #020617 0%, #031227 35%, #0891b2 70%, #22d3ee 100%)",
     recommendedFor: ["premium", "electric", "modern", "live tv"],
@@ -307,29 +319,89 @@ export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === "string" && THEME_IDS.includes(value as ThemeId);
 }
 
+export function getDefaultTheme(): ThemeDefinition {
+  return (
+    THEMES.find((theme) => theme.id === DEFAULT_THEME_ID) ??
+    THEMES[0]
+  );
+}
+
 export function getThemeById(id: ThemeId): ThemeDefinition {
   return THEMES.find((theme) => theme.id === id) ?? getDefaultTheme();
 }
 
-export function getDefaultTheme(): ThemeDefinition {
-  return THEMES.find((theme) => theme.id === DEFAULT_THEME_ID) ?? THEMES[0];
+export function sortThemes(themes: readonly ThemeDefinition[]): ThemeDefinition[] {
+  return [...themes].sort((a, b) => {
+    if (a.isPremium !== b.isPremium) {
+      return a.isPremium ? 1 : -1;
+    }
+
+    if (a.category !== b.category) {
+      return a.category.localeCompare(b.category);
+    }
+
+    return a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
 }
 
 export function getFreeThemes(): ThemeDefinition[] {
-  return THEMES.filter((theme) => !theme.isPremium);
+  return sortThemes(THEMES.filter((theme) => !theme.isPremium));
 }
 
 export function getPremiumThemes(): ThemeDefinition[] {
-  return THEMES.filter((theme) => theme.isPremium);
+  return sortThemes(THEMES.filter((theme) => theme.isPremium));
 }
 
 export function getThemesByCategory(category: ThemeCategory): ThemeDefinition[] {
-  return THEMES.filter((theme) => theme.category === category);
+  return sortThemes(THEMES.filter((theme) => theme.category === category));
+}
+
+export function getThemesByLayoutMode(
+  layoutMode: ThemeLayoutMode,
+): ThemeDefinition[] {
+  return sortThemes(THEMES.filter((theme) => theme.layoutMode === layoutMode));
+}
+
+export function getThemeLayoutLabel(theme: ThemeDefinition): string {
+  if (theme.layoutMode === "electric") {
+    return "Custom Layout";
+  }
+
+  if (theme.layoutMode === "cinematic") {
+    return "Cinematic Skin";
+  }
+
+  if (theme.layoutMode === "modern") {
+    return "Modern Skin";
+  }
+
+  if (theme.layoutMode === "compact") {
+    return "Compact Layout";
+  }
+
+  return "Classic Layout";
+}
+
+export function isThemeOwned(
+  themeId: ThemeId,
+  ownedPremiumThemes: readonly ThemeId[],
+  isAdmin: boolean,
+): boolean {
+  const theme = getThemeById(themeId);
+
+  if (!theme.isPremium) {
+    return true;
+  }
+
+  return isAdmin || ownedPremiumThemes.includes(themeId);
 }
 
 export function canUseTheme(
   themeId: ThemeId,
-  ownedPremiumThemes: ThemeId[],
+  ownedPremiumThemes: readonly ThemeId[],
   isAdmin: boolean,
 ): boolean {
   if (THEME_ACCESS_MODE === "all-unlocked") {
@@ -351,7 +423,7 @@ export function canUseTheme(
 
 export function getSafeThemeId(
   requestedThemeId: unknown,
-  ownedPremiumThemes: ThemeId[],
+  ownedPremiumThemes: readonly ThemeId[],
   isAdmin: boolean,
 ): ThemeId {
   if (!isThemeId(requestedThemeId)) {
@@ -367,7 +439,7 @@ export function getSafeThemeId(
 
 export function getThemeAccessLabel(
   theme: ThemeDefinition,
-  ownedPremiumThemes: ThemeId[],
+  ownedPremiumThemes: readonly ThemeId[],
   isAdmin: boolean,
 ): "Free" | "Unlocked" | "Owned" | "Preview" | "Premium" {
   if (!theme.isPremium) {
@@ -413,9 +485,24 @@ export function createThemeCssVars(theme: ThemeDefinition): Record<string, strin
     "--ttv-guide-row-alt-bg": theme.colors.guideRowAltBg,
     "--ttv-guide-active-bg": theme.colors.guideActiveBg,
     "--ttv-guide-current-bg": theme.colors.guideCurrentBg,
+
+    /**
+     * Legacy aliases used throughout the current app.
+     * Keep these so existing components keep working.
+     */
+    "--app-bg": theme.colors.appBg,
+    "--panel-bg": theme.colors.panelBg,
+    "--panel-alt-bg": theme.colors.panelAltBg,
+    "--border": theme.colors.border,
+    "--text": theme.colors.text,
+    "--text-muted": theme.colors.textMuted,
+    "--button-bg": theme.colors.buttonBg,
+    "--button-hover": theme.colors.buttonHover,
+    "--primary": theme.colors.primary,
+    "--guide-header-bg": theme.colors.guideHeaderBg,
+    "--guide-row-bg": theme.colors.guideRowBg,
+    "--guide-row-alt-bg": theme.colors.guideRowAltBg,
+    "--guide-active-bg": theme.colors.guideActiveBg,
+    "--guide-current-bg": theme.colors.guideCurrentBg,
   };
 }
-
-
-
-
