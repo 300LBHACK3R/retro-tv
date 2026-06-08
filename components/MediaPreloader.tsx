@@ -16,24 +16,6 @@ interface MediaPreloaderProps {
   activeSchedule: BroadcastItem[];
   activeChannel: Channel | undefined;
 }
-
-type IdleCallbackHandle = number;
-
-type IdleDeadlineLike = {
-  didTimeout: boolean;
-  timeRemaining: () => number;
-};
-
-declare global {
-  interface Window {
-    requestIdleCallback?: (
-      callback: (deadline: IdleDeadlineLike) => void,
-      options?: { timeout?: number },
-    ) => IdleCallbackHandle;
-    cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
-  }
-}
-
 function getMediaForChannel(
   channel: Channel | undefined,
   media: MediaItem[],
