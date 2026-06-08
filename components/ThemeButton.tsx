@@ -70,7 +70,7 @@ function getThemeSearchText(theme: ThemeDefinition): string {
 
 function isThemeOwned(
   theme: ThemeDefinition,
-  ownedPremiumThemes: readonly ThemeId[],
+  ownedPremiumThemes: ThemeId[],
   isAdminMode: boolean,
 ): boolean {
   if (!theme.isPremium) {
@@ -88,11 +88,11 @@ function matchesFilter({
 }: {
   theme: ThemeDefinition;
   filter: ThemeFilter;
-  ownedPremiumThemes: readonly ThemeId[];
+  ownedPremiumThemes: ThemeId[];
   isAdminMode: boolean;
 }): boolean {
-  const unlocked = canUseTheme(theme.id, ownedPremiumThemes as readonly ThemeId[], isAdminMode);
-  const owned = isThemeOwned(theme, ownedPremiumThemes as readonly ThemeId[], isAdminMode);
+  const unlocked = canUseTheme(theme.id, ownedPremiumThemes as ThemeId[], isAdminMode);
+  const owned = isThemeOwned(theme, ownedPremiumThemes as ThemeId[], isAdminMode);
 
   if (filter === "free") {
     return !theme.isPremium;
@@ -211,7 +211,7 @@ export default function ThemeButton() {
     const freeCount = THEMES.filter((theme) => !theme.isPremium).length;
     const premiumCount = THEMES.filter((theme) => theme.isPremium).length;
     const unlockedCount = THEMES.filter((theme) =>
-      canUseTheme(theme.id, ownedPremiumThemes as readonly ThemeId[], isAdminMode),
+      canUseTheme(theme.id, ownedPremiumThemes as ThemeId[], isAdminMode),
     ).length;
 
     return {
@@ -255,7 +255,7 @@ export default function ThemeButton() {
   }, [open]);
 
   const applyTheme = (theme: ThemeDefinition) => {
-    const unlocked = canUseTheme(theme.id, ownedPremiumThemes as readonly ThemeId[], isAdminMode);
+    const unlocked = canUseTheme(theme.id, ownedPremiumThemes as ThemeId[], isAdminMode);
 
     if (!unlocked) {
       return;
