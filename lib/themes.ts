@@ -1,4 +1,4 @@
-import type { ThemeId } from "./types";
+﻿import type { ThemeId } from "./types";
 
 export type ThemeColorToken =
   | "appBg"
@@ -263,6 +263,36 @@ export const THEMES = [
       guideRowAltBg: "#4c1d95",
       guideActiveBg: "#fb923c",
       guideCurrentBg: "#bef264",
+    },
+  },
+  {
+    id: "electric-blue-live",
+    name: "Electric Blue Live",
+    description:
+      "A premium electric-blue live TV command center with neon motion, glowing panels, side guide, and futuristic remote styling.",
+    priceLabel: "$5",
+    isPremium: true,
+    colors: {
+      appBg:
+        "radial-gradient(circle at 20% 0%, rgba(0, 217, 255, 0.20), transparent 34%), radial-gradient(circle at 86% 14%, rgba(80, 70, 255, 0.18), transparent 30%), linear-gradient(135deg, #020617 0%, #031227 42%, #050b22 100%)",
+      panelBg:
+        "linear-gradient(135deg, rgba(3, 14, 33, 0.94), rgba(1, 7, 20, 0.92))",
+      panelAltBg:
+        "linear-gradient(135deg, rgba(5, 22, 52, 0.94), rgba(2, 10, 28, 0.96))",
+      border: "rgba(56, 189, 248, 0.42)",
+      text: "#f8fbff",
+      textMuted: "#93c5fd",
+      buttonBg:
+        "linear-gradient(135deg, rgba(8, 47, 73, 0.96), rgba(15, 23, 42, 0.96))",
+      buttonHover:
+        "linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(37, 99, 235, 0.90))",
+      primary: "#22d3ee",
+      guideHeaderBg:
+        "linear-gradient(135deg, rgba(8, 47, 73, 0.98), rgba(15, 23, 42, 0.96))",
+      guideRowBg: "rgba(2, 12, 30, 0.96)",
+      guideRowAltBg: "rgba(8, 22, 48, 0.96)",
+      guideActiveBg: "#22d3ee",
+      guideCurrentBg: "#38bdf8",
     },
   },
 ] as const satisfies readonly ThemeDefinition[];

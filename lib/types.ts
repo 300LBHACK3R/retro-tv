@@ -10,7 +10,7 @@ export type ThemeId =
   | "midas-gold"
   | "halo-2008-inspired"
   | "neon-arcade-2005"
-  | "saturday-morning-max";
+  | "saturday-morning-max"`r`n  | "electric-blue-live";
 
 export type ScheduleMode = "ordered" | "daily-random";
 
@@ -190,5 +190,6 @@ export interface ViewerSettings {
   guideDensity: "compact" | "comfortable";
   preferReducedMotion: boolean;
 }
+
 
 

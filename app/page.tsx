@@ -5,6 +5,7 @@ import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
 import ChannelOverlay from "@/components/ChannelOverlay";
+import ElectricBlueExperience from "@/components/ElectricBlueExperience";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaPreloader from "@/components/MediaPreloader";
 import MultiGuide from "@/components/MultiGuide";
@@ -275,6 +276,85 @@ export default function Home() {
     />
   );
 
+  if (themeId === "electric-blue-live" && !showAdminSidebar) {
+    return (
+      <main
+        style={{
+          ...themeVars,
+          color: "var(--text)",
+        }}
+      >
+        <TextEncodingCleaner />
+        <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
+        <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
+
+        <ElectricBlueExperience
+          activeChannel={activeChannel}
+          activeSchedule={activeSchedule}
+          channelSchedules={channelSchedules}
+          onProgramSelect={(channel) => {
+            setChannel(channel.id);
+          }}
+          onOpenSettings={() => setLocalSettingsOpen(true)}
+        />
+
+        {localSettingsOpen ? (
+          <div
+            className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings and admin access"
+          >
+            <div
+              className="mx-auto my-4 flex max-w-3xl flex-col gap-3 rounded-2xl border p-3 shadow-2xl sm:my-6 sm:p-4"
+              style={{
+                background: "var(--panel-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div
+                    className="text-xs font-black uppercase tracking-[0.2em]"
+                    style={{ color: "var(--primary)" }}
+                  >
+                    Settings
+                  </div>
+
+                  <h2 className="mt-1 text-lg font-black tracking-tight">
+                    Viewer & Admin Controls
+                  </h2>
+
+                  <p
+                    className="mt-1 text-xs leading-5"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Theme, viewer mode, admin unlock, and protected station tools.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setLocalSettingsOpen(false)}
+                  className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                  style={{
+                    background: "var(--button-bg)",
+                    color: "var(--text)",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+
+              <AdminAccessPanel onAuthChange={setIsAdminAuthorized} />
+              <AppModeToggle isAdminAuthorized={isAdminAuthorized} />
+            </div>
+          </div>
+        ) : null}
+      </main>
+    );
+  }
   const guideOverlay = (
     <MultiGuide
       data={channelSchedules}
@@ -585,6 +665,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
