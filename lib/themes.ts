@@ -272,6 +272,10 @@ export const THEMES = [
       "A premium electric-blue live TV command center with neon motion, glowing panels, side guide, and futuristic remote styling.",
     priceLabel: "$5",
     isPremium: true,
+    category: "premium",
+    previewGradient:
+      "linear-gradient(135deg, #020617 0%, #031227 35%, #0891b2 70%, #22d3ee 100%)",
+    recommendedFor: ["premium", "electric", "modern", "live tv"],
     colors: {
       appBg:
         "radial-gradient(circle at 20% 0%, rgba(0, 217, 255, 0.20), transparent 34%), radial-gradient(circle at 86% 14%, rgba(80, 70, 255, 0.18), transparent 30%), linear-gradient(135deg, #020617 0%, #031227 42%, #050b22 100%)",
@@ -411,3 +415,4 @@ export function createThemeCssVars(theme: ThemeDefinition): Record<string, strin
     "--ttv-guide-current-bg": theme.colors.guideCurrentBg,
   };
 }
+
