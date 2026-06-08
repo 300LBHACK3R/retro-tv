@@ -1,19 +1,10 @@
 ﻿"use client";
 
-import Image from "next/image";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
 import ChannelOverlay from "@/components/ChannelOverlay";
-import ElectricBlueExperience from "@/components/ElectricBlueExperience";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaPreloader from "@/components/MediaPreloader";
 import MultiGuide from "@/components/MultiGuide";
@@ -29,27 +20,9 @@ import ViewerHeader from "@/components/ViewerHeader";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
+import Image from "next/image";
 import { getThemeById } from "@/lib/themes";
-import type { Channel, MediaItem, PlayerViewMode, ThemeId } from "@/lib/types";
-
-type ThemeLayoutMode = "classic" | "electric";
-
-type ChannelSchedule = {
-  channel: Channel;
-  schedule: ReturnType<typeof buildGuideSchedule>;
-};
-
-interface SettingsModalProps {
-  isAdminAuthorized: boolean;
-  onAuthChange: (isAuthorized: boolean) => void;
-  onClose: () => void;
-}
-
-interface MobileActionDockProps {
-  onOpenGuide: () => void;
-  onOpenSettings: () => void;
-  isGuideOpen: boolean;
-}
+import type { Channel, MediaItem } from "@/lib/types";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -121,21 +94,13 @@ function getChannelDisplayName(channel: Channel | undefined): string {
   return channel.branding?.displayName ?? channel.name;
 }
 
-function getThemeLayoutMode(themeId: ThemeId): ThemeLayoutMode {
-  if (themeId === "electric-blue-live") {
-    return "electric";
-  }
-
-  return "classic";
-}
-
-function getPlayerFrameClass(playerViewMode: PlayerViewMode): string {
+function getPlayerFrameClass(playerViewMode: "normal" | "mini" | "theater"): string {
   if (playerViewMode === "mini") {
     return [
-      "fixed bottom-[calc(5.75rem+var(--safe-bottom))] right-3 z-[70]",
-      "aspect-video w-[min(420px,calc(100vw-24px))]",
+      "fixed bottom-3 right-3 z-[70]",
+      "aspect-video w-[min(440px,calc(100vw-24px))]",
       "overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/60",
-      "sm:bottom-4 sm:right-4 sm:w-[min(440px,calc(100vw-24px))]",
+      "sm:bottom-4 sm:right-4",
     ].join(" ");
   }
 
@@ -146,120 +111,7 @@ function getPlayerFrameClass(playerViewMode: PlayerViewMode): string {
     ].join(" ");
   }
 
-  return [
-    "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30",
-    "ttv-mobile-priority-player",
-  ].join(" ");
-}
-
-function SettingsModal({
-  isAdminAuthorized,
-  onAuthChange,
-  onClose,
-}: SettingsModalProps) {
-  return (
-    <div
-      className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings and admin access"
-    >
-      <div
-        className="ttv-modal-scroll mx-auto my-4 flex max-w-3xl flex-col gap-3 rounded-2xl border p-3 shadow-2xl sm:my-6 sm:p-4"
-        style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-        }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div
-              className="text-xs font-black uppercase tracking-[0.2em]"
-              style={{ color: "var(--primary)" }}
-            >
-              Settings
-            </div>
-
-            <h2 className="mt-1 text-lg font-black tracking-tight">
-              Viewer & Admin Controls
-            </h2>
-
-            <p
-              className="mt-1 text-xs leading-5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Theme, viewer mode, admin unlock, and protected station tools.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"
-          >
-            Close
-          </button>
-        </div>
-
-        <AdminAccessPanel onAuthChange={onAuthChange} />
-        <AppModeToggle isAdminAuthorized={isAdminAuthorized} />
-
-        <div
-          className="rounded-xl border px-3 py-2 text-xs leading-5"
-          style={{
-            background: "var(--panel-alt-bg)",
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-          }}
-        >
-          Public viewers should only see the premium watching experience. Admin
-          tools stay locked unless the session is authorized.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MobileActionDock({
-  onOpenGuide,
-  onOpenSettings,
-  isGuideOpen,
-}: MobileActionDockProps) {
-  return (
-    <nav
-      className="ttv-mobile-bottom-nav grid grid-cols-4 gap-2 p-2 md:hidden"
-      aria-label="Mobile viewer actions"
-    >
-      <button
-        type="button"
-        onClick={onOpenGuide}
-        className="ttv-touch-target rounded-2xl px-2 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
-        style={{
-          background: isGuideOpen ? "var(--primary)" : "var(--button-bg)",
-          color: "var(--text)",
-        }}
-      >
-        Guide
-      </button>
-
-      <div className="min-w-0 [&>button]:h-full [&>button]:w-full [&>button]:rounded-2xl [&>button]:px-2 [&>button]:py-2 [&>button]:text-[10px]">
-        <ShowLibrary />
-      </div>
-
-      <div className="min-w-0 [&>button]:h-full [&>button]:w-full [&>button]:rounded-2xl [&>button]:px-2 [&>button]:py-2 [&>button]:text-[10px]">
-        <ThemeButton />
-      </div>
-
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="ttv-action-button ttv-touch-target rounded-2xl px-2 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
-      >
-        Admin
-      </button>
-    </nav>
-  );
+  return "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30";
 }
 
 export default function Home() {
@@ -269,7 +121,6 @@ export default function Home() {
   const setChannel = useStore((state) => state.setChannel);
 
   const isGuideOpen = useStore((state) => state.isGuideOpen);
-  const toggleGuide = useStore((state) => state.toggleGuide);
   const closeGuide = useStore((state) => state.closeGuide);
 
   const sidebarWidth = useStore((state) => state.sidebarWidth);
@@ -281,6 +132,7 @@ export default function Home() {
   const setAppMode = useStore((state) => state.setAppMode);
   const themeId = useStore((state) => state.themeId);
 
+  
   const playerViewMode = useStore(
     (state) => state.viewerSettings.playerViewMode,
   );
@@ -288,11 +140,8 @@ export default function Home() {
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
 
-  const queryParamsHandledRef = useRef(false);
-
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
-  const themeLayoutMode = useMemo(() => getThemeLayoutMode(themeId), [themeId]);
 
   const enabledChannels = useMemo(
     () =>
@@ -314,6 +163,11 @@ export default function Home() {
     [activeChannel, media],
   );
 
+  /**
+   * Real playback schedule.
+   * This includes virtual show slices, commercials, bumpers, and hidden guide items.
+   * Player and Now/Next need this schedule so commercial breaks work correctly.
+   */
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
@@ -322,7 +176,16 @@ export default function Home() {
     [activeChannel, activeChannelMedia],
   );
 
-  const channelSchedules: ChannelSchedule[] = useMemo(
+  /**
+   * Clean public guide schedule.
+   * This hides/merges commercials and bumpers into normal show blocks.
+   */
+  const activeGuideSchedule = useMemo(
+    () => buildGuideSchedule(activeSchedule),
+    [activeSchedule],
+  );
+
+  const channelSchedules = useMemo(
     () =>
       enabledChannels.map((channel) => {
         const channelMedia = getMediaForChannel(channel, media);
@@ -339,20 +202,6 @@ export default function Home() {
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
   const playerFrameClass = getPlayerFrameClass(playerViewMode);
 
-  const openGuide = useCallback(() => {
-    if (!isGuideOpen) {
-      toggleGuide();
-    }
-  }, [isGuideOpen, toggleGuide]);
-
-  const closeSettings = useCallback(() => {
-    setLocalSettingsOpen(false);
-  }, []);
-
-  const openSettings = useCallback(() => {
-    setLocalSettingsOpen(true);
-  }, []);
-
   useEffect(() => {
     if (!isAdminAuthorized && appMode === "admin") {
       setAppMode("viewer");
@@ -360,33 +209,21 @@ export default function Home() {
   }, [appMode, isAdminAuthorized, setAppMode]);
 
   useEffect(() => {
-    if (queryParamsHandledRef.current) {
-      return;
-    }
-
-    queryParamsHandledRef.current = true;
-
     const params = new URLSearchParams(window.location.search);
     const requestedChannel = params.get("ch");
 
-    if (requestedChannel) {
-      const channelExists = channels.some(
-        (channel) => channel.id === requestedChannel,
-      );
-
-      if (channelExists) {
-        setChannel(requestedChannel);
-      }
+    if (!requestedChannel) {
+      return;
     }
 
-    if (params.get("guide") === "1") {
-      openGuide();
-    }
+    const channelExists = channels.some(
+      (channel) => channel.id === requestedChannel,
+    );
 
-    if (params.get("settings") === "1" || params.get("admin") === "1") {
-      openSettings();
+    if (channelExists) {
+      setChannel(requestedChannel);
     }
-  }, [channels, openGuide, openSettings, setChannel]);
+  }, [channels, setChannel]);
 
   useEffect(() => {
     if (!activeChannel) {
@@ -406,21 +243,19 @@ export default function Home() {
 
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        openSettings();
+        setLocalSettingsOpen(true);
         return;
       }
 
-      if (event.key === "Escape") {
-        if (isGuideOpen) {
-          event.preventDefault();
-          closeGuide();
-          return;
-        }
+      if (isGuideOpen && event.key === "Escape") {
+        event.preventDefault();
+        closeGuide();
+        return;
+      }
 
-        if (localSettingsOpen) {
-          event.preventDefault();
-          closeSettings();
-        }
+      if (localSettingsOpen && event.key === "Escape") {
+        event.preventDefault();
+        setLocalSettingsOpen(false);
       }
     };
 
@@ -429,7 +264,16 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeGuide, closeSettings, isGuideOpen, localSettingsOpen, openSettings]);
+  }, [closeGuide, isGuideOpen, localSettingsOpen]);
+
+  const guideDock = (
+    <MultiGuide
+      data={channelSchedules}
+      onProgramSelect={({ channel }) => {
+        setChannel(channel.id);
+      }}
+    />
+  );
 
   const guideOverlay = (
     <MultiGuide
@@ -441,46 +285,9 @@ export default function Home() {
     />
   );
 
-  if (themeLayoutMode === "electric" && !showAdminSidebar) {
-    return (
-      <main
-        className="ttv-page-shell"
-        style={{
-          ...themeVars,
-          color: "var(--text)",
-        }}
-      >
-        <TextEncodingCleaner />
-        <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
-        <MediaPreloader
-          activeSchedule={activeSchedule}
-          activeChannel={activeChannel}
-        />
-
-        <ElectricBlueExperience
-          activeChannel={activeChannel}
-          activeSchedule={activeSchedule}
-          channelSchedules={channelSchedules}
-          onProgramSelect={(channel) => {
-            setChannel(channel.id);
-          }}
-          onOpenSettings={openSettings}
-        />
-
-        {localSettingsOpen ? (
-          <SettingsModal
-            isAdminAuthorized={isAdminAuthorized}
-            onAuthChange={setIsAdminAuthorized}
-            onClose={closeSettings}
-          />
-        ) : null}
-      </main>
-    );
-  }
-
   return (
     <main
-      className="ttv-page-shell min-h-screen overflow-x-hidden ttv-mobile-bottom-offset md:pb-0"
+      className="min-h-screen overflow-x-hidden"
       style={{
         ...themeVars,
         background:
@@ -490,56 +297,25 @@ export default function Home() {
     >
       <TextEncodingCleaner />
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
-      <MediaPreloader
-        activeSchedule={activeSchedule}
-        activeChannel={activeChannel}
-      />
+      <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
-      <div className="ttv-page-inner flex flex-col gap-3 p-3 sm:p-4">
-        <header className="ttv-glass-panel rounded-2xl p-3 sm:p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-              <Image
-                src="/retro-logo.png"
-                alt="TatesTv"
-                width={260}
-                height={90}
-                className="h-auto w-full max-w-[210px] object-contain sm:max-w-[250px]"
-                draggable={false}
-                priority
-              />
+      <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+           <Image
+              src="/retro-logo.png"
+              alt="TatesTv"
+              width={260}
+              height={90}
+              className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
+              draggable={false}
+              priority
+            />
+          </div>
 
-              <div className="hidden min-w-0 sm:block">
-                <div
-                  className="text-[11px] font-black uppercase tracking-[0.2em]"
-                  style={{ color: "var(--primary)" }}
-                >
-                  Live Retro Cable
-                </div>
-
-                <div
-                  className="mt-1 max-w-xl text-xs leading-5"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Watching {getChannelDisplayName(activeChannel)} with live
-                  scheduling, guide listings, themes, and on-demand library
-                  access.
-                </div>
-              </div>
-            </div>
-
-            <div className="hidden flex-wrap items-center gap-2 md:flex md:justify-end">
-              <ThemeButton />
-              <ShowLibrary />
-
-              <button
-                type="button"
-                onClick={openSettings}
-                className="ttv-action-button rounded-2xl border px-4 py-3 text-left text-xs font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/30"
-              >
-                Admin
-              </button>
-            </div>
+          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+            <ThemeButton />
+            <ShowLibrary />
           </div>
         </header>
 
@@ -560,8 +336,10 @@ export default function Home() {
           {showAdminSidebar ? (
             <aside className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
               <section
-                className="ttv-glass-panel rounded-2xl p-4"
+                className="rounded-2xl border p-4"
                 style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
                   color: "var(--text)",
                 }}
               >
@@ -644,117 +422,81 @@ export default function Home() {
           >
             <ViewerHeader channel={activeChannel} />
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="flex min-w-0 flex-col gap-3">
-                <NowNextBar channel={activeChannel} schedule={activeSchedule} />
-                <QuickTuneBar />
+            <NowNextBar channel={activeChannel} schedule={activeSchedule} />
 
-                {playerViewMode === "mini" ? (
-                  <section
-                    className="ttv-glass-panel rounded-2xl p-4 text-sm"
-                    style={{
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    Mini-player is active. Use the floating player, or switch
-                    back to Normal/Theater from the remote.
-                  </section>
-                ) : null}
+            <QuickTuneBar />
 
-                <div
-                  className={playerFrameClass}
-                  style={{ borderColor: "var(--border)" }}
-                >
-                  <Player schedule={activeSchedule} />
+            {playerViewMode === "mini" ? (
+              <section
+                className="rounded-2xl border p-4 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Mini-player is active. Use the floating player in the bottom
+                right, or switch back to Normal/Theater from the remote.
+              </section>
+            ) : null}
 
-                  <ChannelOverlay compact={playerViewMode === "mini"} />
-                  <StaticTransition trigger={activeChannel?.id ?? ""} />
-                  <Remote />
+            <div className={playerFrameClass} style={{ borderColor: "var(--border)" }}>
+              <Player schedule={activeSchedule} />
 
-                  {isGuideOpen ? (
-                    <div className="absolute inset-0 z-40 bg-black/85 p-3 backdrop-blur-[2px] sm:p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold tracking-wide text-white">
-                          Live Guide
-                        </div>
+              <ChannelOverlay compact={playerViewMode === "mini"} />
+              <StaticTransition trigger={activeChannel?.id ?? ""} />
+              <Remote />
 
-                        <button
-                          type="button"
-                          onClick={closeGuide}
-                          className="ttv-action-button rounded-lg px-3 py-2 text-sm font-semibold"
-                        >
-                          Close Guide
-                        </button>
-                      </div>
-
-                      <div className="h-[calc(100%-56px)] overflow-auto">
-                        {guideOverlay}
-                      </div>
+              {isGuideOpen ? (
+                <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold tracking-wide text-white">
+                      Live Guide
                     </div>
-                  ) : null}
-                </div>
 
-                {!isGuideOpen ? (
-                  <section
-                    className="ttv-glass-panel rounded-2xl p-4 text-sm"
-                    style={{
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    Press{" "}
-                    <span style={{ color: "var(--text)" }}>Guide</span> on the
-                    remote or bottom dock to open the full live channel guide.
-                  </section>
-                ) : null}
-              </div>
-
-              <aside className="hidden min-w-0 flex-col gap-3 xl:flex">
-                <section className="ttv-glass-panel rounded-2xl p-3">
-                  <div
-                    className="mb-3 text-xs font-black uppercase tracking-[0.18em]"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    Channel Guide
-                  </div>
-
-                  <div
-                    className="ttv-guide-scroll rounded-xl"
-                    style={{ maxHeight: `${guideHeight}px` }}
-                  >
-                    <MultiGuide
-                      data={channelSchedules}
-                      onProgramSelect={({ channel }) => {
-                        setChannel(channel.id);
+                    <button
+                      type="button"
+                      onClick={closeGuide}
+                      className="rounded-lg px-3 py-2 text-sm font-semibold transition hover:opacity-90"
+                      style={{
+                        background: "var(--button-bg)",
+                        color: "var(--text)",
                       }}
-                    />
+                    >
+                      Close Guide
+                    </button>
                   </div>
-                </section>
 
-                <section
-                  className="ttv-glass-panel rounded-2xl p-4 text-xs leading-5"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  <div
-                    className="mb-2 font-black uppercase tracking-[0.16em]"
-                    style={{ color: "var(--primary)" }}
-                  >
-                    Current Channel
+                  <div className="h-[calc(100%-56px)] overflow-auto">
+                    {guideOverlay}
                   </div>
-                  {getChannelDisplayName(activeChannel)}
-                </section>
-              </aside>
+                </div>
+              ) : null}
             </div>
+            {!isGuideOpen ? (
+              <section
+                className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the full live channel guide.
+              </section>
+            ) : null}
           </section>
         </div>
-
         <footer
-          className="ttv-glass-panel rounded-2xl px-4 py-4 text-center text-xs sm:px-5"
+          className="rounded-2xl border px-4 py-4 text-center text-xs shadow-2xl shadow-black/20 sm:px-5"
           style={{
+            background: "var(--panel-bg)",
+            borderColor: "var(--border)",
             color: "var(--text-muted)",
           }}
         >
           <div className="font-semibold uppercase tracking-[0.16em]">
-            TatesTv
+            Tate&apos;s TV
           </div>
 
           <div className="mt-2 leading-5">
@@ -773,19 +515,91 @@ export default function Home() {
         </footer>
       </div>
 
-      <MobileActionDock
-        isGuideOpen={isGuideOpen}
-        onOpenGuide={openGuide}
-        onOpenSettings={openSettings}
-      />
-
       {localSettingsOpen ? (
-        <SettingsModal
-          isAdminAuthorized={isAdminAuthorized}
-          onAuthChange={setIsAdminAuthorized}
-          onClose={closeSettings}
-        />
+        <div
+          className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings and admin access"
+        >
+          <div
+            className="mx-auto my-4 flex max-w-3xl flex-col gap-3 rounded-2xl border p-3 shadow-2xl sm:my-6 sm:p-4"
+            style={{
+              background: "var(--panel-bg)",
+              borderColor: "var(--border)",
+              color: "var(--text)",
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div
+                  className="text-xs font-black uppercase tracking-[0.2em]"
+                  style={{ color: "var(--primary)" }}
+                >
+                  Settings
+                </div>
+
+                <h2 className="mt-1 text-lg font-black tracking-tight">
+                  Viewer & Admin Controls
+                </h2>
+
+                <p
+                  className="mt-1 text-xs leading-5"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Theme, viewer mode, admin unlock, and protected station tools.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLocalSettingsOpen(false)}
+                className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                style={{
+                  background: "var(--button-bg)",
+                  color: "var(--text)",
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <AdminAccessPanel onAuthChange={setIsAdminAuthorized} />
+
+            <AppModeToggle isAdminAuthorized={isAdminAuthorized} />
+
+            <div
+              className="rounded-xl border px-3 py-2 text-xs leading-5"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              Public viewers should only see the premium watching experience.
+              Admin tools stay locked unless the session is authorized.
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

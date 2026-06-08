@@ -12,11 +12,8 @@ interface PlayerProps {
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
 const LIVE_TICK_MS = 1000;
-const HARD_SYNC_DRIFT_SECONDS = 16;
-const SOFT_SYNC_DRIFT_SECONDS = 4;
-const HARD_SYNC_COOLDOWN_MS = 6500;
-const SOURCE_END_PADDING_SECONDS = 0.45;
-const LOADING_OVERLAY_DELAY_MS = 700;
+const HARD_SYNC_DRIFT_SECONDS = 18;
+const SOURCE_END_PADDING_SECONDS = 0.4;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -72,7 +69,7 @@ function getSafeTargetTime(
   const sourceEnd = getSourceEnd(item);
   const videoDuration = Number.isFinite(video.duration) ? video.duration : 0;
 
-  let target = Math.max(sourceStart, sourceStart + Math.max(0, sourceElapsed));
+  let target = Math.max(sourceStart, Math.floor(sourceElapsed));
 
   if (sourceEnd && sourceEnd > sourceStart) {
     target = Math.min(
@@ -113,16 +110,11 @@ function getErrorMessage(video: HTMLVideoElement): string {
   return "Playback failed. Check the video URL or encoding.";
 }
 
-function shouldShowLoadingOverlay(status: PlaybackStatus, delayed: boolean): boolean {
-  return status === "loading" && delayed;
-}
-
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastPlaybackKeyRef = useRef("");
   const lastHardSyncRef = useRef(0);
-  const loadingDelayTimerRef = useRef<number | null>(null);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -135,27 +127,9 @@ export default function Player({ schedule }: PlayerProps) {
   const [status, setStatus] = useState<PlaybackStatus>("idle");
   const [message, setMessage] = useState("");
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
-  const [showDelayedLoading, setShowDelayedLoading] = useState(false);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
-
-  const clearLoadingDelay = useCallback(() => {
-    if (loadingDelayTimerRef.current) {
-      window.clearTimeout(loadingDelayTimerRef.current);
-      loadingDelayTimerRef.current = null;
-    }
-
-    setShowDelayedLoading(false);
-  }, []);
-
-  const startLoadingDelay = useCallback(() => {
-    clearLoadingDelay();
-
-    loadingDelayTimerRef.current = window.setTimeout(() => {
-      setShowDelayedLoading(true);
-    }, LOADING_OVERLAY_DELAY_MS);
-  }, [clearLoadingDelay]);
 
   const applyAudio = useCallback(() => {
     const video = videoRef.current;
@@ -168,48 +142,29 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = muted || volume <= 0;
   }, [muted, volume]);
 
-  const syncPosition = useCallback(
-    (mode: "soft" | "hard" = "soft") => {
-      const video = videoRef.current;
-      const item = live.item;
+  const hardSyncPosition = useCallback(() => {
+    const video = videoRef.current;
+    const item = live.item;
 
-      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-        return;
-      }
+    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      return;
+    }
 
-      const target = getSafeTargetTime(video, item, live.sourceElapsed);
-      const drift = Math.abs(video.currentTime - target);
-      const now = Date.now();
+    const target = getSafeTargetTime(video, item, live.sourceElapsed);
+    const drift = Math.abs(video.currentTime - target);
+    const now = Date.now();
 
-      if (mode === "soft") {
-        if (drift < SOFT_SYNC_DRIFT_SECONDS) {
-          return;
-        }
+    if (drift < HARD_SYNC_DRIFT_SECONDS && now - lastHardSyncRef.current < 8000) {
+      return;
+    }
 
-        if (drift < HARD_SYNC_DRIFT_SECONDS) {
-          try {
-            video.currentTime = target;
-          } catch {
-            // Browser may reject seeking while metadata is settling.
-          }
-
-          return;
-        }
-      }
-
-      if (now - lastHardSyncRef.current < HARD_SYNC_COOLDOWN_MS) {
-        return;
-      }
-
-      try {
-        video.currentTime = target;
-        lastHardSyncRef.current = now;
-      } catch {
-        // Browser may reject seeking before metadata settles.
-      }
-    },
-    [live.item, live.sourceElapsed],
-  );
+    try {
+      video.currentTime = target;
+      lastHardSyncRef.current = now;
+    } catch {
+      // Browser may reject seeking before metadata settles.
+    }
+  }, [live.item, live.sourceElapsed]);
 
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -221,54 +176,43 @@ export default function Player({ schedule }: PlayerProps) {
     try {
       applyAudio();
       await video.play();
-
-      clearLoadingDelay();
       setStatus("playing");
       setMessage("");
     } catch {
-      clearLoadingDelay();
       setStatus("paused");
       setMessage("Tap to start playback.");
     }
-  }, [applyAudio, clearLoadingDelay]);
+  }, [applyAudio]);
 
   const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
     const item = live.item;
 
     if (!video || !item?.file) {
-      clearLoadingDelay();
       setStatus("idle");
       setMessage("");
       return;
     }
 
-    startLoadingDelay();
     setStatus("loading");
     setMessage("");
 
     try {
       video.pause();
-
-      /**
-       * metadata is the better default for large MP4 files.
-       * preload="auto" can fight the active channel switch and download too much.
-       */
-      video.preload = "metadata";
+      video.preload = "auto";
       video.src = item.file;
       video.load();
     } catch {
-      clearLoadingDelay();
       setStatus("error");
       setMessage("Could not load this media source.");
     }
-  }, [clearLoadingDelay, live.item, startLoadingDelay]);
+  }, [live.item]);
 
   const resume = useCallback(() => {
     setNowMs(Date.now());
-    syncPosition("hard");
+    hardSyncPosition();
     void tryPlay();
-  }, [syncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -289,7 +233,6 @@ export default function Player({ schedule }: PlayerProps) {
     const item = live.item;
 
     if (!video || !item) {
-      clearLoadingDelay();
       setStatus("idle");
       setMessage("");
       return;
@@ -299,7 +242,7 @@ export default function Player({ schedule }: PlayerProps) {
       lastPlaybackKeyRef.current = playbackKey;
       loadCurrentSource();
     }
-  }, [clearLoadingDelay, live.item, loadCurrentSource, playbackKey]);
+  }, [live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -309,52 +252,44 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     const handleLoadedMetadata = () => {
-      syncPosition("hard");
+      hardSyncPosition();
       void tryPlay();
     };
 
     const handleCanPlay = () => {
       if (!video.paused) {
-        clearLoadingDelay();
         setStatus("playing");
         setMessage("");
       }
     };
 
     const handlePlaying = () => {
-      clearLoadingDelay();
       setStatus("playing");
       setMessage("");
     };
 
     const handleWaiting = () => {
       /**
-       * Avoid noisy "recovering stream" states.
-       * Waiting can happen briefly during normal channel switching/buffering.
+       * Do not show a big recovery overlay here.
+       * Some browsers fire waiting during normal stream buffering even while video is visibly progressing.
        */
       setStatus((current) => (current === "loading" ? "loading" : "playing"));
     };
 
-    const handleStalled = () => {
-      setStatus((current) => (current === "loading" ? "loading" : current));
-    };
-
     const handlePause = () => {
       if (document.visibilityState === "visible") {
-        clearLoadingDelay();
         setStatus("paused");
       }
     };
 
     const handleError = () => {
-      clearLoadingDelay();
       setStatus("error");
       setMessage(getErrorMessage(video));
     };
 
     const handleEnded = () => {
       setNowMs(Date.now());
-      syncPosition("hard");
+      hardSyncPosition();
       void tryPlay();
     };
 
@@ -362,7 +297,6 @@ export default function Player({ schedule }: PlayerProps) {
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("waiting", handleWaiting);
-    video.addEventListener("stalled", handleStalled);
     video.addEventListener("pause", handlePause);
     video.addEventListener("error", handleError);
     video.addEventListener("ended", handleEnded);
@@ -372,22 +306,11 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("waiting", handleWaiting);
-      video.removeEventListener("stalled", handleStalled);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("error", handleError);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [clearLoadingDelay, syncPosition, tryPlay]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-
-    if (!video || !live.item) {
-      return;
-    }
-
-    syncPosition("soft");
-  }, [live.item, nowMs, syncPosition]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -404,15 +327,14 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
-      syncPosition("hard");
     }
-  }, [live.item, nowMs, syncPosition]);
+  }, [live.item, nowMs]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setNowMs(Date.now());
-        syncPosition("hard");
+        hardSyncPosition();
         void tryPlay();
       }
     };
@@ -422,7 +344,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [syncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -453,8 +375,6 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     return () => {
-      clearLoadingDelay();
-
       const video = videoRef.current;
 
       if (!video) {
@@ -465,7 +385,7 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeAttribute("src");
       video.load();
     };
-  }, [clearLoadingDelay]);
+  }, []);
 
   if (!live.item) {
     return (
@@ -475,7 +395,6 @@ export default function Player({ schedule }: PlayerProps) {
       >
         <div>
           <div className="text-lg font-semibold">No media scheduled</div>
-
           <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
             Add media to this channel from the admin panel.
           </div>
@@ -490,8 +409,6 @@ export default function Player({ schedule }: PlayerProps) {
     live.item.type === "commercial" ||
     live.item.type === "bumper";
 
-  const loadingVisible = shouldShowLoadingOverlay(status, showDelayedLoading);
-
   return (
     <div
       ref={shellRef}
@@ -503,7 +420,7 @@ export default function Player({ schedule }: PlayerProps) {
         ref={videoRef}
         playsInline
         autoPlay
-        preload="metadata"
+        preload="auto"
         controls={false}
         muted={muted || volume <= 0}
         className="h-full w-full bg-black"
@@ -527,13 +444,11 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak
-            ? ` • ${live.item.segmentLabel}`
-            : ""}
+          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
-      {loadingVisible ? (
+      {status === "loading" ? (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
           Loading channel...
         </div>
@@ -558,3 +473,5 @@ export default function Player({ schedule }: PlayerProps) {
     </div>
   );
 }
+
+

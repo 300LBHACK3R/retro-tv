@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import { cleanDisplayText } from "@/lib/textClean";
 import type { Channel } from "@/lib/types";
 
 const QUICK_TUNE_CLEAR_MS = 2200;
-const KEYSTROKE_COMMIT_MS = 900;
 const MAX_TUNE_DIGITS = 3;
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -22,27 +20,11 @@ function getChannelName(channel: Channel | undefined): string {
     return "No Channel";
   }
 
-  return cleanDisplayText(channel.branding?.displayName ?? channel.name);
-}
-
-function getChannelCallsign(channel: Channel | undefined): string {
-  if (!channel) {
-    return "LIVE";
-  }
-
-  return cleanDisplayText(channel.branding?.callsign || channel.name || "LIVE");
+  return channel.branding?.displayName ?? channel.name;
 }
 
 function normalizeTuneValue(value: string): string {
   return value.trim().replace(/\D/g, "").slice(0, MAX_TUNE_DIGITS);
-}
-
-function getChannelNumberString(channel: Channel | undefined): string {
-  if (!channel) {
-    return "";
-  }
-
-  return String(channel.number ?? channel.id);
 }
 
 function sortChannels(channels: Channel[]): Channel[] {
@@ -74,13 +56,12 @@ function findChannelByTuneValue(
 
   return channels.find((channel) => {
     const channelNumber = channel.number ?? Number(channel.id);
-    const channelNumberString = String(channelNumber);
 
     return (
       channel.id === normalized ||
-      channelNumberString === normalized ||
-      channelNumberString.padStart(2, "0") === normalized ||
-      channelNumberString.padStart(3, "0") === normalized ||
+      String(channelNumber) === normalized ||
+      String(channelNumber).padStart(2, "0") === normalized ||
+      String(channelNumber).padStart(3, "0") === normalized ||
       (Number.isFinite(asNumber) && Number(channelNumber) === asNumber)
     );
   });
@@ -109,24 +90,7 @@ function getAvailableChannelSummary(channels: Channel[]): string {
   const first = channels[0];
   const last = channels[channels.length - 1];
 
-  return `Available: ${getChannelLabel(first)} to ${getChannelLabel(last)} / ${
-    channels.length
-  } channels`;
-}
-
-function getTunePreviewLabel(channel: Channel | undefined): string {
-  if (!channel) {
-    return "No matching channel";
-  }
-
-  return `${getChannelLabel(channel)} / ${getChannelName(channel)}`;
-}
-
-function clearTimer(timerRef: React.MutableRefObject<number | null>): void {
-  if (timerRef.current) {
-    window.clearTimeout(timerRef.current);
-    timerRef.current = null;
-  }
+  return `Available: ${getChannelLabel(first)}–${getChannelLabel(last)} • ${channels.length} channels`;
 }
 
 export default function QuickTuneBar() {
@@ -134,13 +98,11 @@ export default function QuickTuneBar() {
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
 
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(currentChannelId);
   const [message, setMessage] = useState("");
   const [flashValue, setFlashValue] = useState("");
-  const [isManualEditing, setIsManualEditing] = useState(false);
 
   const clearTimerRef = useRef<number | null>(null);
-  const commitTimerRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
@@ -150,15 +112,15 @@ export default function QuickTuneBar() {
     [channels, currentChannelId],
   );
 
-  const displayValue = value || getChannelNumberString(currentChannel);
-
   const matchingPreview = useMemo(
-    () => findChannelByTuneValue(enabledChannels, displayValue),
-    [displayValue, enabledChannels],
+    () => findChannelByTuneValue(enabledChannels, value),
+    [enabledChannels, value],
   );
 
   const clearFlashLater = useCallback(() => {
-    clearTimer(clearTimerRef);
+    if (clearTimerRef.current) {
+      window.clearTimeout(clearTimerRef.current);
+    }
 
     clearTimerRef.current = window.setTimeout(() => {
       setFlashValue("");
@@ -166,17 +128,9 @@ export default function QuickTuneBar() {
     }, QUICK_TUNE_CLEAR_MS);
   }, []);
 
-  const resetToCurrentChannel = useCallback(() => {
-    setValue("");
-    setIsManualEditing(false);
-    setMessage("");
-  }, []);
-
   const handleTune = useCallback(
-    (inputValue = displayValue) => {
+    (inputValue = value) => {
       const trimmed = normalizeTuneValue(inputValue);
-
-      clearTimer(commitTimerRef);
 
       if (!trimmed) {
         setMessage("Enter a channel number.");
@@ -188,69 +142,34 @@ export default function QuickTuneBar() {
       if (!matchingChannel) {
         setMessage(`No enabled channel found for CH ${trimmed}.`);
         setFlashValue(trimmed);
-        setIsManualEditing(false);
         clearFlashLater();
         return;
       }
 
       setChannel(matchingChannel.id);
-      setValue("");
-      setIsManualEditing(false);
+      setValue(String(matchingChannel.number ?? matchingChannel.id));
       setMessage(
-        `Tuned to ${getChannelLabel(matchingChannel)} / ${getChannelName(
+        `Tuned to ${getChannelLabel(matchingChannel)} • ${getChannelName(
           matchingChannel,
         )}.`,
       );
-      setFlashValue(getChannelNumberString(matchingChannel));
+      setFlashValue(String(matchingChannel.number ?? matchingChannel.id));
       clearFlashLater();
     },
-    [clearFlashLater, displayValue, enabledChannels, setChannel],
-  );
-
-  const queueKeyboardCommit = useCallback(
-    (nextValue: string) => {
-      clearTimer(commitTimerRef);
-
-      commitTimerRef.current = window.setTimeout(() => {
-        handleTune(nextValue);
-      }, KEYSTROKE_COMMIT_MS);
-    },
-    [handleTune],
-  );
-
-  const appendTuneDigit = useCallback(
-    (digit: string) => {
-      setValue((current) => {
-        const baseValue = isManualEditing ? current : "";
-        const nextValue = normalizeTuneValue(`${baseValue}${digit}`);
-
-        setIsManualEditing(true);
-        setFlashValue(nextValue);
-        setMessage("");
-        clearFlashLater();
-
-        if (nextValue.length >= MAX_TUNE_DIGITS) {
-          window.setTimeout(() => handleTune(nextValue), 0);
-        } else {
-          queueKeyboardCommit(nextValue);
-        }
-
-        return nextValue;
-      });
-    },
-    [clearFlashLater, handleTune, isManualEditing, queueKeyboardCommit],
+    [clearFlashLater, enabledChannels, setChannel, value],
   );
 
   useEffect(() => {
-    if (!isManualEditing) {
-      setValue("");
-    }
-  }, [currentChannelId, isManualEditing]);
+    const channel = channels.find((item) => item.id === currentChannelId);
+
+    setValue(String(channel?.number ?? currentChannelId));
+  }, [channels, currentChannelId]);
 
   useEffect(() => {
     return () => {
-      clearTimer(clearTimerRef);
-      clearTimer(commitTimerRef);
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+      }
     };
   }, []);
 
@@ -262,7 +181,16 @@ export default function QuickTuneBar() {
 
       if (/^\d$/.test(event.key)) {
         event.preventDefault();
-        appendTuneDigit(event.key);
+
+        setValue((current) => {
+          const nextValue = normalizeTuneValue(`${current}${event.key}`);
+
+          setFlashValue(nextValue);
+          clearFlashLater();
+
+          return nextValue;
+        });
+
         return;
       }
 
@@ -271,29 +199,11 @@ export default function QuickTuneBar() {
 
         setValue((current) => {
           const nextValue = normalizeTuneValue(current.slice(0, -1));
-
-          setIsManualEditing(Boolean(nextValue));
           setFlashValue(nextValue);
-          setMessage("");
           clearFlashLater();
-
-          if (nextValue) {
-            queueKeyboardCommit(nextValue);
-          } else {
-            clearTimer(commitTimerRef);
-          }
-
           return nextValue;
         });
 
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        clearTimer(commitTimerRef);
-        resetToCurrentChannel();
-        setFlashValue("");
         return;
       }
 
@@ -308,37 +218,24 @@ export default function QuickTuneBar() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    appendTuneDigit,
-    clearFlashLater,
-    handleTune,
-    queueKeyboardCommit,
-    resetToCurrentChannel,
-  ]);
+  }, [clearFlashLater, handleTune]);
 
   const availableSummary = getAvailableChannelSummary(enabledChannels);
-  const hasEnabledChannels = enabledChannels.length > 0;
 
   return (
     <section
-      className="ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
+      className="relative overflow-hidden rounded-2xl border p-3 shadow-2xl shadow-black/20 sm:p-4"
       style={{
+        background:
+          "linear-gradient(135deg, rgba(255,255,255,0.035), transparent 44%), var(--panel-bg)",
+        borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="Quick tune controls"
     >
       <div
-        className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full opacity-20 blur-3xl"
+        className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full opacity-20 blur-3xl"
         style={{ background: "var(--primary)" }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, var(--primary), transparent)",
-        }}
         aria-hidden="true"
       />
 
@@ -360,13 +257,12 @@ export default function QuickTuneBar() {
             <span style={{ color: "var(--text)" }}>
               {getChannelLabel(currentChannel)}
             </span>{" "}
-            / {getChannelName(currentChannel)}
+            • {getChannelName(currentChannel)}
           </div>
 
           <div
-            className="mt-1 truncate text-[11px]"
+            className="mt-1 text-[11px]"
             style={{ color: "var(--text-muted)" }}
-            title={message || availableSummary}
           >
             {message || availableSummary}
           </div>
@@ -374,14 +270,14 @@ export default function QuickTuneBar() {
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
           <div
-            className="flex min-w-0 items-center gap-2 rounded-2xl border p-2"
+            className="flex min-w-0 items-center gap-2 rounded-xl border p-2"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
             }}
           >
             <div
-              className="rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
+              className="rounded-lg border px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
               style={{
                 borderColor: "var(--border)",
                 color: "var(--text-muted)",
@@ -392,43 +288,18 @@ export default function QuickTuneBar() {
 
             <input
               ref={inputRef}
-              value={displayValue}
-              onFocus={() => {
-                setIsManualEditing(true);
-                setValue("");
-              }}
-              onBlur={() => {
-                if (!value) {
-                  setIsManualEditing(false);
-                }
-              }}
+              value={value}
               onChange={(event) => {
-                const nextValue = normalizeTuneValue(event.target.value);
-
-                setValue(nextValue);
-                setIsManualEditing(true);
+                setValue(normalizeTuneValue(event.target.value));
                 setMessage("");
-                setFlashValue(nextValue);
-                clearFlashLater();
-
-                if (nextValue.length >= MAX_TUNE_DIGITS) {
-                  handleTune(nextValue);
-                }
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
-                  event.preventDefault();
                   handleTune();
-                }
-
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  resetToCurrentChannel();
-                  inputRef.current?.blur();
                 }
               }}
               inputMode="numeric"
-              className="w-full min-w-0 rounded-xl border px-3 py-3 text-center text-lg font-black outline-none transition focus:ring-2 sm:w-28"
+              className="w-full min-w-0 rounded-lg border px-3 py-3 text-center text-lg font-black outline-none transition focus:ring-2 sm:w-28"
               placeholder="###"
               aria-label="Channel number"
               style={{
@@ -442,11 +313,11 @@ export default function QuickTuneBar() {
           <button
             type="button"
             onClick={() => handleTune()}
-            disabled={!hasEnabledChannels}
-            className="ttv-touch-target rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={enabledChannels.length === 0}
+            className="rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background:
-                "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+                "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
               color: "var(--text)",
             }}
           >
@@ -455,9 +326,9 @@ export default function QuickTuneBar() {
         </div>
       </div>
 
-      {matchingPreview && isManualEditing ? (
+      {matchingPreview ? (
         <div
-          className="relative mt-3 rounded-2xl border px-3 py-2 text-xs"
+          className="relative mt-3 rounded-xl border px-3 py-2 text-xs"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
@@ -466,10 +337,7 @@ export default function QuickTuneBar() {
         >
           Preview:{" "}
           <span style={{ color: "var(--text)" }}>
-            {getTunePreviewLabel(matchingPreview)}
-          </span>{" "}
-          <span style={{ color: "var(--text-muted)" }}>
-            / {getChannelCallsign(matchingPreview)}
+            {getChannelLabel(matchingPreview)} • {getChannelName(matchingPreview)}
           </span>
         </div>
       ) : null}
