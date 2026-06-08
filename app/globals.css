@@ -251,3 +251,203 @@ video {
     transition-duration: 0.001ms !important;
   }
 }
+/* ============================================================
+   TTV PREMIUM THEME LAYOUT PATCH
+   Safe presentation upgrade only. Does not touch live playback.
+   ============================================================ */
+
+:root {
+  --ttv-mobile-dock-height: 76px;
+  --ttv-mobile-gap: 0.75rem;
+  --ttv-page-max-width: 1760px;
+}
+
+body {
+  background: var(--app-bg, #020617);
+}
+
+/* Better universal panels */
+.ttv-premium-panel,
+.ttv-glass-panel,
+.ttv-glass-panel-strong {
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.28));
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 45%),
+    var(--panel-bg, rgba(15, 23, 42, 0.88));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+}
+
+.ttv-action-button,
+.ttv-premium-button {
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.28));
+  background: var(--button-bg, rgba(30, 41, 59, 0.9));
+  color: var(--text, #fff);
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.ttv-action-button:hover,
+.ttv-premium-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+  background: var(--button-hover, var(--button-bg));
+}
+
+.ttv-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Video performance / stability */
+.ttv-player-shell {
+  contain: layout paint;
+  isolation: isolate;
+  transform: translateZ(0);
+  will-change: auto;
+}
+
+.ttv-player-shell video {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+/* Make fixed overlays less aggressive */
+.ttv-modal-scroll,
+.admin-mobile-scroll,
+.ttv-guide-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Electric Blue as a theme skin, not a second app */
+[data-theme="electric-blue-live"] main,
+.theme-electric-blue-live main {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(34, 211, 238, 0.18), transparent 34%),
+    radial-gradient(circle at 92% 22%, rgba(79, 70, 229, 0.14), transparent 30%),
+    linear-gradient(135deg, #020617 0%, #031227 42%, #050b22 100%);
+}
+
+[data-theme="electric-blue-live"] .ttv-player-shell,
+.theme-electric-blue-live .ttv-player-shell {
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  box-shadow:
+    0 0 34px rgba(34, 211, 238, 0.16),
+    0 30px 90px rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="electric-blue-live"] .ttv-action-button,
+[data-theme="electric-blue-live"] .ttv-premium-button,
+.theme-electric-blue-live .ttv-action-button,
+.theme-electric-blue-live .ttv-premium-button {
+  border-color: rgba(34, 211, 238, 0.32);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.08);
+}
+
+[data-theme="electric-blue-live"] .ttv-guide-scroll,
+.theme-electric-blue-live .ttv-guide-scroll {
+  border-color: rgba(34, 211, 238, 0.32);
+}
+
+/* Mobile layout rescue */
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  main {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: calc(var(--ttv-mobile-dock-height) + env(safe-area-inset-bottom, 0px));
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  .ttv-player-shell {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 1rem !important;
+  }
+
+  .ttv-player-expanded {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999999 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+  }
+
+  .ttv-player-expanded video {
+    width: 100vw !important;
+    height: 100dvh !important;
+    object-fit: contain !important;
+  }
+
+  .ttv-guide-scroll {
+    max-height: 48dvh;
+    overflow: auto;
+  }
+
+  .admin-mobile-scroll {
+    max-height: 70dvh;
+  }
+
+  /* Prevent remote/settings/library from swallowing the whole player */
+  [aria-label="On-screen remote"] {
+    max-height: 42dvh !important;
+    overflow-y: auto !important;
+  }
+
+  [role="dialog"] {
+    max-width: 100vw;
+  }
+}
+
+/* Smaller phones */
+@media (max-width: 480px) {
+  :root {
+    --ttv-mobile-dock-height: 70px;
+  }
+
+  .ttv-guide-scroll {
+    max-height: 44dvh;
+  }
+
+  .admin-mobile-scroll {
+    max-height: 66dvh;
+  }
+}
+
+/* Keep motion premium but not heavy */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

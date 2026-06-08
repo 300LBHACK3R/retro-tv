@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
@@ -444,7 +444,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` â€¢ ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
@@ -473,5 +473,6 @@ export default function Player({ schedule }: PlayerProps) {
     </div>
   );
 }
+
 
 

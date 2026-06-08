@@ -1,4 +1,4 @@
-﻿export type MediaType = "show" | "commercial" | "movie" | "bumper";
+export type MediaType = "show" | "commercial" | "movie" | "bumper";
 export type AppMode = "viewer" | "admin";
 
 export type PlayerViewMode = "normal" | "mini" | "theater";
@@ -10,7 +10,8 @@ export type ThemeId =
   | "midas-gold"
   | "halo-2008-inspired"
   | "neon-arcade-2005"
-  | "saturday-morning-max";
+  | "saturday-morning-max"
+  | "electric-blue-live";
 
 export type ScheduleMode = "ordered" | "daily-random";
 
@@ -190,5 +191,6 @@ export interface ViewerSettings {
   guideDensity: "compact" | "comfortable";
   preferReducedMotion: boolean;
 }
+
 
 
