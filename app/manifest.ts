@@ -1,22 +1,31 @@
 import type { MetadataRoute } from "next";
 
+const appName = "TatesTv";
+const appShortName = "TatesTv";
+const appDescription =
+  "TatesTv is a browser-based retro cable TV simulator with live-style channels, classic guide listings, custom themes, and on-demand show libraries.";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tate’s Retro TV",
-    short_name: "Retro TV",
-    description:
-      "A browser-based retro cable TV simulator with live-style channels, classic guide listings, and curated programming.",
+    name: appName,
+    short_name: appShortName,
+    description: appDescription,
+
     id: "/",
     start_url: "/",
     scope: "/",
+
     display: "standalone",
     display_override: ["standalone", "minimal-ui", "browser"],
     orientation: "any",
+
     background_color: "#020617",
     theme_color: "#020617",
+
     categories: ["entertainment", "video", "tv"],
     lang: "en-CA",
     dir: "ltr",
+
     icons: [
       {
         src: "/favicon.ico",
@@ -42,11 +51,12 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
     ],
+
     shortcuts: [
       {
         name: "Watch Live TV",
         short_name: "Watch",
-        description: "Open Tate’s Retro TV live viewer.",
+        description: "Open the TatesTv live viewer.",
         url: "/",
         icons: [
           {
@@ -59,7 +69,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Open Channel Guide",
         short_name: "Guide",
-        description: "Open Tate’s Retro TV and use the live guide.",
+        description: "Open TatesTv and jump into the live channel guide.",
         url: "/?guide=1",
         icons: [
           {
@@ -68,6 +78,42 @@ export default function manifest(): MetadataRoute.Manifest {
             type: "image/png",
           },
         ],
+      },
+      {
+        name: "Open Library",
+        short_name: "Library",
+        description: "Open TatesTv and browse shows in order.",
+        url: "/?library=1",
+        icons: [
+          {
+            src: "/icon.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+      {
+        name: "Themes",
+        short_name: "Themes",
+        description: "Open TatesTv and switch visual themes.",
+        url: "/?themes=1",
+        icons: [
+          {
+            src: "/icon.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+    ],
+
+    screenshots: [
+      {
+        src: "/opengraph-image.png",
+        sizes: "1200x630",
+        type: "image/png",
+        form_factor: "wide",
+        label: "TatesTv live retro cable viewer",
       },
     ],
   };

@@ -1,6 +1,20 @@
 import type { MetadataRoute } from "next";
 
-const fallbackSiteUrl = "https://retrotvtheta.vercel.app";
+const fallbackSiteUrl = "https://www.tatestv.ca";
+
+type SitemapEntry = {
+  path: string;
+  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
+  priority: number;
+};
+
+const sitemapEntries: SitemapEntry[] = [
+  {
+    path: "/",
+    changeFrequency: "weekly",
+    priority: 1,
+  },
+];
 
 function getSiteUrl(): string {
   const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || fallbackSiteUrl;
@@ -14,7 +28,7 @@ function getSiteUrl(): string {
   }
 }
 
-function createUrl(path = ""): string {
+function createUrl(path = "/"): string {
   const siteUrl = getSiteUrl();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
 
@@ -28,12 +42,10 @@ function createUrl(path = ""): string {
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
-  return [
-    {
-      url: createUrl("/"),
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-  ];
+  return sitemapEntries.map((entry) => ({
+    url: createUrl(entry.path),
+    lastModified,
+    changeFrequency: entry.changeFrequency,
+    priority: entry.priority,
+  }));
 }

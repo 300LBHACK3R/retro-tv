@@ -50,11 +50,15 @@ function getChannelLabel(channel: Channel): string {
 }
 
 function getChannelName(channel: Channel): string {
-  return channel.branding?.displayName ?? channel.name;
+  return cleanDisplayText(channel.branding?.displayName ?? channel.name);
+}
+
+function getChannelCallsign(channel: Channel): string {
+  return cleanDisplayText(channel.branding?.callsign || channel.name || "LIVE");
 }
 
 function getCleanItemTitle(item: BroadcastItem): string {
-  return item.sourceTitle?.trim() || item.title;
+  return cleanDisplayText(item.sourceTitle?.trim() || item.title);
 }
 
 function getDisplayNowTitle(item: BroadcastItem): string {
@@ -115,6 +119,52 @@ function getPreviousVisibleItem(
   return null;
 }
 
+function getProgressPercent(elapsed: number, duration: number | undefined): number {
+  if (!duration || duration <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, (elapsed / duration) * 100));
+}
+
+function EmptyNowNextState({
+  title,
+  message,
+}: {
+  title: string;
+  message: string;
+}) {
+  return (
+    <section
+      className="ttv-glass-panel rounded-2xl p-4"
+      style={{
+        color: "var(--text)",
+      }}
+    >
+      <div className="text-sm font-black">{title}</div>
+
+      <div className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+        {message}
+      </div>
+    </section>
+  );
+}
+
+function InfoPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
+      style={{
+        borderColor: "var(--border)",
+        background: "rgba(255,255,255,0.04)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -144,76 +194,70 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     [schedule, live.index],
   );
 
-  const isCurrentHidden = live.item ? isHiddenGuideItem(live.item) : false;
-
-  const nowTitle = live.item
-    ? getDisplayNowTitle(live.item)
-    : "Nothing playing";
-
-  const contextTitle =
-    isCurrentHidden && previousVisibleItem
-      ? getCleanItemTitle(previousVisibleItem)
-      : live.item
-        ? getCleanItemTitle(live.item)
-        : "";
-
-  const progressPercent =
-    live.item && live.item.duration > 0
-      ? Math.min(100, Math.max(0, (live.elapsed / live.item.duration) * 100))
-      : 0;
-
   if (!mounted) {
     return (
-      <section
-        className="rounded-2xl border p-4"
-        style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-        }}
-      >
-        <div className="text-sm font-medium">Loading channel data...</div>
-      </section>
+      <EmptyNowNextState
+        title="Loading channel data..."
+        message="Preparing live schedule information."
+      />
     );
   }
 
   if (!channel || !live.item) {
     return (
-      <section
-        className="rounded-2xl border p-4"
-        style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-        }}
-      >
-        <div className="text-sm font-medium">No active channel data</div>
-        <div className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Load or assign media to begin playback.
-        </div>
-      </section>
+      <EmptyNowNextState
+        title="No active channel data"
+        message="Load or assign media to begin playback."
+      />
     );
   }
 
+  const isCurrentHidden = isHiddenGuideItem(live.item);
+
+  const nowTitle = getDisplayNowTitle(live.item);
+
+  const contextTitle =
+    isCurrentHidden && previousVisibleItem
+      ? getCleanItemTitle(previousVisibleItem)
+      : getCleanItemTitle(live.item);
+
+  const progressPercent = getProgressPercent(live.elapsed, live.item.duration);
+
+  const channelMode =
+    channel.scheduleMode === "daily-random" ? "Daily Random" : "Ordered";
+
+  const breakMode = channel.commercialBreakMode ?? "No Breaks";
+
+  const nextTitle = nextVisibleItem
+    ? getCleanItemTitle(nextVisibleItem)
+    : "Nothing queued";
+
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border p-3 shadow-2xl shadow-black/20 sm:p-4"
+      className="ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
       style={{
-        background:
-          "linear-gradient(135deg, rgba(255,255,255,0.035), transparent 44%), var(--panel-bg)",
-        borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="Now and next programming"
     >
       <div
-        className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full opacity-20 blur-3xl"
+        className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full opacity-20 blur-3xl"
         style={{ background: "var(--primary)" }}
         aria-hidden="true"
       />
 
-      <div className="relative grid gap-4 lg:grid-cols-[1fr_1.5fr_1fr]">
-        <div className="min-w-0 rounded-xl border p-3"
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, var(--primary), transparent)",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative grid gap-3 lg:grid-cols-[0.95fr_1.6fr_0.95fr]">
+        <div
+          className="min-w-0 rounded-2xl border p-3"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
@@ -227,27 +271,27 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           </div>
 
           <div className="mt-1 truncate text-base font-black">
-            {getChannelLabel(channel)}  /  {getChannelName(channel)}
+            {getChannelLabel(channel)} / {getChannelName(channel)}
           </div>
 
-          <div className="mt-1 flex flex-wrap gap-2 text-xs">
-            <span style={{ color: "var(--text-muted)" }}>
-              {channel.scheduleMode === "daily-random"
-                ? "Daily Random"
-                : "Ordered"}
-            </span>
+          <div
+            className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {getChannelCallsign(channel)}
+          </div>
 
-            <span style={{ color: "var(--text-muted)" }}> / </span>
-
-            <span style={{ color: "var(--text-muted)" }}>
-              {channel.commercialBreakMode ?? "none"}
-            </span>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <InfoPill>{channelMode}</InfoPill>
+            <InfoPill>{breakMode}</InfoPill>
           </div>
         </div>
 
-        <div className="min-w-0 rounded-xl border p-3"
+        <div
+          className="min-w-0 rounded-2xl border p-3"
           style={{
-            background: "var(--panel-alt-bg)",
+            background:
+              "linear-gradient(135deg, rgba(255,255,255,0.045), transparent 45%), var(--panel-alt-bg)",
             borderColor: "var(--border)",
           }}
         >
@@ -258,10 +302,10 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             <span>Now Playing</span>
 
             {isCurrentHidden ? (
-              <span style={{ color: "var(--primary)" }}>
-                Break
-              </span>
-            ) : null}
+              <span style={{ color: "var(--primary)" }}>Break</span>
+            ) : (
+              <span style={{ color: "var(--primary)" }}>Live</span>
+            )}
           </div>
 
           <div className="mt-1 truncate text-lg font-black" title={nowTitle}>
@@ -283,7 +327,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               {formatClock(live.elapsed)} / {formatClock(live.item.duration)}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}> / </span>
+            <span style={{ color: "var(--text-muted)" }}>•</span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {formatLongClock(live.remaining)} left
@@ -291,7 +335,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
             {!isCurrentHidden && live.item.segmentLabel ? (
               <>
-                <span style={{ color: "var(--text-muted)" }}> / </span>
+                <span style={{ color: "var(--text-muted)" }}>•</span>
                 <span style={{ color: "var(--text-muted)" }}>
                   {live.item.segmentLabel}
                 </span>
@@ -311,12 +355,14 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
                 background: isCurrentHidden
                   ? "linear-gradient(90deg, rgba(255,255,255,0.45), var(--primary))"
                   : "var(--primary)",
+                boxShadow: "0 0 18px color-mix(in srgb, var(--primary) 45%, transparent)",
               }}
             />
           </div>
         </div>
 
-        <div className="min-w-0 rounded-xl border p-3"
+        <div
+          className="min-w-0 rounded-2xl border p-3"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
@@ -329,16 +375,13 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             Next Up
           </div>
 
-          <div
-            className="mt-1 truncate text-base font-black"
-            title={nextVisibleItem ? getCleanItemTitle(nextVisibleItem) : "Nothing queued"}
-          >
-            {nextVisibleItem ? getCleanItemTitle(nextVisibleItem) : "Nothing queued"}
+          <div className="mt-1 truncate text-base font-black" title={nextTitle}>
+            {nextTitle}
           </div>
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)}  / {" "}
+              {getDisplayTypeLabel(nextVisibleItem)} •{" "}
               {formatLongClock(nextVisibleItem.duration)}
             </div>
           ) : (
@@ -346,14 +389,14 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               Add more media to continue the schedule.
             </div>
           )}
+
+          {nextVisibleItem?.airStartTime ? (
+            <div className="mt-3">
+              <InfoPill>Scheduled {nextVisibleItem.airStartTime}</InfoPill>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
   );
 }
-
-
-
-
-
-

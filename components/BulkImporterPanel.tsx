@@ -17,21 +17,37 @@ import {
   WEEKDAYS,
 } from "@/lib/mediaUtils";
 import { useStore } from "@/lib/store";
-import type {
-  CommercialStrategy,
-  MediaType,
-  Weekday,
-} from "@/lib/types";
+import type { CommercialStrategy, MediaType, Weekday } from "@/lib/types";
+
+type ImportPreset = "cartoon" | "sitcom" | "drama" | "commercial";
+
+type ImportSummary = {
+  totalLines: number;
+  validUrls: number;
+  invalidUrls: number;
+  questionableUrls: number;
+  duplicateLines: number;
+};
+
+const DEFAULT_BROADCAST_DURATION = "22:00";
+const DEFAULT_BROADCAST_SLOT = "30:00";
+const DEFAULT_CARTOON_BREAKPOINTS = "7:30, 15:00";
+const DEFAULT_CARTOON_BREAK_DURATIONS = "2:00, 2:00";
+
+function normalizeInputLines(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => normalizeUrl(line))
+    .filter(Boolean);
+}
 
 function splitInputLines(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(/\r?\n/)
-        .map((line) => normalizeUrl(line))
-        .filter(Boolean),
-    ),
-  );
+  return Array.from(new Set(normalizeInputLines(value)));
+}
+
+function countDuplicateLines(value: string): number {
+  const lines = normalizeInputLines(value);
+  return Math.max(0, lines.length - new Set(lines).size);
 }
 
 function isBroadcastType(type: MediaType): boolean {
@@ -75,6 +91,97 @@ function sortChannels<T extends { id: string; number?: number }>(channels: T[]):
   });
 }
 
+function getChannelOptionLabel(channel: {
+  id: string;
+  number?: number;
+  name: string;
+  branding?: { displayName?: string };
+}): string {
+  return `CH ${channel.number ?? channel.id} / ${
+    channel.branding?.displayName ?? channel.name
+  }`;
+}
+
+function getTypeLabel(type: MediaType): string {
+  if (type === "show") return "Shows";
+  if (type === "movie") return "Movies";
+  if (type === "commercial") return "Commercials";
+  return "Bumpers";
+}
+
+function createSummary(
+  totalLines: number,
+  validUrls: number,
+  invalidUrls: number,
+  questionableUrls: number,
+  duplicateLines: number,
+): ImportSummary {
+  return {
+    totalLines,
+    validUrls,
+    invalidUrls,
+    questionableUrls,
+    duplicateLines,
+  };
+}
+
+function SummaryPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "default" | "good" | "warn" | "danger";
+}) {
+  const color =
+    tone === "good"
+      ? "#86efac"
+      : tone === "warn"
+        ? "#fde68a"
+        : tone === "danger"
+          ? "#fecaca"
+          : "var(--text)";
+
+  return (
+    <div
+      className="rounded-2xl border px-3 py-2"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <div className="text-base font-black" style={{ color }}>
+        {value}
+      </div>
+      <div
+        className="text-[10px] font-black uppercase tracking-[0.14em]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function PresetButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ttv-action-button ttv-touch-target rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function BulkImporterPanel() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -85,10 +192,14 @@ export default function BulkImporterPanel() {
   const [type, setType] = useState<MediaType>("show");
   const [channelId, setChannelId] = useState(currentChannelId);
 
-  const [defaultDuration, setDefaultDuration] = useState("22:00");
-  const [slotLengthInput, setSlotLengthInput] = useState("30:00");
-  const [breakpointsInput, setBreakpointsInput] = useState("7:30, 15:00");
-  const [breakDurationsInput, setBreakDurationsInput] = useState("2:00, 2:00");
+  const [defaultDuration, setDefaultDuration] = useState(DEFAULT_BROADCAST_DURATION);
+  const [slotLengthInput, setSlotLengthInput] = useState(DEFAULT_BROADCAST_SLOT);
+  const [breakpointsInput, setBreakpointsInput] = useState(
+    DEFAULT_CARTOON_BREAKPOINTS,
+  );
+  const [breakDurationsInput, setBreakDurationsInput] = useState(
+    DEFAULT_CARTOON_BREAK_DURATIONS,
+  );
   const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(true);
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
@@ -99,9 +210,11 @@ export default function BulkImporterPanel() {
   const [airStartTime, setAirStartTime] = useState("");
   const [airDays, setAirDays] = useState<Weekday[]>([]);
   const [message, setMessage] = useState(
-    "Paste one Cloudflare/R2 public URL per line.",
+    "Paste one Cloudflare/R2 public video URL per line.",
   );
 
+  const rawLineCount = useMemo(() => normalizeInputLines(urls).length, [urls]);
+  const duplicateLineCount = useMemo(() => countDuplicateLines(urls), [urls]);
   const lines = useMemo(() => splitInputLines(urls), [urls]);
 
   const parsedDuration = useMemo(
@@ -153,6 +266,24 @@ export default function BulkImporterPanel() {
     [parsedDuration, type],
   );
 
+  const importSummary = useMemo(
+    () =>
+      createSummary(
+        rawLineCount,
+        validUrls.length,
+        invalidUrls.length,
+        questionableUrls.length,
+        duplicateLineCount,
+      ),
+    [
+      duplicateLineCount,
+      invalidUrls.length,
+      questionableUrls.length,
+      rawLineCount,
+      validUrls.length,
+    ],
+  );
+
   const canImport =
     validUrls.length > 0 &&
     parsedDuration > 0 &&
@@ -174,27 +305,51 @@ export default function BulkImporterPanel() {
     setAirDays([]);
   };
 
-  const applyCartoonPreset = () => {
-    setDefaultDuration("22:00");
-    setSlotLengthInput("30:00");
-    setBreakpointsInput("7:30, 15:00");
-    setBreakDurationsInput("2:00, 2:00");
-    setFillSlotWithCommercials(true);
-    setCommercialStrategy("best-fit");
-    setMessage("Applied 30-minute cartoon/anime bulk preset.");
+  const clearForm = () => {
+    setUrls("");
+    setMessage("Cleared bulk URL list.");
   };
 
-  const applySitcomPreset = () => {
-    setDefaultDuration("22:00");
-    setSlotLengthInput("30:00");
-    setBreakpointsInput("11:00");
-    setBreakDurationsInput("3:00");
-    setFillSlotWithCommercials(true);
-    setCommercialStrategy("best-fit");
-    setMessage("Applied 30-minute sitcom bulk preset.");
-  };
+  const applyPreset = (preset: ImportPreset) => {
+    if (preset === "cartoon") {
+      setType("show");
+      setDefaultDuration("22:00");
+      setSlotLengthInput("30:00");
+      setBreakpointsInput("7:30, 15:00");
+      setBreakDurationsInput("2:00, 2:00");
+      setFillSlotWithCommercials(true);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("best-fit");
+      setMessage("Applied 30-minute cartoon/anime bulk preset.");
+      return;
+    }
 
-  const applyCommercialPreset = () => {
+    if (preset === "sitcom") {
+      setType("show");
+      setDefaultDuration("22:00");
+      setSlotLengthInput("30:00");
+      setBreakpointsInput("11:00");
+      setBreakDurationsInput("3:00");
+      setFillSlotWithCommercials(true);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("best-fit");
+      setMessage("Applied 30-minute sitcom bulk preset.");
+      return;
+    }
+
+    if (preset === "drama") {
+      setType("show");
+      setDefaultDuration("45:00");
+      setSlotLengthInput("60:00");
+      setBreakpointsInput("12:00, 24:00, 36:00");
+      setBreakDurationsInput("3:00, 3:00, 3:00");
+      setFillSlotWithCommercials(true);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("best-fit");
+      setMessage("Applied 60-minute drama bulk preset.");
+      return;
+    }
+
     setType("commercial");
     setDefaultDuration("2:00");
     setSlotLengthInput("");
@@ -215,6 +370,7 @@ export default function BulkImporterPanel() {
       setBreakDurationsInput("");
       setFillSlotWithCommercials(false);
       setAllowCommercialSlicing(true);
+      setMessage(`${getTypeLabel(nextType)} mode selected.`);
       return;
     }
 
@@ -230,6 +386,8 @@ export default function BulkImporterPanel() {
         setSlotLengthInput(formatDurationClock(nextDefaultSlot));
       }
     }
+
+    setMessage(`${getTypeLabel(nextType)} mode selected.`);
   };
 
   const importAll = () => {
@@ -249,7 +407,7 @@ export default function BulkImporterPanel() {
     }
 
     if (!isValidAirStartTime(airStartTime)) {
-      setMessage("Air time must be HH:mm format, like 16:00.");
+      setMessage("Air time must use HH:mm format, like 16:00.");
       return;
     }
 
@@ -279,6 +437,7 @@ export default function BulkImporterPanel() {
     }
 
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime);
+    const cleanCommercialCategory = sanitizeCommercialCategory(commercialCategory);
 
     const imported = validUrls.map((url) =>
       createMediaItemFromUrl({
@@ -301,7 +460,7 @@ export default function BulkImporterPanel() {
           ? allowCommercialSlicing
           : false,
         commercialCategory: isCommercialType(type)
-          ? sanitizeCommercialCategory(commercialCategory)
+          ? cleanCommercialCategory
           : undefined,
 
         airDays,
@@ -315,7 +474,7 @@ export default function BulkImporterPanel() {
     });
 
     setMessage(
-      `Imported ${imported.length} item(s) to CH ${channelId}. Default duration: ${formatDuration(
+      `Imported ${imported.length} ${getTypeLabel(type).toLowerCase()} to CH ${channelId}. Runtime: ${formatDuration(
         parsedDuration,
       )}.`,
     );
@@ -325,36 +484,75 @@ export default function BulkImporterPanel() {
 
   return (
     <section
-      className="rounded-2xl border p-3 sm:p-4"
+      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
         color: "var(--text)",
       }}
     >
-      <div className="mb-3">
-        <div
-          className="text-xs font-semibold uppercase tracking-[0.18em]"
-          style={{ color: "var(--primary)" }}
-        >
-          Bulk Importer
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div
+            className="text-xs font-black uppercase tracking-[0.18em]"
+            style={{ color: "var(--primary)" }}
+          >
+            Bulk Importer
+          </div>
+
+          <h2 className="mt-1 text-base font-black tracking-tight">
+            Bulk R2 URL Import
+          </h2>
+
+          <p
+            className="mt-1 max-w-3xl text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Add many videos quickly using one public R2 URL per line. Best for
+            loading full seasons, complete channels, commercial pools, and
+            bumper packs.
+          </p>
         </div>
 
-        <h2 className="mt-1 text-sm font-semibold">Bulk R2 URL Import</h2>
-
-        <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
-          Add many videos quickly using one public R2 URL per line. Best for
-          loading whole channels, seasons, commercial pools, and bumper packs.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <PresetButton label="30m Cartoon" onClick={() => applyPreset("cartoon")} />
+          <PresetButton label="30m Sitcom" onClick={() => applyPreset("sitcom")} />
+          <PresetButton label="60m Drama" onClick={() => applyPreset("drama")} />
+          <PresetButton label="2m Ads" onClick={() => applyPreset("commercial")} />
+        </div>
       </div>
 
       <div className="grid gap-3">
+        <div
+          className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-5"
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor: "var(--border)",
+          }}
+        >
+          <SummaryPill label="Lines" value={importSummary.totalLines} />
+          <SummaryPill label="Valid" value={importSummary.validUrls} tone="good" />
+          <SummaryPill
+            label="Invalid"
+            value={importSummary.invalidUrls}
+            tone={importSummary.invalidUrls > 0 ? "danger" : "default"}
+          />
+          <SummaryPill
+            label="Questionable"
+            value={importSummary.questionableUrls}
+            tone={importSummary.questionableUrls > 0 ? "warn" : "default"}
+          />
+          <SummaryPill
+            label="Duplicates"
+            value={importSummary.duplicateLines}
+            tone={importSummary.duplicateLines > 0 ? "warn" : "default"}
+          />
+        </div>
+
         <textarea
           value={urls}
           onChange={(event) => setUrls(event.target.value)}
-          rows={8}
-          placeholder={`https://pub-xxxx.r2.dev/Friends%20S01E01.mp4\nhttps://pub-xxxx.r2.dev/Friends%20S01E02.mp4`}
-          className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+          rows={9}
+          placeholder={`https://pub-xxxx.r2.dev/Friends%20S01E01.mp4\nhttps://pub-xxxx.r2.dev/Friends%20S01E02.mp4\nhttps://pub-xxxx.r2.dev/Friends%20S01E03.mp4`}
+          className="w-full rounded-2xl border px-3 py-3 text-base outline-none sm:text-sm"
           spellCheck={false}
           style={{
             background: "var(--panel-alt-bg)",
@@ -392,8 +590,7 @@ export default function BulkImporterPanel() {
           >
             {enabledChannels.map((channel) => (
               <option key={channel.id} value={channel.id}>
-                CH {channel.number ?? channel.id} â€¢{" "}
-                {channel.branding?.displayName ?? channel.name}
+                {getChannelOptionLabel(channel)}
               </option>
             ))}
           </select>
@@ -431,17 +628,17 @@ export default function BulkImporterPanel() {
 
         {isBroadcastType(type) ? (
           <div
-            className="rounded-xl border p-3"
+            className="rounded-2xl border p-3"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
             }}
           >
             <div
-              className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
               style={{ color: "var(--primary)" }}
             >
-              Bulk Broadcast Slot Settings
+              Broadcast Slot Settings
             </div>
 
             <div className="grid gap-3 lg:grid-cols-3">
@@ -495,51 +692,6 @@ export default function BulkImporterPanel() {
               />
             </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={applyCartoonPreset}
-                className="rounded-lg px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
-                style={{
-                  background: "var(--button-bg)",
-                  color: "var(--text)",
-                }}
-              >
-                30m Cartoon
-              </button>
-
-              <button
-                type="button"
-                onClick={applySitcomPreset}
-                className="rounded-lg px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
-                style={{
-                  background: "var(--button-bg)",
-                  color: "var(--text)",
-                }}
-              >
-                30m Sitcom
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSlotLengthInput("60:00");
-                  setBreakpointsInput("12:00, 24:00, 36:00");
-                  setBreakDurationsInput("3:00, 3:00, 3:00");
-                  setFillSlotWithCommercials(true);
-                  setCommercialStrategy("best-fit");
-                  setMessage("Applied 60-minute drama bulk preset.");
-                }}
-                className="rounded-lg px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
-                style={{
-                  background: "var(--button-bg)",
-                  color: "var(--text)",
-                }}
-              >
-                60m Drama
-              </button>
-            </div>
-
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label
                 className="flex items-center gap-3 rounded-xl border p-3 text-sm"
@@ -581,17 +733,17 @@ export default function BulkImporterPanel() {
 
         {isCommercialType(type) ? (
           <div
-            className="rounded-xl border p-3"
+            className="rounded-2xl border p-3"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
             }}
           >
             <div
-              className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
               style={{ color: "var(--primary)" }}
             >
-              Bulk Commercial Pool Settings
+              Commercial Pool Settings
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -610,7 +762,7 @@ export default function BulkImporterPanel() {
                   }
                   className="h-5 w-5"
                 />
-                <span>Allow commercials to be sliced for exact ad blocks</span>
+                <span>Allow slicing for exact ad blocks</span>
               </label>
 
               <input
@@ -625,20 +777,6 @@ export default function BulkImporterPanel() {
                 }}
               />
             </div>
-
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={applyCommercialPreset}
-                className="rounded-lg px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
-                style={{
-                  background: "var(--button-bg)",
-                  color: "var(--text)",
-                }}
-              >
-                2m Commercial Preset
-              </button>
-            </div>
           </div>
         ) : null}
 
@@ -651,11 +789,7 @@ export default function BulkImporterPanel() {
             <button
               type="button"
               onClick={selectEveryDay}
-              className="rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-              style={{
-                background: "var(--button-bg)",
-                color: "var(--text)",
-              }}
+              className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
             >
               Every Day
             </button>
@@ -670,7 +804,7 @@ export default function BulkImporterPanel() {
                   key={day.id}
                   type="button"
                   onClick={() => toggleAirDay(day.id)}
-                  className="rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+                  className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
                   style={{
                     background: active ? "var(--primary)" : "var(--button-bg)",
                     color: "var(--text)",
@@ -684,43 +818,57 @@ export default function BulkImporterPanel() {
         </div>
 
         <div
-          className="rounded-xl border px-3 py-2 text-xs leading-5"
+          className="rounded-2xl border px-3 py-3 text-xs leading-5"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
             color: "var(--text-muted)",
           }}
         >
-          URLs: {validUrls.length} valid / {lines.length} total â€¢ Invalid:{" "}
-          {invalidUrls.length} â€¢ Questionable: {questionableUrls.length} â€¢
-          Duration: {parsedDuration > 0 ? formatDuration(parsedDuration) : "unset"}{" "}
-          â€¢ Slot:{" "}
+          <span style={{ color: "var(--text)" }}>Import Summary:</span>{" "}
+          {validUrls.length} valid / {lines.length} unique URLs • Invalid:{" "}
+          {invalidUrls.length} • Questionable: {questionableUrls.length} •
+          Duplicates removed: {duplicateLineCount} • Duration:{" "}
+          {parsedDuration > 0 ? formatDuration(parsedDuration) : "unset"} •
+          Slot:{" "}
           {parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}{" "}
-          â€¢ Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} â€¢ Ads:{" "}
+          • Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} • Ads:{" "}
           {formatBreakpoints(parsedBreakDurations) || "auto"}
         </div>
 
-        <button
-          type="button"
-          onClick={importAll}
-          disabled={!canImport}
-          className="rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
-            color: "var(--text)",
-          }}
-        >
-          Import All
-        </button>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <button
+            type="button"
+            onClick={importAll}
+            disabled={!canImport}
+            className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+              color: "var(--text)",
+            }}
+          >
+            Import All
+          </button>
+
+          <button
+            type="button"
+            onClick={clearForm}
+            disabled={!urls.trim()}
+            className="ttv-action-button ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
 
         <div
-          className="rounded-xl border px-3 py-2 text-xs leading-5"
+          className="rounded-2xl border px-3 py-2 text-xs leading-5"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
             color: "var(--text-muted)",
           }}
+          aria-live="polite"
         >
           {message}
         </div>
@@ -728,4 +876,3 @@ export default function BulkImporterPanel() {
     </section>
   );
 }
-

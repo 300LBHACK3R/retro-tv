@@ -1,25 +1,90 @@
 import { NextResponse } from "next/server";
-import { sanitizeProgrammingSnapshot } from "@/lib/programmingSnapshot";
+import {
+  sanitizeProgrammingSnapshot,
+  type ProgrammingSnapshot,
+} from "@/lib/programmingSnapshot";
 import { isAdminRequestAuthorized } from "@/lib/server/adminAuth";
 import { createSupabaseAdminClient } from "@/lib/server/supabaseAdmin";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+type ApiResponse<T = null> = {
+  ok: boolean;
+  data?: T;
+  error?: string;
+};
+
+const PROGRAMMING_STATE_ID = "main";
+
+function jsonResponse<T = null>(
+  body: ApiResponse<T>,
+  init?: ResponseInit,
+): NextResponse<ApiResponse<T>> {
+  const response = NextResponse.json(body, init);
+
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+
+  return response;
+}
+
+function isJsonRequest(request: Request): boolean {
+  const contentType = request.headers.get("content-type") ?? "";
+  return contentType.toLowerCase().includes("application/json");
+}
+
+async function readRequestBody(request: Request): Promise<unknown | null> {
+  if (!isJsonRequest(request)) {
+    return null;
+  }
+
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+function createSafeProgrammingPayload(
+  snapshot: ProgrammingSnapshot,
+): ProgrammingSnapshot {
+  return {
+    ...snapshot,
+    appMode: "viewer",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function getPublicErrorMessage(error: unknown): string {
+  if (error instanceof Error && process.env.NODE_ENV !== "production") {
+    return error.message;
+  }
+
+  return "Failed to save programming.";
+}
 
 export async function PUT(request: Request) {
   const isAuthorized = await isAdminRequestAuthorized();
 
   if (!isAuthorized) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized." },
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Unauthorized.",
+      },
       { status: 401 },
     );
   }
 
-  let body: unknown;
+  const body = await readRequestBody(request);
 
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body." },
+  if (!body) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Invalid JSON body.",
+      },
       { status: 400 },
     );
   }
@@ -27,40 +92,55 @@ export async function PUT(request: Request) {
   const snapshot = sanitizeProgrammingSnapshot(body);
 
   if (!snapshot) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid programming snapshot." },
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Invalid programming snapshot.",
+      },
       { status: 400 },
     );
   }
 
+  const safePayload = createSafeProgrammingPayload(snapshot);
+
   try {
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase.from("programming_state").upsert({
-      id: "main",
-      data: {
-        ...snapshot,
-        appMode: "viewer",
-        updatedAt: new Date().toISOString(),
+    const { error } = await supabase.from("programming_state").upsert(
+      {
+        id: PROGRAMMING_STATE_ID,
+        data: safePayload,
+        updated_at: safePayload.updatedAt,
       },
-    });
+      {
+        onConflict: "id",
+      },
+    );
 
     if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
+      return jsonResponse(
+        {
+          ok: false,
+          error:
+            process.env.NODE_ENV === "production"
+              ? "Failed to save programming."
+              : error.message,
+        },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return jsonResponse({
+      ok: true,
+      data: {
+        updatedAt: safePayload.updatedAt,
+      },
+    });
   } catch (error) {
-    return NextResponse.json(
+    return jsonResponse(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to save programming.",
+        error: getPublicErrorMessage(error),
       },
       { status: 500 },
     );

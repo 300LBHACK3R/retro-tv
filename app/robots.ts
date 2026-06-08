@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const fallbackSiteUrl = "https://retrotvtheta.vercel.app";
+const fallbackSiteUrl = "https://www.tatestv.ca";
 
 function getSiteUrl(): string {
   const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || fallbackSiteUrl;
@@ -28,10 +28,13 @@ export default function robots(): MetadataRoute.Robots {
           "/apple-icon.png",
           "/opengraph-image.png",
           "/manifest.webmanifest",
+          "/sitemap.xml",
         ],
         disallow: [
           "/api/",
           "/api/admin/",
+          "/admin/",
+          "/_next/",
         ],
       },
     ],

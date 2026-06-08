@@ -8,15 +8,17 @@ const DEFAULT_ACCENT_COLOR = "#2563eb";
 const MAX_CALLSIGN_LENGTH = 12;
 const MAX_LOGO_TEXT_LENGTH = 32;
 const MAX_DISPLAY_NAME_LENGTH = 48;
-const MAX_DESCRIPTION_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 140;
 
 const COLOR_PRESETS = [
   { label: "Blue", value: "#2563eb" },
+  { label: "Cyan", value: "#0891b2" },
+  { label: "Electric", value: "#22d3ee" },
   { label: "Gold", value: "#d4af37" },
   { label: "Purple", value: "#7c3aed" },
   { label: "Red", value: "#dc2626" },
   { label: "Green", value: "#16a34a" },
-  { label: "Cyan", value: "#0891b2" },
+  { label: "Pink", value: "#db2777" },
 ] as const;
 
 type BrandingDraft = ChannelBranding;
@@ -36,7 +38,7 @@ function getChannelLabel(channel: Channel): string {
 }
 
 function isValidHexColor(value: string): boolean {
-  return /^#[0-9a-f]{6}$/i.test(value);
+  return /^#[0-9a-f]{6}$/i.test(value.trim());
 }
 
 function normalizeHexColor(value: string, fallback = DEFAULT_ACCENT_COLOR): string {
@@ -52,7 +54,7 @@ function normalizeHexColor(value: string, fallback = DEFAULT_ACCENT_COLOR): stri
     return `#${withoutHash.toLowerCase()}`;
   }
 
-  return fallback;
+  return fallback.toLowerCase();
 }
 
 function normalizeCallsign(value: string, fallback: string): string {
@@ -87,7 +89,11 @@ function normalizeDraft(
       MAX_DISPLAY_NAME_LENGTH,
     ),
     callsign: normalizeCallsign(draft.callsign, fallback.callsign),
-    logoText: normalizeText(draft.logoText, fallback.logoText, MAX_LOGO_TEXT_LENGTH),
+    logoText: normalizeText(
+      draft.logoText,
+      fallback.logoText,
+      MAX_LOGO_TEXT_LENGTH,
+    ),
     description: normalizeDescription(draft.description),
     accentColor: normalizeHexColor(
       draft.accentColor,
@@ -120,6 +126,175 @@ function getInitials(value: string): string {
   }
 
   return clean.slice(0, 4).toUpperCase();
+}
+
+function CharacterCount({
+  current,
+  max,
+}: {
+  current: number;
+  max: number;
+}) {
+  const isNearLimit = current >= max * 0.85;
+
+  return (
+    <span
+      className="text-[10px] font-semibold"
+      style={{ color: isNearLimit ? "#fde68a" : "var(--text-muted)" }}
+    >
+      {current}/{max}
+    </span>
+  );
+}
+
+function TextInput({
+  id,
+  label,
+  value,
+  maxLength,
+  onChange,
+  uppercase = false,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  maxLength: number;
+  onChange: (value: string) => void;
+  uppercase?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <label
+          htmlFor={id}
+          className="block text-xs font-medium"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {label}
+        </label>
+
+        <CharacterCount current={value.length} max={maxLength} />
+      </div>
+
+      <input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value.slice(0, maxLength))}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={[
+          "w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm",
+          uppercase ? "uppercase" : "",
+        ].join(" ")}
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+          color: "var(--text)",
+        }}
+      />
+    </div>
+  );
+}
+
+function PreviewCard({
+  channel,
+  draft,
+  accentColor,
+}: {
+  channel: Channel;
+  draft: BrandingDraft;
+  accentColor: string;
+}) {
+  const initials = getInitials(draft.callsign || draft.logoText || channel.name);
+  const channelLabel = getChannelLabel(channel);
+
+  return (
+    <div
+      className="mb-4 overflow-hidden rounded-2xl border shadow-2xl"
+      style={{
+        borderColor: accentColor,
+        background:
+          "radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.84), rgba(0,0,0,0.48))",
+        boxShadow: `0 0 28px ${accentColor}36, 0 18px 55px rgba(0,0,0,0.35)`,
+      }}
+    >
+      <div
+        className="h-px w-full"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+        }}
+      />
+
+      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
+            style={{
+              background: accentColor,
+              boxShadow: `0 0 20px ${accentColor}70`,
+            }}
+          >
+            {initials}
+          </div>
+
+          <div className="min-w-0">
+            <div className="truncate text-base font-black uppercase tracking-[0.13em] text-white">
+              {draft.logoText || draft.displayName || channel.name}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/72">
+              <span>{draft.callsign || channel.name}</span>
+              <span className="text-white/35">•</span>
+              <span>{channelLabel}</span>
+              <span className="text-white/35">•</span>
+              <span>Live</span>
+            </div>
+
+            {draft.description ? (
+              <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/58">
+                {draft.description}
+              </div>
+            ) : (
+              <div className="mt-1 text-xs leading-5 text-white/40">
+                Add a channel description to improve the guide and overlay feel.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="rounded-2xl border p-3"
+          style={{
+            borderColor: `${accentColor}66`,
+            background: "rgba(0,0,0,0.32)",
+          }}
+        >
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+            Viewer Overlay Preview
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <div
+              className="h-2.5 w-2.5 rounded-full"
+              style={{
+                background: accentColor,
+                boxShadow: `0 0 14px ${accentColor}`,
+              }}
+            />
+            <div className="min-w-0 truncate text-xs font-black uppercase tracking-[0.12em] text-white">
+              {draft.displayName || channel.name}
+            </div>
+          </div>
+
+          <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">
+            {draft.callsign || "LIVE"} / {channelLabel}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ChannelBrandingPanel() {
@@ -157,14 +332,7 @@ export default function ChannelBrandingPanel() {
 
   if (!activeChannel || !savedBranding || !draft) {
     return (
-      <section
-        className="rounded-2xl border p-4"
-        style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-        }}
-      >
+      <section className="ttv-glass-panel rounded-2xl p-4">
         <div className="text-sm font-semibold">No active channel.</div>
         <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
           Select a channel before editing branding.
@@ -201,7 +369,6 @@ export default function ChannelBrandingPanel() {
     const nextBranding = normalizeDraft(draft, savedBranding);
 
     updateChannelBranding(activeChannel.id, nextBranding);
-
     setDraft(nextBranding);
     setMessage("Saved locally. Wait for the global sync badge to finish saving.");
   };
@@ -217,40 +384,41 @@ export default function ChannelBrandingPanel() {
     });
   };
 
-  const displayNameCount = draft.displayName.length;
-  const logoTextCount = draft.logoText.length;
   const descriptionCount = draft.description.length;
+  const normalizedCurrentColor = normalizeHexColor(
+    draft.accentColor,
+    savedBranding.accentColor,
+  );
 
   return (
     <section
-      className="rounded-2xl border p-3 sm:p-4"
-      style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
+      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
+      style={{ color: "var(--text)" }}
     >
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <div
-            className="text-xs font-semibold uppercase tracking-[0.18em]"
+            className="text-xs font-black uppercase tracking-[0.18em]"
             style={{ color: "var(--primary)" }}
           >
             Branding
           </div>
 
-          <h2 className="mt-1 text-sm font-semibold tracking-wide">
+          <h2 className="mt-1 text-base font-black tracking-tight">
             Channel Branding
           </h2>
 
-          <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="mt-1 max-w-3xl text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
             Customize the active channel identity, viewer overlay, guide accent,
             callsign, logo label, and channel description.
           </p>
         </div>
 
         <div
-          className="rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
+          className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
             borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
@@ -261,162 +429,48 @@ export default function ChannelBrandingPanel() {
         </div>
       </div>
 
-      <div
-        className="mb-4 overflow-hidden rounded-2xl border shadow-2xl"
-        style={{
-          borderColor: accentColor,
-          background:
-            "radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.82), rgba(0,0,0,0.42))",
-          boxShadow: `0 0 26px ${accentColor}30, 0 18px 55px rgba(0,0,0,0.35)`,
-        }}
-      >
-        <div
-          className="h-px w-full"
-          style={{
-            background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
-          }}
-        />
-
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
-              style={{
-                background: accentColor,
-                boxShadow: `0 0 20px ${accentColor}70`,
-              }}
-            >
-              {getInitials(draft.callsign || draft.logoText || activeChannel.name)}
-            </div>
-
-            <div className="min-w-0">
-              <div className="truncate text-base font-black uppercase tracking-[0.13em] text-white">
-                {draft.logoText || draft.displayName || activeChannel.name}
-              </div>
-
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/72">
-                <span>{draft.callsign || activeChannel.name}</span>
-                <span className="text-white/35">•</span>
-                <span>{getChannelLabel(activeChannel)}</span>
-                <span className="text-white/35">•</span>
-                <span>Live</span>
-              </div>
-
-              {draft.description ? (
-                <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/58">
-                  {draft.description}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div
-            className="rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/70"
-            style={{
-              borderColor: `${accentColor}88`,
-              background: "rgba(0,0,0,0.28)",
-            }}
-          >
-            Preview
-          </div>
-        </div>
-      </div>
+      <PreviewCard
+        channel={activeChannel}
+        draft={draft}
+        accentColor={accentColor}
+      />
 
       <div className="grid gap-3">
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-3">
-            <label
-              htmlFor="channel-display-name"
-              className="block text-xs font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Display Name
-            </label>
-
-            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              {displayNameCount}/{MAX_DISPLAY_NAME_LENGTH}
-            </span>
-          </div>
-
-          <input
-            id="channel-display-name"
-            value={draft.displayName}
-            onChange={(event) =>
-              updateDraft({
-                displayName: event.target.value.slice(0, MAX_DISPLAY_NAME_LENGTH),
-              })
-            }
-            className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-              color: "var(--text)",
-            }}
-          />
-        </div>
+        <TextInput
+          id="channel-display-name"
+          label="Display Name"
+          value={draft.displayName}
+          maxLength={MAX_DISPLAY_NAME_LENGTH}
+          onChange={(value) => updateDraft({ displayName: value })}
+          placeholder="Example: TTV Vortex"
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="channel-callsign"
-              className="mb-1 block text-xs font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Callsign
-            </label>
+          <TextInput
+            id="channel-callsign"
+            label="Callsign"
+            value={draft.callsign}
+            maxLength={MAX_CALLSIGN_LENGTH}
+            uppercase
+            onChange={(value) =>
+              updateDraft({
+                callsign: value
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9 -]/g, "")
+                  .slice(0, MAX_CALLSIGN_LENGTH),
+              })
+            }
+            placeholder="VORTEX"
+          />
 
-            <input
-              id="channel-callsign"
-              value={draft.callsign}
-              onChange={(event) =>
-                updateDraft({
-                  callsign: event.target.value
-                    .toUpperCase()
-                    .replace(/[^A-Z0-9 -]/g, "")
-                    .slice(0, MAX_CALLSIGN_LENGTH),
-                })
-              }
-              className="w-full rounded-xl border px-3 py-3 text-base uppercase outline-none transition focus:ring-2 sm:text-sm"
-              maxLength={MAX_CALLSIGN_LENGTH}
-              style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            />
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <label
-                htmlFor="channel-logo-text"
-                className="block text-xs font-medium"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Logo Text
-              </label>
-
-              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                {logoTextCount}/{MAX_LOGO_TEXT_LENGTH}
-              </span>
-            </div>
-
-            <input
-              id="channel-logo-text"
-              value={draft.logoText}
-              onChange={(event) =>
-                updateDraft({
-                  logoText: event.target.value.slice(0, MAX_LOGO_TEXT_LENGTH),
-                })
-              }
-              className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
-              style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            />
-          </div>
+          <TextInput
+            id="channel-logo-text"
+            label="Logo Text"
+            value={draft.logoText}
+            maxLength={MAX_LOGO_TEXT_LENGTH}
+            onChange={(value) => updateDraft({ logoText: value })}
+            placeholder="TTV Vortex"
+          />
         </div>
 
         <div>
@@ -429,9 +483,10 @@ export default function ChannelBrandingPanel() {
               Description
             </label>
 
-            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              {descriptionCount}/{MAX_DESCRIPTION_LENGTH}
-            </span>
+            <CharacterCount
+              current={descriptionCount}
+              max={MAX_DESCRIPTION_LENGTH}
+            />
           </div>
 
           <textarea
@@ -443,6 +498,7 @@ export default function ChannelBrandingPanel() {
               })
             }
             rows={3}
+            placeholder="Example: High-energy cartoons, anime, action, and after-school chaos."
             className="w-full resize-none rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
@@ -497,7 +553,7 @@ export default function ChannelBrandingPanel() {
               placeholder="#2563eb"
               style={{
                 background: "var(--panel-alt-bg)",
-                borderColor: isValidHexColor(normalizeHexColor(draft.accentColor))
+                borderColor: isValidHexColor(normalizedCurrentColor)
                   ? "var(--border)"
                   : "#f87171",
                 color: "var(--text)",
@@ -506,30 +562,28 @@ export default function ChannelBrandingPanel() {
           </div>
 
           <div className="mt-2 flex flex-wrap gap-2">
-            {COLOR_PRESETS.map((preset) => (
-              <button
-                key={preset.value}
-                type="button"
-                onClick={() => applyPreset(preset.value)}
-                className="rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition hover:scale-[1.02]"
-                style={{
-                  background:
-                    draft.accentColor.toLowerCase() === preset.value
-                      ? preset.value
-                      : "var(--button-bg)",
-                  borderColor: preset.value,
-                  color:
-                    draft.accentColor.toLowerCase() === preset.value
-                      ? "#fff"
-                      : "var(--text)",
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
+            {COLOR_PRESETS.map((preset) => {
+              const active = normalizedCurrentColor === preset.value;
+
+              return (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => applyPreset(preset.value)}
+                  className="ttv-touch-target rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition hover:scale-[1.02]"
+                  style={{
+                    background: active ? preset.value : "var(--button-bg)",
+                    borderColor: preset.value,
+                    color: active ? "#fff" : "var(--text)",
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
 
-          {!isValidHexColor(normalizeHexColor(draft.accentColor)) ? (
+          {!isValidHexColor(normalizedCurrentColor) ? (
             <div className="mt-1 text-[11px] text-red-300">
               Use a valid 6-digit hex color like #2563eb.
             </div>
@@ -546,6 +600,7 @@ export default function ChannelBrandingPanel() {
             : "var(--border)",
           color: hasUnsavedChanges ? "#fde68a" : "var(--text-muted)",
         }}
+        aria-live="polite"
       >
         {message}
       </div>
@@ -555,10 +610,10 @@ export default function ChannelBrandingPanel() {
           type="button"
           onClick={saveChanges}
           disabled={!hasUnsavedChanges}
-          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background:
-              "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))",
+              "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
             color: "var(--text)",
           }}
         >
@@ -569,11 +624,7 @@ export default function ChannelBrandingPanel() {
           type="button"
           onClick={resetChanges}
           disabled={!hasUnsavedChanges}
-          className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            background: "var(--button-bg)",
-            color: "var(--text)",
-          }}
+          className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Reset
         </button>

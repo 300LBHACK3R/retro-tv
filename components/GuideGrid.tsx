@@ -10,7 +10,7 @@ const SLOT_MINUTES = 30;
 const AXIS_SLOTS = 6;
 const WINDOW_MINUTES = SLOT_MINUTES * AXIS_SLOTS;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
-const MIN_ITEM_WIDTH = 56;
+const MIN_ITEM_WIDTH = 64;
 const LIVE_TICK_MS = 15_000;
 
 type GuideSegment = {
@@ -76,10 +76,7 @@ function getGuideDuration(item: BroadcastItem): number {
 
 function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   return schedule.filter(
-    (item) =>
-      item.file &&
-      getGuideDuration(item) > 0 &&
-      !isHiddenGuideItem(item),
+    (item) => item.file && getGuideDuration(item) > 0 && !isHiddenGuideItem(item),
   );
 }
 
@@ -146,7 +143,7 @@ function buildGuideSegments(
     accumulated = end;
   }
 
-  let offsetInsideCurrent = offset - accumulated;
+  let offsetInsideCurrent = Math.max(0, offset - accumulated);
   let cursor = 0;
   const segments: GuideSegment[] = [];
 
@@ -183,6 +180,33 @@ function getDisplayType(item: BroadcastItem): string {
   return "COMMERCIAL";
 }
 
+function getSegmentWidth(segmentDurationSeconds: number): number {
+  return Math.max((segmentDurationSeconds / 60) * PX_PER_MINUTE, MIN_ITEM_WIDTH);
+}
+
+function EmptyGuideState({
+  title,
+  message,
+}: {
+  title: string;
+  message: string;
+}) {
+  return (
+    <section
+      className="ttv-glass-panel rounded-2xl p-4"
+      style={{
+        color: "var(--text)",
+      }}
+    >
+      <div className="text-sm font-black">{title}</div>
+
+      <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+        {message}
+      </div>
+    </section>
+  );
+}
+
 export default function GuideGrid({ schedule }: GuideGridProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -202,9 +226,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
 
   const now = useMemo(() => new Date(nowMs), [nowMs]);
   const windowStart = useMemo(() => floorToHalfHour(now), [now]);
-
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
-
   const visibleSchedule = useMemo(() => getVisibleSchedule(schedule), [schedule]);
 
   const windowStartBroadcastSeconds = useMemo(
@@ -231,28 +253,17 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
 
   if (!schedule.length || !live.item || visibleSchedule.length === 0) {
     return (
-      <section
-        className="rounded-2xl border p-4"
-        style={{
-          background: "var(--panel-bg)",
-          borderColor: "var(--border)",
-          color: "var(--text)",
-        }}
-      >
-        <div className="text-sm font-semibold">No schedule loaded.</div>
-        <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-          Assign shows or movies to this channel to generate public listings.
-        </div>
-      </section>
+      <EmptyGuideState
+        title="No schedule loaded."
+        message="Assign shows or movies to this channel to generate public listings."
+      />
     );
   }
 
   return (
     <section
-      className="overflow-hidden rounded-2xl border shadow-2xl shadow-black/20"
+      className="ttv-glass-panel overflow-hidden rounded-2xl shadow-2xl shadow-black/20"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="Single channel guide grid"
@@ -270,7 +281,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
             className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            Tate&apos;s Retro TV
+            TatesTv
           </div>
 
           <div className="mt-1 font-black">Listings</div>
@@ -278,13 +289,14 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
 
         <div className="text-right">
           <div className="font-black">{formatTime(now)}</div>
+
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute view â€¢ commercials hidden
+            {WINDOW_MINUTES} minute view • commercials hidden
           </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto p-4">
+      <div className="ttv-guide-scroll p-3 sm:p-4">
         <div
           className="relative min-w-max"
           style={{ width: `${totalTimelineWidth}px` }}
@@ -314,7 +326,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
           </div>
 
           <div
-            className="relative h-[72px] overflow-hidden rounded-xl border"
+            className="relative h-[78px] overflow-hidden rounded-2xl border"
             style={{
               borderColor: "var(--border)",
               background: "var(--guide-row-bg)",
@@ -343,11 +355,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
 
             {guideSegments.map((segment, index) => {
               const segmentDuration = segment.endSec - segment.startSec;
-              const width = Math.max(
-                (segmentDuration / 60) * PX_PER_MINUTE,
-                MIN_ITEM_WIDTH,
-              );
-
+              const width = getSegmentWidth(segmentDuration);
               const left = (segment.startSec / 60) * PX_PER_MINUTE;
 
               const isCurrent =
@@ -356,6 +364,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
 
               const title = getGuideTitle(segment.item);
               const duration = getGuideDuration(segment.item);
+              const displayType = getDisplayType(segment.item);
 
               return (
                 <button
@@ -371,17 +380,20 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
                       : "var(--panel-alt-bg)",
                     color: isCurrent ? "#0f172a" : "var(--text)",
                     boxShadow: isCurrent
-                      ? "inset 0 0 0 1px var(--primary)"
+                      ? "inset 0 0 0 1px var(--primary), 0 0 20px rgba(255,255,255,0.10)"
                       : "none",
                   }}
-                  title={`${title} â€¢ ${formatDuration(duration)}`}
+                  title={`${title} • ${formatDuration(duration)}`}
+                  aria-label={`${title}, ${displayType}, ${formatDuration(
+                    duration,
+                  )}`}
                 >
                   <div className="truncate font-black tracking-tight">
                     {title}
                   </div>
 
                   <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                    {getDisplayType(segment.item)} â€¢ {formatDuration(duration)}
+                    {displayType} • {formatDuration(duration)}
                   </div>
                 </button>
               );
@@ -394,6 +406,16 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
               }}
               aria-hidden="true"
             />
+
+            <div
+              className="absolute top-1 z-20 -translate-x-1/2 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[0_0_10px_rgba(239,68,68,0.65)]"
+              style={{
+                left: `${nowLineLeft}px`,
+              }}
+              aria-hidden="true"
+            >
+              Now
+            </div>
           </div>
         </div>
       </div>

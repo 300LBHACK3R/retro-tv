@@ -7,11 +7,12 @@ import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
-const ROW_HEIGHT = 58;
+const BASE_ROW_HEIGHT = 58;
+const COMPACT_ROW_HEIGHT = 48;
 const SLOT_MINUTES = 30;
 const SLOT_COUNT = 6;
-const CHANNEL_COLUMN_WIDTH = 122;
-const MIN_SLOT_WIDTH = 156;
+const CHANNEL_COLUMN_WIDTH = 132;
+const MIN_SLOT_WIDTH = 164;
 const WINDOW_MINUTES = SLOT_MINUTES * SLOT_COUNT;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
 const LIVE_TICK_MS = 15_000;
@@ -72,11 +73,15 @@ function getChannelLabel(channel: Channel): string {
 }
 
 function getChannelName(channel: Channel): string {
-  return channel.branding?.displayName ?? channel.name;
+  return cleanDisplayText(channel.branding?.displayName ?? channel.name);
+}
+
+function getChannelCallsign(channel: Channel): string {
+  return cleanDisplayText(channel.branding?.callsign || getChannelName(channel));
 }
 
 function getGuideTitle(item: BroadcastItem): string {
-  return item.sourceTitle?.trim() || item.title;
+  return cleanDisplayText(item.sourceTitle?.trim() || item.title);
 }
 
 function getGuideDuration(item: BroadcastItem): number {
@@ -114,10 +119,7 @@ function getScheduleOffsetAtBroadcastSecond(
 
 function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   return schedule.filter(
-    (item) =>
-      item.file &&
-      getGuideDuration(item) > 0 &&
-      !isHiddenGuideItem(item),
+    (item) => item.file && getGuideDuration(item) > 0 && !isHiddenGuideItem(item),
   );
 }
 
@@ -164,7 +166,7 @@ function buildVisibleTimeline(
     accumulated = end;
   }
 
-  let offsetInsideCurrent = scheduleOffset - accumulated;
+  let offsetInsideCurrent = Math.max(0, scheduleOffset - accumulated);
   let cursor = 0;
   const segments: TimelineSegment[] = [];
 
@@ -211,6 +213,35 @@ function sortRows(data: MultiGuideRow[]): MultiGuideRow[] {
     });
 }
 
+function isValidHexColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value.trim());
+}
+
+function getSafeAccent(channel: Channel): string {
+  const accent = channel.branding?.accentColor?.trim();
+
+  if (accent && isValidHexColor(accent)) {
+    return accent.toLowerCase();
+  }
+
+  return "var(--primary)";
+}
+
+function getTimelineGridTemplate(): string {
+  return `repeat(${SLOT_COUNT}, minmax(${MIN_SLOT_WIDTH}px, 1fr))`;
+}
+
+function EmptyGuideState({ message }: { message: string }) {
+  return (
+    <div
+      className="col-span-2 flex items-center justify-center px-4 py-8 text-sm"
+      style={{ color: "var(--text-muted)" }}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function MultiGuide({
   data,
   onProgramSelect,
@@ -249,7 +280,7 @@ export default function MultiGuide({
     return null;
   }
 
-  const rowHeight = guideDensity === "compact" ? 48 : ROW_HEIGHT;
+  const rowHeight = guideDensity === "compact" ? COMPACT_ROW_HEIGHT : BASE_ROW_HEIGHT;
 
   const secondsSinceWindowStart = Math.min(
     WINDOW_SECONDS,
@@ -260,7 +291,7 @@ export default function MultiGuide({
     windowStart.getTime(),
   );
 
-  const timelineGridTemplate = `repeat(${SLOT_COUNT}, minmax(${MIN_SLOT_WIDTH}px, 1fr))`;
+  const timelineGridTemplate = getTimelineGridTemplate();
 
   const nowLinePercent = Math.min(
     100,
@@ -269,10 +300,8 @@ export default function MultiGuide({
 
   return (
     <section
-      className="w-full overflow-hidden rounded-2xl border shadow-2xl"
+      className="ttv-glass-panel w-full overflow-hidden rounded-2xl shadow-2xl"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
         color: "var(--text)",
       }}
       aria-label="Live TV guide"
@@ -290,7 +319,7 @@ export default function MultiGuide({
             className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            Tate&apos;s Retro TV
+            TatesTv
           </div>
 
           <div className="mt-1 text-sm font-black">Live Guide</div>
@@ -298,13 +327,14 @@ export default function MultiGuide({
 
         <div className="text-right">
           <div className="text-sm font-black">{formatTime(now)}</div>
+
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute window  /  commercials hidden
+            {WINDOW_MINUTES} minute window / commercials hidden
           </div>
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto">
+      <div className="ttv-guide-scroll w-full">
         <div
           className="grid min-w-max"
           style={{
@@ -353,16 +383,11 @@ export default function MultiGuide({
           </div>
 
           {enabledRows.length === 0 ? (
-            <div
-              className="col-span-2 flex items-center justify-center px-4 py-8 text-sm"
-              style={{ color: "var(--text-muted)" }}
-            >
-              No enabled channels available.
-            </div>
+            <EmptyGuideState message="No enabled channels available." />
           ) : (
             enabledRows.map(({ channel, schedule }, rowIndex) => {
               const isActive = channel.id === currentChannelId;
-              const accent = channel.branding?.accentColor || "var(--primary)";
+              const accent = getSafeAccent(channel);
 
               const visibleSegments = buildVisibleTimeline(
                 schedule,
@@ -380,6 +405,9 @@ export default function MultiGuide({
                   rowHeight={rowHeight}
                   visibleSegments={visibleSegments}
                   nowLinePercent={nowLinePercent}
+                  onChannelSelect={() => {
+                    setChannel(channel.id);
+                  }}
                   onProgramSelect={(payload) => {
                     setChannel(payload.channel.id);
                     onProgramSelect?.(payload);
@@ -402,6 +430,7 @@ function GuideRow({
   rowHeight,
   visibleSegments,
   nowLinePercent,
+  onChannelSelect,
   onProgramSelect,
 }: {
   channel: Channel;
@@ -411,6 +440,7 @@ function GuideRow({
   rowHeight: number;
   visibleSegments: TimelineSegment[];
   nowLinePercent: number;
+  onChannelSelect: () => void;
   onProgramSelect?: (payload: { channel: Channel; item: BroadcastItem }) => void;
 }) {
   const rowBg = isActive
@@ -419,25 +449,31 @@ function GuideRow({
       ? "var(--guide-row-bg)"
       : "var(--guide-row-alt-bg)";
 
-  const activeTextColor = isActive ? "#0f172a" : "var(--text)";
+  const channelTextColor = isActive ? "#0f172a" : "var(--text)";
+  const nowSeconds = (nowLinePercent / 100) * WINDOW_SECONDS;
+  const firstVisibleItem = visibleSegments[0]?.item;
 
   return (
     <>
       <button
         type="button"
-        onClick={() =>
-          onProgramSelect?.({
-            channel,
-            item: visibleSegments[0]?.item as BroadcastItem,
-          })
-        }
-        className="flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
+        onClick={() => {
+          onChannelSelect();
+
+          if (firstVisibleItem) {
+            onProgramSelect?.({
+              channel,
+              item: firstVisibleItem,
+            });
+          }
+        }}
+        className="ttv-touch-target flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
         style={{
           height: `${rowHeight}px`,
           borderColor: "var(--border)",
           background: isActive ? "var(--guide-active-bg)" : "var(--panel-alt-bg)",
           borderLeft: `3px solid ${isActive ? accent : "transparent"}`,
-          color: activeTextColor,
+          color: channelTextColor,
         }}
       >
         <div className="text-[13px] font-black">{getChannelLabel(channel)}</div>
@@ -447,7 +483,7 @@ function GuideRow({
           style={{ opacity: 0.8 }}
           title={getChannelName(channel)}
         >
-          {channel.branding?.callsign || getChannelName(channel)}
+          {getChannelCallsign(channel)}
         </div>
       </button>
 
@@ -462,7 +498,7 @@ function GuideRow({
         <div
           className="grid h-full w-full"
           style={{
-            gridTemplateColumns: `repeat(${SLOT_COUNT}, minmax(${MIN_SLOT_WIDTH}px, 1fr))`,
+            gridTemplateColumns: getTimelineGridTemplate(),
           }}
           aria-hidden="true"
         >
@@ -489,8 +525,6 @@ function GuideRow({
           const widthPercent =
             ((segment.endSec - segment.startSec) / WINDOW_SECONDS) * 100;
 
-          const nowSeconds = (nowLinePercent / 100) * WINDOW_SECONDS;
-
           const isCurrentProgram =
             segment.startSec <= nowSeconds && segment.endSec > nowSeconds;
 
@@ -510,23 +544,28 @@ function GuideRow({
               className="absolute top-0 overflow-hidden border px-2 py-1 text-left text-[11px] leading-tight transition hover:brightness-110"
               style={{
                 left: `${leftPercent}%`,
-                width: `${Math.max(widthPercent, 1.25)}%`,
+                width: `${Math.max(widthPercent, 1.35)}%`,
                 height: `${rowHeight}px`,
                 background: isCurrentProgram
                   ? "var(--guide-current-bg)"
                   : "var(--panel-alt-bg)",
                 borderColor: isCurrentProgram ? accent : "var(--border)",
                 color: isCurrentProgram ? "#0f172a" : "var(--text)",
-                boxShadow: isCurrentProgram ? `inset 0 0 0 1px ${accent}` : "none",
+                boxShadow: isCurrentProgram
+                  ? `inset 0 0 0 1px ${accent}, 0 0 18px rgba(255,255,255,0.10)`
+                  : "none",
               }}
-              title={`${title}  /  ${formatDuration(duration)}`}
+              title={`${title} / ${formatDuration(duration)}`}
+              aria-label={`${getChannelLabel(channel)} ${title}, ${formatDuration(
+                duration,
+              )}`}
             >
               <div className="truncate font-black tracking-tight">
                 {title}
               </div>
 
               <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                {segment.item.type.toUpperCase()}  /  {formatDuration(duration)}
+                {segment.item.type.toUpperCase()} / {formatDuration(duration)}
               </div>
             </button>
           );
@@ -543,5 +582,3 @@ function GuideRow({
     </>
   );
 }
-
-

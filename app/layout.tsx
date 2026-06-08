@@ -1,7 +1,9 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 
-const fallbackSiteUrl = "https://retrotvtheta.vercel.app";
+const fallbackSiteUrl = "https://www.tatestv.ca";
+const fallbackOgImage = "/opengraph-image.png";
 
 function getSiteUrl(): string {
   const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || fallbackSiteUrl;
@@ -21,56 +23,59 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
 
   title: {
-    default: "Tate’s Retro TV",
-    template: "%s | Tate’s Retro TV",
+    default: "TatesTv",
+    template: "%s | TatesTv",
   },
 
   description:
-    "A browser-based retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and Cloudflare-hosted media.",
+    "TatesTv is a browser-based retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and on-demand show libraries.",
 
-  applicationName: "Tate’s Retro TV",
+  applicationName: "TatesTv",
   creator: "Tate Byers",
-  publisher: "Tate’s Retro TV",
+  publisher: "TatesTv",
 
   alternates: {
     canonical: "/",
   },
 
   keywords: [
+    "TatesTv",
+    "Tate's TV",
     "retro TV",
+    "retro cable TV",
     "cable TV simulator",
     "live TV guide",
     "nostalgic TV",
-    "retro cable guide",
     "browser TV app",
     "scheduled programming",
-    "Tate's Retro TV",
+    "on demand show library",
+    "custom TV themes",
   ],
 
   openGraph: {
-    title: "Tate’s Retro TV",
+    title: "TatesTv",
     description:
-      "A retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and Cloudflare-hosted media.",
+      "A retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and on-demand show libraries.",
     url: "/",
     type: "website",
-    siteName: "Tate’s Retro TV",
+    siteName: "TatesTv",
     locale: "en_CA",
     images: [
       {
-        url: "/opengraph-image.png",
+        url: fallbackOgImage,
         width: 1200,
         height: 630,
-        alt: "Tate’s Retro TV live cable simulator",
+        alt: "TatesTv live retro cable simulator",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "Tate’s Retro TV",
+    title: "TatesTv",
     description:
-      "A retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and Cloudflare-hosted media.",
-    images: ["/opengraph-image.png"],
+      "A retro cable TV simulator with live-style channels, scheduled programming, nostalgic guide UI, custom themes, and on-demand show libraries.",
+    images: [fallbackOgImage],
   },
 
   icons: {
@@ -99,7 +104,7 @@ export const metadata: Metadata = {
 
   appleWebApp: {
     capable: true,
-    title: "Retro TV",
+    title: "TatesTv",
     statusBarStyle: "black-translucent",
   },
 
@@ -120,11 +125,14 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+
+  category: "entertainment",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
   viewportFit: "cover",
   themeColor: "#020617",
   colorScheme: "dark",
@@ -137,8 +145,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-CA" suppressHydrationWarning>
-      <body className="min-h-screen bg-[#020617] antialiased selection:bg-yellow-400/30 selection:text-white">
+      <body className="min-h-screen bg-[#020617] antialiased selection:bg-cyan-300/30 selection:text-white">
         {children}
+        <Analytics />
       </body>
     </html>
   );

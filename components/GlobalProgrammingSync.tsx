@@ -21,11 +21,31 @@ type SyncStatus =
   | "fallback"
   | "error";
 
+type SaveProgrammingResponse = {
+  ok?: boolean;
+  data?: {
+    updatedAt?: string;
+  };
+  error?: string;
+};
+
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 const SAVED_MESSAGE_RESET_MS = 2500;
 
 function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Request cancelled.";
+  }
+
   return error instanceof Error ? error.message : fallback;
+}
+
+async function readJsonSafe<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 function createStatusMessage(
@@ -36,7 +56,72 @@ function createStatusMessage(
     return prefix;
   }
 
-  return `${prefix} • ${snapshot.media.length} media • ${snapshot.channels.length} channels`;
+  return `${prefix} / ${snapshot.media.length} media / ${snapshot.channels.length} channels`;
+}
+
+function createSnapshotSignature(snapshot: ProgrammingSnapshot): string {
+  /**
+   * updatedAt changes during save/load cycles, so exclude it from the signature.
+   * This prevents unnecessary repeat saves when the actual programming did not change.
+   */
+  return JSON.stringify({
+    ...snapshot,
+    updatedAt: "",
+  });
+}
+
+function getStatusTone(status: SyncStatus): {
+  borderColor: string;
+  color: string;
+  dotColor: string;
+} {
+  if (status === "error") {
+    return {
+      borderColor: "rgba(248,113,113,0.5)",
+      color: "#fca5a5",
+      dotColor: "#f87171",
+    };
+  }
+
+  if (status === "fallback" || status === "dirty" || status === "saving") {
+    return {
+      borderColor: "rgba(250,204,21,0.5)",
+      color: "#fde68a",
+      dotColor: "#facc15",
+    };
+  }
+
+  if (status === "saved" || status === "loaded") {
+    return {
+      borderColor: "rgba(34,197,94,0.35)",
+      color: "#bbf7d0",
+      dotColor: "#22c55e",
+    };
+  }
+
+  return {
+    borderColor: "rgba(255,255,255,0.12)",
+    color: "#d1d5db",
+    dotColor: "#94a3b8",
+  };
+}
+
+function formatLastSaved(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 export default function GlobalProgrammingSync({
@@ -57,6 +142,8 @@ export default function GlobalProgrammingSync({
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const lastSavedAtRef = useRef<string | null>(null);
+  const lastSavedSignatureRef = useRef<string | null>(null);
+  const lastQueuedSignatureRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const clearSaveTimer = useCallback(() => {
@@ -79,33 +166,44 @@ export default function GlobalProgrammingSync({
         return;
       }
 
+      const snapshot = exportProgrammingSnapshot();
+      const signature = createSnapshotSignature(snapshot);
+
+      if (reason === "auto" && signature === lastSavedSignatureRef.current) {
+        setStatus("loaded");
+        setMessage("Global sync active");
+        return;
+      }
+
       if (isSavingRef.current) {
         pendingSaveRef.current = true;
+        lastQueuedSignatureRef.current = signature;
         return;
       }
 
       try {
         isSavingRef.current = true;
         pendingSaveRef.current = false;
+        lastQueuedSignatureRef.current = signature;
 
         clearResetTimer();
 
         setStatus("saving");
-        setMessage(reason === "manual" ? "Saving now" : "Saving global programming");
-
-        const snapshot = exportProgrammingSnapshot();
+        setMessage(
+          reason === "manual" ? "Saving now" : "Saving global programming",
+        );
 
         const response = await fetch("/api/admin/programming", {
           method: "PUT",
+          cache: "no-store",
+          credentials: "same-origin",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(snapshot),
         });
 
-        const data = (await response.json().catch(() => null)) as
-          | { ok?: boolean; error?: string }
-          | null;
+        const data = await readJsonSafe<SaveProgrammingResponse>(response);
 
         if (!response.ok || !data?.ok) {
           throw new Error(data?.error || `Save failed with ${response.status}`);
@@ -115,7 +213,11 @@ export default function GlobalProgrammingSync({
           return;
         }
 
-        lastSavedAtRef.current = new Date().toISOString();
+        const savedAt = data.data?.updatedAt ?? new Date().toISOString();
+
+        lastSavedAtRef.current = savedAt;
+        lastSavedSignatureRef.current = signature;
+
         setStatus("saved");
         setMessage(createStatusMessage("Global saved", snapshot));
 
@@ -146,7 +248,8 @@ export default function GlobalProgrammingSync({
 
   useEffect(() => {
     mountedRef.current = true;
-    let cancelled = false;
+
+    const abortController = new AbortController();
 
     const loadProgramming = async () => {
       setStatus("loading");
@@ -155,52 +258,69 @@ export default function GlobalProgrammingSync({
       try {
         const response = await fetch("/api/programming", {
           cache: "no-store",
+          credentials: "same-origin",
+          signal: abortController.signal,
         });
 
-        const data = (await response.json()) as ProgrammingApiResponse;
+        const data = await readJsonSafe<ProgrammingApiResponse>(response);
 
-        if (cancelled) return;
+        if (abortController.signal.aborted) {
+          return;
+        }
 
-        if (!response.ok || !data.ok) {
-          throw new Error(data.error || `Load failed with ${response.status}`);
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || `Load failed with ${response.status}`);
         }
 
         if (data.programming) {
           /**
-           * This flag prevents the local replaceProgramming() hydration event
-           * from immediately saving the same data back to Supabase.
+           * This flag prevents replaceProgramming() hydration from immediately
+           * saving the exact same remote state back to Supabase.
            */
           skipNextSaveRef.current = true;
+
           replaceProgramming(data.programming);
+
+          const signature = createSnapshotSignature(data.programming);
+
           hasHydratedRef.current = true;
           lastSavedAtRef.current = data.programming.updatedAt;
+          lastSavedSignatureRef.current = signature;
+          lastQueuedSignatureRef.current = signature;
 
           setStatus("loaded");
           setMessage(createStatusMessage("Global loaded", data.programming));
           return;
         }
 
+        const localSnapshot = exportProgrammingSnapshot();
+
         hasHydratedRef.current = true;
+        lastSavedSignatureRef.current = createSnapshotSignature(localSnapshot);
+        lastQueuedSignatureRef.current = lastSavedSignatureRef.current;
+
         setStatus("fallback");
         setMessage("Using local/default programming");
       } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         console.error("Failed to load global programming:", error);
 
-        if (!cancelled) {
-          hasHydratedRef.current = true;
-          setStatus("error");
-          setMessage(getErrorMessage(error, "Global load failed"));
-        }
+        hasHydratedRef.current = true;
+        setStatus("error");
+        setMessage(getErrorMessage(error, "Global load failed"));
       }
     };
 
     void loadProgramming();
 
     return () => {
-      cancelled = true;
+      abortController.abort();
       mountedRef.current = false;
     };
-  }, [replaceProgramming]);
+  }, [exportProgrammingSnapshot, replaceProgramming]);
 
   useEffect(() => {
     if (!isAdminAuthorized || !hasHydratedRef.current) {
@@ -212,6 +332,18 @@ export default function GlobalProgrammingSync({
         skipNextSaveRef.current = false;
         return;
       }
+
+      const snapshot = exportProgrammingSnapshot();
+      const signature = createSnapshotSignature(snapshot);
+
+      if (
+        signature === lastSavedSignatureRef.current ||
+        signature === lastQueuedSignatureRef.current
+      ) {
+        return;
+      }
+
+      lastQueuedSignatureRef.current = signature;
 
       clearSaveTimer();
       clearResetTimer();
@@ -232,6 +364,7 @@ export default function GlobalProgrammingSync({
   }, [
     clearResetTimer,
     clearSaveTimer,
+    exportProgrammingSnapshot,
     isAdminAuthorized,
     saveProgramming,
   ]);
@@ -243,33 +376,37 @@ export default function GlobalProgrammingSync({
     };
   }, [clearResetTimer, clearSaveTimer]);
 
-  const isError = status === "error";
   const isSaving = status === "saving";
-  const isDirty = status === "dirty";
-  const isFallback = status === "fallback";
+  const tone = getStatusTone(status);
+  const lastSavedLabel = formatLastSaved(lastSavedAtRef.current);
 
   return (
     <div
-      className="fixed bottom-3 left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md"
+      className="fixed bottom-[calc(5.75rem+var(--safe-bottom))] left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md md:bottom-3"
       style={{
         background: "rgba(0,0,0,0.76)",
-        borderColor: isError
-          ? "rgba(248,113,113,0.5)"
-          : isFallback || isDirty || isSaving
-            ? "rgba(250,204,21,0.5)"
-            : "rgba(255,255,255,0.12)",
-        color: isError
-          ? "#fca5a5"
-          : isFallback || isDirty || isSaving
-            ? "#fde68a"
-            : "#d1d5db",
+        borderColor: tone.borderColor,
+        color: tone.color,
       }}
       title={`${message}${
-        lastSavedAtRef.current ? ` • Last saved ${lastSavedAtRef.current}` : ""
+        lastSavedAtRef.current ? ` / Last saved ${lastSavedAtRef.current}` : ""
       }`}
       aria-live="polite"
     >
-      <span className="truncate">{message}</span>
+      <span
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{
+          background: tone.dotColor,
+          boxShadow: `0 0 12px ${tone.dotColor}`,
+        }}
+      />
+
+      <span className="truncate">
+        {message}
+        {lastSavedLabel && status !== "saving" && status !== "dirty"
+          ? ` / ${lastSavedLabel}`
+          : ""}
+      </span>
 
       {isAdminAuthorized ? (
         <button
@@ -281,7 +418,7 @@ export default function GlobalProgrammingSync({
           disabled={isSaving}
           className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSaving ? "Saving" : "Save Now"}
+          {isSaving ? "Saving" : "Save"}
         </button>
       ) : null}
     </div>

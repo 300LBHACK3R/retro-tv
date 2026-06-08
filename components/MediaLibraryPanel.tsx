@@ -9,7 +9,13 @@ import {
 import { useStore } from "@/lib/store";
 import type { Channel, MediaItem, MediaType } from "@/lib/types";
 
-type MediaFilter = MediaType | "all";
+type MediaFilter = MediaType | "all" | "assigned" | "unassigned";
+
+type LibraryStat = {
+  label: string;
+  value: string | number;
+  helper: string;
+};
 
 const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -17,7 +23,11 @@ const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
   { value: "movie", label: "Movies" },
   { value: "commercial", label: "Commercials" },
   { value: "bumper", label: "Bumpers" },
+  { value: "assigned", label: "Assigned" },
+  { value: "unassigned", label: "Unassigned" },
 ];
+
+const MAX_LIBRARY_HEIGHT = 580;
 
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
@@ -62,6 +72,7 @@ function getMediaSearchLabel(item: MediaItem): string {
     item.provider,
     item.mimeType,
     item.commercialCategory,
+    item.airStartTime,
   ]
     .filter(Boolean)
     .join(" ")
@@ -133,12 +144,144 @@ function getBroadcastDetails(item: MediaItem): string[] {
 
 function sortMedia(items: MediaItem[]): MediaItem[] {
   return [...items].sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type.localeCompare(b.type);
+    const typeCompare = a.type.localeCompare(b.type);
+
+    if (typeCompare !== 0) {
+      return typeCompare;
     }
 
-    return a.title.localeCompare(b.title);
+    return a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("en-CA", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function createAssignedChannelMap(
+  media: MediaItem[],
+  channels: Channel[],
+): Map<string, Channel[]> {
+  const map = new Map<string, Channel[]>();
+
+  for (const item of media) {
+    map.set(
+      item.id,
+      channels.filter((channel) => channel.mediaIds.includes(item.id)),
+    );
+  }
+
+  return map;
+}
+
+function createTypeCounts(media: MediaItem[]): Record<MediaType, number> {
+  return media.reduce<Record<MediaType, number>>(
+    (acc, item) => {
+      acc[item.type] += 1;
+      return acc;
+    },
+    {
+      show: 0,
+      movie: 0,
+      commercial: 0,
+      bumper: 0,
+    },
+  );
+}
+
+function filterMediaByMode(
+  item: MediaItem,
+  filter: MediaFilter,
+  assignedChannels: Channel[],
+): boolean {
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "assigned") {
+    return assignedChannels.length > 0;
+  }
+
+  if (filter === "unassigned") {
+    return assignedChannels.length === 0;
+  }
+
+  return item.type === filter;
+}
+
+function StatCard({ stat }: { stat: LibraryStat }) {
+  return (
+    <div
+      className="rounded-2xl border p-3"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <div className="text-lg font-black tracking-tight">{stat.value}</div>
+
+      <div
+        className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {stat.label}
+      </div>
+
+      <div
+        className="mt-2 line-clamp-2 text-[11px] leading-4"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {stat.helper}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div
+      className="rounded-2xl border px-3 py-8 text-center text-xs"
+      style={{
+        background: "var(--panel-alt-bg)",
+        borderColor: "var(--border)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+  danger = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="ttv-touch-target rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        background: danger ? "#7f1d1d" : "var(--button-bg)",
+        color: danger ? "#fff" : "var(--text)",
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function MediaLibraryPanel() {
@@ -160,28 +303,26 @@ export default function MediaLibraryPanel() {
     [channels, currentChannelId],
   );
 
-  const assignedChannelMap = useMemo(() => {
-    const map = new Map<string, Channel[]>();
-
-    for (const item of media) {
-      map.set(
-        item.id,
-        channels.filter((channel) => channel.mediaIds.includes(item.id)),
-      );
-    }
-
-    return map;
-  }, [channels, media]);
+  const assignedChannelMap = useMemo(
+    () => createAssignedChannelMap(media, channels),
+    [channels, media],
+  );
 
   const filteredMedia = useMemo(() => {
     return sortMedia(
       media
-        .filter((item) => filter === "all" || item.type === filter)
+        .filter((item) =>
+          filterMediaByMode(
+            item,
+            filter,
+            assignedChannelMap.get(item.id) ?? [],
+          ),
+        )
         .filter((item) => matchesSearch(item, query)),
     );
-  }, [filter, media, query]);
+  }, [assignedChannelMap, filter, media, query]);
 
-  const totalDuration = useMemo(
+  const totalVisibleDuration = useMemo(
     () =>
       filteredMedia.reduce(
         (sum, item) => sum + Math.max(0, Math.floor(item.duration)),
@@ -190,20 +331,60 @@ export default function MediaLibraryPanel() {
     [filteredMedia],
   );
 
-  const typeCounts = useMemo(() => {
-    return media.reduce<Record<MediaType, number>>(
-      (acc, item) => {
-        acc[item.type] += 1;
-        return acc;
+  const typeCounts = useMemo(() => createTypeCounts(media), [media]);
+
+  const assignedCount = useMemo(
+    () =>
+      media.filter((item) => (assignedChannelMap.get(item.id) ?? []).length > 0)
+        .length,
+    [assignedChannelMap, media],
+  );
+
+  const unassignedCount = Math.max(0, media.length - assignedCount);
+
+  const currentChannelMediaCount = useMemo(() => {
+    if (!currentChannel) {
+      return 0;
+    }
+
+    return media.filter((item) => currentChannel.mediaIds.includes(item.id)).length;
+  }, [currentChannel, media]);
+
+  const libraryStats = useMemo<LibraryStat[]>(
+    () => [
+      {
+        label: "Total",
+        value: formatCompactNumber(media.length),
+        helper: "All saved media metadata records.",
       },
       {
-        show: 0,
-        movie: 0,
-        commercial: 0,
-        bumper: 0,
+        label: "Shows",
+        value: formatCompactNumber(typeCounts.show),
+        helper: "Episode-style long-form items.",
       },
-    );
-  }, [media]);
+      {
+        label: "Movies",
+        value: formatCompactNumber(typeCounts.movie),
+        helper: "Movie-length long-form items.",
+      },
+      {
+        label: "Ads / Bumpers",
+        value: formatCompactNumber(typeCounts.commercial + typeCounts.bumper),
+        helper: "Short-form break inventory.",
+      },
+      {
+        label: "Assigned",
+        value: formatCompactNumber(assignedCount),
+        helper: "Media attached to at least one channel.",
+      },
+      {
+        label: "Unassigned",
+        value: formatCompactNumber(unassignedCount),
+        helper: "Media not currently used by a channel.",
+      },
+    ],
+    [assignedCount, media.length, typeCounts, unassignedCount],
+  );
 
   const handleDeleteClick = (item: MediaItem) => {
     if (pendingDeleteId !== item.id) {
@@ -223,86 +404,69 @@ export default function MediaLibraryPanel() {
     window.open(item.file, "_blank", "noopener,noreferrer");
   };
 
+  const clearSearch = () => {
+    setQuery("");
+    setPendingDeleteId(null);
+  };
+
   return (
     <section
-      className="rounded-2xl border p-3 sm:p-4"
-      style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
+      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
+      style={{ color: "var(--text)" }}
     >
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <div
-            className="text-xs font-semibold uppercase tracking-[0.18em]"
+            className="text-xs font-black uppercase tracking-[0.18em]"
             style={{ color: "var(--primary)" }}
           >
             Library
           </div>
 
-          <h2 className="mt-1 text-sm font-semibold tracking-wide">
+          <h2 className="mt-1 text-base font-black tracking-tight">
             Media Manager
           </h2>
 
-          <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="mt-1 max-w-3xl text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
             Manage saved Cloudflare/R2 media metadata, commercial pools, slot
-            settings, and channel assignments.
+            settings, source testing, and channel assignments.
           </p>
         </div>
 
         <div
-          className="rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
+          className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
             borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
             color: "var(--text-muted)",
           }}
         >
-          {media.length} Items
+          {formatCompactNumber(media.length)} Items
         </div>
       </div>
 
       <div
-        className="mb-3 grid gap-2 rounded-xl border p-3 sm:grid-cols-4"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
         }}
       >
-        <div>
-          <div className="text-lg font-black">{typeCounts.show}</div>
-          <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Shows
-          </div>
-        </div>
-
-        <div>
-          <div className="text-lg font-black">{typeCounts.movie}</div>
-          <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Movies
-          </div>
-        </div>
-
-        <div>
-          <div className="text-lg font-black">{typeCounts.commercial}</div>
-          <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Commercials
-          </div>
-        </div>
-
-        <div>
-          <div className="text-lg font-black">{typeCounts.bumper}</div>
-          <div className="text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--text-muted)" }}>
-            Bumpers
-          </div>
-        </div>
+        {libraryStats.map((stat) => (
+          <StatCard key={stat.label} stat={stat} />
+        ))}
       </div>
 
       <div className="mb-3 grid gap-2 lg:grid-cols-[1fr_auto]">
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPendingDeleteId(null);
+          }}
           placeholder="Search title, URL, filename, provider, category..."
           className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
           spellCheck={false}
@@ -313,7 +477,7 @@ export default function MediaLibraryPanel() {
           }}
         />
 
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="ttv-no-scrollbar flex max-w-full gap-2 overflow-x-auto">
           {FILTER_OPTIONS.map((option) => {
             const active = filter === option.value;
 
@@ -321,8 +485,11 @@ export default function MediaLibraryPanel() {
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setFilter(option.value)}
-                className="shrink-0 rounded-xl border px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
+                onClick={() => {
+                  setFilter(option.value);
+                  setPendingDeleteId(null);
+                }}
+                className="ttv-touch-target shrink-0 rounded-xl border px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
                 style={{
                   background: active ? "var(--primary)" : "var(--button-bg)",
                   borderColor: active ? "var(--primary)" : "var(--border)",
@@ -337,33 +504,52 @@ export default function MediaLibraryPanel() {
       </div>
 
       <div
-        className="mb-3 flex flex-wrap gap-2 text-[11px]"
-        style={{ color: "var(--text-muted)" }}
+        className="mb-3 rounded-2xl border px-3 py-2 text-xs leading-5"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+          color: "var(--text-muted)",
+        }}
       >
-        <span>
-          Showing {filteredMedia.length} of {media.length}
-        </span>
-        <span>•</span>
-        <span>Total visible runtime: {formatDuration(totalDuration)}</span>
-        <span>•</span>
-        <span>
-          Current channel: {getChannelLabel(currentChannel)} •{" "}
-          {getChannelName(currentChannel)}
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span>
+            Showing {filteredMedia.length} of {media.length}
+          </span>
+          <span>•</span>
+          <span>Total visible runtime: {formatDuration(totalVisibleDuration)}</span>
+          <span>•</span>
+          <span>
+            Current channel: {getChannelLabel(currentChannel)} /{" "}
+            {getChannelName(currentChannel)}
+          </span>
+          <span>•</span>
+          <span>Current channel items: {currentChannelMediaCount}</span>
+        </div>
+
+        {query ? (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--button-bg)",
+                color: "var(--text)",
+              }}
+            >
+              Clear Search
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
+      <div
+        className="space-y-2 overflow-auto pr-1"
+        style={{ maxHeight: MAX_LIBRARY_HEIGHT }}
+      >
         {filteredMedia.length === 0 ? (
-          <div
-            className="rounded-xl border px-3 py-6 text-center text-xs"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-            }}
-          >
-            No media found.
-          </div>
+          <EmptyState message="No media found." />
         ) : (
           filteredMedia.map((item) => {
             const assignedChannels = assignedChannelMap.get(item.id) ?? [];
@@ -377,7 +563,7 @@ export default function MediaLibraryPanel() {
             return (
               <article
                 key={item.id}
-                className="rounded-xl border p-3"
+                className="rounded-2xl border p-3"
                 style={{
                   background: "var(--panel-alt-bg)",
                   borderColor: isPendingDelete ? "#ef4444" : "var(--border)",
@@ -385,16 +571,26 @@ export default function MediaLibraryPanel() {
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-black" title={item.title}>
-                      {item.title}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div
+                        className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {getTypeLabel(item.type)}
+                      </div>
+
+                      <div className="truncate text-sm font-black" title={item.title}>
+                        {item.title}
+                      </div>
                     </div>
 
                     <div
                       className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px]"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      <span>{getTypeLabel(item.type).toUpperCase()}</span>
-                      <span>•</span>
                       <span>{formatDurationClock(item.duration)}</span>
                       <span>•</span>
                       <span>{getProviderLabel(item)}</span>
@@ -452,7 +648,7 @@ export default function MediaLibraryPanel() {
                   <button
                     type="button"
                     onClick={() => handleDeleteClick(item)}
-                    className="shrink-0 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90"
+                    className="ttv-touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90"
                     style={{
                       background: isPendingDelete ? "#ef4444" : "#7f1d1d",
                       color: "#fff",
@@ -468,16 +664,15 @@ export default function MediaLibraryPanel() {
                 </div>
 
                 {isPendingDelete ? (
-                  <div className="mt-2 rounded-lg border border-red-400/30 bg-red-950/30 px-3 py-2 text-[11px] text-red-200">
-                    Click Confirm to permanently remove this media entry from all
-                    channels. This does not delete the actual R2 file.
+                  <div className="mt-2 rounded-xl border border-red-400/30 bg-red-950/30 px-3 py-2 text-[11px] leading-5 text-red-200">
+                    Click Confirm to permanently remove this media metadata from
+                    every channel. This does not delete the actual R2 file.
                   </div>
                 ) : null}
 
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   {!isAssignedToCurrent ? (
-                    <button
-                      type="button"
+                    <ActionButton
                       onClick={() => {
                         if (!currentChannel) return;
 
@@ -485,17 +680,11 @@ export default function MediaLibraryPanel() {
                         setPendingDeleteId(null);
                       }}
                       disabled={!currentChannel}
-                      className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
                     >
                       Add to {getChannelLabel(currentChannel)}
-                    </button>
+                    </ActionButton>
                   ) : (
-                    <button
-                      type="button"
+                    <ActionButton
                       onClick={() => {
                         if (!currentChannel) return;
 
@@ -503,41 +692,22 @@ export default function MediaLibraryPanel() {
                         setPendingDeleteId(null);
                       }}
                       disabled={!currentChannel}
-                      className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
                     >
                       Remove from {getChannelLabel(currentChannel)}
-                    </button>
+                    </ActionButton>
                   )}
 
-                  <button
-                    type="button"
+                  <ActionButton
                     onClick={() => openSource(item)}
                     disabled={!isRemoteTestableUrl(item.file)}
-                    className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{
-                      background: "var(--button-bg)",
-                      color: "var(--text)",
-                    }}
                   >
                     Test Source
-                  </button>
+                  </ActionButton>
 
-                  {pendingDeleteId && pendingDeleteId !== item.id ? (
-                    <button
-                      type="button"
-                      onClick={() => setPendingDeleteId(null)}
-                      className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
-                    >
+                  {isPendingDelete ? (
+                    <ActionButton onClick={() => setPendingDeleteId(null)}>
                       Cancel Delete
-                    </button>
+                    </ActionButton>
                   ) : null}
                 </div>
               </article>

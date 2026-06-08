@@ -5,11 +5,33 @@ import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import type { BroadcastItem, Channel, MediaItem } from "@/lib/types";
 
-const MAX_PRELOAD_ITEMS = 8;
+const MAX_METADATA_WARM_ITEMS = 4;
+const MAX_ORIGIN_HINTS = 6;
+const ACTIVE_SCHEDULE_LOOKAHEAD = 4;
+const NEARBY_CHANNEL_RADIUS = 2;
+const NEARBY_CHANNEL_LOOKAHEAD = 2;
+const IDLE_TIMEOUT_MS = 1200;
 
 interface MediaPreloaderProps {
   activeSchedule: BroadcastItem[];
   activeChannel: Channel | undefined;
+}
+
+type IdleCallbackHandle = number;
+
+type IdleDeadlineLike = {
+  didTimeout: boolean;
+  timeRemaining: () => number;
+};
+
+declare global {
+  interface Window {
+    requestIdleCallback?: (
+      callback: (deadline: IdleDeadlineLike) => void,
+      options?: { timeout?: number },
+    ) => IdleCallbackHandle;
+    cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+  }
 }
 
 function getMediaForChannel(
@@ -40,21 +62,78 @@ function sortChannelsByNumber(channels: Channel[]): Channel[] {
   });
 }
 
-function getUniquePlayableUrls(items: BroadcastItem[]): string[] {
-  const urls = items
-    .map((item) => item.file)
-    .filter((file): file is string => typeof file === "string" && file.length > 0);
+function isPlayableUrl(value: string | undefined): value is string {
+  if (!value) {
+    return false;
+  }
 
-  return Array.from(new Set(urls)).slice(0, MAX_PRELOAD_ITEMS);
+  return value.startsWith("https://") || value.startsWith("/");
 }
 
-function createPreloadLink(url: string): HTMLLinkElement {
+function isRemoteUrl(value: string): boolean {
+  return value.startsWith("https://");
+}
+
+function getOrigin(value: string): string | null {
+  if (!isRemoteUrl(value)) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getUniquePlayableUrls(items: BroadcastItem[]): string[] {
+  return uniqueValues(
+    items
+      .map((item) => item.file)
+      .filter(isPlayableUrl),
+  );
+}
+
+function getNearbyChannels(
+  channels: Channel[],
+  activeChannel: Channel | undefined,
+): Channel[] {
+  const enabledChannels = sortChannelsByNumber(
+    channels.filter((channel) => channel.isEnabled !== false),
+  );
+
+  const activeIndex = activeChannel
+    ? enabledChannels.findIndex((channel) => channel.id === activeChannel.id)
+    : -1;
+
+  if (activeIndex < 0) {
+    return enabledChannels.slice(0, NEARBY_CHANNEL_RADIUS * 2 + 1);
+  }
+
+  const start = Math.max(0, activeIndex - NEARBY_CHANNEL_RADIUS);
+  const end = Math.min(enabledChannels.length, activeIndex + NEARBY_CHANNEL_RADIUS + 1);
+
+  return enabledChannels.slice(start, end);
+}
+
+function createOriginHintLink(
+  origin: string,
+  rel: "preconnect" | "dns-prefetch",
+): HTMLLinkElement {
   const link = document.createElement("link");
 
-  link.rel = "preload";
-  link.as = "video";
-  link.href = url;
-  link.crossOrigin = "anonymous";
+  link.rel = rel;
+  link.href = origin;
+
+  if (rel === "preconnect") {
+    link.crossOrigin = "anonymous";
+  }
+
+  link.dataset.ttvPreloader = "true";
 
   return link;
 }
@@ -67,9 +146,45 @@ function warmVideoMetadata(url: string): HTMLVideoElement {
   video.playsInline = true;
   video.crossOrigin = "anonymous";
   video.src = url;
+
+  /**
+   * Do not append this video to the DOM and do not call play().
+   * This only asks the browser to fetch enough metadata to speed up readiness.
+   */
   video.load();
 
   return video;
+}
+
+function cleanupWarmVideo(video: HTMLVideoElement): void {
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+}
+
+function scheduleIdleTask(task: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  if (window.requestIdleCallback && window.cancelIdleCallback) {
+    const handle = window.requestIdleCallback(
+      () => {
+        task();
+      },
+      { timeout: IDLE_TIMEOUT_MS },
+    );
+
+    return () => {
+      window.cancelIdleCallback?.(handle);
+    };
+  }
+
+  const timeout = window.setTimeout(task, 250);
+
+  return () => {
+    window.clearTimeout(timeout);
+  };
 }
 
 export default function MediaPreloader({
@@ -78,47 +193,51 @@ export default function MediaPreloader({
 }: MediaPreloaderProps) {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
+  const preferReducedMotion = useStore(
+    (state) => state.viewerSettings.preferReducedMotion,
+  );
 
   const preloadUrls = useMemo(() => {
-    const enabledChannels = sortChannelsByNumber(
-      channels.filter((channel) => channel.isEnabled !== false),
-    );
-
-    const activeIndex = activeChannel
-      ? enabledChannels.findIndex((channel) => channel.id === activeChannel.id)
-      : -1;
-
-    const nearbyChannels =
-      activeIndex >= 0
-        ? [
-            enabledChannels[activeIndex - 2],
-            enabledChannels[activeIndex - 1],
-            enabledChannels[activeIndex],
-            enabledChannels[activeIndex + 1],
-            enabledChannels[activeIndex + 2],
-          ].filter((channel): channel is Channel => Boolean(channel))
-        : enabledChannels.slice(0, 5);
+    const nearbyChannels = getNearbyChannels(channels, activeChannel);
 
     const nearbyFirstItems = nearbyChannels.flatMap((channel) => {
       const channelMedia = getMediaForChannel(channel, media);
       const schedule = buildSchedule(channelMedia, { channel });
 
-      return schedule.slice(0, 2);
+      return schedule.slice(0, NEARBY_CHANNEL_LOOKAHEAD);
     });
 
     return getUniquePlayableUrls([
-      ...activeSchedule.slice(0, 4),
+      ...activeSchedule.slice(0, ACTIVE_SCHEDULE_LOOKAHEAD),
       ...nearbyFirstItems,
     ]);
   }, [activeChannel, activeSchedule, channels, media]);
+
+  const originHints = useMemo(() => {
+    return uniqueValues(
+      preloadUrls
+        .map(getOrigin)
+        .filter((origin): origin is string => Boolean(origin)),
+    ).slice(0, MAX_ORIGIN_HINTS);
+  }, [preloadUrls]);
+
+  const metadataWarmUrls = useMemo(() => {
+    /**
+     * Keep this intentionally small. Big MP4s should not all be aggressively
+     * fetched, or the active player can stall during channel switching.
+     */
+    return preloadUrls.slice(0, preferReducedMotion ? 2 : MAX_METADATA_WARM_ITEMS);
+  }, [preferReducedMotion, preloadUrls]);
 
   useEffect(() => {
     if (typeof document === "undefined") {
       return;
     }
 
-    const links = preloadUrls.map(createPreloadLink);
-    const warmVideos = preloadUrls.map(warmVideoMetadata);
+    const links = originHints.flatMap((origin) => [
+      createOriginHintLink(origin, "dns-prefetch"),
+      createOriginHintLink(origin, "preconnect"),
+    ]);
 
     links.forEach((link) => {
       document.head.appendChild(link);
@@ -128,14 +247,30 @@ export default function MediaPreloader({
       links.forEach((link) => {
         link.remove();
       });
+    };
+  }, [originHints]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const warmVideos: HTMLVideoElement[] = [];
+
+    const cancelIdleTask = scheduleIdleTask(() => {
+      metadataWarmUrls.forEach((url) => {
+        warmVideos.push(warmVideoMetadata(url));
+      });
+    });
+
+    return () => {
+      cancelIdleTask();
 
       warmVideos.forEach((video) => {
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
+        cleanupWarmVideo(video);
       });
     };
-  }, [preloadUrls]);
+  }, [metadataWarmUrls]);
 
   return null;
 }
