@@ -1542,3 +1542,192 @@ body:not(.ttv-scroll-locked) {
     transform: none;
   }
 }
+
+
+/* ============================================================
+   TATES TV MOBILE CONTROL DOCK V1
+   Safer mobile remote/guide/panel behavior.
+   CSS-only. Playback protected.
+   ============================================================ */
+
+:root {
+  --ttv-mobile-dock-safe: calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
+  --ttv-mobile-panel-radius: 1.05rem;
+}
+
+/* Mobile app scroll should remain unlocked */
+@media (max-width: 768px) {
+  html,
+  body {
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
+  }
+
+  main {
+    min-height: 100dvh;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding-bottom: var(--ttv-mobile-dock-safe);
+  }
+
+  /* Player remains the primary focus */
+  .ttv-player-shell {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-height: 48dvh;
+    overflow: hidden;
+  }
+
+  /* Fullscreen remains locked only when expanded */
+  .ttv-player-expanded {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999999 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    touch-action: none !important;
+  }
+
+  /* Guide becomes an app-style scroll panel */
+  .ttv-guide-scroll {
+    max-height: 44dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    border-radius: var(--ttv-mobile-panel-radius);
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y !important;
+  }
+
+  /* Remote should never trap the whole page */
+  [aria-label="On-screen remote"],
+  .ttv-remote,
+  .remote,
+  [data-remote="true"] {
+    max-height: 48dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y !important;
+    border-radius: var(--ttv-mobile-panel-radius);
+  }
+
+  /* Dialogs/panels behave like mobile sheets */
+  [role="dialog"],
+  .ttv-modal-scroll,
+  .admin-mobile-scroll,
+  .ttv-theme-panel,
+  .theme-panel {
+    max-height: 82dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y !important;
+  }
+
+  /* Sticky/fixed UI should avoid blocking scrolling */
+  .ttv-mobile-dock,
+  [data-mobile-dock="true"] {
+    position: sticky;
+    bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 50;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.65rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 999px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.06), transparent 46%),
+      rgba(2, 6, 23, 0.86);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.34);
+    backdrop-filter: blur(16px);
+  }
+
+  .ttv-mobile-dock button,
+  [data-mobile-dock="true"] button {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 999px;
+  }
+
+  /* Prevent accidental tiny controls */
+  button,
+  [role="button"],
+  input,
+  select {
+    min-height: 40px;
+  }
+
+  /* Tables/grids/guide rows should not force horizontal page scroll */
+  table,
+  .ttv-guide-scroll *,
+  .ttv-glass-panel *,
+  .ttv-glass-panel-strong *,
+  .ttv-premium-panel * {
+    min-width: 0;
+  }
+
+  /* Long titles should wrap instead of widening page */
+  .ttv-guide-scroll,
+  .ttv-guide-scroll * {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Tiny phones */
+@media (max-width: 430px) {
+  main {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.65rem);
+  }
+
+  .ttv-player-shell {
+    max-height: 42dvh;
+  }
+
+  .ttv-guide-scroll {
+    max-height: 40dvh !important;
+  }
+
+  [aria-label="On-screen remote"],
+  .ttv-remote,
+  .remote,
+  [data-remote="true"] {
+    max-height: 44dvh !important;
+  }
+
+  [role="dialog"],
+  .ttv-modal-scroll,
+  .admin-mobile-scroll,
+  .ttv-theme-panel,
+  .theme-panel {
+    max-height: 78dvh !important;
+  }
+}
+
+/* Landscape phones */
+@media (max-width: 920px) and (orientation: landscape) {
+  .ttv-player-shell {
+    max-height: 76dvh;
+  }
+
+  .ttv-guide-scroll,
+  [aria-label="On-screen remote"],
+  .ttv-remote,
+  .remote,
+  [data-remote="true"] {
+    max-height: 62dvh !important;
+  }
+
+  [role="dialog"],
+  .ttv-modal-scroll,
+  .admin-mobile-scroll,
+  .ttv-theme-panel,
+  .theme-panel {
+    max-height: 86dvh !important;
+  }
+}
