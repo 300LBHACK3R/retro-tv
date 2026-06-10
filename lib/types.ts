@@ -1,4 +1,4 @@
-export type MediaType = "show" | "commercial" | "movie" | "bumper";
+﻿export type MediaType = "show" | "commercial" | "movie" | "bumper";
 export type AppMode = "viewer" | "admin";
 
 export type PlayerViewMode = "normal" | "mini" | "theater";
@@ -191,6 +191,5 @@ export interface ViewerSettings {
   guideDensity: "compact" | "comfortable";
   preferReducedMotion: boolean;
 }
-
 
 
