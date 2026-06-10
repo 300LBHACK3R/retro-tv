@@ -1321,3 +1321,224 @@ body:not(.ttv-scroll-locked) {
     display: grid;
   }
 }
+
+
+/* ============================================================
+   TATES TV THEME MARKETPLACE POLISH V1
+   Premium theme picker / marketplace styling.
+   CSS-only. Playback protected.
+   ============================================================ */
+
+.ttv-theme-marketplace,
+.ttv-theme-panel,
+.theme-panel {
+  position: relative;
+}
+
+/* Theme cards: make them feel like products */
+.ttv-theme-card,
+.theme-card,
+[data-theme-card="true"] {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 46%),
+    rgba(15, 23, 42, 0.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 60px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.ttv-theme-card:hover,
+.theme-card:hover,
+[data-theme-card="true"]:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 30px rgba(34, 211, 238, 0.10),
+    0 24px 80px rgba(0, 0, 0, 0.36);
+}
+
+/* Selected theme card */
+.ttv-theme-card[aria-pressed="true"],
+.theme-card[aria-pressed="true"],
+[data-theme-card="true"][aria-pressed="true"],
+.ttv-theme-card.is-active,
+.theme-card.is-active {
+  border-color: rgba(34, 211, 238, 0.70);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.24),
+    0 0 34px rgba(34, 211, 238, 0.16),
+    0 24px 90px rgba(0, 0, 0, 0.42);
+}
+
+/* Premium product shine */
+.ttv-theme-card::before,
+.theme-card::before,
+[data-theme-card="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.08) 38%, transparent 64%);
+  transform: translateX(-120%);
+  transition: transform 500ms ease;
+}
+
+.ttv-theme-card:hover::before,
+.theme-card:hover::before,
+[data-theme-card="true"]:hover::before {
+  transform: translateX(120%);
+}
+
+/* Premium badges */
+.ttv-premium-badge,
+.theme-premium-badge,
+[data-premium-badge="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  min-height: 1.65rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid rgba(250, 204, 21, 0.36);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(250, 204, 21, 0.26), transparent 34%),
+    rgba(113, 63, 18, 0.38);
+  color: #fde68a;
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.08);
+}
+
+/* Locked theme treatment */
+.ttv-theme-card.is-locked,
+.theme-card.is-locked,
+[data-theme-locked="true"] {
+  opacity: 0.86;
+}
+
+.ttv-theme-card.is-locked::after,
+.theme-card.is-locked::after,
+[data-theme-locked="true"]::after {
+  content: "Premium";
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #fde68a;
+  font-size: 0.65rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+}
+
+/* Theme preview blocks */
+.ttv-theme-preview,
+.theme-preview,
+[data-theme-preview="true"] {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.95rem;
+  min-height: 6.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ttv-theme-preview::after,
+.theme-preview::after,
+[data-theme-preview="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 38%),
+    radial-gradient(circle at 25% 18%, rgba(255,255,255,0.14), transparent 30%);
+}
+
+/* Electric Blue preview enhancement */
+.ttv-theme-card[data-theme-id="electric-blue-live"],
+.theme-card[data-theme-id="electric-blue-live"] {
+  border-color: rgba(34, 211, 238, 0.32);
+}
+
+.ttv-theme-card[data-theme-id="electric-blue-live"] .ttv-theme-preview,
+.theme-card[data-theme-id="electric-blue-live"] .theme-preview {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 0 28px rgba(34, 211, 238, 0.12);
+}
+
+/* Purchase / unlock buttons */
+.ttv-unlock-button,
+.theme-unlock-button,
+[data-unlock-theme="true"] {
+  min-height: 42px;
+  border: 1px solid rgba(250, 204, 21, 0.36);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(15, 23, 42, 0.92));
+  color: #fef3c7;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 0 24px rgba(250, 204, 21, 0.08);
+}
+
+.ttv-unlock-button:hover,
+.theme-unlock-button:hover,
+[data-unlock-theme="true"]:hover {
+  border-color: rgba(250, 204, 21, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.09),
+    0 0 32px rgba(250, 204, 21, 0.14);
+}
+
+/* Mobile marketplace behavior */
+@media (max-width: 768px) {
+  .ttv-theme-marketplace,
+  .ttv-theme-panel,
+  .theme-panel {
+    max-height: 78dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .ttv-theme-card,
+  .theme-card,
+  [data-theme-card="true"] {
+    border-radius: 1rem;
+  }
+
+  .ttv-theme-preview,
+  .theme-preview,
+  [data-theme-preview="true"] {
+    min-height: 5.25rem;
+    border-radius: 0.8rem;
+  }
+
+  .ttv-theme-card:hover,
+  .theme-card:hover,
+  [data-theme-card="true"]:hover {
+    transform: none;
+  }
+}
