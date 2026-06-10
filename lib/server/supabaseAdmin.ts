@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+let cachedAdminClient: SupabaseClient | null = null;
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
 
@@ -39,10 +41,14 @@ function getSupabaseServiceRoleKey(): string {
 }
 
 export function createSupabaseAdminClient(): SupabaseClient {
+  if (cachedAdminClient) {
+    return cachedAdminClient;
+  }
+
   const supabaseUrl = getRequiredUrlEnv("SUPABASE_URL");
   const serviceRoleKey = getSupabaseServiceRoleKey();
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  cachedAdminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -54,4 +60,6 @@ export function createSupabaseAdminClient(): SupabaseClient {
       },
     },
   });
+
+  return cachedAdminClient;
 }
