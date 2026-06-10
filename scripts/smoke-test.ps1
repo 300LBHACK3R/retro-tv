@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $BaseUrl = "https://www.tatestv.ca"
 
@@ -33,6 +33,15 @@ foreach ($route in $routes) {
 
   try {
     $response = Invoke-WebRequest -Uri $url -Method GET -TimeoutSec 25 -MaximumRedirection 5
+
+    if (-not $response.Headers["X-Content-Type-Options"]) {
+      throw "Missing X-Content-Type-Options header"
+    }
+
+    if (-not $response.Headers["Referrer-Policy"]) {
+      throw "Missing Referrer-Policy header"
+    }
+
     Write-Host "PASS $route -> $($response.StatusCode)"
   } catch {
     Write-Host "FAIL $route"
