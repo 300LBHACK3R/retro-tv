@@ -13,6 +13,7 @@ $routes = @(
   "/api/health",
   "/api/programming",
   "/health",
+  "/launch",
   "/recovery",
   "/backup",
   "/manifest.webmanifest",
