@@ -49,6 +49,30 @@ function formatCategory(category: string): string {
   return category.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getThemePitch(theme: ThemeDefinition): string {
+  if (theme.id === "electric-blue-live") {
+    return "Modern command-center interface with electric neon panels and app-style polish.";
+  }
+
+  if (theme.category === "premium") {
+    return "Premium visual package designed to make Tate's TV feel more collectible.";
+  }
+
+  if (theme.category === "cartoon") {
+    return "Bright, fun, playful interface styling for animated and kids-style channels.";
+  }
+
+  if (theme.category === "arcade") {
+    return "High-energy retro arcade look for gaming, anime, and action channels.";
+  }
+
+  if (theme.category === "console") {
+    return "Console-era interface styling inspired by old dashboards and game systems.";
+  }
+
+  return "Classic cable-inspired look for nostalgic live-TV browsing.";
+}
+
 export default function ThemePanel({ open, onClose }: ThemePanelProps) {
   const appMode = useStore((state) => state.appMode);
   const themeId = useStore((state) => state.themeId);
@@ -69,6 +93,9 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
 
     return themes.filter((theme) => theme.category === filter);
   }, [filter]);
+
+  const premiumCount = THEMES.filter((theme) => theme.isPremium).length;
+  const freeCount = THEMES.length - premiumCount;
 
   if (!open) {
     return null;
@@ -101,7 +128,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
       aria-label="Theme selection panel"
     >
       <div
-        className="mx-auto my-4 max-w-5xl overflow-hidden rounded-2xl border shadow-2xl sm:my-6"
+        className="ttv-theme-marketplace theme-panel mx-auto my-4 max-w-6xl overflow-hidden rounded-2xl border shadow-2xl sm:my-6"
         style={{
           background: "var(--panel-bg)",
           borderColor: "var(--border)",
@@ -116,7 +143,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
             borderColor: "var(--border)",
           }}
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div
                 className="text-xs font-semibold uppercase tracking-[0.18em]"
@@ -125,18 +152,38 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                 Theme Store
               </div>
 
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Choose Your TV Interface
+              <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+                Premium TV Interfaces
               </h2>
 
               <p
-                className="mt-1 max-w-2xl text-sm leading-6"
+                className="mt-2 max-w-3xl text-sm leading-6"
                 style={{ color: "var(--text-muted)" }}
               >
-                Switch between classic cable, premium gold, console, arcade, and
-                cartoon-style interfaces. Premium themes are unlocked for testing
-                right now and can be locked later when payments are ready.
+                Themes change the personality of the app: classic cable, console,
+                arcade, cartoon, gold premium, and Electric Blue command-center
+                styling. This is the foundation for paid visual packs.
               </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span
+                  className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
+                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                >
+                  {THEMES.length} total
+                </span>
+
+                <span
+                  className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
+                  style={{ borderColor: "rgba(34,197,94,0.35)", color: "#86efac" }}
+                >
+                  {freeCount} free
+                </span>
+
+                <span className="ttv-premium-badge" data-premium-badge="true">
+                  {premiumCount} premium
+                </span>
+              </div>
             </div>
 
             <button
@@ -152,7 +199,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
             </button>
           </div>
 
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 ttv-no-scrollbar">
             {THEME_FILTERS.map((item) => {
               const active = item.id === filter;
 
@@ -190,7 +237,11 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
             return (
               <article
                 key={theme.id}
-                className="group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5 hover:shadow-2xl"
+                className={`ttv-theme-card theme-card group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5 hover:shadow-2xl ${isSelected ? "is-active" : ""} ${!isUnlocked ? "is-locked" : ""}`}
+                data-theme-card="true"
+                data-theme-id={theme.id}
+                data-theme-locked={!isUnlocked ? "true" : undefined}
+                aria-pressed={isSelected}
                 style={{
                   borderColor: isSelected ? theme.colors.primary : "var(--border)",
                   background:
@@ -204,18 +255,33 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                   className="block w-full p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <div
-                    className="relative mb-4 h-28 overflow-hidden rounded-xl border"
+                    className="ttv-theme-preview theme-preview relative mb-4 h-32 overflow-hidden rounded-xl border"
+                    data-theme-preview="true"
                     style={{
                       background: getPreviewGradient(theme),
                       borderColor: isSelected ? theme.colors.primary : "var(--border)",
                     }}
                   >
+                    <div className="absolute left-3 top-3 flex gap-2">
+                      <span
+                        className="rounded-full border border-white/20 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm"
+                      >
+                        {formatCategory(theme.category)}
+                      </span>
+
+                      {theme.isPremium ? (
+                        <span className="rounded-full border border-yellow-300/30 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-yellow-200 backdrop-blur-sm">
+                          Premium
+                        </span>
+                      ) : null}
+                    </div>
+
                     <div className="absolute inset-x-3 bottom-3 rounded-lg border border-white/20 bg-black/35 px-3 py-2 backdrop-blur-sm">
                       <div className="text-xs font-black uppercase tracking-[0.18em] text-white">
                         {theme.name}
                       </div>
                       <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
-                        {formatCategory(theme.category)}
+                        {isSelected ? "Currently active" : getThemePitch(theme)}
                       </div>
                     </div>
                   </div>
@@ -249,7 +315,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
 
                   {theme.recommendedFor.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {theme.recommendedFor.slice(0, 4).map((tag) => (
+                      {theme.recommendedFor.slice(0, 5).map((tag) => (
                         <span
                           key={tag}
                           className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
@@ -309,11 +375,8 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                     <button
                       type="button"
                       onClick={() => handleUnlockPreview(theme)}
-                      className="w-full rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
+                      className="theme-unlock-button w-full rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                      data-unlock-theme="true"
                     >
                       Unlock Locally for Testing
                     </button>

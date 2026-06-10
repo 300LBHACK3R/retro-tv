@@ -137,19 +137,20 @@ export default function ThemeButton() {
 
           <div
             className="
-              fixed inset-x-3 top-16 z-[100] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-2xl border p-3 shadow-2xl
+              theme-panel fixed inset-x-3 top-16 z-[100] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border p-3 shadow-2xl
               md:absolute md:right-0 md:top-14 md:inset-x-auto md:max-h-[75vh] md:w-[28rem]
             "
             style={{
               background:
-                "radial-gradient(circle at top right, rgba(212,175,55,0.12), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.95), rgba(18,18,18,0.9))",
+                "radial-gradient(circle at top right, rgba(34,211,238,0.14), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.95), rgba(18,18,18,0.9))",
               borderColor: "var(--border)",
               color: "var(--text)",
             }}
             role="dialog"
             aria-label="Theme library"
           >
-            <div className="sticky top-0 z-10 mb-3 rounded-xl border p-3 backdrop-blur-xl"
+            <div
+              className="sticky top-0 z-10 mb-3 rounded-xl border p-3 backdrop-blur-xl"
               style={{
                 background: "rgba(0,0,0,0.42)",
                 borderColor: "var(--border)",
@@ -209,7 +210,11 @@ export default function ThemeButton() {
                 return (
                   <article
                     key={theme.id}
-                    className="overflow-hidden rounded-xl border transition hover:-translate-y-0.5"
+                    className={`theme-card overflow-hidden rounded-xl border transition hover:-translate-y-0.5 ${isActive ? "is-active" : ""} ${!unlocked ? "is-locked" : ""}`}
+                    data-theme-card="true"
+                    data-theme-id={theme.id}
+                    data-theme-locked={!unlocked ? "true" : undefined}
+                    aria-pressed={isActive}
                     style={{
                       background:
                         "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 46%), rgba(255,255,255,0.035)",
@@ -225,7 +230,8 @@ export default function ThemeButton() {
                       className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-65"
                     >
                       <div
-                        className="h-3"
+                        className="theme-preview h-4"
+                        data-theme-preview="true"
                         style={{
                           background: getPreviewGradient(theme),
                         }}
@@ -286,7 +292,7 @@ export default function ThemeButton() {
                               background: isActive
                                 ? "var(--button-bg)"
                                 : unlocked
-                                  ? "linear-gradient(135deg, var(--primary), rgba(212,175,55,0.72))"
+                                  ? "linear-gradient(135deg, var(--primary), rgba(34,211,238,0.72))"
                                   : "var(--button-bg)",
                               color: "var(--text)",
                             }}
