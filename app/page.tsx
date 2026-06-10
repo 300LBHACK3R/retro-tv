@@ -22,6 +22,7 @@ import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import Image from "next/image";
 import { getThemeById } from "@/lib/themes";
+import { getThemeLayoutClass, getThemeLayoutMode } from "@/lib/themeLayouts";
 import type { Channel, MediaItem } from "@/lib/types";
 
 function isTypingTarget(target: EventTarget | null): boolean {

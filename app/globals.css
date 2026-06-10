@@ -836,3 +836,78 @@ main[data-theme="electric-blue-live"] .ttv-guide-scroll,
     transform: none;
   }
 }
+
+
+/* ============================================================
+   TATES TV PREMIUM LAYOUT MODES
+   Theme layout foundation. CSS-only. Live engine protected.
+   ============================================================ */
+
+main[data-theme-layout] {
+  --ttv-layout-gap: clamp(0.85rem, 1.6vw, 1.35rem);
+  --ttv-layout-radius: 1.15rem;
+}
+
+/* Classic cable remains stable/default */
+main[data-theme-layout="classic-cable"],
+.ttv-layout-classic-cable {
+  --ttv-layout-radius: 1rem;
+}
+
+/* Electric Blue gets a command-center layout feel */
+main[data-theme-layout="electric-command"],
+.ttv-layout-electric-command {
+  --ttv-layout-radius: 1.35rem;
+  --ttv-layout-glow: rgba(34, 211, 238, 0.18);
+}
+
+main[data-theme-layout="electric-command"] .ttv-player-shell,
+.ttv-layout-electric-command .ttv-player-shell {
+  min-height: clamp(280px, 42vw, 680px);
+}
+
+main[data-theme-layout="electric-command"] .ttv-glass-panel,
+main[data-theme-layout="electric-command"] .ttv-glass-panel-strong,
+main[data-theme-layout="electric-command"] .ttv-premium-panel,
+.ttv-layout-electric-command .ttv-glass-panel,
+.ttv-layout-electric-command .ttv-glass-panel-strong,
+.ttv-layout-electric-command .ttv-premium-panel {
+  border-radius: var(--ttv-layout-radius) !important;
+}
+
+/* Cinematic themes get a more premium screen-first feel */
+main[data-theme-layout="cinematic-premium"] .ttv-player-shell,
+.ttv-layout-cinematic-premium .ttv-player-shell {
+  border-radius: 1.5rem !important;
+  box-shadow: 0 34px 120px rgba(0, 0, 0, 0.50) !important;
+}
+
+/* Cartoon theme gets softer shapes */
+main[data-theme-layout="cartoon-pop"] .ttv-player-shell,
+main[data-theme-layout="cartoon-pop"] .ttv-glass-panel,
+main[data-theme-layout="cartoon-pop"] .ttv-glass-panel-strong,
+.ttv-layout-cartoon-pop .ttv-player-shell,
+.ttv-layout-cartoon-pop .ttv-glass-panel,
+.ttv-layout-cartoon-pop .ttv-glass-panel-strong {
+  border-radius: 1.65rem !important;
+}
+
+/* Mobile: layout modes stay safe and app-like */
+@media (max-width: 768px) {
+  main[data-theme-layout="electric-command"] .ttv-player-shell,
+  .ttv-layout-electric-command .ttv-player-shell {
+    min-height: auto;
+    max-height: 48dvh;
+    border-radius: 1rem !important;
+  }
+
+  main[data-theme-layout="cinematic-premium"] .ttv-player-shell,
+  .ttv-layout-cinematic-premium .ttv-player-shell {
+    border-radius: 1rem !important;
+  }
+
+  main[data-theme-layout="cartoon-pop"] .ttv-player-shell,
+  .ttv-layout-cartoon-pop .ttv-player-shell {
+    border-radius: 1.25rem !important;
+  }
+}
