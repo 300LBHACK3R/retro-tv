@@ -498,3 +498,185 @@ main[data-theme="electric-blue-live"] .ttv-premium-button,
     overflow: auto;
   }
 }
+
+
+/* ============================================================
+   TATES TV MOBILE APP POLISH V2
+   App-ready mobile feel. CSS-only. Safe for live playback.
+   ============================================================ */
+
+:root {
+  --ttv-mobile-shell-pad: clamp(0.65rem, 2.5vw, 1rem);
+  --ttv-mobile-card-radius: 1.05rem;
+  --ttv-mobile-control-height: 48px;
+}
+
+/* Prevent mobile layout blowouts from long guide text / channel names */
+* {
+  min-width: 0;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+/* Better mobile scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  touch-action: manipulation;
+}
+
+/* Main shell polish */
+main {
+  min-height: 100dvh;
+}
+
+/* Stronger app-like mobile shell */
+@media (max-width: 768px) {
+  main {
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  }
+
+  /* Keep the hero/player area dominant */
+  .ttv-player-shell {
+    aspect-ratio: 16 / 9;
+    min-height: auto !important;
+    max-height: 54dvh;
+    overflow: hidden;
+  }
+
+  /* Better video fit on phones */
+  .ttv-player-shell video {
+    object-fit: contain;
+  }
+
+  /* Compact oversized desktop panels */
+  .ttv-glass-panel,
+  .ttv-glass-panel-strong,
+  .ttv-premium-panel {
+    border-radius: var(--ttv-mobile-card-radius) !important;
+  }
+
+  /* Stop controls from becoming tiny */
+  .ttv-action-button,
+  .ttv-premium-button,
+  button {
+    min-height: 42px;
+  }
+
+  /* Cleaner modals/drawers on phone */
+  [role="dialog"] {
+    width: min(100vw, 100%);
+    max-height: 92dvh;
+    overflow: auto;
+    border-radius: 1rem;
+  }
+
+  /* Guide should feel like a scrollable app panel */
+  .ttv-guide-scroll {
+    max-height: 46dvh;
+    overflow: auto;
+    scroll-snap-type: y proximity;
+    border-radius: var(--ttv-mobile-card-radius);
+  }
+
+  .ttv-guide-scroll > * {
+    scroll-snap-align: start;
+  }
+
+  /* Admin panels should not bury the player */
+  .admin-mobile-scroll,
+  .ttv-modal-scroll {
+    max-height: 72dvh;
+    overflow: auto;
+  }
+
+  /* Better horizontal chip rows if any exist */
+  .ttv-no-scrollbar,
+  [data-scroll-row="true"] {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .ttv-no-scrollbar::-webkit-scrollbar,
+  [data-scroll-row="true"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 430px) {
+  .ttv-player-shell {
+    max-height: 46dvh;
+  }
+
+  .ttv-guide-scroll {
+    max-height: 42dvh;
+  }
+
+  .admin-mobile-scroll,
+  .ttv-modal-scroll {
+    max-height: 68dvh;
+  }
+
+  .ttv-action-button,
+  .ttv-premium-button,
+  button {
+    min-height: 40px;
+  }
+}
+
+/* Landscape phones */
+@media (max-width: 920px) and (orientation: landscape) {
+  main {
+    padding-top: 0.35rem;
+  }
+
+  .ttv-player-shell {
+    max-height: 78dvh;
+  }
+
+  .ttv-guide-scroll {
+    max-height: 64dvh;
+  }
+
+  [role="dialog"] {
+    max-height: 88dvh;
+  }
+}
+
+/* Premium responsiveness on desktop too */
+@media (min-width: 1024px) {
+  .ttv-player-shell {
+    transition:
+      box-shadow 180ms ease,
+      border-color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .ttv-player-shell:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Video startup stability */
+video {
+  background: #000;
+}
+
+/* Remove heavy hover transforms on touch devices */
+@media (hover: none) {
+  .ttv-action-button:hover,
+  .ttv-premium-button:hover,
+  .ttv-player-shell:hover {
+    transform: none;
+  }
+}
