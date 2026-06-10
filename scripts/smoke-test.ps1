@@ -17,6 +17,13 @@ $routes = @(
   "/recovery",
   "/backup",
   "/manifest.webmanifest",
+  "/favicon.ico",
+  "/favicon.svg",
+  "/apple-icon-180.png",
+  "/favicon-512.png",
+  "/maskable-icon.svg",
+  "/safari-pinned-tab.svg",
+  "/browserconfig.xml",
   "/robots.txt",
   "/sitemap.xml"
 )

@@ -2337,3 +2337,151 @@ body:not(.ttv-scroll-locked) {
     transform: none !important;
   }
 }
+
+
+/* ============================================================
+   TATES TV PLATFORM COMPATIBILITY V1
+   Cross-browser, mobile, TV, and safe-area support.
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+  --ttv-safe-top: env(safe-area-inset-top, 0px);
+  --ttv-safe-right: env(safe-area-inset-right, 0px);
+  --ttv-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ttv-safe-left: env(safe-area-inset-left, 0px);
+}
+
+html {
+  min-height: 100%;
+  background: #020617;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: #020617;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Better default media behavior across browsers/devices */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+video {
+  background: #000;
+}
+
+/* Form controls behave better on iOS/Safari */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe-area support for notch phones and installable PWA mode */
+main {
+  padding-left: max(var(--ttv-safe-left), 0px);
+  padding-right: max(var(--ttv-safe-right), 0px);
+}
+
+/* TV browsers / remote-control style focus visibility */
+:focus-visible {
+  outline: 3px solid rgba(34, 211, 238, 0.9);
+  outline-offset: 3px;
+}
+
+/* Firefox scrollbar polish */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(15, 23, 42, 0.35);
+}
+
+/* WebKit scrollbar polish */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+/* Older / weaker browsers: reduce expensive glass if backdrop-filter unsupported */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ttv-glass-panel,
+  .ttv-glass-panel-strong,
+  .ttv-premium-panel,
+  .ttv-ops-card,
+  .ttv-launch-card,
+  .ttv-recovery-card {
+    background: rgba(15, 23, 42, 0.96) !important;
+  }
+}
+
+/* Larger TV/browser screens */
+@media (min-width: 1800px) {
+  main {
+    font-size: 1.04rem;
+  }
+
+  .ttv-player-shell {
+    max-height: 78vh;
+  }
+}
+
+/* Small phones and PWA standalone mode */
+@media (max-width: 768px) {
+  body {
+    overscroll-behavior-y: auto;
+  }
+
+  main {
+    padding-top: max(0.5rem, var(--ttv-safe-top));
+    padding-bottom: max(0.75rem, var(--ttv-safe-bottom));
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    background: #020617;
+  }
+
+  main {
+    min-height: 100dvh;
+  }
+}
+
+/* Prevent fixed backgrounds from acting weird on mobile Safari */
+@media (max-width: 768px) {
+  main::before,
+  main::after,
+  body::before,
+  body::after {
+    background-attachment: scroll !important;
+  }
+}
