@@ -26,8 +26,11 @@ type ChannelLike = {
   items?: MediaItem[];
 };
 
-const MAX_PRELOADS = 4;
+type IdleCallbackHandle = number;
+
+const MAX_DESKTOP_PRELOADS = 4;
 const MAX_MOBILE_PRELOADS = 2;
+const PRELOAD_DATA_ATTRIBUTE = "ttvPreload";
 
 function isUsableUrl(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -77,7 +80,7 @@ function isLikelyMobile(): boolean {
 }
 
 function getPreloadLimit(): number {
-  return isLikelyMobile() ? MAX_MOBILE_PRELOADS : MAX_PRELOADS;
+  return isLikelyMobile() ? MAX_MOBILE_PRELOADS : MAX_DESKTOP_PRELOADS;
 }
 
 function toAbsoluteUrl(url: string): string | null {
@@ -88,38 +91,102 @@ function toAbsoluteUrl(url: string): string | null {
   }
 }
 
-function getExistingPreloadLinks(): HTMLLinkElement[] {
+function getOrigin(url: string): string | null {
+  try {
+    return new URL(url, window.location.href).origin;
+  } catch {
+    return null;
+  }
+}
+
+function getExistingManagedLinks(): HTMLLinkElement[] {
   return Array.from(
-    document.querySelectorAll<HTMLLinkElement>('link[data-ttv-preload="true"]'),
+    document.querySelectorAll<HTMLLinkElement>(
+      `link[data-${PRELOAD_DATA_ATTRIBUTE}="true"]`,
+    ),
   );
 }
 
-function cleanupPreloadLinks(validUrls: Set<string>) {
-  for (const link of getExistingPreloadLinks()) {
-    if (!validUrls.has(link.href)) {
+function cleanupManagedLinks(validHrefs: Set<string>) {
+  for (const link of getExistingManagedLinks()) {
+    if (!validHrefs.has(link.href)) {
       link.remove();
     }
   }
 }
 
-function addMissingPreloadLinks(urls: string[]) {
-  const existingUrls = new Set(getExistingPreloadLinks().map((link) => link.href));
+function appendLink(rel: string, href: string, as?: string) {
+  const existing = Array.from(document.querySelectorAll<HTMLLinkElement>("link")).some(
+    (link) => link.rel === rel && link.href === href,
+  );
 
-  for (const url of urls) {
-    const absoluteUrl = toAbsoluteUrl(url);
+  if (existing) return;
 
-    if (!absoluteUrl || existingUrls.has(absoluteUrl)) continue;
+  const link = document.createElement("link");
 
-    const link = document.createElement("link");
+  link.rel = rel;
+  link.href = href;
+  link.dataset[PRELOAD_DATA_ATTRIBUTE] = "true";
 
-    link.rel = "preload";
-    link.as = "video";
-    link.href = absoluteUrl;
-    link.dataset.ttvPreload = "true";
-
-    document.head.appendChild(link);
-    existingUrls.add(absoluteUrl);
+  if (as) {
+    link.as = as;
   }
+
+  document.head.appendChild(link);
+}
+
+function addPerformanceLinks(urls: string[]) {
+  const absoluteUrls = urls
+    .map((url) => toAbsoluteUrl(url))
+    .filter((url): url is string => Boolean(url));
+
+  const origins = Array.from(
+    new Set(
+      absoluteUrls
+        .map((url) => getOrigin(url))
+        .filter((origin): origin is string => Boolean(origin)),
+    ),
+  );
+
+  const validHrefs = new Set<string>(absoluteUrls);
+
+  for (const origin of origins) {
+    validHrefs.add(origin + "/");
+  }
+
+  cleanupManagedLinks(validHrefs);
+
+  for (const origin of origins) {
+    appendLink("preconnect", origin);
+    appendLink("dns-prefetch", origin);
+  }
+
+  for (const url of absoluteUrls) {
+    appendLink("preload", url, "video");
+  }
+}
+
+function scheduleIdleWork(callback: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const requestIdleCallback = window.requestIdleCallback;
+  const cancelIdleCallback = window.cancelIdleCallback;
+
+  if (requestIdleCallback && cancelIdleCallback) {
+    const handle = requestIdleCallback(callback, { timeout: 2000 }) as IdleCallbackHandle;
+
+    return () => {
+      cancelIdleCallback(handle);
+    };
+  }
+
+  const timeout = window.setTimeout(callback, 250);
+
+  return () => {
+    window.clearTimeout(timeout);
+  };
 }
 
 export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloaderProps) {
@@ -133,7 +200,7 @@ export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloader
         urls.push(url);
       }
 
-      if (urls.length >= MAX_PRELOADS) break;
+      if (urls.length >= MAX_DESKTOP_PRELOADS) break;
     }
 
     for (const mediaItem of getChannelMediaItems(activeChannel)) {
@@ -143,7 +210,7 @@ export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloader
         urls.push(url);
       }
 
-      if (urls.length >= MAX_PRELOADS) break;
+      if (urls.length >= MAX_DESKTOP_PRELOADS) break;
     }
 
     return Array.from(new Set(urls));
@@ -153,18 +220,15 @@ export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloader
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
     const limitedUrls = preloadUrls.slice(0, getPreloadLimit());
-    const validAbsoluteUrls = new Set(
-      limitedUrls
-        .map((url) => toAbsoluteUrl(url))
-        .filter((url): url is string => Boolean(url)),
-    );
 
-    cleanupPreloadLinks(validAbsoluteUrls);
-    addMissingPreloadLinks(limitedUrls);
+    if (limitedUrls.length === 0) {
+      cleanupManagedLinks(new Set());
+      return;
+    }
 
-    return () => {
-      cleanupPreloadLinks(new Set());
-    };
+    return scheduleIdleWork(() => {
+      addPerformanceLinks(limitedUrls);
+    });
   }, [preloadUrls]);
 
   return null;

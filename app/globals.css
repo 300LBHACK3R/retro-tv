@@ -2219,3 +2219,121 @@ body:not(.ttv-scroll-locked) {
     min-height: 7.25rem;
   }
 }
+
+
+/* ============================================================
+   TATES TV PERFORMANCE HARDENING V1
+   Rendering, mobile GPU, and scroll performance improvements.
+   ============================================================ */
+
+/* Make expensive layout sections cheaper to paint */
+.ttv-glass-panel,
+.ttv-glass-panel-strong,
+.ttv-premium-panel,
+.ttv-theme-card,
+.theme-card,
+.ttv-launch-hub-tile,
+.ttv-ops-card {
+  contain: layout paint;
+}
+
+/* Defer off-screen panel rendering where supported */
+.ttv-theme-card,
+.theme-card,
+.ttv-launch-hub-tile,
+.ttv-ops-list,
+.ttv-guide-scroll {
+  content-visibility: auto;
+  contain-intrinsic-size: 220px;
+}
+
+/* Keep player smooth without over-promoting every element */
+.ttv-player-shell {
+  contain: layout paint;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+/* Reduce accidental expensive animation stacking */
+.ttv-glass-panel *,
+.ttv-glass-panel-strong *,
+.ttv-premium-panel * {
+  backface-visibility: hidden;
+}
+
+/* Mobile performance mode */
+@media (max-width: 768px) {
+  /* Mobile Safari/Chrome hate too many huge blur layers */
+  .ttv-glass-panel,
+  .ttv-glass-panel-strong,
+  .ttv-premium-panel,
+  .ttv-ops-card,
+  .ttv-launch-card,
+  .ttv-recovery-card {
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 16px 52px rgba(0, 0, 0, 0.32) !important;
+  }
+
+  /* Limit huge glowing player effects on phones */
+  .ttv-player-shell {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42) !important;
+  }
+
+  /* Keep scrolling responsive */
+  html,
+  body,
+  main {
+    scroll-behavior: auto !important;
+  }
+
+  .ttv-guide-scroll,
+  .ttv-modal-scroll,
+  .admin-mobile-scroll,
+  .theme-panel,
+  .ttv-theme-panel,
+  [role="dialog"] {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Heavy pseudo-overlay effects should be less intense on mobile */
+  main[data-theme-layout="electric-command"]::before,
+  main[data-theme-layout="electric-command"]::after,
+  .ttv-layout-electric-command::before,
+  .ttv-layout-electric-command::after {
+    opacity: 0.07 !important;
+  }
+
+  main[data-theme-layout="electric-command"] .ttv-player-shell::before,
+  main[data-theme-layout="electric-command"] .ttv-player-shell::after,
+  .ttv-layout-electric-command .ttv-player-shell::before,
+  .ttv-layout-electric-command .ttv-player-shell::after {
+    opacity: 0.22 !important;
+  }
+}
+
+/* Low-end / preference-safe mode */
+@media (prefers-reduced-motion: reduce) {
+  .ttv-theme-card,
+  .theme-card,
+  .ttv-launch-hub-tile,
+  .ttv-player-shell,
+  .ttv-action-button,
+  .ttv-premium-button,
+  button {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Hover effects only on real hover devices */
+@media (hover: none) {
+  .ttv-theme-card:hover,
+  .theme-card:hover,
+  .ttv-launch-hub-tile:hover,
+  .ttv-player-shell:hover,
+  .ttv-action-button:hover,
+  .ttv-premium-button:hover {
+    transform: none !important;
+  }
+}
