@@ -1103,3 +1103,86 @@ main[data-theme-layout="electric-command"] .ttv-guide-scroll,
     animation: none !important;
   }
 }
+
+
+/* ============================================================
+   TATES TV MOBILE SCROLL FIX
+   Restores normal vertical page scrolling on phones.
+   ============================================================ */
+
+html,
+body {
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  position: relative;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+main {
+  min-height: 100dvh;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* Mobile scroll unlock */
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    min-height: 100%;
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: auto !important;
+    touch-action: pan-y !important;
+  }
+
+  body {
+    position: relative !important;
+  }
+
+  main {
+    min-height: 100dvh;
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    touch-action: pan-y !important;
+  }
+
+  #__next,
+  [data-nextjs-scroll-focus-boundary] {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow: visible !important;
+  }
+
+  /* Keep only fullscreen player locked */
+  .ttv-player-expanded {
+    overflow: hidden !important;
+    touch-action: none !important;
+  }
+
+  /* Internal panels can still scroll */
+  .ttv-guide-scroll,
+  .admin-mobile-scroll,
+  .ttv-modal-scroll,
+  [role="dialog"] {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y !important;
+  }
+}
+
+/* Remove page scroll lock when modals are not intentionally locking */
+body:not(.ttv-scroll-locked) {
+  overflow-y: auto !important;
+}
