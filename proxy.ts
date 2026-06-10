@@ -70,7 +70,7 @@ function applyCacheHeaders(request: NextRequest, response: NextResponse): NextRe
   return response;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
   applySecurityHeaders(response);
@@ -87,3 +87,4 @@ export const config = {
     "/((?!_next/static|_next/image|.*\\.map$).*)",
   ],
 };
+
