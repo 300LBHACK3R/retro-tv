@@ -28,6 +28,7 @@ function isTatesTvKey(key: string): boolean {
     normalized.includes("retro") ||
     normalized.includes("channel") ||
     normalized.includes("programming") ||
+    normalized.includes("theme") ||
     normalized.includes("zustand")
   );
 }
@@ -64,34 +65,35 @@ export default function RecoveryPage() {
   }
 
   return (
-    <main className="ttv-recovery-screen">
-      <section className="ttv-recovery-card">
-        <div className="ttv-recovery-logo">TTV</div>
+    <main className="ttv-ops-screen">
+      <section className="ttv-ops-card">
+        <div className="ttv-ops-logo">TTV</div>
 
         <div>
-          <p className="ttv-recovery-kicker">Launch recovery</p>
+          <p className="ttv-ops-kicker">Device recovery</p>
           <h1>Repair Tate&apos;s TV on this device</h1>
           <p>
             Use this if the site loads strangely, mobile scrolling breaks, old layouts appear,
-            or the player acts wrong after an update. This only clears local browser app state
-            on this device.
+            or the player acts wrong after an update. This clears only local browser state on
+            this device.
           </p>
         </div>
 
-        <div className="ttv-recovery-actions">
+        <div className="ttv-ops-actions">
           <button type="button" onClick={clearLikelyAppStorage}>
             Clear local app state
           </button>
 
           <button type="button" onClick={hardReload}>
-            Reload Tate&apos;s TV
+            Reload app
           </button>
 
           <Link href="/">Back to app</Link>
+          <Link href="/health">Health check</Link>
         </div>
 
         {status === "cleared" ? (
-          <div className="ttv-recovery-result">
+          <div className="ttv-ops-status" data-status="healthy">
             <strong>Cleared local app state.</strong>
             <span>
               {clearedKeys.length > 0
@@ -102,17 +104,18 @@ export default function RecoveryPage() {
         ) : null}
 
         {status === "failed" ? (
-          <div className="ttv-recovery-result is-error">
+          <div className="ttv-ops-status" data-status="failed">
             <strong>Could not clear storage.</strong>
             <span>Try clearing site data manually in your browser settings.</span>
           </div>
         ) : null}
 
-        <div className="ttv-recovery-keys">
+        <div className="ttv-ops-list">
           <strong>Detected possible app keys:</strong>
+
           {likelyAppKeys.length > 0 ? (
             <ul>
-              {likelyAppKeys.slice(0, 12).map((key) => (
+              {likelyAppKeys.slice(0, 16).map((key) => (
                 <li key={key}>{key}</li>
               ))}
             </ul>
