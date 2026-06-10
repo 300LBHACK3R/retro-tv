@@ -14,6 +14,7 @@ $routes = @(
   "/api/programming",
   "/health",
   "/recovery",
+  "/backup",
   "/manifest.webmanifest",
   "/robots.txt",
   "/sitemap.xml"

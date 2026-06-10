@@ -2048,3 +2048,45 @@ body:not(.ttv-scroll-locked) {
     display: grid;
   }
 }
+
+
+/* ============================================================
+   TATES TV BACKUP TOOLKIT V1
+   Backup/import controls for launch operations.
+   ============================================================ */
+
+.ttv-backup-upload {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.78rem 1rem;
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(15, 23, 42, 0.88));
+  color: #f8fafc;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ttv-backup-upload:hover {
+  border-color: rgba(34, 211, 238, 0.55);
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(30, 41, 59, 0.96));
+}
+
+.ttv-backup-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 520px) {
+  .ttv-backup-upload {
+    width: 100%;
+  }
+}
