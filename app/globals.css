@@ -911,3 +911,195 @@ main[data-theme-layout="cartoon-pop"] .ttv-glass-panel-strong,
     border-radius: 1.25rem !important;
   }
 }
+
+
+/* ============================================================
+   TATES TV ELECTRIC COMMAND CENTER V2
+   Premium Electric Blue experience. CSS-only. Playback protected.
+   ============================================================ */
+
+main[data-theme-layout="electric-command"],
+.ttv-layout-electric-command {
+  --ttv-command-cyan: #22d3ee;
+  --ttv-command-blue: #2563eb;
+  --ttv-command-navy: #020617;
+  --ttv-command-panel: rgba(2, 12, 30, 0.88);
+  --ttv-command-border: rgba(34, 211, 238, 0.36);
+  --ttv-command-soft-border: rgba(125, 211, 252, 0.20);
+  --ttv-command-glow: rgba(34, 211, 238, 0.16);
+  --ttv-command-hard-glow: rgba(34, 211, 238, 0.28);
+
+  position: relative;
+  isolation: isolate;
+}
+
+/* Animated premium ambient layer without adding DOM */
+main[data-theme-layout="electric-command"]::before,
+.ttv-layout-electric-command::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(34, 211, 238, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 18%, rgba(37, 99, 235, 0.15), transparent 30%),
+    radial-gradient(circle at 50% 110%, rgba(14, 165, 233, 0.10), transparent 46%);
+}
+
+/* Subtle scan/grid overlay */
+main[data-theme-layout="electric-command"]::after,
+.ttv-layout-electric-command::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.13) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+
+/* Make the active player feel like a premium screen module */
+main[data-theme-layout="electric-command"] .ttv-player-shell,
+.ttv-layout-electric-command .ttv-player-shell {
+  position: relative;
+  border: 1px solid var(--ttv-command-border) !important;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(0, 0, 0, 0.94)) !important;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.12),
+    0 0 46px var(--ttv-command-glow),
+    0 38px 130px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* Light bars around player */
+main[data-theme-layout="electric-command"] .ttv-player-shell::after,
+.ttv-layout-electric-command .ttv-player-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(34, 211, 238, 0.34), transparent 18%, transparent 82%, rgba(34, 211, 238, 0.22)),
+    linear-gradient(180deg, rgba(255,255,255,0.10), transparent 18%, transparent 78%, rgba(34, 211, 238, 0.12));
+  opacity: 0.42;
+  mix-blend-mode: screen;
+}
+
+/* Panels become command modules */
+main[data-theme-layout="electric-command"] .ttv-glass-panel,
+main[data-theme-layout="electric-command"] .ttv-glass-panel-strong,
+main[data-theme-layout="electric-command"] .ttv-premium-panel,
+.ttv-layout-electric-command .ttv-glass-panel,
+.ttv-layout-electric-command .ttv-glass-panel-strong,
+.ttv-layout-electric-command .ttv-premium-panel {
+  border: 1px solid var(--ttv-command-soft-border) !important;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.065), transparent 44%),
+    linear-gradient(180deg, rgba(3, 14, 33, 0.94), rgba(1, 7, 20, 0.90)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 0 28px rgba(34, 211, 238, 0.07),
+    0 24px 90px rgba(0, 0, 0, 0.36) !important;
+}
+
+/* Buttons feel more like app controls */
+main[data-theme-layout="electric-command"] button,
+main[data-theme-layout="electric-command"] .ttv-action-button,
+main[data-theme-layout="electric-command"] .ttv-premium-button,
+.ttv-layout-electric-command button,
+.ttv-layout-electric-command .ttv-action-button,
+.ttv-layout-electric-command .ttv-premium-button {
+  border-color: rgba(34, 211, 238, 0.28) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+main[data-theme-layout="electric-command"] button:active,
+main[data-theme-layout="electric-command"] .ttv-action-button:active,
+main[data-theme-layout="electric-command"] .ttv-premium-button:active,
+.ttv-layout-electric-command button:active,
+.ttv-layout-electric-command .ttv-action-button:active,
+.ttv-layout-electric-command .ttv-premium-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Guide gets sharper command-center styling */
+main[data-theme-layout="electric-command"] .ttv-guide-scroll,
+.ttv-layout-electric-command .ttv-guide-scroll {
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.055), transparent 42%),
+    rgba(2, 12, 30, 0.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    inset 0 -1px 0 rgba(34, 211, 238, 0.06);
+}
+
+/* Mobile command-center behavior */
+@media (max-width: 768px) {
+  main[data-theme-layout="electric-command"],
+  .ttv-layout-electric-command {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+
+  main[data-theme-layout="electric-command"]::after,
+  .ttv-layout-electric-command::after {
+    opacity: 0.08;
+    background-size: 32px 32px;
+  }
+
+  main[data-theme-layout="electric-command"] .ttv-player-shell,
+  .ttv-layout-electric-command .ttv-player-shell {
+    border-radius: 1.05rem !important;
+    max-height: 46dvh;
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.12),
+      0 0 30px rgba(34, 211, 238, 0.12),
+      0 18px 62px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  main[data-theme-layout="electric-command"] .ttv-glass-panel,
+  main[data-theme-layout="electric-command"] .ttv-glass-panel-strong,
+  main[data-theme-layout="electric-command"] .ttv-premium-panel,
+  .ttv-layout-electric-command .ttv-glass-panel,
+  .ttv-layout-electric-command .ttv-glass-panel-strong,
+  .ttv-layout-electric-command .ttv-premium-panel {
+    border-radius: 1rem !important;
+    backdrop-filter: blur(12px);
+  }
+
+  main[data-theme-layout="electric-command"] .ttv-guide-scroll,
+  .ttv-layout-electric-command .ttv-guide-scroll {
+    max-height: 42dvh;
+    overflow: auto;
+  }
+}
+
+/* Tiny phones */
+@media (max-width: 430px) {
+  main[data-theme-layout="electric-command"] .ttv-player-shell,
+  .ttv-layout-electric-command .ttv-player-shell {
+    max-height: 42dvh;
+  }
+
+  main[data-theme-layout="electric-command"] .ttv-guide-scroll,
+  .ttv-layout-electric-command .ttv-guide-scroll {
+    max-height: 38dvh;
+  }
+}
+
+/* Keep premium look but respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  main[data-theme-layout="electric-command"]::before,
+  main[data-theme-layout="electric-command"]::after,
+  .ttv-layout-electric-command::before,
+  .ttv-layout-electric-command::after {
+    animation: none !important;
+  }
+}
