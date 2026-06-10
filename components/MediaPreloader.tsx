@@ -1,13 +1,70 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useTvStore } from "@/lib/store";
+import type { BroadcastItem, Channel, MediaItem } from "@/lib/types";
 
-const MAX_DESKTOP_PRELOADS = 5;
-const MAX_MOBILE_PRELOADS = 3;
+type MediaPreloaderProps = {
+  activeSchedule: BroadcastItem[];
+  activeChannel?: Channel;
+};
 
-function isVideoUrl(url: string | undefined): url is string {
-  return Boolean(url && typeof url === "string" && url.trim().length > 0);
+type UrlLike = {
+  url?: string;
+  sourceUrl?: string;
+  mediaUrl?: string;
+  fileUrl?: string;
+  src?: string;
+  media?: UrlLike;
+  mediaItem?: UrlLike;
+  item?: UrlLike;
+};
+
+type ChannelLike = {
+  media?: MediaItem[];
+  mediaItems?: MediaItem[];
+  library?: MediaItem[];
+  items?: MediaItem[];
+};
+
+const MAX_PRELOADS = 4;
+const MAX_MOBILE_PRELOADS = 2;
+
+function isUsableUrl(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function getUrlFromUnknown(value: unknown): string | undefined {
+  const item = value as UrlLike | undefined;
+
+  if (!item) return undefined;
+
+  return (
+    item.url ??
+    item.sourceUrl ??
+    item.mediaUrl ??
+    item.fileUrl ??
+    item.src ??
+    item.media?.url ??
+    item.media?.sourceUrl ??
+    item.mediaItem?.url ??
+    item.mediaItem?.sourceUrl ??
+    item.item?.url ??
+    item.item?.sourceUrl
+  );
+}
+
+function getChannelMediaItems(channel?: Channel): MediaItem[] {
+  if (!channel) return [];
+
+  const channelLike = channel as unknown as ChannelLike;
+
+  return (
+    channelLike.media ??
+    channelLike.mediaItems ??
+    channelLike.library ??
+    channelLike.items ??
+    []
+  );
 }
 
 function isLikelyMobile(): boolean {
@@ -20,26 +77,25 @@ function isLikelyMobile(): boolean {
 }
 
 function getPreloadLimit(): number {
-  return isLikelyMobile() ? MAX_MOBILE_PRELOADS : MAX_DESKTOP_PRELOADS;
+  return isLikelyMobile() ? MAX_MOBILE_PRELOADS : MAX_PRELOADS;
 }
 
-function createPreloadLink(url: string): HTMLLinkElement {
-  const link = document.createElement("link");
+function toAbsoluteUrl(url: string): string | null {
+  try {
+    return new URL(url, window.location.href).href;
+  } catch {
+    return null;
+  }
+}
 
-  link.rel = "preload";
-  link.as = "video";
-  link.href = url;
-  link.dataset.ttvPreload = "true";
-
-  return link;
+function getExistingPreloadLinks(): HTMLLinkElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLLinkElement>('link[data-ttv-preload="true"]'),
+  );
 }
 
 function cleanupPreloadLinks(validUrls: Set<string>) {
-  const existingLinks = Array.from(
-    document.querySelectorAll<HTMLLinkElement>('link[data-ttv-preload="true"]'),
-  );
-
-  for (const link of existingLinks) {
+  for (const link of getExistingPreloadLinks()) {
     if (!validUrls.has(link.href)) {
       link.remove();
     }
@@ -47,63 +103,60 @@ function cleanupPreloadLinks(validUrls: Set<string>) {
 }
 
 function addMissingPreloadLinks(urls: string[]) {
-  const existingUrls = new Set(
-    Array.from(
-      document.querySelectorAll<HTMLLinkElement>('link[data-ttv-preload="true"]'),
-    ).map((link) => link.href),
-  );
+  const existingUrls = new Set(getExistingPreloadLinks().map((link) => link.href));
 
   for (const url of urls) {
-    const absoluteUrl = new URL(url, window.location.href).href;
+    const absoluteUrl = toAbsoluteUrl(url);
 
-    if (existingUrls.has(absoluteUrl)) continue;
+    if (!absoluteUrl || existingUrls.has(absoluteUrl)) continue;
 
-    document.head.appendChild(createPreloadLink(absoluteUrl));
+    const link = document.createElement("link");
+
+    link.rel = "preload";
+    link.as = "video";
+    link.href = absoluteUrl;
+    link.dataset.ttvPreload = "true";
+
+    document.head.appendChild(link);
     existingUrls.add(absoluteUrl);
   }
 }
 
-export function MediaPreloader() {
-  const channels = useTvStore((state) => state.channels);
-  const selectedChannelId = useTvStore((state) => state.selectedChannelId);
-  const channelSchedules = useTvStore((state) => state.channelSchedules);
-
+export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloaderProps) {
   const preloadUrls = useMemo(() => {
-    const activeChannel = channels.find((channel) => channel.id === selectedChannelId);
-    const activeSchedule = selectedChannelId
-      ? channelSchedules[selectedChannelId] ?? []
-      : [];
-
     const urls: string[] = [];
 
     for (const item of activeSchedule) {
-      if (isVideoUrl(item.media.url)) {
-        urls.push(item.media.url);
+      const url = getUrlFromUnknown(item);
+
+      if (isUsableUrl(url)) {
+        urls.push(url);
       }
 
-      if (urls.length >= MAX_DESKTOP_PRELOADS) break;
+      if (urls.length >= MAX_PRELOADS) break;
     }
 
-    if (activeChannel) {
-      for (const media of activeChannel.library) {
-        if (isVideoUrl(media.url)) {
-          urls.push(media.url);
-        }
+    for (const mediaItem of getChannelMediaItems(activeChannel)) {
+      const url = getUrlFromUnknown(mediaItem);
 
-        if (urls.length >= MAX_DESKTOP_PRELOADS) break;
+      if (isUsableUrl(url)) {
+        urls.push(url);
       }
+
+      if (urls.length >= MAX_PRELOADS) break;
     }
 
     return Array.from(new Set(urls));
-  }, [channelSchedules, channels, selectedChannelId]);
+  }, [activeSchedule, activeChannel]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || preloadUrls.length === 0) return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
 
-    const limit = getPreloadLimit();
-    const limitedUrls = preloadUrls.slice(0, limit);
+    const limitedUrls = preloadUrls.slice(0, getPreloadLimit());
     const validAbsoluteUrls = new Set(
-      limitedUrls.map((url) => new URL(url, window.location.href).href),
+      limitedUrls
+        .map((url) => toAbsoluteUrl(url))
+        .filter((url): url is string => Boolean(url)),
     );
 
     cleanupPreloadLinks(validAbsoluteUrls);

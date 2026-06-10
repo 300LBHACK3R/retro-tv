@@ -680,3 +680,159 @@ video {
     transform: none;
   }
 }
+
+
+/* ============================================================
+   TATES TV ELECTRIC BLUE LAYOUT POLISH
+   Premium layout feel. CSS-only. No live engine changes.
+   ============================================================ */
+
+/* Electric Blue should feel like a modern streaming command center */
+main[data-theme="electric-blue-live"],
+.theme-electric-blue-live {
+  --ttv-electric-cyan: #22d3ee;
+  --ttv-electric-blue: #2563eb;
+  --ttv-electric-deep: #020617;
+  --ttv-electric-panel: rgba(3, 14, 33, 0.88);
+  --ttv-electric-border: rgba(34, 211, 238, 0.34);
+  --ttv-electric-glow: rgba(34, 211, 238, 0.16);
+
+  background:
+    radial-gradient(circle at 14% 8%, rgba(34, 211, 238, 0.22), transparent 34%),
+    radial-gradient(circle at 88% 16%, rgba(37, 99, 235, 0.16), transparent 34%),
+    radial-gradient(circle at 55% 105%, rgba(14, 165, 233, 0.10), transparent 45%),
+    linear-gradient(135deg, #020617 0%, #031227 46%, #050b22 100%) !important;
+}
+
+/* Premium glass surfaces */
+main[data-theme="electric-blue-live"] section,
+main[data-theme="electric-blue-live"] aside,
+main[data-theme="electric-blue-live"] header,
+.theme-electric-blue-live section,
+.theme-electric-blue-live aside,
+.theme-electric-blue-live header {
+  border-color: var(--ttv-electric-border);
+}
+
+/* Player becomes the hero of the layout */
+main[data-theme="electric-blue-live"] .ttv-player-shell,
+.theme-electric-blue-live .ttv-player-shell {
+  position: relative;
+  border: 1px solid rgba(34, 211, 238, 0.56) !important;
+  border-radius: 1.45rem !important;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.08), transparent 44%),
+    #000 !important;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.18),
+    0 0 48px rgba(34, 211, 238, 0.18),
+    0 36px 120px rgba(0, 0, 0, 0.58) !important;
+  overflow: hidden;
+}
+
+main[data-theme="electric-blue-live"] .ttv-player-shell::before,
+.theme-electric-blue-live .ttv-player-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(90deg, rgba(34, 211, 238, 0.10), transparent 18%, transparent 82%, rgba(34, 211, 238, 0.08)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 22%, transparent 80%, rgba(34, 211, 238, 0.08));
+  mix-blend-mode: screen;
+  opacity: 0.78;
+}
+
+/* Neon panel treatment */
+main[data-theme="electric-blue-live"] .ttv-glass-panel,
+main[data-theme="electric-blue-live"] .ttv-glass-panel-strong,
+main[data-theme="electric-blue-live"] .ttv-premium-panel,
+.theme-electric-blue-live .ttv-glass-panel,
+.theme-electric-blue-live .ttv-glass-panel-strong,
+.theme-electric-blue-live .ttv-premium-panel {
+  border: 1px solid rgba(34, 211, 238, 0.34) !important;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.08), transparent 44%),
+    linear-gradient(135deg, rgba(3, 14, 33, 0.94), rgba(1, 7, 20, 0.90)) !important;
+  box-shadow:
+    0 0 28px rgba(34, 211, 238, 0.08),
+    0 24px 90px rgba(0, 0, 0, 0.42) !important;
+  backdrop-filter: blur(18px);
+}
+
+/* Modern buttons */
+main[data-theme="electric-blue-live"] button,
+main[data-theme="electric-blue-live"] .ttv-action-button,
+main[data-theme="electric-blue-live"] .ttv-premium-button,
+.theme-electric-blue-live button,
+.theme-electric-blue-live .ttv-action-button,
+.theme-electric-blue-live .ttv-premium-button {
+  border-color: rgba(34, 211, 238, 0.30);
+}
+
+main[data-theme="electric-blue-live"] .ttv-action-button:hover,
+main[data-theme="electric-blue-live"] .ttv-premium-button:hover,
+.theme-electric-blue-live .ttv-action-button:hover,
+.theme-electric-blue-live .ttv-premium-button:hover {
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.18),
+    0 0 22px rgba(34, 211, 238, 0.16);
+}
+
+/* Guide should look sharper in the premium theme */
+main[data-theme="electric-blue-live"] .ttv-guide-scroll,
+.theme-electric-blue-live .ttv-guide-scroll {
+  border: 1px solid rgba(34, 211, 238, 0.30);
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.06), transparent 48%),
+    rgba(2, 12, 30, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+/* Mobile: make Electric Blue feel like an app */
+@media (max-width: 768px) {
+  main[data-theme="electric-blue-live"],
+  .theme-electric-blue-live {
+    background:
+      radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.20), transparent 38%),
+      radial-gradient(circle at 85% 8%, rgba(37, 99, 235, 0.14), transparent 34%),
+      linear-gradient(180deg, #020617 0%, #031227 48%, #020617 100%) !important;
+  }
+
+  main[data-theme="electric-blue-live"] .ttv-player-shell,
+  .theme-electric-blue-live .ttv-player-shell {
+    border-radius: 1.05rem !important;
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.18),
+      0 0 30px rgba(34, 211, 238, 0.12),
+      0 18px 60px rgba(0, 0, 0, 0.46) !important;
+  }
+
+  main[data-theme="electric-blue-live"] .ttv-glass-panel,
+  main[data-theme="electric-blue-live"] .ttv-glass-panel-strong,
+  main[data-theme="electric-blue-live"] .ttv-premium-panel,
+  .theme-electric-blue-live .ttv-glass-panel,
+  .theme-electric-blue-live .ttv-glass-panel-strong,
+  .theme-electric-blue-live .ttv-premium-panel {
+    border-radius: 1rem !important;
+    backdrop-filter: blur(14px);
+  }
+
+  main[data-theme="electric-blue-live"] .ttv-guide-scroll,
+  .theme-electric-blue-live .ttv-guide-scroll {
+    max-height: 44dvh;
+    overflow: auto;
+  }
+}
+
+/* Touch devices should not do hover jumpiness */
+@media (hover: none) {
+  main[data-theme="electric-blue-live"] .ttv-action-button:hover,
+  main[data-theme="electric-blue-live"] .ttv-premium-button:hover,
+  .theme-electric-blue-live .ttv-action-button:hover,
+  .theme-electric-blue-live .ttv-premium-button:hover {
+    transform: none;
+  }
+}
