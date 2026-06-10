@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $BaseUrl = "https://www.tatestv.ca"
 
@@ -14,6 +14,7 @@ $routes = @(
   "/api/programming",
   "/health",
   "/launch",
+  "/compat",
   "/recovery",
   "/backup",
   "/manifest.webmanifest",
