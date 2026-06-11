@@ -30,6 +30,18 @@ $routes = @(
   "/sitemap.xml"
 )
 
+function Get-ResponseText {
+  param(
+    [Parameter(Mandatory = $true)] $Response
+  )
+
+  if ($Response.Content -is [byte[]]) {
+    return [System.Text.Encoding]::UTF8.GetString($Response.Content)
+  }
+
+  return [string]$Response.Content
+}
+
 function Assert-Header {
   param(
     [Parameter(Mandatory = $true)] $Response,
@@ -70,9 +82,10 @@ function Get-Json {
 
   Assert-Header -Response $response -HeaderName "X-Content-Type-Options" -Route $route
   Assert-Header -Response $response -HeaderName "Referrer-Policy" -Route $route
-  Assert-ContentType -Response $response -Route $route -Allowed @("application/json")
+  Assert-ContentType -Response $response -Route $route -Allowed @("application/json", "application/manifest+json")
 
-  return $response.Content | ConvertFrom-Json
+  $text = Get-ResponseText -Response $response
+  return $text | ConvertFrom-Json
 }
 
 foreach ($route in $routes) {
@@ -99,7 +112,8 @@ foreach ($route in $routes) {
     if ($route -eq "/manifest.webmanifest") {
       Assert-ContentType -Response $response -Route $route -Allowed @("application/manifest+json", "application/json")
 
-      $manifest = $response.Content | ConvertFrom-Json
+      $manifestText = Get-ResponseText -Response $response
+      $manifest = $manifestText | ConvertFrom-Json
 
       if (-not $manifest.name) {
         throw "Manifest missing name"
