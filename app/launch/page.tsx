@@ -86,6 +86,12 @@ export default function LaunchHubPage() {
             <small>Check API and deploy health.</small>
           </Link>
 
+          <Link href="/compat" className="ttv-launch-hub-tile">
+            <span>Compat</span>
+            <strong>Browser test</strong>
+            <small>Check video, storage, viewport, PWA, and device support.</small>
+          </Link>
+
           <Link href="/backup" className="ttv-launch-hub-tile">
             <span>Backup</span>
             <strong>Export / import</strong>
@@ -96,6 +102,12 @@ export default function LaunchHubPage() {
             <span>Recovery</span>
             <strong>Fix this device</strong>
             <small>Clear broken cached app state.</small>
+          </Link>
+
+          <Link href="/install" className="ttv-launch-hub-tile">
+            <span>Install</span>
+            <strong>Add to device</strong>
+            <small>Instructions for iPhone, Android, desktop, and TV browsers.</small>
           </Link>
 
           <a href="/manifest.webmanifest" className="ttv-launch-hub-tile">
