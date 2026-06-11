@@ -9,6 +9,8 @@ const APP_SHELL_URLS = [
   "/health",
   "/launch",
   "/readiness",
+  "/backup",
+  "/recovery",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/favicon.svg",
@@ -18,6 +20,10 @@ const APP_SHELL_URLS = [
   "/safari-pinned-tab.svg"
 ];
 
+function isVideoOrAudio(pathname) {
+  return /\.(mp4|webm|mov|m4v|avi|mkv|mp3|wav|ogg|m3u8|ts)$/i.test(pathname);
+}
+
 function isSafeShellRequest(request) {
   const url = new URL(request.url);
 
@@ -26,10 +32,7 @@ function isSafeShellRequest(request) {
 
   if (url.pathname.startsWith("/api/admin")) return false;
   if (url.pathname.startsWith("/api/")) return false;
-
-  if (url.pathname.match(/\.(mp4|webm|mov|m4v|avi|mkv|mp3|wav|ogg)$/i)) {
-    return false;
-  }
+  if (isVideoOrAudio(url.pathname)) return false;
 
   return true;
 }
@@ -39,7 +42,7 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL_URLS))
-      .then(() => self.skipWaiting())
+      .then(() => undefined)
       .catch(() => undefined)
   );
 });
@@ -59,12 +62,16 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  if (!isSafeShellRequest(request)) {
-    return;
-  }
+  if (!isSafeShellRequest(request)) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -78,7 +85,9 @@ self.addEventListener("fetch", (event) => {
 
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/offline")))
+        .catch(() =>
+          caches.match(request).then((cached) => cached || caches.match("/offline"))
+        )
     );
 
     return;

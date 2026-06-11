@@ -10,8 +10,8 @@ export default function OfflinePage() {
           <p className="ttv-ops-kicker">Offline mode</p>
           <h1>You&apos;re offline</h1>
           <p>
-            Tate&apos;s TV needs an internet connection for live programming, video playback, admin,
-            uploads, and schedule updates. Reconnect and reload the app.
+            Tate&apos;s TV needs an internet connection for live programming, video playback,
+            admin tools, uploads, and schedule updates. Reconnect and reload the app.
           </p>
         </div>
 

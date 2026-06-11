@@ -2883,3 +2883,71 @@ main {
     min-height: auto;
   }
 }
+
+
+/* ============================================================
+   TATES TV PWA APP SHELL UPDATE V1
+   Offline shell and update-ready toast.
+   ============================================================ */
+
+.ttv-offline-card {
+  width: min(100%, 760px);
+}
+
+.ttv-update-toast {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right, 0px));
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  z-index: 9999;
+  width: min(calc(100vw - 2rem), 420px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(34, 211, 238, 0.36);
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(34,211,238,0.14), transparent 48%),
+    rgba(2, 6, 23, 0.94);
+  color: #f8fafc;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.ttv-update-toast div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ttv-update-toast strong {
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.ttv-update-toast span {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ttv-update-toast button {
+  min-height: 40px;
+  shrink: 0;
+  padding: 0.65rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22d3ee, #ef4444);
+  color: white;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .ttv-update-toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    width: auto;
+  }
+}
