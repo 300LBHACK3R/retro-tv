@@ -2679,3 +2679,105 @@ main {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   TATES TV READINESS REPORT V1
+   Production readiness overview page.
+   ============================================================ */
+
+.ttv-readiness-card {
+  width: min(100%, 1080px);
+}
+
+.ttv-readiness-score {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.ttv-readiness-score > div {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(34,197,94,0.10), transparent 52%),
+    rgba(20, 83, 45, 0.14);
+}
+
+.ttv-readiness-score span {
+  color: #86efac;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.ttv-readiness-score strong {
+  color: #f8fafc;
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.ttv-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.ttv-readiness-section {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(34,211,238,0.12), transparent 36%),
+    linear-gradient(135deg, rgba(255,255,255,0.055), transparent 48%),
+    rgba(15, 23, 42, 0.58);
+}
+
+.ttv-readiness-section h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.1rem;
+  letter-spacing: -0.04em;
+}
+
+.ttv-readiness-section ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttv-readiness-section li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.ttv-readiness-section li span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  font-size: 0.75rem;
+  font-weight: 950;
+}
+
+@media (max-width: 820px) {
+  .ttv-readiness-score,
+  .ttv-readiness-grid {
+    grid-template-columns: 1fr;
+  }
+}
