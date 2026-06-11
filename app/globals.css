@@ -2589,3 +2589,93 @@ main {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   TATES TV INSTALL PAGE V1
+   User-facing install instructions for mobile, desktop, and TV.
+   ============================================================ */
+
+.ttv-install-card {
+  width: min(100%, 980px);
+}
+
+.ttv-install-status {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(245,158,11,0.11), transparent 52%),
+    rgba(120, 53, 15, 0.15);
+}
+
+.ttv-install-status[data-installed="true"] {
+  border-color: rgba(34, 197, 94, 0.34);
+  background:
+    linear-gradient(135deg, rgba(34,197,94,0.11), transparent 52%),
+    rgba(20, 83, 45, 0.15);
+}
+
+.ttv-install-status strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.ttv-install-status span {
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.ttv-install-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.ttv-install-card-step {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(34,211,238,0.12), transparent 36%),
+    linear-gradient(135deg, rgba(255,255,255,0.055), transparent 48%),
+    rgba(15, 23, 42, 0.58);
+}
+
+.ttv-install-card-step span {
+  width: fit-content;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 999px;
+  color: #93c5fd;
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ttv-install-card-step h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.2rem;
+  letter-spacing: -0.04em;
+}
+
+.ttv-install-card-step ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+@media (max-width: 780px) {
+  .ttv-install-grid {
+    grid-template-columns: 1fr;
+  }
+}

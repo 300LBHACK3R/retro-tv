@@ -15,6 +15,7 @@ $routes = @(
   "/health",
   "/launch",
   "/compat",
+  "/install",
   "/recovery",
   "/backup",
   "/manifest.webmanifest",
