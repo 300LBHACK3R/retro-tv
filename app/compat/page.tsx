@@ -226,6 +226,7 @@ export default function CompatibilityPage() {
           <Link href="/health">Health</Link>
           <Link href="/backup">Backup</Link>
           <Link href="/recovery">Recovery</Link>
+          <Link href="/readiness">Readiness</Link>
         </div>
       </section>
     </main>

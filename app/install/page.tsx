@@ -116,6 +116,7 @@ export default function InstallPage() {
           <Link href="/launch">Launch hub</Link>
           <Link href="/compat">Compatibility</Link>
           <Link href="/health">Health</Link>
+          <Link href="/readiness">Readiness</Link>
         </div>
       </section>
     </main>

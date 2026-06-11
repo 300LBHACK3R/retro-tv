@@ -92,6 +92,12 @@ export default function LaunchHubPage() {
             <small>Check video, storage, viewport, PWA, and device support.</small>
           </Link>
 
+          <Link href="/readiness" className="ttv-launch-hub-tile">
+            <span>Readiness</span>
+            <strong>Launch report</strong>
+            <small>Review production tools, routes, PWA status, and verification.</small>
+          </Link>
+
           <Link href="/backup" className="ttv-launch-hub-tile">
             <span>Backup</span>
             <strong>Export / import</strong>
