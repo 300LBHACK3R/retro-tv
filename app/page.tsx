@@ -304,7 +304,7 @@ export default function Home() {
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
            <Image
-              src="/retro-logo.png?v=20260610-logo-fix"
+              src="/retro-logo.png"
               alt="TatesTv"
               width={260}
               height={90}

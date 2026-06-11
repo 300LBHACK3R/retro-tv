@@ -58,7 +58,7 @@ export default function AndroidPrepPage() {
               </li>
               <li>
                 <span aria-hidden="true">✓</span>
-                /retro-logo.png?v=20260610-logo-fix
+                /retro-logo.png
               </li>
               <li>
                 <span aria-hidden="true">✓</span>
