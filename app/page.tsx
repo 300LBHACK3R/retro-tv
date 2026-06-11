@@ -25,8 +25,6 @@ import { getThemeLayoutClass, getThemeLayoutMode } from "@/lib/themeLayouts";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
-type CommandPanel = "guide" | "categories" | "schedule" | "search" | null;
-
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -148,8 +146,6 @@ export default function Home() {
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
-  const [commandPanel, setCommandPanel] = useState<CommandPanel>(null);
-  const [commandSearchQuery, setCommandSearchQuery] = useState("");
   const [clockLabel, setClockLabel] = useState(getCurrentTimeLabel);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
@@ -213,29 +209,6 @@ export default function Home() {
 
   const previewChannels = enabledChannels.slice(0, 12);
 
-  const searchedChannels = useMemo(() => {
-    const query = commandSearchQuery.trim().toLowerCase();
-
-    if (!query) {
-      return enabledChannels;
-    }
-
-    return enabledChannels.filter((channel) => {
-      const label = [
-        channel.name,
-        channel.branding?.displayName,
-        channel.branding?.logoText,
-        channel.number,
-        channel.id,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return label.includes(query);
-    });
-  }, [commandSearchQuery, enabledChannels]);
-
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockLabel(getCurrentTimeLabel());
@@ -297,12 +270,6 @@ export default function Home() {
         return;
       }
 
-      if (commandPanel && event.key === "Escape") {
-        event.preventDefault();
-        setCommandPanel(null);
-        return;
-      }
-
       if (localSettingsOpen && event.key === "Escape") {
         event.preventDefault();
         setLocalSettingsOpen(false);
@@ -314,7 +281,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeGuide, commandPanel, isGuideOpen, localSettingsOpen]);
+  }, [closeGuide, isGuideOpen, localSettingsOpen]);
 
   const guideDock = (
     <MultiGuide
@@ -378,46 +345,13 @@ export default function Home() {
             </div>
 
             <nav className="ttv-command-nav flex min-w-0 gap-2 overflow-x-auto pb-1 xl:justify-center xl:pb-0">
-              <button
-                type="button"
-                className={commandPanel === null ? "is-active" : ""}
-                onClick={() => setCommandPanel(null)}
-              >
+              <button type="button" className="is-active">
                 Live TV
               </button>
-
-              <button
-                type="button"
-                className={commandPanel === "guide" ? "is-active" : ""}
-                onClick={() => setCommandPanel("guide")}
-              >
-                Guide
-              </button>
-
-              <button
-                type="button"
-                className={commandPanel === "categories" ? "is-active" : ""}
-                onClick={() => setCommandPanel("categories")}
-              >
-                Categories
-              </button>
-
-              <button
-                type="button"
-                className={commandPanel === "schedule" ? "is-active" : ""}
-                onClick={() => setCommandPanel("schedule")}
-              >
-                Schedule
-              </button>
-
-              <button
-                type="button"
-                className={commandPanel === "search" ? "is-active" : ""}
-                onClick={() => setCommandPanel("search")}
-              >
-                Search
-              </button>
-
+              <button type="button">Guide</button>
+              <button type="button">Categories</button>
+              <button type="button">Schedule</button>
+              <button type="button">Search</button>
               <button type="button" onClick={() => setLocalSettingsOpen(true)}>
                 Settings
               </button>
@@ -717,107 +651,6 @@ export default function Home() {
           </section>
         </div>
       </div>
-
-      {commandPanel ? (
-        <div
-          className="ttv-command-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Tate's TV command panel"
-        >
-          <div className="ttv-command-modal__panel">
-            <div className="ttv-command-modal__header">
-              <div>
-                <div className="ttv-command-modal__kicker">
-                  {commandPanel}
-                </div>
-
-                <h2>
-                  {commandPanel === "guide"
-                    ? "Live TV Guide"
-                    : commandPanel === "categories"
-                      ? "Channel Categories"
-                      : commandPanel === "schedule"
-                        ? "Schedule"
-                        : "Search Tate's TV"}
-                </h2>
-              </div>
-
-              <button type="button" onClick={() => setCommandPanel(null)}>
-                Close
-              </button>
-            </div>
-
-            {commandPanel === "guide" ? (
-              <div className="ttv-command-modal__body">
-                {guideOverlay}
-              </div>
-            ) : null}
-
-            {commandPanel === "categories" ? (
-              <div className="ttv-command-category-grid">
-                {enabledChannels.map((channel, index) => (
-                  <button
-                    key={channel.id}
-                    type="button"
-                    onClick={() => {
-                      setChannel(channel.id);
-                      setCommandPanel(null);
-                    }}
-                    className={channel.id === activeChannel?.id ? "is-active" : ""}
-                  >
-                    <span>CH {channel.number ?? index + 1}</span>
-                    <strong>{getChannelDisplayName(channel)}</strong>
-                    <em>{channel.branding?.description ?? channel.name}</em>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {commandPanel === "schedule" ? (
-              <div className="ttv-command-modal__body">
-                <div className="ttv-command-schedule-summary">
-                  <strong>Current schedule view</strong>
-                  <span>
-                    Showing the active live guide lineup for all enabled channels.
-                  </span>
-                </div>
-
-                {guideOverlay}
-              </div>
-            ) : null}
-
-            {commandPanel === "search" ? (
-              <div className="ttv-command-search-panel">
-                <input
-                  value={commandSearchQuery}
-                  onChange={(event) => setCommandSearchQuery(event.target.value)}
-                  placeholder="Search channels..."
-                  autoFocus
-                />
-
-                <div className="ttv-command-category-grid">
-                  {searchedChannels.map((channel, index) => (
-                    <button
-                      key={channel.id}
-                      type="button"
-                      onClick={() => {
-                        setChannel(channel.id);
-                        setCommandPanel(null);
-                      }}
-                      className={channel.id === activeChannel?.id ? "is-active" : ""}
-                    >
-                      <span>CH {channel.number ?? index + 1}</span>
-                      <strong>{getChannelDisplayName(channel)}</strong>
-                      <em>{channel.branding?.description ?? channel.name}</em>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
       {localSettingsOpen ? (
         <div
