@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "en-CA",
     icons: [
       {
-        src: "/tatestv-logo.png",
+        src: "/retro-logo.png",
         sizes: "any",
         type: "image/png",
         purpose: "any",
@@ -40,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
-        src: "/favicon-512.png",
+        src: "/retro-logo.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
