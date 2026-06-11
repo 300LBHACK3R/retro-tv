@@ -26,6 +26,7 @@ $routes = @(
   "/.well-known/assetlinks.json",
   "/favicon.ico",
   "/favicon.svg",
+  "/tatestv-logo.png",
   "/apple-icon-180.png",
   "/favicon-512.png",
   "/maskable-icon.svg",

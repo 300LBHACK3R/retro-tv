@@ -16,15 +16,15 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "en-CA",
     icons: [
       {
-        src: "/favicon.svg",
+        src: "/tatestv-logo.png",
         sizes: "any",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "any",
       },
       {
         src: "/maskable-icon.svg",
         sizes: "any",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "maskable",
       },
       {
