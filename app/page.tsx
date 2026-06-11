@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
@@ -20,9 +21,8 @@ import ViewerHeader from "@/components/ViewerHeader";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
-import Image from "next/image";
-import { getThemeById } from "@/lib/themes";
 import { getThemeLayoutClass, getThemeLayoutMode } from "@/lib/themeLayouts";
+import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -115,6 +115,13 @@ function getPlayerFrameClass(playerViewMode: "normal" | "mini" | "theater"): str
   return "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30";
 }
 
+function getCurrentTimeLabel(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date());
+}
+
 export default function Home() {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
@@ -133,16 +140,18 @@ export default function Home() {
   const setAppMode = useStore((state) => state.setAppMode);
   const themeId = useStore((state) => state.themeId);
 
-  
   const playerViewMode = useStore(
     (state) => state.viewerSettings.playerViewMode,
   );
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
   const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
+  const [clockLabel, setClockLabel] = useState(getCurrentTimeLabel);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
+  const themeLayoutMode = useMemo(() => getThemeLayoutMode(themeId), [themeId]);
+  const themeLayoutClass = useMemo(() => getThemeLayoutClass(themeId), [themeId]);
 
   const enabledChannels = useMemo(
     () =>
@@ -164,11 +173,6 @@ export default function Home() {
     [activeChannel, media],
   );
 
-  /**
-   * Real playback schedule.
-   * This includes virtual show slices, commercials, bumpers, and hidden guide items.
-   * Player and Now/Next need this schedule so commercial breaks work correctly.
-   */
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
@@ -177,10 +181,6 @@ export default function Home() {
     [activeChannel, activeChannelMedia],
   );
 
-  /**
-   * Clean public guide schedule.
-   * This hides/merges commercials and bumpers into normal show blocks.
-   */
   const activeGuideSchedule = useMemo(
     () => buildGuideSchedule(activeSchedule),
     [activeSchedule],
@@ -202,6 +202,22 @@ export default function Home() {
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
   const playerFrameClass = getPlayerFrameClass(playerViewMode);
+
+  const activeChannelIndex = enabledChannels.findIndex(
+    (channel) => channel.id === activeChannel?.id,
+  );
+
+  const previewChannels = enabledChannels.slice(0, 12);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockLabel(getCurrentTimeLabel());
+    }, 30_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAdminAuthorized && appMode === "admin") {
@@ -288,11 +304,13 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden"
+      className={`theme-${themeId} ${themeLayoutClass} min-h-screen overflow-x-hidden`}
+      data-theme={themeId}
+      data-theme-layout={themeLayoutMode}
       style={{
         ...themeVars,
         background:
-          "radial-gradient(circle at top right, rgba(255,255,255,0.045), transparent 32%), var(--app-bg)",
+          "radial-gradient(circle at top right, rgba(34,211,238,0.08), transparent 30%), radial-gradient(circle at top left, rgba(147,51,234,0.12), transparent 32%), var(--app-bg)",
         color: "var(--text)",
       }}
     >
@@ -300,30 +318,65 @@ export default function Home() {
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
       <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
-      <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-           <Image
-              src="/retro-logo.png"
-              alt="TatesTv"
-              width={260}
-              height={90}
-              className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
-              draggable={false}
-              priority
-            />
-          </div>
+      <div className="ttv-command-shell mx-auto flex w-full max-w-[1900px] flex-col gap-4 p-3 sm:p-4 xl:p-5">
+        <header className="ttv-command-topbar rounded-3xl border px-3 py-3 shadow-2xl shadow-black/30 sm:px-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="shrink-0">
+                <Image
+                  src="/retro-logo.png"
+                  alt="Tate's Retro TV"
+                  width={300}
+                  height={110}
+                  className="h-auto w-[180px] max-w-[48vw] sm:w-[240px] xl:w-[280px]"
+                  draggable={false}
+                  priority
+                />
+              </div>
 
-          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
-            <ThemeButton />
-            <ShowLibrary />
+              <div className="hidden min-w-0 xl:block">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-200">
+                  Live TV Dashboard
+                </div>
+                <div className="mt-1 truncate text-sm font-semibold text-white/80">
+                  {activeChannel ? `CH ${activeChannel.number ?? activeChannel.id} · ${getChannelDisplayName(activeChannel)}` : "No channel selected"}
+                </div>
+              </div>
+            </div>
+
+            <nav className="ttv-command-nav flex min-w-0 gap-2 overflow-x-auto pb-1 xl:justify-center xl:pb-0">
+              <button type="button" className="is-active">
+                Live TV
+              </button>
+              <button type="button">Guide</button>
+              <button type="button">Categories</button>
+              <button type="button">Schedule</button>
+              <button type="button">Search</button>
+              <button type="button" onClick={() => setLocalSettingsOpen(true)}>
+                Settings
+              </button>
+            </nav>
+
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              <div className="ttv-command-pill">
+                <span>{clockLabel}</span>
+              </div>
+
+              <div className="ttv-command-quality">
+                <span>Stream Quality</span>
+                <strong>Excellent</strong>
+              </div>
+
+              <ThemeButton />
+              <ShowLibrary />
+            </div>
           </div>
         </header>
 
         <div
-          className={`grid gap-3 ${
+          className={`grid gap-4 ${
             showAdminSidebar
-              ? "lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]"
+              ? "xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]"
               : "grid-cols-1"
           }`}
           style={
@@ -335,7 +388,7 @@ export default function Home() {
           }
         >
           {showAdminSidebar ? (
-            <aside className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
+            <aside className="order-2 flex min-w-0 flex-col gap-3 xl:order-1">
               <section
                 className="rounded-2xl border p-4"
                 style={{
@@ -417,8 +470,8 @@ export default function Home() {
           ) : null}
 
           <section
-            className={`order-1 flex min-w-0 flex-col gap-3 ${
-              showAdminSidebar ? "lg:order-2" : ""
+            className={`order-1 flex min-w-0 flex-col gap-4 ${
+              showAdminSidebar ? "xl:order-2" : ""
             }`}
           >
             <ViewerHeader channel={activeChannel} />
@@ -427,93 +480,176 @@ export default function Home() {
 
             <QuickTuneBar />
 
-            {playerViewMode === "mini" ? (
-              <section
-                className="rounded-2xl border p-4 text-sm"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Mini-player is active. Use the floating player in the bottom
-                right, or switch back to Normal/Theater from the remote.
+            <div className="ttv-command-main-grid grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+              <section className="flex min-w-0 flex-col gap-4">
+                {playerViewMode === "mini" ? (
+                  <section
+                    className="rounded-2xl border p-4 text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Mini-player is active. Use the floating player in the bottom
+                    right, or switch back to Normal/Theater from the remote.
+                  </section>
+                ) : null}
+
+                <div
+                  className={`ttv-command-player ${playerFrameClass}`}
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <Player schedule={activeSchedule} />
+                  <ChannelOverlay compact={playerViewMode === "mini"} />
+                  <StaticTransition trigger={activeChannel?.id ?? ""} />
+
+                  {isGuideOpen ? (
+                    <div className="absolute inset-0 z-40 bg-black/85 p-3 backdrop-blur-[2px] sm:p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold tracking-wide text-white">
+                          Live Guide
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={closeGuide}
+                          className="rounded-lg px-3 py-2 text-sm font-semibold transition hover:opacity-90"
+                          style={{
+                            background: "var(--button-bg)",
+                            color: "var(--text)",
+                          }}
+                        >
+                          Close Guide
+                        </button>
+                      </div>
+
+                      <div className="h-[calc(100%-56px)] overflow-auto">
+                        {guideOverlay}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <section className="ttv-command-info-grid grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+                  <article className="ttv-command-card">
+                    <div className="flex gap-3">
+                      <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-xl border border-cyan-300/20 bg-black/40">
+                        <Image
+                          src="/retro-logo.png"
+                          alt=""
+                          fill
+                          sizes="112px"
+                          className="object-contain p-2"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                          On Air Now
+                        </div>
+                        <h2 className="mt-1 truncate text-2xl font-black tracking-tight text-white">
+                          {getChannelDisplayName(activeChannel)}
+                        </h2>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/70">
+                          Live retro programming, custom channels, scheduled shows,
+                          commercials, bumpers, and Tate&apos;s TV channel flow.
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="ttv-command-card">
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                      Up Next
+                    </div>
+                    <h3 className="mt-2 text-xl font-black tracking-tight text-white">
+                      Guide-controlled schedule
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-white/70">
+                      Use the side guide or remote guide button to jump channels.
+                    </p>
+                  </article>
+                </section>
               </section>
-            ) : null}
 
-            <div className={playerFrameClass} style={{ borderColor: "var(--border)" }}>
-              <Player schedule={activeSchedule} />
-
-              <ChannelOverlay compact={playerViewMode === "mini"} />
-              <StaticTransition trigger={activeChannel?.id ?? ""} />
-              <Remote />
-
-              {isGuideOpen ? (
-                <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
+              <aside className="ttv-command-side flex min-w-0 flex-col gap-4">
+                <section className="ttv-command-side-panel">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold tracking-wide text-white">
-                      Live Guide
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                        TV Guide
+                      </div>
+                      <div className="mt-1 text-xs text-white/55">
+                        Current lineup
+                      </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={closeGuide}
-                      className="rounded-lg px-3 py-2 text-sm font-semibold transition hover:opacity-90"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
+                      className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-cyan-100"
                     >
-                      Close Guide
+                      View All
                     </button>
                   </div>
 
-                  <div className="h-[calc(100%-56px)] overflow-auto">
-                    {guideOverlay}
+                  <div className="ttv-command-guide-dock">
+                    {guideDock}
                   </div>
-                </div>
-              ) : null}
+                </section>
+
+                <section className="ttv-command-side-panel">
+                  <div className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                    Remote Control
+                  </div>
+                  <div className="ttv-command-remote-dock">
+                    <Remote />
+                  </div>
+                </section>
+              </aside>
             </div>
-            {!isGuideOpen ? (
-              <section
-                className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the full live channel guide.
-              </section>
-            ) : null}
+
+            <section className="ttv-command-channel-rail">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                  Channels
+                </div>
+                <div className="text-xs text-white/50">
+                  {enabledChannels.length} active
+                </div>
+              </div>
+
+              <div className="ttv-command-channel-scroll">
+                {previewChannels.map((channel, index) => {
+                  const isActive = channel.id === activeChannel?.id;
+
+                  return (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      onClick={() => setChannel(channel.id)}
+                      className={isActive ? "is-active" : ""}
+                    >
+                      <span>{channel.branding?.logoText ?? channel.name}</span>
+                      <strong>CH {channel.number ?? index + 1}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <footer className="ttv-command-ticker">
+              <span>Welcome to Tate&apos;s Retro TV</span>
+              <strong>
+                Now Playing · {getChannelDisplayName(activeChannel)}
+              </strong>
+              <em>
+                Channel {activeChannelIndex >= 0 ? activeChannelIndex + 1 : 1} of{" "}
+                {enabledChannels.length}
+              </em>
+            </footer>
           </section>
         </div>
-        <footer
-          className="rounded-2xl border px-4 py-4 text-center text-xs shadow-2xl shadow-black/20 sm:px-5"
-          style={{
-            background: "var(--panel-bg)",
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-          }}
-        >
-          <div className="font-semibold uppercase tracking-[0.16em]">
-            Tate&apos;s TV
-          </div>
-
-          <div className="mt-2 leading-5">
-            Built, managed, and maintained by{" "}
-            <a
-              href="https://lltechsolutions.ca"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-black transition hover:opacity-80"
-              style={{ color: "var(--primary)" }}
-            >
-              L&amp;L Tech Solutions
-            </a>
-            .
-          </div>
-        </footer>
       </div>
 
       {localSettingsOpen ? (
@@ -586,21 +722,3 @@ export default function Home() {
     </main>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
