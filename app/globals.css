@@ -3575,3 +3575,229 @@ button[aria-label="Show remote"] {
     margin-left: 0;
   }
 }
+
+
+/* ============================================================
+   TATES TV COMMAND PANELS V1
+   Functional nav panels + full-screen theme/library overlay fix.
+   ============================================================ */
+
+.ttv-command-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9996;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.ttv-command-modal__panel {
+  width: min(100%, 1320px);
+  max-height: min(92dvh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  border-radius: 1.4rem;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(34,211,238,0.15), transparent 34%),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96));
+  box-shadow: 0 35px 140px rgba(0,0,0,0.62);
+}
+
+.ttv-command-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.18);
+}
+
+.ttv-command-modal__kicker {
+  color: #22d3ee;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.ttv-command-modal__header h2 {
+  margin: 0.25rem 0 0;
+  color: white;
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+  text-transform: capitalize;
+}
+
+.ttv-command-modal__header button {
+  min-height: 44px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: white;
+  padding: 0.65rem 1rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.ttv-command-modal__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ttv-command-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+  overflow: auto;
+  padding: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ttv-command-category-grid button {
+  min-height: 8rem;
+  display: grid;
+  align-content: end;
+  gap: 0.35rem;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(34,211,238,0.14), transparent 40%),
+    rgba(15, 23, 42, 0.74);
+  color: white;
+  padding: 1rem;
+  text-align: left;
+  transition: 150ms ease;
+}
+
+.ttv-command-category-grid button:hover,
+.ttv-command-category-grid button.is-active {
+  transform: translateY(-1px);
+  border-color: rgba(34, 211, 238, 0.58);
+  box-shadow: 0 0 30px rgba(34,211,238,0.12);
+}
+
+.ttv-command-category-grid span {
+  color: #22d3ee;
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ttv-command-category-grid strong {
+  font-size: 1.1rem;
+  font-weight: 950;
+}
+
+.ttv-command-category-grid em {
+  color: rgba(255,255,255,0.58);
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.ttv-command-search-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.ttv-command-search-panel input {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 1rem;
+  background: rgba(2, 6, 23, 0.76);
+  color: white;
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  outline: none;
+}
+
+.ttv-command-search-panel input:focus {
+  border-color: rgba(34, 211, 238, 0.7);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+.ttv-command-schedule-summary {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.68);
+  padding: 1rem;
+}
+
+.ttv-command-schedule-summary strong {
+  color: white;
+}
+
+.ttv-command-schedule-summary span {
+  color: rgba(255,255,255,0.62);
+}
+
+/* Theme + Library popups launched from the command topbar must become full overlay panels */
+.ttv-command-topbar .theme-panel,
+.ttv-command-topbar [role="dialog"],
+.ttv-command-topbar [aria-label*="library" i],
+.ttv-command-topbar [aria-label*="theme" i] {
+  position: fixed !important;
+  inset: clamp(0.75rem, 2vw, 1.5rem) !important;
+  z-index: 9997 !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: auto !important;
+  border-radius: 1.35rem !important;
+}
+
+/* Make sure Show Library's internal panels do not get trapped under the player */
+.ttv-command-topbar [role="dialog"] > div,
+.ttv-command-topbar .theme-panel > div {
+  max-height: calc(100dvh - 3rem) !important;
+  overflow: auto !important;
+}
+
+/* Mobile command panels */
+@media (max-width: 760px) {
+  .ttv-command-modal {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .ttv-command-modal__panel {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .ttv-command-modal__header {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  }
+
+  .ttv-command-category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ttv-command-topbar .theme-panel,
+  .ttv-command-topbar [role="dialog"],
+  .ttv-command-topbar [aria-label*="library" i],
+  .ttv-command-topbar [aria-label*="theme" i] {
+    inset: 0 !important;
+    border-radius: 0 !important;
+    max-height: 100dvh !important;
+  }
+}
