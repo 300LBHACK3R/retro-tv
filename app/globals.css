@@ -2951,3 +2951,120 @@ main {
     width: auto;
   }
 }
+
+
+/* ============================================================
+   TATES TV SMART INSTALL PROMPT V1
+   App-style install prompt for PWA/web users.
+   ============================================================ */
+
+.ttv-install-prompt {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  right: max(1rem, env(safe-area-inset-right, 0px));
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  z-index: 9998;
+  width: min(720px, calc(100vw - 2rem));
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 184, 0, 0.34);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(255, 230, 0, 0.16), transparent 30%),
+    radial-gradient(circle at 88% 15%, rgba(34, 211, 238, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(76, 29, 149, 0.96), rgba(2, 6, 23, 0.96));
+  color: #f8fafc;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(16px);
+}
+
+.ttv-install-prompt__icon {
+  width: 3.1rem;
+  height: 3.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(135deg, #7e22ce, #06b6d4 55%, #f59e0b);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+}
+
+.ttv-install-prompt__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ttv-install-prompt__copy strong {
+  color: #fff;
+  font-size: 0.96rem;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+}
+
+.ttv-install-prompt__copy span {
+  color: #dbeafe;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.ttv-install-prompt__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ttv-install-prompt__actions button,
+.ttv-install-prompt__actions a {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.76);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ttv-install-prompt__actions button:first-child,
+.ttv-install-prompt__actions a:first-child {
+  border-color: rgba(255, 230, 0, 0.34);
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+
+@media (max-width: 640px) {
+  .ttv-install-prompt {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .ttv-install-prompt__actions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .ttv-install-prompt__actions button,
+  .ttv-install-prompt__actions a {
+    flex: 1;
+  }
+}
+
+@media (display-mode: standalone) {
+  .ttv-install-prompt {
+    display: none !important;
+  }
+}

@@ -1,5 +1,6 @@
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import InstallPromptBanner from "@/components/InstallPromptBanner";
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -89,6 +90,7 @@ export default function RootLayout({
     <html lang="en-CA" suppressHydrationWarning>
       <body className="min-h-screen bg-[#020617] antialiased selection:bg-cyan-300/30 selection:text-white">
         <ServiceWorkerRegister />
+        <InstallPromptBanner />
         {children}
         <Analytics />
       </body>
