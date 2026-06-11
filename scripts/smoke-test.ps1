@@ -17,6 +17,7 @@ $routes = @(
   "/compat",
   "/install",
   "/help",
+  "/offline",
   "/readiness",
   "/recovery",
   "/backup",
@@ -29,7 +30,8 @@ $routes = @(
   "/safari-pinned-tab.svg",
   "/browserconfig.xml",
   "/robots.txt",
-  "/sitemap.xml"
+  "/sitemap.xml",
+  "/sw.js"
 )
 
 function Get-ResponseText {

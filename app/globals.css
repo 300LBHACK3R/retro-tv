@@ -2865,3 +2865,21 @@ main {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   TATES TV PWA APP SHELL V1
+   Offline/app-shell support.
+   ============================================================ */
+
+.ttv-offline-card {
+  width: min(100%, 760px);
+}
+
+@media (display-mode: standalone) {
+  .ttv-offline-card,
+  .ttv-install-card,
+  .ttv-help-card {
+    min-height: auto;
+  }
+}
