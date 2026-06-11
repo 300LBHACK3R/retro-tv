@@ -16,6 +16,7 @@ $routes = @(
   "/launch",
   "/compat",
   "/install",
+  "/help",
   "/readiness",
   "/recovery",
   "/backup",
