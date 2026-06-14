@@ -12,8 +12,11 @@ interface PlayerProps {
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
 const LIVE_TICK_MS = 1000;
+const SOFT_SYNC_INTERVAL_MS = 10_000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
+const HARD_SYNC_THROTTLE_MS = 8_000;
 const SOURCE_END_PADDING_SECONDS = 0.4;
+const RECOVERY_PLAY_DELAY_MS = 500;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -154,7 +157,10 @@ export default function Player({ schedule }: PlayerProps) {
     const drift = Math.abs(video.currentTime - target);
     const now = Date.now();
 
-    if (drift < HARD_SYNC_DRIFT_SECONDS && now - lastHardSyncRef.current < 8000) {
+    if (
+      drift < HARD_SYNC_DRIFT_SECONDS ||
+      now - lastHardSyncRef.current < HARD_SYNC_THROTTLE_MS
+    ) {
       return;
     }
 
@@ -184,6 +190,13 @@ export default function Player({ schedule }: PlayerProps) {
     }
   }, [applyAudio]);
 
+  const retryPlayback = useCallback(() => {
+    window.setTimeout(() => {
+      hardSyncPosition();
+      void tryPlay();
+    }, RECOVERY_PLAY_DELAY_MS);
+  }, [hardSyncPosition, tryPlay]);
+
   const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
     const item = live.item;
@@ -199,6 +212,10 @@ export default function Player({ schedule }: PlayerProps) {
 
     try {
       video.pause();
+
+      video.removeAttribute("src");
+      video.load();
+
       video.preload = "auto";
       video.src = item.file;
       video.load();
@@ -223,6 +240,16 @@ export default function Player({ schedule }: PlayerProps) {
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      hardSyncPosition();
+    }, SOFT_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [hardSyncPosition]);
 
   useEffect(() => {
     applyAudio();
@@ -269,11 +296,23 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handleWaiting = () => {
-      /**
-       * Do not show a big recovery overlay here.
-       * Some browsers fire waiting during normal stream buffering even while video is visibly progressing.
-       */
-      setStatus((current) => (current === "loading" ? "loading" : "playing"));
+      if (!video.seeking) {
+        setStatus("loading");
+      }
+    };
+
+    const handleStalled = () => {
+      setStatus("loading");
+      retryPlayback();
+    };
+
+    const handleSuspend = () => {
+      if (video.paused) {
+        setStatus("paused");
+        return;
+      }
+
+      setStatus("loading");
     };
 
     const handlePause = () => {
@@ -297,6 +336,8 @@ export default function Player({ schedule }: PlayerProps) {
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("stalled", handleStalled);
+    video.addEventListener("suspend", handleSuspend);
     video.addEventListener("pause", handlePause);
     video.addEventListener("error", handleError);
     video.addEventListener("ended", handleEnded);
@@ -306,11 +347,13 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("stalled", handleStalled);
+      video.removeEventListener("suspend", handleSuspend);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("error", handleError);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [hardSyncPosition, retryPlayback, tryPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -347,6 +390,20 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
+    const handleOnline = () => {
+      setNowMs(Date.now());
+      hardSyncPosition();
+      void tryPlay();
+    };
+
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [hardSyncPosition, tryPlay]);
+
+  useEffect(() => {
     if (fullscreenRequestId === 0) {
       return;
     }
@@ -361,17 +418,33 @@ export default function Player({ schedule }: PlayerProps) {
       try {
         if (document.fullscreenElement) {
           await document.exitFullscreen();
+          setFallbackFullscreen(false);
           return;
         }
 
         await shell.requestFullscreen();
+        setFallbackFullscreen(false);
       } catch {
-        setFallbackFullscreen((value) => !value);
+        setFallbackFullscreen(true);
       }
     };
 
     void run();
   }, [fullscreenRequestId]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (document.fullscreenElement) {
+        setFallbackFullscreen(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -395,6 +468,7 @@ export default function Player({ schedule }: PlayerProps) {
       >
         <div>
           <div className="text-lg font-semibold">No media scheduled</div>
+
           <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
             Add media to this channel from the admin panel.
           </div>
@@ -423,6 +497,8 @@ export default function Player({ schedule }: PlayerProps) {
         preload="auto"
         controls={false}
         muted={muted || volume <= 0}
+        disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -437,14 +513,16 @@ export default function Player({ schedule }: PlayerProps) {
         tabIndex={-1}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {isBreak ? "Commercial Break" : title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak
+            ? ` • ${live.item.segmentLabel}`
+            : ""}
         </div>
       </div>
 
@@ -465,7 +543,7 @@ export default function Player({ schedule }: PlayerProps) {
       ) : null}
 
       <div
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 hover:opacity-100"
+        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-100 backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:hover:opacity-100"
         aria-hidden="true"
       >
         {status}
@@ -473,5 +551,3 @@ export default function Player({ schedule }: PlayerProps) {
     </div>
   );
 }
-
-
