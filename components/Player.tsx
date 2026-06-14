@@ -16,7 +16,6 @@ const SOFT_SYNC_INTERVAL_MS = 10_000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
 const HARD_SYNC_THROTTLE_MS = 8_000;
 const SOURCE_END_PADDING_SECONDS = 0.4;
-const RECOVERY_PLAY_DELAY_MS = 500;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -118,6 +117,8 @@ export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastPlaybackKeyRef = useRef("");
   const lastHardSyncRef = useRef(0);
+  const isSwitchingSourceRef = useRef(false);
+  const fallbackFullscreenRef = useRef(false);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -145,32 +146,38 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = muted || volume <= 0;
   }, [muted, volume]);
 
-  const hardSyncPosition = useCallback(() => {
-    const video = videoRef.current;
-    const item = live.item;
+  const syncPosition = useCallback(
+    (force = false) => {
+      const video = videoRef.current;
+      const item = live.item;
 
-    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-      return;
-    }
+      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+        return;
+      }
 
-    const target = getSafeTargetTime(video, item, live.sourceElapsed);
-    const drift = Math.abs(video.currentTime - target);
-    const now = Date.now();
+      const target = getSafeTargetTime(video, item, live.sourceElapsed);
+      const drift = Math.abs(video.currentTime - target);
+      const now = Date.now();
 
-    if (
-      drift < HARD_SYNC_DRIFT_SECONDS ||
-      now - lastHardSyncRef.current < HARD_SYNC_THROTTLE_MS
-    ) {
-      return;
-    }
+      if (!force) {
+        if (drift < HARD_SYNC_DRIFT_SECONDS) {
+          return;
+        }
 
-    try {
-      video.currentTime = target;
-      lastHardSyncRef.current = now;
-    } catch {
-      // Browser may reject seeking before metadata settles.
-    }
-  }, [live.item, live.sourceElapsed]);
+        if (now - lastHardSyncRef.current < HARD_SYNC_THROTTLE_MS) {
+          return;
+        }
+      }
+
+      try {
+        video.currentTime = target;
+        lastHardSyncRef.current = now;
+      } catch {
+        // Browser may reject seeking before metadata settles.
+      }
+    },
+    [live.item, live.sourceElapsed],
+  );
 
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -190,18 +197,31 @@ export default function Player({ schedule }: PlayerProps) {
     }
   }, [applyAudio]);
 
-  const retryPlayback = useCallback(() => {
-    window.setTimeout(() => {
-      hardSyncPosition();
-      void tryPlay();
-    }, RECOVERY_PLAY_DELAY_MS);
-  }, [hardSyncPosition, tryPlay]);
+  const clearVideoSource = useCallback(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    try {
+      isSwitchingSourceRef.current = true;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    } catch {
+      // Ignore browser cleanup errors.
+    } finally {
+      isSwitchingSourceRef.current = false;
+    }
+  }, []);
 
   const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
     const item = live.item;
 
     if (!video || !item?.file) {
+      clearVideoSource();
       setStatus("idle");
       setMessage("");
       return;
@@ -209,10 +229,11 @@ export default function Player({ schedule }: PlayerProps) {
 
     setStatus("loading");
     setMessage("");
+    lastHardSyncRef.current = 0;
+    isSwitchingSourceRef.current = true;
 
     try {
       video.pause();
-
       video.removeAttribute("src");
       video.load();
 
@@ -220,16 +241,21 @@ export default function Player({ schedule }: PlayerProps) {
       video.src = item.file;
       video.load();
     } catch {
+      isSwitchingSourceRef.current = false;
       setStatus("error");
       setMessage("Could not load this media source.");
     }
-  }, [live.item]);
+  }, [clearVideoSource, live.item]);
 
   const resume = useCallback(() => {
     setNowMs(Date.now());
-    hardSyncPosition();
+    syncPosition(true);
     void tryPlay();
-  }, [hardSyncPosition, tryPlay]);
+  }, [syncPosition, tryPlay]);
+
+  useEffect(() => {
+    fallbackFullscreenRef.current = fallbackFullscreen;
+  }, [fallbackFullscreen]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -243,13 +269,15 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      hardSyncPosition();
+      if (document.visibilityState === "visible") {
+        syncPosition(false);
+      }
     }, SOFT_SYNC_INTERVAL_MS);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [hardSyncPosition]);
+  }, [syncPosition]);
 
   useEffect(() => {
     applyAudio();
@@ -260,6 +288,8 @@ export default function Player({ schedule }: PlayerProps) {
     const item = live.item;
 
     if (!video || !item) {
+      lastPlaybackKeyRef.current = "empty";
+      clearVideoSource();
       setStatus("idle");
       setMessage("");
       return;
@@ -269,7 +299,7 @@ export default function Player({ schedule }: PlayerProps) {
       lastPlaybackKeyRef.current = playbackKey;
       loadCurrentSource();
     }
-  }, [live.item, loadCurrentSource, playbackKey]);
+  }, [clearVideoSource, live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -279,7 +309,8 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     const handleLoadedMetadata = () => {
-      hardSyncPosition();
+      isSwitchingSourceRef.current = false;
+      syncPosition(true);
       void tryPlay();
     };
 
@@ -291,44 +322,48 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handlePlaying = () => {
+      isSwitchingSourceRef.current = false;
       setStatus("playing");
       setMessage("");
     };
 
     const handleWaiting = () => {
-      if (!video.seeking) {
-        setStatus("loading");
-      }
+      /**
+       * Avoid showing a false blocking overlay during normal stream buffering.
+       * Some browsers fire waiting while playback is still visibly progressing.
+       */
+      setStatus((current) => (current === "loading" ? "loading" : "playing"));
     };
 
     const handleStalled = () => {
-      setStatus("loading");
-      retryPlayback();
-    };
-
-    const handleSuspend = () => {
-      if (video.paused) {
-        setStatus("paused");
-        return;
+      if (!video.paused && document.visibilityState === "visible") {
+        setStatus("loading");
+        window.setTimeout(() => {
+          syncPosition(false);
+          void tryPlay();
+        }, 500);
       }
-
-      setStatus("loading");
     };
 
     const handlePause = () => {
-      if (document.visibilityState === "visible") {
+      if (isSwitchingSourceRef.current) {
+        return;
+      }
+
+      if (!video.ended && document.visibilityState === "visible") {
         setStatus("paused");
       }
     };
 
     const handleError = () => {
+      isSwitchingSourceRef.current = false;
       setStatus("error");
       setMessage(getErrorMessage(video));
     };
 
     const handleEnded = () => {
       setNowMs(Date.now());
-      hardSyncPosition();
+      syncPosition(true);
       void tryPlay();
     };
 
@@ -337,7 +372,6 @@ export default function Player({ schedule }: PlayerProps) {
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("stalled", handleStalled);
-    video.addEventListener("suspend", handleSuspend);
     video.addEventListener("pause", handlePause);
     video.addEventListener("error", handleError);
     video.addEventListener("ended", handleEnded);
@@ -348,12 +382,11 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("waiting", handleWaiting);
       video.removeEventListener("stalled", handleStalled);
-      video.removeEventListener("suspend", handleSuspend);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("error", handleError);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [hardSyncPosition, retryPlayback, tryPlay]);
+  }, [syncPosition, tryPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -370,14 +403,15 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
+      syncPosition(true);
     }
-  }, [live.item, nowMs]);
+  }, [live.item, nowMs, syncPosition]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setNowMs(Date.now());
-        hardSyncPosition();
+        syncPosition(true);
         void tryPlay();
       }
     };
@@ -387,12 +421,12 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [syncPosition, tryPlay]);
 
   useEffect(() => {
     const handleOnline = () => {
       setNowMs(Date.now());
-      hardSyncPosition();
+      syncPosition(true);
       void tryPlay();
     };
 
@@ -401,7 +435,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       window.removeEventListener("online", handleOnline);
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [syncPosition, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -416,6 +450,11 @@ export default function Player({ schedule }: PlayerProps) {
 
     const run = async () => {
       try {
+        if (fallbackFullscreenRef.current) {
+          setFallbackFullscreen(false);
+          return;
+        }
+
         if (document.fullscreenElement) {
           await document.exitFullscreen();
           setFallbackFullscreen(false);
@@ -439,26 +478,26 @@ export default function Player({ schedule }: PlayerProps) {
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && fallbackFullscreenRef.current) {
+        setFallbackFullscreen(false);
+      }
+    };
+
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
   useEffect(() => {
     return () => {
-      const video = videoRef.current;
-
-      if (!video) {
-        return;
-      }
-
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
+      clearVideoSource();
     };
-  }, []);
+  }, [clearVideoSource]);
 
   if (!live.item) {
     return (
@@ -486,9 +525,11 @@ export default function Player({ schedule }: PlayerProps) {
   return (
     <div
       ref={shellRef}
-      className={`ttv-player-shell relative h-full w-full bg-black ${
+      className={`ttv-player-shell group relative h-full w-full bg-black ${
         fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
+      data-playback-status={status}
+      aria-label={`Tate's TV player: ${isBreak ? "Commercial Break" : title}`}
     >
       <video
         ref={videoRef}
@@ -505,15 +546,7 @@ export default function Player({ schedule }: PlayerProps) {
         }}
       />
 
-      <button
-        type="button"
-        onClick={resume}
-        className="absolute inset-0 z-[1] cursor-default"
-        aria-label="Resume playback"
-        tabIndex={-1}
-      />
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {isBreak ? "Commercial Break" : title}
         </div>
@@ -543,7 +576,7 @@ export default function Player({ schedule }: PlayerProps) {
       ) : null}
 
       <div
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-100 backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:hover:opacity-100"
+        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-100 backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100"
         aria-hidden="true"
       >
         {status}
