@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type TestStatus = "checking" | "pass" | "warn" | "fail";
 
@@ -9,6 +9,11 @@ type CompatCheck = {
   label: string;
   status: TestStatus;
   detail: string;
+};
+
+type HealthResponse = {
+  status?: string;
+  version?: string;
 };
 
 function getStatusLabel(status: TestStatus): string {
@@ -25,20 +30,23 @@ function getStatusLabel(status: TestStatus): string {
 }
 
 function getStandaloneMode(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") {
+    return false;
+  }
 
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
-    // Safari iOS legacy standalone flag.
-    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
+    Boolean(
+      (
+        window.navigator as Navigator & {
+          standalone?: boolean;
+        }
+      ).standalone,
+    )
   );
 }
 
-function getVideoSupport(): {
-  mp4: string;
-  webm: string;
-  hls: string;
-} {
+function getVideoSupport() {
   if (typeof document === "undefined") {
     return {
       mp4: "",
@@ -50,18 +58,24 @@ function getVideoSupport(): {
   const video = document.createElement("video");
 
   return {
-    mp4: video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'),
-    webm: video.canPlayType('video/webm; codecs="vp8, vorbis"'),
-    hls: video.canPlayType("application/vnd.apple.mpegurl"),
+    mp4: video.canPlayType(
+      'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+    ),
+    webm: video.canPlayType(
+      'video/webm; codecs="vp8, vorbis"',
+    ),
+    hls: video.canPlayType(
+      "application/vnd.apple.mpegurl",
+    ),
   };
 }
 
 function canUseLocalStorage(): boolean {
   try {
-    const key = "__ttv_compat_test__";
+    const key = "__ttv_storage_test__";
 
-    window.localStorage.setItem(key, "ok");
-    window.localStorage.removeItem(key);
+    localStorage.setItem(key, "1");
+    localStorage.removeItem(key);
 
     return true;
   } catch {
@@ -69,69 +83,133 @@ function canUseLocalStorage(): boolean {
   }
 }
 
+function canUseIndexedDb(): boolean {
+  return typeof indexedDB !== "undefined";
+}
+
+function hasServiceWorkerSupport(): boolean {
+  return typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator;
+}
+
 export default function CompatibilityPage() {
-  const [apiStatus, setApiStatus] = useState<CompatCheck>({
-    label: "API health fetch",
-    status: "checking",
-    detail: "Checking /api/health...",
-  });
+  const [checks, setChecks] = useState<CompatCheck[]>([]);
+  const [apiStatus, setApiStatus] =
+    useState<CompatCheck>({
+      label: "API health fetch",
+      status: "checking",
+      detail: "Checking /api/health...",
+    });
 
-  const clientChecks = useMemo<CompatCheck[]>(() => {
-    if (typeof window === "undefined") {
-      return [];
-    }
+  useEffect(() => {
+    const buildChecks = () => {
+      const videoSupport = getVideoSupport();
 
-    const videoSupport = getVideoSupport();
-    const localStorageWorks = canUseLocalStorage();
-    const hasTouch = window.matchMedia("(pointer: coarse)").matches;
-    const isStandalone = getStandaloneMode();
-    const viewport = `${window.innerWidth} × ${window.innerHeight}`;
-    const userAgent = window.navigator.userAgent;
+      const viewport =
+        `${window.innerWidth} × ${window.innerHeight}`;
 
-    const videoDetail = [
-      `MP4: ${videoSupport.mp4 || "no"}`,
-      `WebM: ${videoSupport.webm || "no"}`,
-      `HLS: ${videoSupport.hls || "no"}`,
-    ].join(" · ");
+      const userAgent =
+        window.navigator.userAgent.length > 140
+          ? `${window.navigator.userAgent.slice(0, 140)}...`
+          : window.navigator.userAgent;
 
-    return [
-      {
-        label: "Local browser storage",
-        status: localStorageWorks ? "pass" : "fail",
-        detail: localStorageWorks
-          ? "localStorage is available for settings, themes, and local state."
-          : "localStorage is blocked. Backup/recovery and some local settings may not work.",
-      },
-      {
-        label: "Video format support",
-        status: videoSupport.mp4 ? "pass" : "warn",
-        detail: videoDetail,
-      },
-      {
-        label: "Viewport",
-        status: "pass",
-        detail: viewport,
-      },
-      {
-        label: "Touch / mobile input",
-        status: hasTouch ? "pass" : "warn",
-        detail: hasTouch
-          ? "Coarse pointer detected. Mobile/touch controls should be active."
-          : "Mouse/trackpad style pointer detected.",
-      },
-      {
-        label: "PWA standalone mode",
-        status: isStandalone ? "pass" : "warn",
-        detail: isStandalone
-          ? "Running in standalone/install mode."
-          : "Running in normal browser tab mode.",
-      },
-      {
-        label: "Browser user agent",
-        status: "pass",
-        detail: userAgent,
-      },
-    ];
+      const nextChecks: CompatCheck[] = [
+        {
+          label: "Local browser storage",
+          status: canUseLocalStorage()
+            ? "pass"
+            : "fail",
+          detail: canUseLocalStorage()
+            ? "localStorage available."
+            : "localStorage unavailable.",
+        },
+        {
+          label: "IndexedDB",
+          status: canUseIndexedDb()
+            ? "pass"
+            : "fail",
+          detail: canUseIndexedDb()
+            ? "IndexedDB available."
+            : "IndexedDB unavailable.",
+        },
+        {
+          label: "Service Worker",
+          status: hasServiceWorkerSupport()
+            ? "pass"
+            : "warn",
+          detail: hasServiceWorkerSupport()
+            ? "Service Worker supported."
+            : "Service Worker unsupported.",
+        },
+        {
+          label: "Video format support",
+          status: videoSupport.mp4
+            ? "pass"
+            : "warn",
+          detail:
+            `MP4: ${videoSupport.mp4 || "no"} · ` +
+            `WebM: ${videoSupport.webm || "no"} · ` +
+            `HLS: ${videoSupport.hls || "no"}`,
+        },
+        {
+          label: "Viewport",
+          status: "pass",
+          detail: viewport,
+        },
+        {
+          label: "Network",
+          status: navigator.onLine
+            ? "pass"
+            : "warn",
+          detail: navigator.onLine
+            ? "Browser online."
+            : "Browser offline.",
+        },
+        {
+          label: "Touch / mobile input",
+          status: window.matchMedia(
+            "(pointer: coarse)",
+          ).matches
+            ? "pass"
+            : "warn",
+          detail: window.matchMedia(
+            "(pointer: coarse)",
+          ).matches
+            ? "Touch-capable device detected."
+            : "Mouse/trackpad device detected.",
+        },
+        {
+          label: "PWA standalone mode",
+          status: getStandaloneMode()
+            ? "pass"
+            : "warn",
+          detail: getStandaloneMode()
+            ? "Running in installed mode."
+            : "Running in browser mode.",
+        },
+        {
+          label: "Browser user agent",
+          status: "pass",
+          detail: userAgent,
+        },
+      ];
+
+      setChecks(nextChecks);
+    };
+
+    buildChecks();
+
+    window.addEventListener(
+      "resize",
+      buildChecks,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        buildChecks,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -139,22 +217,29 @@ export default function CompatibilityPage() {
 
     async function checkApi() {
       try {
-        const response = await fetch("/api/health", {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetch(
+          "/api/health",
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
-          throw new Error(`Returned ${response.status}`);
+          throw new Error(
+            `Returned ${response.status}`,
+          );
         }
 
-        const data = await response.json();
+        const data =
+          (await response.json()) as HealthResponse;
 
         if (!cancelled) {
           setApiStatus({
             label: "API health fetch",
             status: "pass",
-            detail: `API responded: ${data.status ?? "healthy"} · version ${data.version ?? "unknown"}`,
+            detail:
+              `API responded: ${data.status ?? "healthy"} · ` +
+              `version ${data.version ?? "unknown"}`,
           });
         }
       } catch (error) {
@@ -162,7 +247,10 @@ export default function CompatibilityPage() {
           setApiStatus({
             label: "API health fetch",
             status: "fail",
-            detail: error instanceof Error ? error.message : "API request failed.",
+            detail:
+              error instanceof Error
+                ? error.message
+                : "API request failed.",
           });
         }
       }
@@ -175,54 +263,69 @@ export default function CompatibilityPage() {
     };
   }, []);
 
-  const checks = [apiStatus, ...clientChecks];
-
   return (
     <main className="ttv-ops-screen">
       <section className="ttv-ops-card ttv-compat-card">
-        <div className="ttv-ops-logo">TTV</div>
+        <div className="ttv-ops-logo">
+          TTV
+        </div>
 
         <div>
-          <p className="ttv-ops-kicker">Compatibility diagnostics</p>
-          <h1>Device + browser test</h1>
+          <p className="ttv-ops-kicker">
+            Compatibility diagnostics
+          </p>
+
+          <h1>Device + Browser Test</h1>
+
           <p>
-            Use this page on phones, tablets, desktop browsers, and TV browsers to check whether
-            Tate&apos;s TV has the core browser features needed for a stable experience.
+            Verify browser compatibility,
+            storage, media playback,
+            PWA support, and API access.
           </p>
         </div>
 
         <div className="ttv-compat-grid">
-          {checks.map((check) => (
-            <article
-              key={check.label}
-              className="ttv-compat-check"
-              data-status={check.status}
-            >
-              <div>
-                <span>{check.label}</span>
-                <strong>{getStatusLabel(check.status)}</strong>
-              </div>
+          {[apiStatus, ...checks].map(
+            (check) => (
+              <article
+                key={check.label}
+                className="ttv-compat-check"
+                data-status={check.status}
+              >
+                <div>
+                  <span>{check.label}</span>
+                  <strong>
+                    {getStatusLabel(
+                      check.status,
+                    )}
+                  </strong>
+                </div>
 
-              <p>{check.detail}</p>
-            </article>
-          ))}
+                <p>{check.detail}</p>
+              </article>
+            ),
+          )}
         </div>
 
         <div className="ttv-ops-list">
-          <strong>Recommended launch test devices:</strong>
+          <strong>
+            Recommended launch test devices:
+          </strong>
+
           <ul>
             <li>iPhone Safari</li>
             <li>Android Chrome</li>
-            <li>Windows Chrome / Edge</li>
-            <li>Firefox desktop</li>
-            <li>Tablet browser</li>
-            <li>Smart TV browser if available</li>
+            <li>Windows Chrome</li>
+            <li>Microsoft Edge</li>
+            <li>Firefox Desktop</li>
+            <li>Tablet Browser</li>
+            <li>Smart TV Browser</li>
           </ul>
         </div>
 
         <div className="ttv-ops-actions">
-          <Link href="/">Back to app</Link>
-          <Link href="/launch">Launch hub</Link>
+          <Link href="/">Back to App</Link>
+          <Link href="/launch">Launch Hub</Link>
           <Link href="/health">Health</Link>
           <Link href="/backup">Backup</Link>
           <Link href="/recovery">Recovery</Link>

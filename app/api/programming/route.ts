@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const PROGRAMMING_STATE_ID = "main";
+const GENERIC_ERROR_MESSAGE = "Failed to load programming.";
 
 type ProgrammingStateRow = {
   data: unknown;
@@ -24,6 +25,8 @@ function jsonResponse(
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
   response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "same-origin");
 
   return response;
 }
@@ -49,11 +52,14 @@ function createErrorResponse(error: string): ProgrammingApiResponse {
 }
 
 function getPublicErrorMessage(error: unknown): string {
-  if (error instanceof Error && process.env.NODE_ENV !== "production") {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    error instanceof Error
+  ) {
     return error.message;
   }
 
-  return "Failed to load programming.";
+  return GENERIC_ERROR_MESSAGE;
 }
 
 export async function GET() {
@@ -67,23 +73,33 @@ export async function GET() {
       .maybeSingle<ProgrammingStateRow>();
 
     if (error) {
-      return jsonResponse(createErrorResponse(error.message), { status: 500 });
+      return jsonResponse(
+        createErrorResponse(getPublicErrorMessage(error)),
+        { status: 500 },
+      );
     }
 
     if (!data?.data) {
-      return jsonResponse(createSuccessResponse(null, "default"));
+      return jsonResponse(
+        createSuccessResponse(null, "default"),
+      );
     }
 
     const snapshot = sanitizeProgrammingSnapshot(data.data);
 
     if (!snapshot) {
-      return jsonResponse(createSuccessResponse(null, "default"));
+      return jsonResponse(
+        createSuccessResponse(null, "default"),
+      );
     }
 
-    return jsonResponse(createSuccessResponse(snapshot, "database"));
+    return jsonResponse(
+      createSuccessResponse(snapshot, "database"),
+    );
   } catch (error) {
-    return jsonResponse(createErrorResponse(getPublicErrorMessage(error)), {
-      status: 500,
-    });
+    return jsonResponse(
+      createErrorResponse(getPublicErrorMessage(error)),
+      { status: 500 },
+    );
   }
 }

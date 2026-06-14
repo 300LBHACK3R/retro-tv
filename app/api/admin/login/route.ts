@@ -20,6 +20,8 @@ type LoginResponseBody = {
   error?: string;
 };
 
+const MAX_PASSWORD_LENGTH = 512;
+
 function jsonResponse(
   body: LoginResponseBody,
   init?: ResponseInit,
@@ -28,11 +30,15 @@ function jsonResponse(
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
   response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "same-origin");
 
   return response;
 }
 
-async function readLoginBody(request: Request): Promise<LoginRequestBody | null> {
+async function readLoginBody(
+  request: Request,
+): Promise<LoginRequestBody | null> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (!contentType.toLowerCase().includes("application/json")) {
@@ -42,7 +48,11 @@ async function readLoginBody(request: Request): Promise<LoginRequestBody | null>
   try {
     const body = (await request.json()) as unknown;
 
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
+    if (
+      body === null ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
       return null;
     }
 
@@ -57,7 +67,7 @@ function getPasswordFromBody(body: LoginRequestBody | null): string {
     return "";
   }
 
-  return body.password;
+  return body.password.trim();
 }
 
 export async function POST(request: Request) {
@@ -68,7 +78,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          "ADMIN_PASSWORD is missing or too short. Set it in Vercel environment variables.",
+          "ADMIN_PASSWORD is missing or too short. Set it in environment variables.",
       },
       { status: 500 },
     );
@@ -77,7 +87,20 @@ export async function POST(request: Request) {
   const body = await readLoginBody(request);
   const password = getPasswordFromBody(body);
 
-  if (!password || !safeCompare(password, adminPassword)) {
+  if (
+    password.length === 0 ||
+    password.length > MAX_PASSWORD_LENGTH
+  ) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Invalid admin password.",
+      },
+      { status: 401 },
+    );
+  }
+
+  if (!safeCompare(password, adminPassword)) {
     return jsonResponse(
       {
         ok: false,

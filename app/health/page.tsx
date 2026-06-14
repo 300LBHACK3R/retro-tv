@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type HealthPayload = {
   ok: boolean;
@@ -18,87 +18,159 @@ type CheckState =
   | { status: "healthy"; data: HealthPayload }
   | { status: "failed"; message: string };
 
+function isHealthPayload(value: unknown): value is HealthPayload {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const payload = value as Partial<HealthPayload>;
+
+  return (
+    typeof payload.ok === "boolean" &&
+    typeof payload.app === "string" &&
+    typeof payload.shortName === "string" &&
+    typeof payload.status === "string" &&
+    typeof payload.environment === "string" &&
+    typeof payload.version === "string" &&
+    typeof payload.checkedAt === "string"
+  );
+}
+
 export default function HealthPage() {
-  const [state, setState] = useState<CheckState>({ status: "loading" });
+  const [state, setState] = useState<CheckState>({
+    status: "loading",
+  });
+
+  const checkHealth = useCallback(async () => {
+    try {
+      setState({ status: "loading" });
+
+      const response = await fetch("/api/health", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Health endpoint returned ${response.status}`,
+        );
+      }
+
+      const data: unknown = await response.json();
+
+      if (!isHealthPayload(data)) {
+        throw new Error(
+          "Health endpoint returned an unexpected response.",
+        );
+      }
+
+      setState({
+        status: "healthy",
+        data,
+      });
+    } catch (error) {
+      setState({
+        status: "failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown health check error",
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkHealth() {
-      try {
-        const response = await fetch("/api/health", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Health endpoint returned ${response.status}`);
-        }
-
-        const data = (await response.json()) as HealthPayload;
-
-        if (!cancelled) {
-          setState({ status: "healthy", data });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setState({
-            status: "failed",
-            message: error instanceof Error ? error.message : "Unknown health check error",
-          });
-        }
-      }
-    }
-
-    checkHealth();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void checkHealth();
+  }, [checkHealth]);
 
   return (
     <main className="ttv-ops-screen">
       <section className="ttv-ops-card">
-        <div className="ttv-ops-logo">TTV</div>
+        <div className="ttv-ops-logo">
+          TTV
+        </div>
 
         <div>
-          <p className="ttv-ops-kicker">Production health</p>
-          <h1>Tate&apos;s TV status</h1>
+          <p className="ttv-ops-kicker">
+            Production health
+          </p>
+
+          <h1>Tate&apos;s TV Status</h1>
+
           <p>
-            Quick production check for deploy state, API response, and launch readiness.
+            Quick production check for deployment
+            status, API availability, and launch
+            readiness.
           </p>
         </div>
 
-        <div className="ttv-ops-status" data-status={state.status}>
-          {state.status === "loading" ? (
+        <div
+          className="ttv-ops-status"
+          data-status={state.status}
+        >
+          {state.status === "loading" && (
             <>
               <strong>Checking...</strong>
-              <span>Contacting the health endpoint.</span>
+              <span>
+                Contacting the health endpoint.
+              </span>
             </>
-          ) : null}
+          )}
 
-          {state.status === "healthy" ? (
+          {state.status === "healthy" && (
             <>
               <strong>Healthy</strong>
-              <span>{state.data.app} is responding normally.</span>
-              <code>Version: {state.data.version}</code>
-              <code>Environment: {state.data.environment}</code>
-              <code>Checked: {state.data.checkedAt}</code>
-            </>
-          ) : null}
 
-          {state.status === "failed" ? (
-            <>
-              <strong>Health check failed</strong>
-              <span>{state.message}</span>
+              <span>
+                {state.data.app} is responding
+                normally.
+              </span>
+
+              <code>
+                Version: {state.data.version}
+              </code>
+
+              <code>
+                Environment:{" "}
+                {state.data.environment}
+              </code>
+
+              <code>
+                Checked: {state.data.checkedAt}
+              </code>
             </>
-          ) : null}
+          )}
+
+          {state.status === "failed" && (
+            <>
+              <strong>
+                Health Check Failed
+              </strong>
+
+              <span>
+                {state.message}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="ttv-ops-actions">
-          <Link href="/">Back to app</Link>
-          <Link href="/recovery">Open recovery</Link>
+          <button
+            type="button"
+            onClick={() => {
+              void checkHealth();
+            }}
+          >
+            Refresh Health Check
+          </button>
+
+          <Link href="/">
+            Back to App
+          </Link>
+
+          <Link href="/recovery">
+            Open Recovery
+          </Link>
         </div>
       </section>
     </main>

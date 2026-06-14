@@ -9,6 +9,8 @@ type LogoutResponseBody = {
   ok: boolean;
 };
 
+const EXPIRED_DATE = new Date(0);
+
 function jsonResponse(
   body: LogoutResponseBody,
   init?: ResponseInit,
@@ -17,6 +19,8 @@ function jsonResponse(
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
   response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "same-origin");
 
   return response;
 }
@@ -32,9 +36,11 @@ export async function POST() {
     sameSite: "strict",
     path: "/",
     maxAge: 0,
-    expires: new Date(0),
+    expires: EXPIRED_DATE,
     priority: "high",
   });
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({
+    ok: true,
+  });
 }

@@ -16,6 +16,7 @@ type ApiResponse<T = null> = {
 };
 
 const PROGRAMMING_STATE_ID = "main";
+const MAX_REQUEST_SIZE_BYTES = 5 * 1024 * 1024;
 
 function jsonResponse<T = null>(
   body: ApiResponse<T>,
@@ -25,6 +26,8 @@ function jsonResponse<T = null>(
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
   response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "same-origin");
 
   return response;
 }
@@ -36,6 +39,17 @@ function isJsonRequest(request: Request): boolean {
 
 async function readRequestBody(request: Request): Promise<unknown | null> {
   if (!isJsonRequest(request)) {
+    return null;
+  }
+
+  const contentLength = Number(
+    request.headers.get("content-length") ?? "0",
+  );
+
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_REQUEST_SIZE_BYTES
+  ) {
     return null;
   }
 
@@ -57,7 +71,10 @@ function createSafeProgrammingPayload(
 }
 
 function getPublicErrorMessage(error: unknown): string {
-  if (error instanceof Error && process.env.NODE_ENV !== "production") {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    error instanceof Error
+  ) {
     return error.message;
   }
 
@@ -106,16 +123,18 @@ export async function PUT(request: Request) {
   try {
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase.from("programming_state").upsert(
-      {
-        id: PROGRAMMING_STATE_ID,
-        data: safePayload,
-        updated_at: safePayload.updatedAt,
-      },
-      {
-        onConflict: "id",
-      },
-    );
+    const { error } = await supabase
+      .from("programming_state")
+      .upsert(
+        {
+          id: PROGRAMMING_STATE_ID,
+          data: safePayload,
+          updated_at: safePayload.updatedAt,
+        },
+        {
+          onConflict: "id",
+        },
+      );
 
     if (error) {
       return jsonResponse(

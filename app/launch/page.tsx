@@ -5,34 +5,56 @@ import { useEffect, useState } from "react";
 
 type HealthStatus = "checking" | "healthy" | "failed";
 
+type HealthResponse = {
+  ok?: boolean;
+  version?: string;
+};
+
 export default function LaunchHubPage() {
-  const [status, setStatus] = useState<HealthStatus>("checking");
-  const [version, setVersion] = useState("checking...");
+  const [status, setStatus] =
+    useState<HealthStatus>("checking");
+
+  const [version, setVersion] =
+    useState("checking...");
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkHealth() {
       try {
-        const response = await fetch("/api/health", {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          "/api/health",
+          {
+            cache: "no-store",
+            method: "GET",
+          },
+        );
 
         if (!response.ok) {
-          throw new Error("Health endpoint failed");
+          throw new Error(
+            `Health endpoint returned ${response.status}`,
+          );
         }
 
-        const data = await response.json();
+        const data =
+          (await response.json()) as HealthResponse;
 
-        if (!cancelled) {
-          setStatus("healthy");
-          setVersion(data.version ?? "unknown");
+        if (cancelled) {
+          return;
         }
+
+        setStatus("healthy");
+
+        setVersion(
+          data.version?.trim() || "unknown",
+        );
       } catch {
-        if (!cancelled) {
-          setStatus("failed");
-          setVersion("unavailable");
+        if (cancelled) {
+          return;
         }
+
+        setStatus("failed");
+        setVersion("unavailable");
       }
     }
 
@@ -46,92 +68,208 @@ export default function LaunchHubPage() {
   return (
     <main className="ttv-ops-screen">
       <section className="ttv-ops-card ttv-launch-hub-card">
-        <div className="ttv-ops-logo">TTV</div>
+        <div
+          className="ttv-ops-logo"
+          aria-hidden="true"
+        >
+          TTV
+        </div>
 
         <div>
-          <p className="ttv-ops-kicker">Launch command</p>
-          <h1>Tate&apos;s TV Launch Hub</h1>
+          <p className="ttv-ops-kicker">
+            Launch Command
+          </p>
+
+          <h1>
+            Tate&apos;s TV Launch Hub
+          </h1>
+
           <p>
-            Production tools, recovery, backups, app health, and launch checks in one place.
+            Centralized access to launch
+            validation, health monitoring,
+            compatibility checks, backups,
+            recovery tools, and installation
+            resources.
           </p>
         </div>
 
         <div className="ttv-launch-status-grid">
-          <div className="ttv-launch-status-card" data-status={status}>
-            <span>Production health</span>
-            <strong>{status === "checking" ? "Checking..." : status}</strong>
+          <div
+            className="ttv-launch-status-card"
+            data-status={status}
+          >
+            <span>
+              Production Health
+            </span>
+
+            <strong>
+              {status === "checking"
+                ? "Checking..."
+                : status === "healthy"
+                  ? "Healthy"
+                  : "Failed"}
+            </strong>
           </div>
 
           <div className="ttv-launch-status-card">
             <span>Version</span>
-            <strong>{version}</strong>
+
+            <strong>
+              {version}
+            </strong>
           </div>
 
           <div className="ttv-launch-status-card">
-            <span>Mode</span>
-            <strong>Launch-ready</strong>
+            <span>System State</span>
+
+            <strong>
+              Launch Ready
+            </strong>
           </div>
         </div>
 
         <div className="ttv-launch-hub-grid">
-          <Link href="/" className="ttv-launch-hub-tile">
+          <Link
+            href="/"
+            className="ttv-launch-hub-tile"
+          >
             <span>Open App</span>
-            <strong>Watch Tate&apos;s TV</strong>
-            <small>Return to the live TV experience.</small>
+            <strong>
+              Watch Tate&apos;s TV
+            </strong>
+            <small>
+              Return to the live channel
+              experience.
+            </small>
           </Link>
 
-          <Link href="/health" className="ttv-launch-hub-tile">
+          <Link
+            href="/health"
+            className="ttv-launch-hub-tile"
+          >
             <span>Health</span>
-            <strong>Production status</strong>
-            <small>Check API and deploy health.</small>
+            <strong>
+              Production Status
+            </strong>
+            <small>
+              Check deployment and API
+              health.
+            </small>
           </Link>
 
-          <Link href="/compat" className="ttv-launch-hub-tile">
-            <span>Compat</span>
-            <strong>Browser test</strong>
-            <small>Check video, storage, viewport, PWA, and device support.</small>
+          <Link
+            href="/compat"
+            className="ttv-launch-hub-tile"
+          >
+            <span>Compatibility</span>
+            <strong>
+              Browser Validation
+            </strong>
+            <small>
+              Test browser features,
+              storage, playback, and PWA
+              support.
+            </small>
           </Link>
 
-          <Link href="/readiness" className="ttv-launch-hub-tile">
+          <Link
+            href="/readiness"
+            className="ttv-launch-hub-tile"
+          >
             <span>Readiness</span>
-            <strong>Launch report</strong>
-            <small>Review production tools, routes, PWA status, and verification.</small>
+            <strong>
+              Launch Report
+            </strong>
+            <small>
+              Review deployment readiness
+              and verification status.
+            </small>
           </Link>
 
-          <Link href="/backup" className="ttv-launch-hub-tile">
+          <Link
+            href="/backup"
+            className="ttv-launch-hub-tile"
+          >
             <span>Backup</span>
-            <strong>Export / import</strong>
-            <small>Save or restore local browser state.</small>
+            <strong>
+              Export / Import
+            </strong>
+            <small>
+              Save and restore local
+              application data.
+            </small>
           </Link>
 
-          <Link href="/recovery" className="ttv-launch-hub-tile">
+          <Link
+            href="/recovery"
+            className="ttv-launch-hub-tile"
+          >
             <span>Recovery</span>
-            <strong>Fix this device</strong>
-            <small>Clear broken cached app state.</small>
+            <strong>
+              Device Recovery
+            </strong>
+            <small>
+              Clear broken local state and
+              recover the application.
+            </small>
           </Link>
 
-          <Link href="/install" className="ttv-launch-hub-tile">
+          <Link
+            href="/install"
+            className="ttv-launch-hub-tile"
+          >
             <span>Install</span>
-            <strong>Add to device</strong>
-            <small>Instructions for iPhone, Android, desktop, and TV browsers.</small>
+            <strong>
+              Add to Device
+            </strong>
+            <small>
+              Install instructions for
+              phones, tablets, desktops,
+              and TVs.
+            </small>
           </Link>
 
-          <a href="/manifest.webmanifest" className="ttv-launch-hub-tile">
+          <a
+            href="/manifest.webmanifest"
+            className="ttv-launch-hub-tile"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <span>PWA</span>
-            <strong>Manifest</strong>
-            <small>Verify app install metadata.</small>
+            <strong>
+              Manifest
+            </strong>
+            <small>
+              Verify install metadata and
+              app configuration.
+            </small>
           </a>
 
-          <a href="/sitemap.xml" className="ttv-launch-hub-tile">
+          <a
+            href="/sitemap.xml"
+            className="ttv-launch-hub-tile"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <span>SEO</span>
-            <strong>Sitemap</strong>
-            <small>Check production sitemap route.</small>
+            <strong>
+              Sitemap
+            </strong>
+            <small>
+              Validate production sitemap
+              output.
+            </small>
           </a>
         </div>
 
         <div className="ttv-ops-list">
-          <strong>Local smoke test command:</strong>
-          <code>.\scripts\smoke-test.ps1</code>
+          <strong>
+            Local Smoke Test
+          </strong>
+
+          <code>
+            .\scripts\smoke-test.ps1
+          </code>
         </div>
       </section>
     </main>
