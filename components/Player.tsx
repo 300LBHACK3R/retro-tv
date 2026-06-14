@@ -532,19 +532,18 @@ export default function Player({ schedule }: PlayerProps) {
       aria-label={`Tate's TV player: ${isBreak ? "Commercial Break" : title}`}
     >
       <video
-        ref={videoRef}
-        playsInline
-        autoPlay
-        preload="auto"
-        controls={false}
-        muted={muted || volume <= 0}
-        disablePictureInPicture
-        controlsList="nodownload noplaybackrate"
-        className="h-full w-full bg-black"
-        style={{
-          objectFit: fitMode,
-        }}
-      />
+  ref={videoRef}
+  playsInline
+  autoPlay
+  preload="auto"
+  controls={false}
+  muted={muted || volume <= 0}
+  controlsList="nodownload"
+  className="h-full w-full bg-black"
+  style={{
+    objectFit: fitMode,
+  }}
+/>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
