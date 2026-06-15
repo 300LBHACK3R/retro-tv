@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
@@ -304,7 +304,7 @@ export default function Home() {
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
            <Image
-              src="/retro-logo.png"
+              src="/tatestv-logo.png"
               alt="TatesTv"
               width={260}
               height={90}

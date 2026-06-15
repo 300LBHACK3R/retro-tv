@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { cleanDisplayText } from "@/lib/textClean";
 import type { Channel } from "@/lib/types";
@@ -39,7 +39,7 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
               className="text-[11px] font-black uppercase tracking-[0.22em]"
               style={{ color: "var(--text-muted)" }}
             >
-              Tate&apos;s Retro TV
+              Tate&apos;s TV
             </div>
 
             <div
@@ -50,7 +50,7 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
                 color: "var(--primary)",
               }}
             >
-              ● Live
+              ? Live
             </div>
 
             <div

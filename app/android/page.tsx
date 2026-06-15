@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ const androidSteps = [
 const importantFiles = [
   "/.well-known/assetlinks.json",
   "/manifest.webmanifest",
-  "/retro-logo.png",
+  "/tatestv-logo.png",
   "/privacy",
   "/terms",
 ] as const;
@@ -58,7 +58,7 @@ export default function AndroidPrepPage() {
             <ul>
               {androidSteps.map((step) => (
                 <li key={step}>
-                  <span aria-hidden="true">✓</span>
+                  <span aria-hidden="true">?</span>
                   {step}
                 </li>
               ))}
@@ -71,7 +71,7 @@ export default function AndroidPrepPage() {
             <ul>
               {importantFiles.map((file) => (
                 <li key={file}>
-                  <span aria-hidden="true">✓</span>
+                  <span aria-hidden="true">?</span>
                   {file}
                 </li>
               ))}
