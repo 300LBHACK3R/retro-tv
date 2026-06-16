@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
@@ -20,9 +21,7 @@ import ViewerHeader from "@/components/ViewerHeader";
 import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
-import Image from "next/image";
 import { getThemeById } from "@/lib/themes";
-import { getThemeLayoutClass, getThemeLayoutMode } from "@/lib/themeLayouts";
 import type { Channel, MediaItem } from "@/lib/types";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -87,14 +86,6 @@ function sortChannelsByNumber(channels: Channel[]): Channel[] {
   });
 }
 
-function getChannelDisplayName(channel: Channel | undefined): string {
-  if (!channel) {
-    return "No channel";
-  }
-
-  return channel.branding?.displayName ?? channel.name;
-}
-
 function getPlayerFrameClass(playerViewMode: "normal" | "mini" | "theater"): string {
   if (playerViewMode === "mini") {
     return [
@@ -133,7 +124,6 @@ export default function Home() {
   const setAppMode = useStore((state) => state.setAppMode);
   const themeId = useStore((state) => state.themeId);
 
-  
   const playerViewMode = useStore(
     (state) => state.viewerSettings.playerViewMode,
   );
@@ -164,26 +154,12 @@ export default function Home() {
     [activeChannel, media],
   );
 
-  /**
-   * Real playback schedule.
-   * This includes virtual show slices, commercials, bumpers, and hidden guide items.
-   * Player and Now/Next need this schedule so commercial breaks work correctly.
-   */
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
         channel: activeChannel,
       }),
     [activeChannel, activeChannelMedia],
-  );
-
-  /**
-   * Clean public guide schedule.
-   * This hides/merges commercials and bumpers into normal show blocks.
-   */
-  const activeGuideSchedule = useMemo(
-    () => buildGuideSchedule(activeSchedule),
-    [activeSchedule],
   );
 
   const channelSchedules = useMemo(
@@ -195,6 +171,7 @@ export default function Home() {
         return {
           channel,
           schedule: buildGuideSchedule(playbackSchedule),
+          media: channelMedia,
         };
       }),
     [enabledChannels, media],
@@ -267,15 +244,6 @@ export default function Home() {
     };
   }, [closeGuide, isGuideOpen, localSettingsOpen]);
 
-  const guideDock = (
-    <MultiGuide
-      data={channelSchedules}
-      onProgramSelect={({ channel }) => {
-        setChannel(channel.id);
-      }}
-    />
-  );
-
   const guideOverlay = (
     <MultiGuide
       data={channelSchedules}
@@ -303,7 +271,7 @@ export default function Home() {
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-           <Image
+            <Image
               src="/tatestv-logo.png"
               alt="TatesTv"
               width={260}
@@ -447,33 +415,8 @@ export default function Home() {
               <ChannelOverlay compact={playerViewMode === "mini"} />
               <StaticTransition trigger={activeChannel?.id ?? ""} />
               <Remote />
-
-              {isGuideOpen ? (
-                <div className="absolute inset-0 z-40 bg-black/80 p-3 backdrop-blur-[2px] sm:p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold tracking-wide text-white">
-                      Live Guide
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={closeGuide}
-                      className="rounded-lg px-3 py-2 text-sm font-semibold transition hover:opacity-90"
-                      style={{
-                        background: "var(--button-bg)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      Close Guide
-                    </button>
-                  </div>
-
-                  <div className="h-[calc(100%-56px)] overflow-auto">
-                    {guideOverlay}
-                  </div>
-                </div>
-              ) : null}
             </div>
+
             {!isGuideOpen ? (
               <section
                 className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
@@ -488,6 +431,7 @@ export default function Home() {
             ) : null}
           </section>
         </div>
+
         <footer
           className="rounded-2xl border px-4 py-4 text-center text-xs shadow-2xl shadow-black/20 sm:px-5"
           style={{
@@ -515,6 +459,43 @@ export default function Home() {
           </div>
         </footer>
       </div>
+
+      {isGuideOpen ? (
+        <div
+          className="fixed inset-0 z-[90] flex h-[100dvh] min-h-0 flex-col bg-black/90 p-2 backdrop-blur-md sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tate's TV live guide"
+        >
+          <div className="mb-2 flex shrink-0 items-center justify-between gap-3 sm:mb-3">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-white/55">
+                Tate&apos;s TV
+              </div>
+
+              <div className="text-lg font-black text-white sm:text-xl">
+                Live Guide
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeGuide}
+              className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+              style={{
+                background: "var(--button-bg)",
+                color: "var(--text)",
+              }}
+            >
+              Close Guide
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {guideOverlay}
+          </div>
+        </div>
+      ) : null}
 
       {localSettingsOpen ? (
         <div
@@ -586,21 +567,3 @@ export default function Home() {
     </main>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
