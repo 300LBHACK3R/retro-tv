@@ -118,11 +118,11 @@ export default function InstallPromptBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   const title = useMemo(() => {
-    if (mode === "native") return "Install Tate’s TV";
-    if (mode === "ios") return "Add Tate’s TV to your Home Screen";
-    if (mode === "android") return "Add Tate’s TV to your phone";
-    if (mode === "desktop") return "Use Tate’s TV like an app";
-    if (mode === "fallback") return "Save Tate’s TV for quick access";
+    if (mode === "native") return "Install Tate's TV";
+    if (mode === "ios") return "Add Tate's TV to your Home Screen";
+    if (mode === "android") return "Add Tate's TV to your phone";
+    if (mode === "desktop") return "Use Tate's TV like an app";
+    if (mode === "fallback") return "Save Tate's TV for quick access";
     return "";
   }, [mode]);
 
@@ -140,7 +140,7 @@ export default function InstallPromptBanner() {
     }
 
     if (mode === "desktop") {
-      return "Chrome and Edge can install Tate’s TV from the address bar or browser menu.";
+      return "Chrome and Edge can install Tate's TV from the address bar or browser menu.";
     }
 
     if (mode === "fallback") {

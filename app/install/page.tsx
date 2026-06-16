@@ -100,15 +100,15 @@ function getInstallRecommendation(status: InstallStatus): {
     return {
       title: "Already installed",
       detail:
-        "Tate’s TV is currently running in standalone app mode on this device.",
+        "Tate's TV is currently running in standalone app mode on this device.",
     };
   }
 
   if (platform.includes("iphone") || platform.includes("ipad")) {
     return {
-      title: "Use Safari ? Share ? Add to Home Screen",
+      title: "Use Safari, Share, Add to Home Screen",
       detail:
-        "On iPhone and iPad, open Tate’s TV in Safari, tap the Share button, choose Add to Home Screen, then tap Add.",
+        "On iPhone and iPad, open Tate's TV in Safari, tap the Share button, choose Add to Home Screen, then tap Add.",
     };
   }
 
@@ -136,7 +136,7 @@ function getInstallRecommendation(status: InstallStatus): {
     return {
       title: "Use the address bar install button",
       detail:
-        "In Chrome or Edge, look for the install icon in the address bar, or open the browser menu and choose Install Tate’s TV.",
+        "In Chrome or Edge, look for the install icon in the address bar, or open the browser menu and choose Install Tate's TV.",
     };
   }
 
@@ -144,7 +144,7 @@ function getInstallRecommendation(status: InstallStatus): {
     return {
       title: "Use bookmark or fullscreen mode",
       detail:
-        "This browser may not show a full install button. Bookmark Tate’s TV and use fullscreen mode when available.",
+        "This browser may not show a full install button. Bookmark Tate's TV and use fullscreen mode when available.",
     };
   }
 
