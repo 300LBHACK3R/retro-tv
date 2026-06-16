@@ -131,3 +131,129 @@
     box-shadow: 12px 0 18px rgba(0, 0, 0, 0.26);
   }
 }
+
+/* === PREMIUM_GUIDE_V2_START === */
+.ttv-guide-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: min(82vh, 900px);
+  max-height: 100%;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,0.06), transparent 34%),
+    var(--panel-bg);
+}
+
+.ttv-guide-topbar {
+  flex-shrink: 0;
+}
+
+.ttv-guide-days {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-bg) 88%, black 12%);
+  padding: 0.75rem 1rem;
+  scrollbar-width: thin;
+}
+
+.ttv-guide-day {
+  display: flex;
+  min-width: 6.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-alt-bg);
+  color: var(--text);
+  padding: 0.55rem 0.8rem;
+  text-align: left;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ttv-guide-day:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+}
+
+.ttv-guide-day[data-active="true"] {
+  background: var(--guide-current-bg);
+  color: #0f172a;
+  border-color: var(--primary);
+}
+
+.ttv-guide-day span {
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ttv-guide-day small {
+  font-size: 0.64rem;
+  font-weight: 800;
+  opacity: 0.72;
+}
+
+.ttv-guide-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+}
+
+.ttv-guide-sticky-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 70;
+}
+
+.ttv-guide-sticky-time {
+  position: sticky;
+  top: 0;
+  z-index: 55;
+}
+
+.ttv-guide-channel-cell {
+  position: sticky;
+  left: 0;
+  z-index: 45;
+}
+
+@media (max-width: 640px) {
+  .ttv-guide-shell {
+    height: 100%;
+    border-radius: 1rem;
+  }
+
+  .ttv-guide-topbar {
+    padding: 0.75rem;
+  }
+
+  .ttv-guide-days {
+    gap: 0.4rem;
+    padding: 0.6rem;
+  }
+
+  .ttv-guide-day {
+    min-width: 6.25rem;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .ttv-guide-scroll {
+    height: 100%;
+    max-height: none;
+  }
+}
+/* === PREMIUM_GUIDE_V2_END === */

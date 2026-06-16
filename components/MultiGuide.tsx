@@ -1,32 +1,35 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
-import { isHiddenGuideItem } from "@/lib/guideSchedule";
+import { buildGuideSchedule, isHiddenGuideItem } from "@/lib/guideSchedule";
+import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
-import type { BroadcastItem, Channel } from "@/lib/types";
+import type { BroadcastItem, Channel, MediaItem } from "@/lib/types";
 
-const BASE_ROW_HEIGHT = 74;
-const COMPACT_ROW_HEIGHT = 62;
+const ROW_HEIGHT_COMFORTABLE = 68;
+const ROW_HEIGHT_COMPACT = 56;
+
 const SLOT_MINUTES = 30;
-const GUIDE_HOURS = 24;
-const SLOT_COUNT = GUIDE_HOURS * 2;
-const CHANNEL_COLUMN_WIDTH = 132;
-const MIN_SLOT_WIDTH = 154;
-const WINDOW_MINUTES = SLOT_MINUTES * SLOT_COUNT;
-const WINDOW_SECONDS = WINDOW_MINUTES * 60;
+const SLOTS_PER_DAY = 48;
+const GUIDE_DAY_COUNT = 7;
+const TOTAL_SLOT_COUNT = SLOTS_PER_DAY * GUIDE_DAY_COUNT;
+
+const CHANNEL_COLUMN_WIDTH = 154;
+const SLOT_WIDTH = 168;
+const DAY_PIXEL_WIDTH = SLOTS_PER_DAY * SLOT_WIDTH;
+const TIMELINE_WIDTH = TOTAL_SLOT_COUNT * SLOT_WIDTH;
+
+const DAY_SECONDS = 24 * 60 * 60;
+const GUIDE_WINDOW_SECONDS = DAY_SECONDS * GUIDE_DAY_COUNT;
 const LIVE_TICK_MS = 15_000;
 
 type MultiGuideRow = {
   channel: Channel;
   schedule: BroadcastItem[];
+  media?: MediaItem[];
 };
-
-interface MultiGuideProps {
-  data: MultiGuideRow[];
-  onProgramSelect?: (payload: { channel: Channel; item: BroadcastItem }) => void;
-}
 
 type TimelineSegment = {
   item: BroadcastItem;
@@ -34,18 +37,28 @@ type TimelineSegment = {
   endSec: number;
 };
 
+type PreparedGuideRow = MultiGuideRow & {
+  visibleSegments: TimelineSegment[];
+};
+
+type GuideDay = {
+  date: Date;
+  label: string;
+  subLabel: string;
+};
+
+interface MultiGuideProps {
+  data: MultiGuideRow[];
+  onProgramSelect?: (payload: {
+    channel: Channel;
+    item: BroadcastItem;
+  }) => void;
+}
+
 function formatTime(date: Date): string {
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
-  });
-}
-
-function formatShortDate(date: Date): string {
-  return date.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
   });
 }
 
@@ -66,15 +79,44 @@ function formatDuration(seconds: number): string {
   return `${minutes} min`;
 }
 
-function floorToHalfHour(date: Date): Date {
+function startOfLocalDay(date: Date): Date {
   const nextDate = new Date(date);
-
-  nextDate.setSeconds(0, 0);
-
-  const minutes = nextDate.getMinutes();
-  nextDate.setMinutes(minutes < 30 ? 0 : 30);
-
+  nextDate.setHours(0, 0, 0, 0);
   return nextDate;
+}
+
+function addDays(date: Date, amount: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + amount);
+  return nextDate;
+}
+
+function getNoonForGuideDay(date: Date): Date {
+  const nextDate = new Date(date);
+  nextDate.setHours(12, 0, 0, 0);
+  return nextDate;
+}
+
+function buildGuideDays(now: Date): GuideDay[] {
+  const today = startOfLocalDay(now);
+
+  return Array.from({ length: GUIDE_DAY_COUNT }, (_, offset) => {
+    const date = addDays(today, offset);
+
+    return {
+      date,
+      label:
+        offset === 0
+          ? "Today"
+          : offset === 1
+            ? "Tomorrow"
+            : date.toLocaleDateString([], { weekday: "short" }),
+      subLabel: date.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+      }),
+    };
+  });
 }
 
 function getChannelLabel(channel: Channel): string {
@@ -132,7 +174,7 @@ function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   );
 }
 
-function buildVisibleTimeline(
+function buildVisibleTimelineForWindow(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
   windowDurationSeconds: number,
@@ -207,6 +249,58 @@ function buildVisibleTimeline(
   return segments;
 }
 
+function buildSevenDayTimeline(
+  row: MultiGuideRow,
+  guideStartDate: Date,
+): TimelineSegment[] {
+  if (!row.media) {
+    const guideStartBroadcastSeconds = getSecondsSinceBroadcastEpoch(
+      guideStartDate.getTime(),
+    );
+
+    return buildVisibleTimelineForWindow(
+      row.schedule,
+      guideStartBroadcastSeconds,
+      GUIDE_WINDOW_SECONDS,
+    );
+  }
+
+  const segments: TimelineSegment[] = [];
+
+  for (let dayOffset = 0; dayOffset < GUIDE_DAY_COUNT; dayOffset += 1) {
+    const dayStart = addDays(guideStartDate, dayOffset);
+    const scheduleDate = getNoonForGuideDay(dayStart);
+
+    const playbackSchedule = buildSchedule(row.media, {
+      channel: row.channel,
+      now: scheduleDate,
+    });
+
+    const publicGuideSchedule = buildGuideSchedule(playbackSchedule);
+    const dayStartBroadcastSeconds = getSecondsSinceBroadcastEpoch(
+      dayStart.getTime(),
+    );
+
+    const daySegments = buildVisibleTimelineForWindow(
+      publicGuideSchedule,
+      dayStartBroadcastSeconds,
+      DAY_SECONDS,
+    );
+
+    const dayOffsetSeconds = dayOffset * DAY_SECONDS;
+
+    for (const segment of daySegments) {
+      segments.push({
+        item: segment.item,
+        startSec: segment.startSec + dayOffsetSeconds,
+        endSec: segment.endSec + dayOffsetSeconds,
+      });
+    }
+  }
+
+  return segments;
+}
+
 function sortRows(data: MultiGuideRow[]): MultiGuideRow[] {
   return [...data]
     .filter(({ channel }) => channel.isEnabled !== false)
@@ -236,10 +330,36 @@ function getSafeAccent(channel: Channel): string {
   return "var(--primary)";
 }
 
+function getTimelineGridTemplate(): string {
+  return `repeat(${TOTAL_SLOT_COUNT}, ${SLOT_WIDTH}px)`;
+}
+
+function getTickLabel(date: Date, index: number): {
+  primary: string;
+  secondary: string;
+  isDayStart: boolean;
+} {
+  const isDayStart = index % SLOTS_PER_DAY === 0;
+  const isMajorTick = index % 12 === 0;
+
+  return {
+    primary: formatTime(date),
+    secondary:
+      isDayStart || isMajorTick
+        ? date.toLocaleDateString([], {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })
+        : "",
+    isDayStart,
+  };
+}
+
 function EmptyGuideState({ message }: { message: string }) {
   return (
     <div
-      className="flex min-h-[14rem] items-center justify-center px-4 py-8 text-sm"
+      className="col-span-2 flex min-h-[16rem] items-center justify-center px-4 py-8 text-sm"
       style={{ color: "var(--text-muted)" }}
     >
       {message}
@@ -247,16 +367,17 @@ function EmptyGuideState({ message }: { message: string }) {
   );
 }
 
-export default function MultiGuide({
-  data,
-  onProgramSelect,
-}: MultiGuideProps) {
+export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const didInitialAutoScrollRef = useRef(false);
+
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const guideDensity = useStore((state) => state.viewerSettings.guideDensity);
 
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -271,171 +392,229 @@ export default function MultiGuide({
     };
   }, []);
 
-  const enabledRows = useMemo(() => sortRows(data), [data]);
-
-  const windowStart = useMemo(() => {
+  const guideDays = useMemo(() => {
     if (!now) {
-      return null;
+      return [];
     }
 
-    return floorToHalfHour(now);
+    return buildGuideDays(now);
   }, [now]);
 
-  if (!mounted || !now || !windowStart) {
+  const guideStartDate = guideDays[0]?.date ?? null;
+
+  const preparedRows = useMemo<PreparedGuideRow[]>(() => {
+    if (!guideStartDate) {
+      return [];
+    }
+
+    return sortRows(data).map((row) => ({
+      ...row,
+      visibleSegments: buildSevenDayTimeline(row, guideStartDate),
+    }));
+  }, [data, guideStartDate]);
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+
+    if (
+      !scrollElement ||
+      !now ||
+      !guideStartDate ||
+      didInitialAutoScrollRef.current
+    ) {
+      return;
+    }
+
+    didInitialAutoScrollRef.current = true;
+
+    window.requestAnimationFrame(() => {
+      const secondsIntoToday = Math.max(
+        0,
+        Math.floor((now.getTime() - guideStartDate.getTime()) / 1000),
+      );
+
+      const estimatedLeft = (secondsIntoToday / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
+
+      scrollElement.scrollLeft = Math.max(
+        0,
+        estimatedLeft - scrollElement.clientWidth * 0.35,
+      );
+    });
+  }, [guideStartDate, now]);
+
+  function scrollToDay(dayIndex: number): void {
+    const scrollElement = scrollRef.current;
+
+    setSelectedDayIndex(dayIndex);
+
+    if (!scrollElement) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      scrollElement.scrollTo({
+        left: Math.max(0, dayIndex * DAY_PIXEL_WIDTH),
+        behavior: "smooth",
+      });
+    });
+  }
+
+  function handleGuideScroll(): void {
+    const scrollElement = scrollRef.current;
+
+    if (!scrollElement) {
+      return;
+    }
+
+    const centeredPosition = scrollElement.scrollLeft + scrollElement.clientWidth * 0.5;
+    const nextDayIndex = Math.min(
+      GUIDE_DAY_COUNT - 1,
+      Math.max(0, Math.floor(centeredPosition / DAY_PIXEL_WIDTH)),
+    );
+
+    setSelectedDayIndex((currentDayIndex) =>
+      currentDayIndex === nextDayIndex ? currentDayIndex : nextDayIndex,
+    );
+  }
+
+  if (!mounted || !now || !guideStartDate) {
     return null;
   }
 
-  const rowHeight = guideDensity === "compact" ? COMPACT_ROW_HEIGHT : BASE_ROW_HEIGHT;
-  const timelineWidth = SLOT_COUNT * MIN_SLOT_WIDTH;
+  const rowHeight =
+    guideDensity === "compact" ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE;
 
-  const secondsSinceWindowStart = Math.min(
-    WINDOW_SECONDS,
-    Math.max(0, Math.floor((now.getTime() - windowStart.getTime()) / 1000)),
-  );
-
-  const windowStartBroadcastSeconds = getSecondsSinceBroadcastEpoch(
-    windowStart.getTime(),
+  const secondsSinceGuideStart = Math.min(
+    GUIDE_WINDOW_SECONDS,
+    Math.max(0, Math.floor((now.getTime() - guideStartDate.getTime()) / 1000)),
   );
 
   const nowLineLeft = Math.min(
-    timelineWidth,
-    Math.max(0, (secondsSinceWindowStart / WINDOW_SECONDS) * timelineWidth),
+    TIMELINE_WIDTH,
+    Math.max(0, (secondsSinceGuideStart / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH),
   );
 
-  const guideEnd = new Date(windowStart.getTime() + WINDOW_SECONDS * 1000);
+  const timelineGridTemplate = getTimelineGridTemplate();
 
   return (
     <section
-      className="ttv-glass-panel flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border shadow-2xl"
-      style={{
-        borderColor: "var(--border)",
-        color: "var(--text)",
-      }}
+      className="ttv-glass-panel ttv-guide-shell w-full overflow-hidden rounded-2xl shadow-2xl"
+      style={{ color: "var(--text)" }}
       aria-label="Live TV guide"
     >
       <div
-        className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        className="ttv-guide-topbar flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
         style={{
           borderColor: "var(--border)",
           background:
-            "linear-gradient(135deg, rgba(255,255,255,0.06), transparent 42%), var(--guide-header-bg)",
+            "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 44%), var(--guide-header-bg)",
         }}
       >
         <div className="min-w-0">
           <div
-            className="text-[11px] font-black uppercase tracking-[0.28em]"
+            className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            TatesTV
+            Tate&apos;s TV
           </div>
 
-          <div className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
+          <div className="mt-1 text-base font-black tracking-tight sm:text-lg">
             Premium Live Guide
-          </div>
-
-          <div
-            className="mt-1 text-xs leading-5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Scroll right for the next {GUIDE_HOURS} hours. Scroll down for all
-            channels. Commercials are hidden from guide view.
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <div
-            className="rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
-            style={{
-              borderColor: "var(--border)",
-              background: "var(--panel-alt-bg)",
-              color: "var(--text)",
-            }}
-          >
-            {formatTime(now)}
-          </div>
+        <div className="text-right">
+          <div className="text-sm font-black">{formatTime(now)}</div>
 
+          <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            7 day timeline / scroll right for tomorrow
+          </div>
+        </div>
+      </div>
+
+      <div className="ttv-guide-days" aria-label="Guide days">
+        {guideDays.map((day, index) => (
+          <button
+            key={day.date.toISOString()}
+            type="button"
+            className="ttv-guide-day"
+            data-active={index === selectedDayIndex ? "true" : "false"}
+            onClick={() => scrollToDay(index)}
+          >
+            <span>{day.label}</span>
+            <small>{day.subLabel}</small>
+          </button>
+        ))}
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="ttv-guide-scroll w-full"
+        onScroll={handleGuideScroll}
+      >
+        <div
+          className="grid min-w-max"
+          style={{
+            gridTemplateColumns: `${CHANNEL_COLUMN_WIDTH}px ${TIMELINE_WIDTH}px`,
+          }}
+        >
           <div
-            className="rounded-full border px-3 py-2 text-xs"
+            className="ttv-guide-sticky-corner border-r border-b px-3 py-3 text-xs font-black uppercase tracking-[0.12em]"
             style={{
               borderColor: "var(--border)",
               background: "var(--panel-alt-bg)",
               color: "var(--text-muted)",
             }}
           >
-            {formatShortDate(windowStart)} → {formatShortDate(guideEnd)}
+            Channels
           </div>
-        </div>
-      </div>
 
-      {enabledRows.length === 0 ? (
-        <EmptyGuideState message="No enabled channels available." />
-      ) : (
-        <div className="ttv-guide-scroll min-h-0 flex-1 overflow-auto overscroll-contain">
           <div
-            className="grid min-w-max"
+            className="ttv-guide-sticky-time grid border-b"
             style={{
-              gridTemplateColumns: `${CHANNEL_COLUMN_WIDTH}px ${timelineWidth}px`,
+              width: `${TIMELINE_WIDTH}px`,
+              gridTemplateColumns: timelineGridTemplate,
+              borderColor: "var(--border)",
+              background: "var(--panel-alt-bg)",
             }}
           >
-            <div
-              className="sticky left-0 top-0 z-50 flex items-center border-r border-b px-3 py-3 text-xs font-black uppercase tracking-[0.16em]"
-              style={{
-                minHeight: "54px",
-                borderColor: "var(--border)",
-                background: "var(--panel-alt-bg)",
-                color: "var(--text-muted)",
-              }}
-            >
-              Channels
-            </div>
+            {Array.from({ length: TOTAL_SLOT_COUNT }).map((_, index) => {
+              const tickTime = new Date(
+                guideStartDate.getTime() + index * SLOT_MINUTES * 60 * 1000,
+              );
 
-            <div
-              className="sticky top-0 z-40 grid border-b"
-              style={{
-                width: `${timelineWidth}px`,
-                gridTemplateColumns: `repeat(${SLOT_COUNT}, ${MIN_SLOT_WIDTH}px)`,
-                borderColor: "var(--border)",
-                background: "var(--panel-alt-bg)",
-              }}
-            >
-              {Array.from({ length: SLOT_COUNT }).map((_, index) => {
-                const tickTime = new Date(
-                  windowStart.getTime() + index * SLOT_MINUTES * 60 * 1000,
-                );
+              const label = getTickLabel(tickTime, index);
 
-                const isMidnight =
-                  tickTime.getHours() === 0 && tickTime.getMinutes() === 0;
+              return (
+                <div
+                  key={tickTime.toISOString()}
+                  className="border-r px-3 py-2 text-xs font-black last:border-r-0"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: label.isDayStart ? "var(--primary)" : "var(--text-muted)",
+                  }}
+                >
+                  <div>{label.primary}</div>
 
-                return (
-                  <div
-                    key={tickTime.toISOString()}
-                    className="flex min-h-[54px] flex-col justify-center border-r px-3 py-2 text-xs font-black last:border-r-0"
-                    style={{
-                      borderColor: "var(--border)",
-                      color: isMidnight ? "var(--primary)" : "var(--text-muted)",
-                    }}
-                  >
-                    <span>{formatTime(tickTime)}</span>
+                  {label.secondary ? (
+                    <div
+                      className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.12em]"
+                      style={{ color: label.isDayStart ? "var(--primary)" : "var(--text-muted)" }}
+                    >
+                      {label.secondary}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
 
-                    {isMidnight ? (
-                      <span className="mt-1 text-[10px] uppercase tracking-[0.16em]">
-                        {formatShortDate(tickTime)}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            {enabledRows.map(({ channel, schedule }, rowIndex) => {
+          {preparedRows.length === 0 ? (
+            <EmptyGuideState message="No enabled channels available." />
+          ) : (
+            preparedRows.map(({ channel, visibleSegments }, rowIndex) => {
               const isActive = channel.id === currentChannelId;
               const accent = getSafeAccent(channel);
-
-              const visibleSegments = buildVisibleTimeline(
-                schedule,
-                windowStartBroadcastSeconds,
-                WINDOW_SECONDS,
-              );
 
               return (
                 <GuideRow
@@ -445,7 +624,6 @@ export default function MultiGuide({
                   accent={accent}
                   rowIndex={rowIndex}
                   rowHeight={rowHeight}
-                  timelineWidth={timelineWidth}
                   visibleSegments={visibleSegments}
                   nowLineLeft={nowLineLeft}
                   onChannelSelect={() => {
@@ -457,10 +635,10 @@ export default function MultiGuide({
                   }}
                 />
               );
-            })}
-          </div>
+            })
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -471,7 +649,6 @@ function GuideRow({
   accent,
   rowIndex,
   rowHeight,
-  timelineWidth,
   visibleSegments,
   nowLineLeft,
   onChannelSelect,
@@ -482,7 +659,6 @@ function GuideRow({
   accent: string;
   rowIndex: number;
   rowHeight: number;
-  timelineWidth: number;
   visibleSegments: TimelineSegment[];
   nowLineLeft: number;
   onChannelSelect: () => void;
@@ -495,7 +671,7 @@ function GuideRow({
       : "var(--guide-row-alt-bg)";
 
   const channelTextColor = isActive ? "#0f172a" : "var(--text)";
-  const nowSeconds = (nowLineLeft / timelineWidth) * WINDOW_SECONDS;
+  const nowSeconds = (nowLineLeft / TIMELINE_WIDTH) * GUIDE_WINDOW_SECONDS;
   const firstVisibleItem = visibleSegments[0]?.item;
 
   return (
@@ -512,7 +688,7 @@ function GuideRow({
             });
           }
         }}
-        className="ttv-touch-target sticky left-0 z-30 flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-95"
+        className="ttv-guide-channel-cell ttv-touch-target flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
         style={{
           height: `${rowHeight}px`,
           borderColor: "var(--border)",
@@ -521,11 +697,11 @@ function GuideRow({
           color: channelTextColor,
         }}
       >
-        <div className="text-[14px] font-black">{getChannelLabel(channel)}</div>
+        <div className="text-[13px] font-black">{getChannelLabel(channel)}</div>
 
         <div
-          className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.18em]"
-          style={{ opacity: 0.82 }}
+          className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.16em]"
+          style={{ opacity: 0.8 }}
           title={getChannelName(channel)}
         >
           {getChannelCallsign(channel)}
@@ -536,7 +712,7 @@ function GuideRow({
         className="relative border-b"
         style={{
           height: `${rowHeight}px`,
-          width: `${timelineWidth}px`,
+          width: `${TIMELINE_WIDTH}px`,
           borderColor: "var(--border)",
           background: rowBg,
         }}
@@ -544,12 +720,12 @@ function GuideRow({
         <div
           className="grid h-full"
           style={{
-            width: `${timelineWidth}px`,
-            gridTemplateColumns: `repeat(${SLOT_COUNT}, ${MIN_SLOT_WIDTH}px)`,
+            width: `${TIMELINE_WIDTH}px`,
+            gridTemplateColumns: getTimelineGridTemplate(),
           }}
           aria-hidden="true"
         >
-          {Array.from({ length: SLOT_COUNT }).map((_, index) => (
+          {Array.from({ length: TOTAL_SLOT_COUNT }).map((_, index) => (
             <div
               key={index}
               className="border-r last:border-r-0"
@@ -560,7 +736,7 @@ function GuideRow({
 
         {visibleSegments.length === 0 ? (
           <div
-            className="absolute inset-0 flex items-center justify-center text-xs font-semibold"
+            className="absolute inset-0 flex items-center justify-center text-xs"
             style={{ color: "var(--text-muted)" }}
           >
             Off Air
@@ -568,9 +744,10 @@ function GuideRow({
         ) : null}
 
         {visibleSegments.map((segment, index) => {
-          const left = (segment.startSec / WINDOW_SECONDS) * timelineWidth;
+          const left = (segment.startSec / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
           const width =
-            ((segment.endSec - segment.startSec) / WINDOW_SECONDS) * timelineWidth;
+            ((segment.endSec - segment.startSec) / GUIDE_WINDOW_SECONDS) *
+            TIMELINE_WIDTH;
 
           const isCurrentProgram =
             segment.startSec <= nowSeconds && segment.endSec > nowSeconds;
@@ -588,10 +765,10 @@ function GuideRow({
                   item: segment.item,
                 })
               }
-              className="absolute top-0 overflow-hidden border px-3 py-2 text-left text-[12px] leading-tight transition hover:z-20 hover:brightness-110"
+              className="absolute top-0 overflow-hidden border px-2 py-2 text-left text-[11px] leading-tight transition hover:z-20 hover:brightness-110"
               style={{
                 left: `${left}px`,
-                width: `${Math.max(width, 44)}px`,
+                width: `${Math.max(width, 42)}px`,
                 height: `${rowHeight}px`,
                 background: isCurrentProgram
                   ? "var(--guide-current-bg)"
@@ -599,7 +776,7 @@ function GuideRow({
                 borderColor: isCurrentProgram ? accent : "var(--border)",
                 color: isCurrentProgram ? "#0f172a" : "var(--text)",
                 boxShadow: isCurrentProgram
-                  ? `inset 0 0 0 1px ${accent}, 0 0 20px rgba(255,255,255,0.14)`
+                  ? `inset 0 0 0 1px ${accent}, 0 0 18px rgba(255,255,255,0.12)`
                   : "none",
               }}
               title={`${title} / ${formatDuration(duration)}`}
@@ -609,7 +786,7 @@ function GuideRow({
             >
               <div className="truncate font-black tracking-tight">{title}</div>
 
-              <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.78 }}>
+              <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.76 }}>
                 {segment.item.type.toUpperCase()} / {formatDuration(duration)}
               </div>
             </button>
@@ -617,7 +794,7 @@ function GuideRow({
         })}
 
         <div
-          className="absolute bottom-0 top-0 z-20 w-[2px] bg-red-500 shadow-[0_0_14px_rgba(239,68,68,0.95)]"
+          className="absolute bottom-0 top-0 z-10 w-[2px] bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]"
           style={{
             left: `${nowLineLeft}px`,
           }}

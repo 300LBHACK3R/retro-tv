@@ -214,6 +214,22 @@ export default function Home() {
   }, [activeChannel, enabledChannels, setChannel]);
 
   useEffect(() => {
+    const shouldLockPage = isGuideOpen || localSettingsOpen;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+
+    if (shouldLockPage) {
+      document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "none";
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [isGuideOpen, localSettingsOpen]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) {
         return;
@@ -426,7 +442,7 @@ export default function Home() {
                   color: "var(--text-muted)",
                 }}
               >
-                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the full live channel guide.
+                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the premium live guide.
               </section>
             ) : null}
           </section>
