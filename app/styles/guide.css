@@ -1,9 +1,133 @@
-.ttv-guide-scroll
+.ttv-guide-shell {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  isolation: isolate;
+  flex-direction: column;
+}
 
-guide mobile fixes
+.ttv-guide-topbar {
+  flex: 0 0 auto;
+}
 
-guide max heights
+.ttv-guide-days {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 46%),
+    var(--panel-bg);
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
 
-guide scrolling
+.ttv-guide-day {
+  min-width: 6.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-alt-bg);
+  color: var(--text-muted);
+  padding: 0.55rem 0.75rem;
+  text-align: center;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
 
-guide styling
+.ttv-guide-day:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.ttv-guide-day span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ttv-guide-day small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  opacity: 0.78;
+}
+
+.ttv-guide-day[data-active="true"] {
+  border-color: var(--primary);
+  background: var(--guide-current-bg);
+  color: #0f172a;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 0 22px rgba(255, 255, 255, 0.08);
+}
+
+.ttv-guide-scroll {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) rgba(255, 255, 255, 0.08);
+  background: var(--panel-bg);
+  -webkit-overflow-scrolling: touch;
+}
+
+.ttv-guide-scroll::-webkit-scrollbar {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.ttv-guide-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ttv-guide-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.ttv-guide-sticky-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 35;
+}
+
+.ttv-guide-sticky-time {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+.ttv-guide-channel-cell {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+}
+
+@media (max-width: 720px) {
+  .ttv-guide-days {
+    padding: 0.6rem;
+  }
+
+  .ttv-guide-day {
+    min-width: 5.5rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .ttv-guide-sticky-corner,
+  .ttv-guide-channel-cell {
+    box-shadow: 12px 0 18px rgba(0, 0, 0, 0.26);
+  }
+}

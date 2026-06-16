@@ -1,4 +1,4 @@
-ï»¿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -11,9 +11,23 @@ type BeforeInstallPromptEvent = Event & {
   }>;
 };
 
-type InstallPromptMode = "hidden" | "native" | "ios" | "desktop";
+type InstallPromptMode =
+  | "hidden"
+  | "native"
+  | "ios"
+  | "android"
+  | "desktop"
+  | "fallback";
 
-const DISMISSED_KEY = "ttv-install-prompt-dismissed-v1";
+type BrowserProfile = {
+  isIos: boolean;
+  isAndroid: boolean;
+  isDesktop: boolean;
+  isSamsungInternet: boolean;
+};
+
+const DISMISSED_KEY = "ttv-install-prompt-dismissed-v2";
+const DISMISS_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 
 function isStandaloneMode(): boolean {
   if (typeof window === "undefined") return false;
@@ -24,22 +38,37 @@ function isStandaloneMode(): boolean {
   );
 }
 
-function isIosDevice(): boolean {
-  if (typeof window === "undefined") return false;
+function getBrowserProfile(): BrowserProfile {
+  if (typeof window === "undefined") {
+    return {
+      isIos: false,
+      isAndroid: false,
+      isDesktop: false,
+      isSamsungInternet: false,
+    };
+  }
 
   const userAgent = window.navigator.userAgent.toLowerCase();
   const platform = window.navigator.platform.toLowerCase();
 
-  return (
+  const isIos =
     /iphone|ipad|ipod/.test(userAgent) ||
-    (platform === "macintel" && window.navigator.maxTouchPoints > 1)
-  );
-}
+    (platform === "macintel" && window.navigator.maxTouchPoints > 1);
 
-function isLikelyDesktop(): boolean {
-  if (typeof window === "undefined") return false;
+  const isAndroid = /android/.test(userAgent);
+  const isSamsungInternet = /samsungbrowser/.test(userAgent);
 
-  return window.matchMedia("(min-width: 900px)").matches;
+  const isDesktop =
+    !isIos &&
+    !isAndroid &&
+    window.matchMedia("(min-width: 900px)").matches;
+
+  return {
+    isIos,
+    isAndroid,
+    isDesktop,
+    isSamsungInternet,
+  };
 }
 
 function wasDismissedRecently(): boolean {
@@ -52,9 +81,7 @@ function wasDismissedRecently(): boolean {
 
     if (!Number.isFinite(dismissedAt)) return false;
 
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-
-    return Date.now() - dismissedAt < sevenDays;
+    return Date.now() - dismissedAt < DISMISS_DURATION_MS;
   } catch {
     return false;
   }
@@ -68,6 +95,22 @@ function saveDismissed() {
   }
 }
 
+function getFallbackMode(profile: BrowserProfile): InstallPromptMode {
+  if (profile.isIos) {
+    return "ios";
+  }
+
+  if (profile.isAndroid || profile.isSamsungInternet) {
+    return "android";
+  }
+
+  if (profile.isDesktop) {
+    return "desktop";
+  }
+
+  return "fallback";
+}
+
 export default function InstallPromptBanner() {
   const [mode, setMode] = useState<InstallPromptMode>("hidden");
   const [deferredPrompt, setDeferredPrompt] =
@@ -75,23 +118,33 @@ export default function InstallPromptBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   const title = useMemo(() => {
-    if (mode === "native") return "Install Tateâ€™s TV";
-    if (mode === "ios") return "Add Tateâ€™s TV to your Home Screen";
-    if (mode === "desktop") return "Want the app version?";
+    if (mode === "native") return "Install Tate’s TV";
+    if (mode === "ios") return "Add Tate’s TV to your Home Screen";
+    if (mode === "android") return "Add Tate’s TV to your phone";
+    if (mode === "desktop") return "Use Tate’s TV like an app";
+    if (mode === "fallback") return "Save Tate’s TV for quick access";
     return "";
   }, [mode]);
 
   const message = useMemo(() => {
     if (mode === "native") {
-      return "Get the cleaner app-style experience from your device.";
+      return "Get the cleaner app-style experience from your browser.";
     }
 
     if (mode === "ios") {
-      return "Open in Safari, tap Share, then choose Add to Home Screen.";
+      return "On iPhone or iPad, open Safari, tap Share, then choose Add to Home Screen.";
+    }
+
+    if (mode === "android") {
+      return "Use Chrome, Samsung Internet, or your browser menu, then choose Install app or Add to Home screen.";
     }
 
     if (mode === "desktop") {
-      return "Install from Chrome or Edge, or view install instructions.";
+      return "Chrome and Edge can install Tate’s TV from the address bar or browser menu.";
+    }
+
+    if (mode === "fallback") {
+      return "Open install instructions for your device, browser, or TV.";
     }
 
     return "";
@@ -112,7 +165,13 @@ export default function InstallPromptBanner() {
       setMode("native");
     };
 
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setMode("hidden");
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     const fallbackTimer = window.setTimeout(() => {
       if (isStandaloneMode() || wasDismissedRecently()) {
@@ -120,18 +179,18 @@ export default function InstallPromptBanner() {
         return;
       }
 
-      if (isIosDevice()) {
-        setMode("ios");
-        return;
-      }
+      setMode((current) => {
+        if (current === "native") {
+          return current;
+        }
 
-      if (isLikelyDesktop()) {
-        setMode("desktop");
-      }
-    }, 1800);
+        return getFallbackMode(getBrowserProfile());
+      });
+    }, 900);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
       window.clearTimeout(fallbackTimer);
     };
   }, []);
@@ -141,15 +200,20 @@ export default function InstallPromptBanner() {
       return;
     }
 
-    await deferredPrompt.prompt();
+    try {
+      await deferredPrompt.prompt();
 
-    const choice = await deferredPrompt.userChoice;
+      const choice = await deferredPrompt.userChoice;
 
-    if (choice.outcome === "accepted") {
-      setMode("hidden");
+      if (choice.outcome === "accepted") {
+        setMode("hidden");
+      }
+
+      setDeferredPrompt(null);
+    } catch {
+      setDeferredPrompt(null);
+      setMode(getFallbackMode(getBrowserProfile()));
     }
-
-    setDeferredPrompt(null);
   }
 
   function dismiss() {
