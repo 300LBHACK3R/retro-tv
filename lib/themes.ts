@@ -39,6 +39,19 @@ export type ThemeDefinition = {
 
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
+export type ThemeAccessLabel =
+  | "Free"
+  | "Unlocked"
+  | "Owned"
+  | "Preview"
+  | "Premium";
+
+export type ThemeCategoryMeta = {
+  id: ThemeCategory;
+  label: string;
+  description: string;
+};
+
 /**
  * Keep all unlocked while the product is being built/tested.
  * Switch to "premium-locked" later when payment/unlock flow exists.
@@ -46,6 +59,34 @@ export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 
 export const DEFAULT_THEME_ID: ThemeId = "shaw-2006";
+
+export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
+  {
+    id: "classic",
+    label: "Classic Cable",
+    description: "Nostalgic cable-box and early digital guide styles.",
+  },
+  {
+    id: "premium",
+    label: "Premium",
+    description: "High-end dark, gold, and modern app themes.",
+  },
+  {
+    id: "console",
+    label: "Console",
+    description: "Gaming-console inspired interfaces.",
+  },
+  {
+    id: "arcade",
+    label: "Arcade",
+    description: "Neon gaming and late-night channel styles.",
+  },
+  {
+    id: "cartoon",
+    label: "Cartoon",
+    description: "Bright, playful, Saturday-morning style interfaces.",
+  },
+];
 
 export const THEMES = [
   {
@@ -265,7 +306,6 @@ export const THEMES = [
       guideCurrentBg: "#bef264",
     },
   },
-
   {
     id: "electric-blue-live",
     name: "Electric Blue Live",
@@ -300,33 +340,79 @@ export const THEMES = [
       guideCurrentBg: "#38bdf8",
     },
   },
-
 ] as const satisfies readonly ThemeDefinition[];
 
 export const THEME_IDS = THEMES.map((theme) => theme.id) as ThemeId[];
+
+const DEFAULT_THEME =
+  THEMES.find((theme) => theme.id === DEFAULT_THEME_ID) ?? THEMES[0];
+
+function getThemeSortValue(theme: ThemeDefinition): number {
+  const categoryIndex = THEME_CATEGORY_META.findIndex(
+    (category) => category.id === theme.category,
+  );
+
+  return categoryIndex === -1 ? Number.MAX_SAFE_INTEGER : categoryIndex;
+}
+
+function sortThemesByCategory(themes: readonly ThemeDefinition[]): ThemeDefinition[] {
+  return [...themes].sort((a, b) => {
+    const categoryDifference = getThemeSortValue(a) - getThemeSortValue(b);
+
+    if (categoryDifference !== 0) {
+      return categoryDifference;
+    }
+
+    if (a.isPremium !== b.isPremium) {
+      return a.isPremium ? 1 : -1;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function isOwnedTheme(themeId: ThemeId, ownedPremiumThemes: readonly ThemeId[]): boolean {
+  return ownedPremiumThemes.includes(themeId);
+}
 
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === "string" && THEME_IDS.includes(value as ThemeId);
 }
 
 export function getThemeById(id: ThemeId): ThemeDefinition {
-  return THEMES.find((theme) => theme.id === id) ?? getDefaultTheme();
+  return THEMES.find((theme) => theme.id === id) ?? DEFAULT_THEME;
 }
 
 export function getDefaultTheme(): ThemeDefinition {
-  return THEMES.find((theme) => theme.id === DEFAULT_THEME_ID) ?? THEMES[0];
+  return DEFAULT_THEME;
+}
+
+export function getAllThemes(): ThemeDefinition[] {
+  return sortThemesByCategory(THEMES);
 }
 
 export function getFreeThemes(): ThemeDefinition[] {
-  return THEMES.filter((theme) => !theme.isPremium);
+  return sortThemesByCategory(THEMES.filter((theme) => !theme.isPremium));
 }
 
 export function getPremiumThemes(): ThemeDefinition[] {
-  return THEMES.filter((theme) => theme.isPremium);
+  return sortThemesByCategory(THEMES.filter((theme) => theme.isPremium));
 }
 
 export function getThemesByCategory(category: ThemeCategory): ThemeDefinition[] {
   return THEMES.filter((theme) => theme.category === category);
+}
+
+export function getThemeCategoryMeta(
+  category: ThemeCategory,
+): ThemeCategoryMeta {
+  return (
+    THEME_CATEGORY_META.find((item) => item.id === category) ?? {
+      id: category,
+      label: category,
+      description: "Custom theme category.",
+    }
+  );
 }
 
 export function canUseTheme(
@@ -348,7 +434,7 @@ export function canUseTheme(
     return true;
   }
 
-  return ownedPremiumThemes.includes(themeId);
+  return isOwnedTheme(themeId, ownedPremiumThemes);
 }
 
 export function getSafeThemeId(
@@ -371,7 +457,7 @@ export function getThemeAccessLabel(
   theme: ThemeDefinition,
   ownedPremiumThemes: ThemeId[],
   isAdmin: boolean,
-): "Free" | "Unlocked" | "Owned" | "Preview" | "Premium" {
+): ThemeAccessLabel {
   if (!theme.isPremium) {
     return "Free";
   }
@@ -384,7 +470,7 @@ export function getThemeAccessLabel(
     return "Preview";
   }
 
-  if (ownedPremiumThemes.includes(theme.id)) {
+  if (isOwnedTheme(theme.id, ownedPremiumThemes)) {
     return "Owned";
   }
 
@@ -392,6 +478,10 @@ export function getThemeAccessLabel(
 }
 
 export function getThemePriceLabel(theme: ThemeDefinition): string {
+  if (!theme.isPremium) {
+    return "Free";
+  }
+
   if (THEME_ACCESS_MODE === "all-unlocked") {
     return "Free";
   }
