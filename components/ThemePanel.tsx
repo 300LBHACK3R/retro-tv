@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   canUseTheme,
   getThemeAccessLabel,
@@ -16,6 +16,7 @@ interface ThemePanelProps {
 }
 
 type ThemeFilter = "all" | ThemeCategory;
+type AccessFilter = "all" | "free" | "premium" | "owned" | "locked";
 
 const THEME_FILTERS: { id: ThemeFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -24,6 +25,14 @@ const THEME_FILTERS: { id: ThemeFilter; label: string }[] = [
   { id: "arcade", label: "Arcade" },
   { id: "cartoon", label: "Cartoon" },
   { id: "premium", label: "Premium" },
+];
+
+const ACCESS_FILTERS: { id: AccessFilter; label: string }[] = [
+  { id: "all", label: "All Access" },
+  { id: "free", label: "Free" },
+  { id: "premium", label: "Premium" },
+  { id: "owned", label: "Owned" },
+  { id: "locked", label: "Locked" },
 ];
 
 function getPreviewGradient(theme: ThemeDefinition): string {
@@ -46,7 +55,9 @@ function sortThemes(a: ThemeDefinition, b: ThemeDefinition): number {
 }
 
 function formatCategory(category: string): string {
-  return category.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return category
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function getThemePitch(theme: ThemeDefinition): string {
@@ -73,6 +84,82 @@ function getThemePitch(theme: ThemeDefinition): string {
   return "Classic cable-inspired look for nostalgic live-TV browsing.";
 }
 
+function themeMatchesSearch(theme: ThemeDefinition, query: string): boolean {
+  const cleanQuery = query.trim().toLowerCase();
+
+  if (!cleanQuery) {
+    return true;
+  }
+
+  return [
+    theme.id,
+    theme.name,
+    theme.description,
+    theme.category,
+    theme.recommendedFor.join(" "),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(cleanQuery);
+}
+
+function themeMatchesAccessFilter({
+  theme,
+  accessFilter,
+  ownedPremiumThemes,
+  isAdmin,
+}: {
+  theme: ThemeDefinition;
+  accessFilter: AccessFilter;
+  ownedPremiumThemes: Parameters<typeof canUseTheme>[1];
+  isAdmin: boolean;
+}): boolean {
+  const isOwned = ownedPremiumThemes.includes(theme.id);
+  const isUnlocked = canUseTheme(theme.id, ownedPremiumThemes, isAdmin);
+
+  if (accessFilter === "all") return true;
+  if (accessFilter === "free") return !theme.isPremium;
+  if (accessFilter === "premium") return theme.isPremium;
+  if (accessFilter === "owned") return theme.isPremium && isOwned;
+  if (accessFilter === "locked") return theme.isPremium && !isUnlocked;
+
+  return true;
+}
+
+function ThemeStat({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: number;
+  tone?: "default" | "good" | "premium";
+}) {
+  const color =
+    tone === "good"
+      ? "#86efac"
+      : tone === "premium"
+        ? "#fcd34d"
+        : "var(--text-muted)";
+
+  return (
+    <span
+      className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
+      style={{
+        borderColor:
+          tone === "good"
+            ? "rgba(34,197,94,0.35)"
+            : tone === "premium"
+              ? "rgba(245,158,11,0.35)"
+              : "var(--border)",
+        color,
+      }}
+    >
+      {value} {label}
+    </span>
+  );
+}
+
 export default function ThemePanel({ open, onClose }: ThemePanelProps) {
   const appMode = useStore((state) => state.appMode);
   const themeId = useStore((state) => state.themeId);
@@ -81,21 +168,58 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
   const unlockTheme = useStore((state) => state.unlockTheme);
 
   const [filter, setFilter] = useState<ThemeFilter>("all");
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+  const [query, setQuery] = useState("");
 
   const isAdmin = appMode === "admin";
 
   const sortedThemes = useMemo(() => {
-    const themes = [...THEMES].sort(sortThemes);
-
-    if (filter === "all") {
-      return themes;
-    }
-
-    return themes.filter((theme) => theme.category === filter);
-  }, [filter]);
+    return [...THEMES]
+      .sort(sortThemes)
+      .filter((theme) => filter === "all" || theme.category === filter)
+      .filter((theme) =>
+        themeMatchesAccessFilter({
+          theme,
+          accessFilter,
+          ownedPremiumThemes,
+          isAdmin,
+        }),
+      )
+      .filter((theme) => themeMatchesSearch(theme, query));
+  }, [accessFilter, filter, isAdmin, ownedPremiumThemes, query]);
 
   const premiumCount = THEMES.filter((theme) => theme.isPremium).length;
   const freeCount = THEMES.length - premiumCount;
+  const ownedCount = THEMES.filter(
+    (theme) => theme.isPremium && ownedPremiumThemes.includes(theme.id),
+  ).length;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
 
   if (!open) {
     return null;
@@ -162,27 +286,17 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
               >
                 Themes change the personality of the app: classic cable, console,
                 arcade, cartoon, gold premium, and Electric Blue command-center
-                styling. This is the foundation for paid visual packs.
+                styling.
               </p>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <span
-                  className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
-                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                >
-                  {THEMES.length} total
-                </span>
+                <ThemeStat label="total" value={THEMES.length} />
+                <ThemeStat label="free" value={freeCount} tone="good" />
+                <ThemeStat label="premium" value={premiumCount} tone="premium" />
 
-                <span
-                  className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]"
-                  style={{ borderColor: "rgba(34,197,94,0.35)", color: "#86efac" }}
-                >
-                  {freeCount} free
-                </span>
-
-                <span className="ttv-premium-badge" data-premium-badge="true">
-                  {premiumCount} premium
-                </span>
+                {isAdmin || ownedCount > 0 ? (
+                  <ThemeStat label="owned" value={ownedCount} tone="good" />
+                ) : null}
               </div>
             </div>
 
@@ -196,6 +310,37 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
               }}
             >
               Close
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto]">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search themes, categories, moods..."
+              className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+              spellCheck={false}
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setFilter("all");
+                setAccessFilter("all");
+              }}
+              className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:opacity-90"
+              style={{
+                background: "var(--button-bg)",
+                color: "var(--text)",
+              }}
+            >
+              Reset
             </button>
           </div>
 
@@ -220,171 +365,211 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
               );
             })}
           </div>
+
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1 ttv-no-scrollbar">
+            {ACCESS_FILTERS.map((item) => {
+              const active = item.id === accessFilter;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setAccessFilter(item.id)}
+                  className="shrink-0 rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.12em] transition hover:opacity-90"
+                  style={{
+                    background: active ? "var(--primary)" : "var(--button-bg)",
+                    borderColor: active ? "var(--primary)" : "var(--border)",
+                    color: active ? "var(--text)" : "var(--text-muted)",
+                  }}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
-          {sortedThemes.map((theme) => {
-            const isSelected = theme.id === themeId;
-            const isUnlocked = canUseTheme(theme.id, ownedPremiumThemes, isAdmin);
-            const isOwned = ownedPremiumThemes.includes(theme.id);
-            const accessLabel = getThemeAccessLabel(
-              theme,
-              ownedPremiumThemes,
-              isAdmin,
-            );
-            const priceLabel = getThemePriceLabel(theme);
+          {sortedThemes.length === 0 ? (
+            <div
+              className="rounded-2xl border px-4 py-10 text-center text-sm md:col-span-2 xl:col-span-3"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              No themes match the current search/filter.
+            </div>
+          ) : (
+            sortedThemes.map((theme) => {
+              const isSelected = theme.id === themeId;
+              const isUnlocked = canUseTheme(theme.id, ownedPremiumThemes, isAdmin);
+              const isOwned = ownedPremiumThemes.includes(theme.id);
+              const accessLabel = getThemeAccessLabel(
+                theme,
+                ownedPremiumThemes,
+                isAdmin,
+              );
+              const priceLabel = getThemePriceLabel(theme);
 
-            return (
-              <article
-                key={theme.id}
-                className={`ttv-theme-card theme-card group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5 hover:shadow-2xl ${isSelected ? "is-active" : ""} ${!isUnlocked ? "is-locked" : ""}`}
-                data-theme-card="true"
-                data-theme-id={theme.id}
-                data-theme-locked={!isUnlocked ? "true" : undefined}
-                aria-pressed={isSelected}
-                style={{
-                  borderColor: isSelected ? theme.colors.primary : "var(--border)",
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.035), transparent 46%), var(--panel-alt-bg)",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleThemeSelect(theme)}
-                  disabled={!isUnlocked}
-                  className="block w-full p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+              return (
+                <article
+                  key={theme.id}
+                  className={`ttv-theme-card theme-card group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5 hover:shadow-2xl ${
+                    isSelected ? "is-active" : ""
+                  } ${!isUnlocked ? "is-locked" : ""}`}
+                  data-theme-card="true"
+                  data-theme-id={theme.id}
+                  data-theme-locked={!isUnlocked ? "true" : undefined}
+                  aria-pressed={isSelected}
+                  style={{
+                    borderColor: isSelected
+                      ? theme.colors.primary
+                      : "var(--border)",
+                    background:
+                      "linear-gradient(135deg, rgba(255,255,255,0.035), transparent 46%), var(--panel-alt-bg)",
+                  }}
                 >
-                  <div
-                    className="ttv-theme-preview theme-preview relative mb-4 h-32 overflow-hidden rounded-xl border"
-                    data-theme-preview="true"
-                    style={{
-                      background: getPreviewGradient(theme),
-                      borderColor: isSelected ? theme.colors.primary : "var(--border)",
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => handleThemeSelect(theme)}
+                    disabled={!isUnlocked}
+                    className="block w-full p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <div className="absolute left-3 top-3 flex gap-2">
-                      <span
-                        className="rounded-full border border-white/20 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm"
-                      >
-                        {formatCategory(theme.category)}
-                      </span>
-
-                      {theme.isPremium ? (
-                        <span className="rounded-full border border-yellow-300/30 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-yellow-200 backdrop-blur-sm">
-                          Premium
+                    <div
+                      className="ttv-theme-preview theme-preview relative mb-4 h-32 overflow-hidden rounded-xl border"
+                      data-theme-preview="true"
+                      style={{
+                        background: getPreviewGradient(theme),
+                        borderColor: isSelected
+                          ? theme.colors.primary
+                          : "var(--border)",
+                      }}
+                    >
+                      <div className="absolute left-3 top-3 flex gap-2">
+                        <span className="rounded-full border border-white/20 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+                          {formatCategory(theme.category)}
                         </span>
-                      ) : null}
+
+                        {theme.isPremium ? (
+                          <span className="rounded-full border border-yellow-300/30 bg-black/35 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-yellow-200 backdrop-blur-sm">
+                            Premium
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="absolute inset-x-3 bottom-3 rounded-lg border border-white/20 bg-black/35 px-3 py-2 backdrop-blur-sm">
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-white">
+                          {theme.name}
+                        </div>
+
+                        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                          {isSelected ? "Currently active" : getThemePitch(theme)}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="absolute inset-x-3 bottom-3 rounded-lg border border-white/20 bg-black/35 px-3 py-2 backdrop-blur-sm">
-                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white">
-                        {theme.name}
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
-                        {isSelected ? "Currently active" : getThemePitch(theme)}
-                      </div>
-                    </div>
-                  </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-base font-black">
+                          {theme.name}
+                        </div>
 
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-base font-black">
-                        {theme.name}
+                        <div
+                          className="mt-1 line-clamp-3 text-sm leading-relaxed"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {theme.description}
+                        </div>
                       </div>
 
                       <div
-                        className="mt-1 line-clamp-3 text-sm leading-relaxed"
-                        style={{ color: "var(--text-muted)" }}
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
+                        style={{
+                          background: theme.isPremium
+                            ? "rgba(245, 158, 11, 0.18)"
+                            : "rgba(34, 197, 94, 0.16)",
+                          color: theme.isPremium ? "#fcd34d" : "#86efac",
+                        }}
                       >
-                        {theme.description}
+                        {theme.isPremium ? priceLabel : "Free"}
                       </div>
                     </div>
 
-                    <div
-                      className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
-                      style={{
-                        background: theme.isPremium
-                          ? "rgba(245, 158, 11, 0.18)"
-                          : "rgba(34, 197, 94, 0.16)",
-                        color: theme.isPremium ? "#fcd34d" : "#86efac",
-                      }}
-                    >
-                      {theme.isPremium ? priceLabel : "Free"}
-                    </div>
-                  </div>
+                    {theme.recommendedFor.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {theme.recommendedFor.slice(0, 5).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                            style={{
+                              borderColor: "var(--border)",
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
 
-                  {theme.recommendedFor.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {theme.recommendedFor.slice(0, 5).map((tag) => (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {isSelected ? (
                         <span
-                          key={tag}
-                          className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                          className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
                           style={{
-                            borderColor: "var(--border)",
-                            color: "var(--text-muted)",
+                            borderColor: theme.colors.primary,
+                            color: theme.colors.primary,
                           }}
                         >
-                          {tag}
+                          Active
                         </span>
-                      ))}
+                      ) : null}
+
+                      <span
+                        className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {accessLabel}
+                      </span>
+
+                      {theme.isPremium && isOwned ? (
+                        <span
+                          className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
+                          style={{
+                            borderColor: "rgba(34, 197, 94, 0.35)",
+                            color: "#86efac",
+                          }}
+                        >
+                          Owned
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+
+                  {theme.isPremium && isAdmin && !isOwned ? (
+                    <div
+                      className="border-t px-4 py-3"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleUnlockPreview(theme)}
+                        className="theme-unlock-button w-full rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
+                        data-unlock-theme="true"
+                      >
+                        Unlock Locally for Testing
+                      </button>
                     </div>
                   ) : null}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {isSelected ? (
-                      <span
-                        className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
-                        style={{
-                          borderColor: theme.colors.primary,
-                          color: theme.colors.primary,
-                        }}
-                      >
-                        Active
-                      </span>
-                    ) : null}
-
-                    <span
-                      className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
-                      style={{
-                        borderColor: "var(--border)",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {accessLabel}
-                    </span>
-
-                    {theme.isPremium && isOwned ? (
-                      <span
-                        className="rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
-                        style={{
-                          borderColor: "rgba(34, 197, 94, 0.35)",
-                          color: "#86efac",
-                        }}
-                      >
-                        Owned
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-
-                {theme.isPremium && isAdmin && !isOwned ? (
-                  <div
-                    className="border-t px-4 py-3"
-                    style={{ borderColor: "var(--border)" }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleUnlockPreview(theme)}
-                      className="theme-unlock-button w-full rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
-                      data-unlock-theme="true"
-                    >
-                      Unlock Locally for Testing
-                    </button>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
