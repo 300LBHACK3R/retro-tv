@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   BroadcastItem,
   Channel,
   CommercialBreakMode,
@@ -56,7 +56,12 @@ function getToday(now: Date): Weekday {
 }
 
 function isLongForm(item: MediaItem): boolean {
-  return item.type === "show" || item.type === "movie";
+  return (
+    item.type === "show" ||
+    item.type === "movie" ||
+    item.type === "music" ||
+    item.type === "music-video"
+  );
 }
 
 function isShortForm(item: MediaItem): boolean {

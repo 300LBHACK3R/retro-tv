@@ -134,7 +134,12 @@ function isTestableSource(file: string): boolean {
 }
 
 function isLongForm(item: MediaItem | null): boolean {
-  return item?.type === "show" || item?.type === "movie";
+  return (
+    item?.type === "show" ||
+    item?.type === "movie" ||
+    item?.type === "music" ||
+    item?.type === "music-video"
+  );
 }
 
 function isShortForm(item: MediaItem | null): boolean {
@@ -180,9 +185,9 @@ function createPlaylistStats({
       helper: "Items currently matching search.",
     },
     {
-      label: "Shows / Movies",
+      label: "Programs",
       value: formatCompactNumber(longFormCount),
-      helper: "Long-form playback items.",
+      helper: "Shows, movies, music, and music videos.",
     },
     {
       label: "Ads / Bumpers",
@@ -756,11 +761,11 @@ export default function ChannelProgrammingPanel() {
       >
         <div className="flex flex-wrap gap-2">
           <span>Visible: {visibleItems.length}</span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>Total slots: {programmedItems.length}</span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>Playable: {validProgrammedItems.length}</span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>Missing: {missingProgrammedItems.length}</span>
         </div>
 
@@ -864,9 +869,9 @@ export default function ChannelProgrammingPanel() {
                       style={{ color: "var(--text-muted)" }}
                     >
                       <span>{item.type.toUpperCase()}</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{formatDurationClock(item.duration)}</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{getProviderLabel(item)}</span>
                     </div>
 

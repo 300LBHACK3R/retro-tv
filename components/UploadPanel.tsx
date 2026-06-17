@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
@@ -104,6 +104,8 @@ function sortChannels(channels: Channel[]): Channel[] {
 
 function getTypeLabel(type: MediaType): string {
   if (type === "movie") return "Movie";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "Music Video";
   if (type === "commercial") return "Commercial";
   if (type === "bumper") return "Bumper";
   return "Show";
@@ -455,6 +457,16 @@ export default function UploadPanel() {
       return;
     }
 
+    if (nextType === "music" || nextType === "music-video") {
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setSlotLengthInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setStatus(`${getTypeLabel(nextType)} mode selected.`);
+      return;
+    }
+
     setAllowCommercialSlicing(false);
 
     if (parsedDurationSeconds > 0 && !slotLengthInput.trim()) {
@@ -692,6 +704,8 @@ export default function UploadPanel() {
           >
             <option value="show">Show</option>
             <option value="movie">Movie</option>
+            <option value="music">Music</option>
+            <option value="music-video">Music Video</option>
             <option value="commercial">Commercial</option>
             <option value="bumper">Bumper</option>
           </select>

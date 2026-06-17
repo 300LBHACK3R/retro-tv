@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
@@ -76,6 +76,8 @@ function getDisplayTypeLabel(item: BroadcastItem): string {
 
   if (item.type === "movie") return "MOVIE";
   if (item.type === "show") return "SHOW";
+  if (item.type === "music") return "MUSIC";
+  if (item.type === "music-video") return "MUSIC VIDEO";
   if (item.type === "bumper") return "BUMPER";
   return "COMMERCIAL";
 }

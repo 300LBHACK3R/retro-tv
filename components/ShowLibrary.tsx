@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
@@ -102,7 +102,7 @@ function buildLibrary(media: MediaItem[]): LibraryShow[] {
   const shows = new Map<string, LibraryShow>();
 
   media
-    .filter((item) => item.type === "show" || item.type === "movie")
+    .filter((item) => item.type === "show" || item.type === "movie" || item.type === "music" || item.type === "music-video")
     .map(parseEpisode)
     .forEach((episode) => {
       const key = episode.seriesTitle.toLowerCase();
