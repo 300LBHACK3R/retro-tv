@@ -21,10 +21,24 @@ export type LiveState = {
  */
 export const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
-export function safeDuration(item: BroadcastItem): number {
-  const duration = Math.floor(Number(item.duration));
+function normalizeSecond(value: unknown): number {
+  const numberValue = Math.floor(Number(value));
 
-  return Number.isFinite(duration) && duration > 0 ? duration : 1;
+  if (!Number.isFinite(numberValue)) {
+    return 0;
+  }
+
+  return numberValue;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function safeDuration(item: BroadcastItem): number {
+  const duration = normalizeSecond(item.duration);
+
+  return duration > 0 ? duration : 1;
 }
 
 export function getScheduleDuration(schedule: BroadcastItem[]): number {
@@ -46,19 +60,91 @@ export function getOffsetInLoop(totalDuration: number, nowMs = Date.now()): numb
 }
 
 export function getItemSourceStart(item: BroadcastItem): number {
-  const sourceStart = Math.floor(Number(item.sourceStart ?? 0));
+  const sourceStart = normalizeSecond(item.sourceStart ?? 0);
 
-  return Number.isFinite(sourceStart) && sourceStart > 0 ? sourceStart : 0;
+  return sourceStart > 0 ? sourceStart : 0;
 }
 
 export function getItemSourceEnd(item: BroadcastItem): number | null {
-  const sourceEnd = Math.floor(Number(item.sourceEnd));
+  const sourceEnd = normalizeSecond(item.sourceEnd);
 
-  if (!Number.isFinite(sourceEnd) || sourceEnd <= 0) {
+  if (sourceEnd <= 0) {
     return null;
   }
 
   return sourceEnd;
+}
+
+function getSourceElapsed(
+  item: BroadcastItem,
+  elapsed: number,
+): {
+  sourceElapsed: number;
+  sourceStart: number;
+  sourceEnd: number | null;
+} {
+  const sourceStart = getItemSourceStart(item);
+  const sourceEnd = getItemSourceEnd(item);
+
+  let sourceElapsed = sourceStart + Math.max(0, normalizeSecond(elapsed));
+
+  if (sourceEnd !== null && sourceEnd > sourceStart) {
+    sourceElapsed = clampNumber(sourceElapsed, sourceStart, sourceEnd);
+  }
+
+  return {
+    sourceElapsed,
+    sourceStart,
+    sourceEnd,
+  };
+}
+
+function createEmptyLiveState(totalDuration = 0): LiveState {
+  return {
+    item: null,
+    index: -1,
+    elapsed: 0,
+    remaining: 0,
+    offsetInLoop: 0,
+    totalDuration,
+    sourceElapsed: 0,
+    sourceStart: 0,
+    sourceEnd: null,
+    progress: 0,
+  };
+}
+
+function createLiveState({
+  item,
+  index,
+  elapsed,
+  offsetInLoop,
+  totalDuration,
+}: {
+  item: BroadcastItem;
+  index: number;
+  elapsed: number;
+  offsetInLoop: number;
+  totalDuration: number;
+}): LiveState {
+  const duration = safeDuration(item);
+  const safeElapsed = clampNumber(normalizeSecond(elapsed), 0, duration);
+  const remaining = Math.max(0, duration - safeElapsed);
+  const source = getSourceElapsed(item, safeElapsed);
+
+  return {
+    item,
+    index,
+    elapsed: safeElapsed,
+    remaining,
+    offsetInLoop,
+    totalDuration,
+    sourceElapsed: source.sourceElapsed,
+    sourceStart: source.sourceStart,
+    sourceEnd: source.sourceEnd,
+    progress:
+      duration > 0 ? clampNumber(safeElapsed / duration, 0, 1) : 0,
+  };
 }
 
 export function getLiveState(
@@ -68,18 +154,7 @@ export function getLiveState(
   const totalDuration = getScheduleDuration(schedule);
 
   if (!schedule.length || totalDuration <= 0) {
-    return {
-      item: null,
-      index: -1,
-      elapsed: 0,
-      remaining: 0,
-      offsetInLoop: 0,
-      totalDuration: 0,
-      sourceElapsed: 0,
-      sourceStart: 0,
-      sourceEnd: null,
-      progress: 0,
-    };
+    return createEmptyLiveState();
   }
 
   const offsetInLoop = getOffsetInLoop(totalDuration, nowMs);
@@ -96,24 +171,13 @@ export function getLiveState(
     const end = cursor + duration;
 
     if (offsetInLoop >= cursor && offsetInLoop < end) {
-      const elapsed = offsetInLoop - cursor;
-      const remaining = Math.max(0, duration - elapsed);
-      const sourceStart = getItemSourceStart(item);
-      const sourceEnd = getItemSourceEnd(item);
-      const sourceElapsed = sourceStart + elapsed;
-
-      return {
+      return createLiveState({
         item,
         index,
-        elapsed,
-        remaining,
+        elapsed: offsetInLoop - cursor,
         offsetInLoop,
         totalDuration,
-        sourceElapsed,
-        sourceStart,
-        sourceEnd,
-        progress: duration > 0 ? Math.min(Math.max(elapsed / duration, 0), 1) : 0,
-      };
+      });
     }
 
     cursor = end;
@@ -122,35 +186,16 @@ export function getLiveState(
   const fallback = schedule[0];
 
   if (!fallback) {
-    return {
-      item: null,
-      index: -1,
-      elapsed: 0,
-      remaining: 0,
-      offsetInLoop: 0,
-      totalDuration,
-      sourceElapsed: 0,
-      sourceStart: 0,
-      sourceEnd: null,
-      progress: 0,
-    };
+    return createEmptyLiveState(totalDuration);
   }
 
-  const fallbackDuration = safeDuration(fallback);
-  const fallbackSourceStart = getItemSourceStart(fallback);
-
-  return {
+  return createLiveState({
     item: fallback,
     index: 0,
     elapsed: 0,
-    remaining: fallbackDuration,
     offsetInLoop: 0,
     totalDuration,
-    sourceElapsed: fallbackSourceStart,
-    sourceStart: fallbackSourceStart,
-    sourceEnd: getItemSourceEnd(fallback),
-    progress: 0,
-  };
+  });
 }
 
 export function getNextLiveItem(
@@ -164,6 +209,20 @@ export function getNextLiveItem(
   const nextIndex = (currentIndex + 1) % schedule.length;
 
   return schedule[nextIndex] ?? null;
+}
+
+export function getPreviousLiveItem(
+  schedule: BroadcastItem[],
+  currentIndex: number,
+): BroadcastItem | null {
+  if (schedule.length === 0 || currentIndex < 0) {
+    return null;
+  }
+
+  const previousIndex =
+    (currentIndex - 1 + schedule.length) % schedule.length;
+
+  return schedule[previousIndex] ?? null;
 }
 
 export function isVirtualSlice(item: BroadcastItem | null | undefined): boolean {
