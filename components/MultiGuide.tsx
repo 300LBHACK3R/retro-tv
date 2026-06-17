@@ -30,6 +30,8 @@ const SLOT_SECONDS = SLOT_MINUTES * 60;
 const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 const LIVE_TICK_MS = 15_000;
 
+const SLOT_INDEXES = Array.from({ length: SLOT_COUNT }, (_, index) => index);
+
 type GuideRowInput = {
   channel: Channel;
   schedule: BroadcastItem[];
@@ -98,24 +100,28 @@ function floorToHalfHour(date: Date): Date {
   const nextDate = new Date(date);
   nextDate.setSeconds(0, 0);
   nextDate.setMinutes(nextDate.getMinutes() < 30 ? 0 : 30);
+
   return nextDate;
 }
 
 function startOfLocalDay(date: Date): Date {
   const nextDate = new Date(date);
   nextDate.setHours(0, 0, 0, 0);
+
   return nextDate;
 }
 
 function startOfNextLocalDay(date: Date): Date {
   const nextDate = startOfLocalDay(date);
   nextDate.setDate(nextDate.getDate() + 1);
+
   return nextDate;
 }
 
 function getNoonForDate(date: Date): Date {
   const nextDate = new Date(date);
   nextDate.setHours(12, 0, 0, 0);
+
   return nextDate;
 }
 
@@ -137,6 +143,7 @@ function getSecondsSinceBroadcastEpoch(dateMs: number): number {
 
 function getItemDuration(item: BroadcastItem): number {
   const duration = Math.floor(Number(item.duration));
+
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
 }
 
@@ -238,7 +245,6 @@ function findSchedulePosition(
   broadcastSeconds: number,
 ): SchedulePosition {
   const offset = getScheduleOffset(schedule, broadcastSeconds);
-
   let accumulated = 0;
 
   for (let index = 0; index < schedule.length; index += 1) {
@@ -276,6 +282,10 @@ function pushCell(
   endSec: number,
   options: { mergeWithPrevious?: boolean } = {},
 ): void {
+  if (endSec <= startSec) {
+    return;
+  }
+
   const stableKey = getStableItemKey(item);
   const previous = cells[cells.length - 1];
 
@@ -330,25 +340,17 @@ function buildDisplayCellsForWindow(
     const itemDuration = getItemDuration(item);
     const remainingInItem = Math.max(1, itemDuration - offsetInsideItem);
     const segmentDuration = Math.min(remainingInItem, windowDurationSeconds - cursor);
+
     const segmentStart = cursor;
     const segmentEnd = cursor + segmentDuration;
 
     if (isGuideVisibleItem(item)) {
       lastVisibleItem = item;
 
-      /**
-       * Important:
-       * Visible programs are intentionally NOT merged by title/group.
-       * This keeps separate episodes/songs from becoming one giant guide block.
-       */
       pushCell(cells, item, segmentStart, segmentEnd, {
         mergeWithPrevious: false,
       });
     } else if (lastVisibleItem) {
-      /**
-       * Hidden commercials/bumpers can extend the previous visible program cell,
-       * so guide rows still look like broadcast slots without exposing filler.
-       */
       pushCell(cells, lastVisibleItem, segmentStart, segmentEnd, {
         mergeWithPrevious: true,
       });
@@ -383,9 +385,15 @@ function appendCells(
   offsetSeconds: number,
 ): void {
   for (const cell of source) {
-    pushCell(target, cell.item, cell.startSec + offsetSeconds, cell.endSec + offsetSeconds, {
-      mergeWithPrevious: false,
-    });
+    pushCell(
+      target,
+      cell.item,
+      cell.startSec + offsetSeconds,
+      cell.endSec + offsetSeconds,
+      {
+        mergeWithPrevious: false,
+      },
+    );
   }
 }
 
@@ -403,6 +411,7 @@ function buildForwardGuideCells(
   while (sliceStart.getTime() < windowEndMs) {
     const nextDay = startOfNextLocalDay(sliceStart);
     const sliceEndMs = Math.min(nextDay.getTime(), windowEndMs);
+
     const sliceDurationSeconds = Math.max(
       0,
       Math.floor((sliceEndMs - sliceStart.getTime()) / 1000),
@@ -422,7 +431,6 @@ function buildForwardGuideCells(
     );
 
     appendCells(result, sliceCells, offsetSeconds);
-
     sliceStart = new Date(sliceEndMs);
   }
 
@@ -462,6 +470,14 @@ function buildGuideMarkers(windowStart: Date): GuideMarker[] {
   }
 
   return markers;
+}
+
+function getCellLeft(startSec: number): number {
+  return (startSec / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
+}
+
+function getCellWidth(startSec: number, endSec: number): number {
+  return ((endSec - startSec) / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
 }
 
 function EmptyGuideState() {
@@ -506,6 +522,10 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
 
     return floorToHalfHour(now);
   }, [now]);
+
+  useEffect(() => {
+    setActiveMarkerIndex(0);
+  }, [windowStart?.getTime()]);
 
   const preparedRows = useMemo<PreparedGuideRow[]>(() => {
     if (!now || !windowStart) {
@@ -580,8 +600,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     GUIDE_WINDOW_SECONDS,
   );
 
-  const nowLineLeft =
-    (secondsSinceWindowStart / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
+  const nowLineLeft = getCellLeft(secondsSinceWindowStart);
 
   return (
     <section
@@ -642,7 +661,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       </div>
 
       <div
-        className="flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-3"
+        className="ttv-no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-3"
         style={{
           borderColor: "var(--border)",
           background: "var(--panel-bg)",
@@ -703,7 +722,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
               background: "var(--panel-alt-bg)",
             }}
           >
-            {Array.from({ length: SLOT_COUNT }).map((_, index) => {
+            {SLOT_INDEXES.map((index) => {
               const slotTime = new Date(
                 windowStart.getTime() + index * SLOT_SECONDS * 1000,
               );
@@ -749,6 +768,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
                   rowIndex={rowIndex}
                   rowHeight={rowHeight}
                   nowLineLeft={nowLineLeft}
+                  liveOffsetSec={secondsSinceWindowStart}
                   onChannelSelect={() => setChannel(channel.id)}
                   onProgramSelect={(payload) => {
                     setChannel(payload.channel.id);
@@ -772,6 +792,7 @@ function GuideRow({
   rowIndex,
   rowHeight,
   nowLineLeft,
+  liveOffsetSec,
   onChannelSelect,
   onProgramSelect,
 }: {
@@ -782,6 +803,7 @@ function GuideRow({
   rowIndex: number;
   rowHeight: number;
   nowLineLeft: number;
+  liveOffsetSec: number;
   onChannelSelect: () => void;
   onProgramSelect?: (payload: { channel: Channel; item: BroadcastItem }) => void;
 }) {
@@ -845,7 +867,7 @@ function GuideRow({
           }}
           aria-hidden="true"
         >
-          {Array.from({ length: SLOT_COUNT }).map((_, index) => (
+          {SLOT_INDEXES.map((index) => (
             <div
               key={index}
               className="border-r last:border-r-0"
@@ -864,10 +886,12 @@ function GuideRow({
         ) : null}
 
         {cells.map((cell, index) => {
-          const left = (cell.startSec / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
-          const width =
-            ((cell.endSec - cell.startSec) / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
-          const isCurrent = cell.startSec <= 1 && cell.endSec > 1;
+          const left = getCellLeft(cell.startSec);
+          const rawWidth = getCellWidth(cell.startSec, cell.endSec);
+          const width = Math.max(rawWidth, 52);
+          const isCurrent =
+            cell.startSec <= liveOffsetSec && cell.endSec > liveOffsetSec;
+
           const title = getDisplayTitle(cell.item);
           const duration = cell.endSec - cell.startSec;
 
@@ -884,7 +908,7 @@ function GuideRow({
               className="absolute top-0 overflow-hidden border px-3 py-2 text-left text-[12px] leading-tight transition hover:z-20 hover:brightness-110"
               style={{
                 left: `${left}px`,
-                width: `${Math.max(width, 52)}px`,
+                width: `${width}px`,
                 height: `${rowHeight}px`,
                 background: isCurrent
                   ? "var(--guide-current-bg)"
