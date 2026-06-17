@@ -6,6 +6,19 @@ type ActiveGuideState = {
   canMergeVisibleSegments: boolean;
 };
 
+const FALLBACK_GUIDE_DURATION_SECONDS = 1;
+
+const ENCODING_REPLACEMENTS: readonly [searchValue: RegExp, replacement: string][] = [
+  [/â€¢/g, " / "],
+  [/â€“/g, "–"],
+  [/â€”/g, "—"],
+  [/â€˜/g, "‘"],
+  [/â€™/g, "’"],
+  [/â€œ/g, "“"],
+  [/â€\u009d/g, "”"],
+  [/Â/g, ""],
+];
+
 export function isHiddenGuideItem(item: BroadcastItem): boolean {
   return (
     item.hiddenFromGuide === true ||
@@ -14,12 +27,14 @@ export function isHiddenGuideItem(item: BroadcastItem): boolean {
   );
 }
 
-function getGuideGroupKey(item: BroadcastItem): string {
-  if (item.isVirtualSegment && item.parentMediaId) {
-    return item.parentMediaId;
+function normalizePositiveSecond(value: unknown): number {
+  const numberValue = Math.floor(Number(value));
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    return 0;
   }
 
-  return item.id;
+  return numberValue;
 }
 
 function escapeRegExp(value: string): string {
@@ -27,11 +42,21 @@ function escapeRegExp(value: string): string {
 }
 
 function cleanEncoding(value: string | undefined): string {
-  return String(value ?? "")
-    .replaceAll("â€¢", " / ")
-    .replaceAll("Â", "")
-    .replace(/\s+/g, " ")
-    .trim();
+  let output = String(value ?? "");
+
+  for (const [searchValue, replacement] of ENCODING_REPLACEMENTS) {
+    output = output.replace(searchValue, replacement);
+  }
+
+  return output.replace(/\s+/g, " ").trim();
+}
+
+function getGuideGroupKey(item: BroadcastItem): string {
+  if (item.isVirtualSegment && item.parentMediaId) {
+    return item.parentMediaId;
+  }
+
+  return item.parentMediaId || item.id || item.title;
 }
 
 function getCleanTitle(item: BroadcastItem): string {
@@ -49,16 +74,42 @@ function getCleanTitle(item: BroadcastItem): string {
   );
 }
 
-function getGuideDuration(item: BroadcastItem): number {
-  const guideDuration = Math.floor(Number(item.guideDuration));
+function getCleanSourceTitle(item: BroadcastItem, cleanTitle: string): string {
+  const sourceTitle = cleanEncoding(item.sourceTitle?.trim());
 
-  if (Number.isFinite(guideDuration) && guideDuration > 0) {
+  if (!sourceTitle) {
+    return cleanTitle;
+  }
+
+  if (!item.isVirtualSegment || !item.segmentLabel) {
+    return sourceTitle;
+  }
+
+  return cleanEncoding(
+    sourceTitle.replace(
+      new RegExp(`\\s+${escapeRegExp(item.segmentLabel)}$`),
+      "",
+    ),
+  );
+}
+
+function getGuideDuration(item: BroadcastItem): number {
+  const guideDuration = normalizePositiveSecond(item.guideDuration);
+
+  if (guideDuration > 0) {
     return guideDuration;
   }
 
-  const duration = Math.floor(Number(item.duration));
+  const duration = normalizePositiveSecond(item.duration);
 
-  return Number.isFinite(duration) && duration > 0 ? duration : 1;
+  return duration > 0 ? duration : FALLBACK_GUIDE_DURATION_SECONDS;
+}
+
+function createGuideId(groupKey: string, item: BroadcastItem): string {
+  const safeGroupKey = cleanEncoding(groupKey) || "unknown";
+  const safeItemKey = cleanEncoding(item.id || item.parentMediaId || item.title) || "item";
+
+  return `guide:${safeGroupKey}:${safeItemKey}`;
 }
 
 function createVisibleGuideItem(
@@ -67,11 +118,11 @@ function createVisibleGuideItem(
 ): BroadcastItem {
   const duration = getGuideDuration(item);
   const cleanTitle = getCleanTitle(item);
-  const cleanSourceTitle = cleanEncoding(item.sourceTitle?.trim() || cleanTitle);
+  const cleanSourceTitle = getCleanSourceTitle(item, cleanTitle);
 
   return {
     ...item,
-    id: `guide:${groupKey}:${item.id}`,
+    id: createGuideId(groupKey, item),
     title: cleanTitle,
     duration,
     guideDuration: duration,
@@ -88,14 +139,13 @@ function addDurationToGuideItem(
   item: BroadcastItem,
   additionalDuration: number,
 ): BroadcastItem {
-  const safeAdditionalDuration = Math.max(0, Math.floor(Number(additionalDuration)));
+  const safeAdditionalDuration = normalizePositiveSecond(additionalDuration);
 
   if (safeAdditionalDuration <= 0) {
     return item;
   }
 
-  const currentDuration = getGuideDuration(item);
-  const duration = currentDuration + safeAdditionalDuration;
+  const duration = getGuideDuration(item) + safeAdditionalDuration;
 
   return {
     ...item,
@@ -113,26 +163,18 @@ function canMergeVisibleItem(
     return false;
   }
 
-  /*
-   * Only merge visible items when they are virtual segments from the same
-   * original media item. This keeps one episode/movie block together when
-   * it has internal commercial breaks, but does not merge separate episodes,
-   * movies, songs, or music videos into one oversized guide block.
-   */
   return active.canMergeVisibleSegments && nextItem.isVirtualSegment === true;
 }
 
 export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   const guideItems: BroadcastItem[] = [];
-
   let active: ActiveGuideState | undefined;
 
   const flush = () => {
     if (active) {
       guideItems.push(active.item);
+      active = undefined;
     }
-
-    active = undefined;
   };
 
   for (const item of schedule) {
