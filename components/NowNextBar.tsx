@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { getLiveState } from "@/lib/liveEngine";
+import { useEffect, useMemo, useState } from "react";
+import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
@@ -10,11 +10,6 @@ interface NowNextBarProps {
   channel: Channel | undefined;
   schedule: BroadcastItem[];
 }
-
-type NearbyVisibleItem = {
-  item: BroadcastItem;
-  distanceSeconds: number;
-};
 
 const LIVE_TICK_MS = 2_000;
 
@@ -88,73 +83,20 @@ function getDisplayTypeLabel(item: BroadcastItem): string {
   return "COMMERCIAL";
 }
 
-function getScheduleModeLabel(channel: Channel): string {
-  if (channel.scheduleMode === "daily-random") {
-    return "Daily Random";
-  }
-
-  return "Ordered";
-}
-
-function getBreakModeLabel(channel: Channel): string {
-  const mode = channel.commercialBreakMode ?? "none";
-
-  if (mode === "classic-tv") return "Classic TV Breaks";
-  if (mode === "midpoint-and-end") return "Midpoint + End";
-  if (mode === "end-only") return "End Breaks";
-
-  return "No Auto Breaks";
-}
-
-function getCommercialStrategyLabel(channel: Channel): string {
-  const strategy = channel.commercialStrategy ?? "best-fit";
-
-  if (strategy === "random") return "Random Ads";
-  if (strategy === "sequential") return "Sequential Ads";
-
-  return "Best Fit Ads";
-}
-
-function getItemDuration(item: BroadcastItem | undefined): number {
-  const duration = Math.floor(Number(item?.duration ?? 0));
-
-  return Number.isFinite(duration) && duration > 0 ? duration : 0;
-}
-
-function isVisibleProgram(item: BroadcastItem | undefined): item is BroadcastItem {
-  if (!item) {
-    return false;
-  }
-
-  return !isHiddenGuideItem(item) && getItemDuration(item) > 0;
-}
-
 function getNextVisibleItem(
   schedule: BroadcastItem[],
   currentIndex: number,
-  currentRemainingSeconds: number,
-): NearbyVisibleItem | null {
+): BroadcastItem | null {
   if (schedule.length === 0 || currentIndex < 0) {
     return null;
   }
 
-  let distanceSeconds = Math.max(0, Math.floor(currentRemainingSeconds));
-
   for (let offset = 1; offset <= schedule.length; offset += 1) {
     const candidate = schedule[(currentIndex + offset) % schedule.length];
 
-    if (!candidate) {
-      continue;
+    if (candidate && !isHiddenGuideItem(candidate)) {
+      return candidate;
     }
-
-    if (isVisibleProgram(candidate)) {
-      return {
-        item: candidate,
-        distanceSeconds,
-      };
-    }
-
-    distanceSeconds += getItemDuration(candidate);
   }
 
   return null;
@@ -172,7 +114,7 @@ function getPreviousVisibleItem(
     const candidate =
       schedule[(currentIndex - offset + schedule.length) % schedule.length];
 
-    if (isVisibleProgram(candidate)) {
+    if (candidate && !isHiddenGuideItem(candidate)) {
       return candidate;
     }
   }
@@ -211,7 +153,7 @@ function EmptyNowNextState({
   );
 }
 
-function InfoPill({ children }: { children: ReactNode }) {
+function InfoPill({ children }: { children: React.ReactNode }) {
   return (
     <span
       className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
@@ -228,7 +170,7 @@ function InfoPill({ children }: { children: ReactNode }) {
 
 export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
   const [mounted, setMounted] = useState(false);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
 
   useEffect(() => {
     setMounted(true);
@@ -245,9 +187,9 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
 
-  const nextVisible = useMemo(
-    () => getNextVisibleItem(schedule, live.index, live.remaining),
-    [schedule, live.index, live.remaining],
+  const nextVisibleItem = useMemo(
+    () => getNextVisibleItem(schedule, live.index),
+    [schedule, live.index],
   );
 
   const previousVisibleItem = useMemo(
@@ -283,8 +225,13 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
   const progressPercent = getProgressPercent(live.elapsed, live.item.duration);
 
-  const nextTitle = nextVisible?.item
-    ? getCleanItemTitle(nextVisible.item)
+  const channelMode =
+    channel.scheduleMode === "daily-random" ? "Daily Random" : "Ordered";
+
+  const breakMode = channel.commercialBreakMode ?? "No Breaks";
+
+  const nextTitle = nextVisibleItem
+    ? getCleanItemTitle(nextVisibleItem)
     : "Nothing queued";
 
   return (
@@ -337,9 +284,8 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <InfoPill>{getScheduleModeLabel(channel)}</InfoPill>
-            <InfoPill>{getBreakModeLabel(channel)}</InfoPill>
-            <InfoPill>{getCommercialStrategyLabel(channel)}</InfoPill>
+            <InfoPill>{channelMode}</InfoPill>
+            <InfoPill>{breakMode}</InfoPill>
           </div>
         </div>
 
@@ -348,7 +294,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           style={{
             background:
               "linear-gradient(135deg, rgba(255,255,255,0.045), transparent 45%), var(--panel-alt-bg)",
-            borderColor: isCurrentHidden ? "var(--primary)" : "var(--border)",
+            borderColor: "var(--border)",
           }}
         >
           <div
@@ -383,7 +329,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               {formatClock(live.elapsed)} / {formatClock(live.item.duration)}
             </span>
 
-            <span style={{ color: "var(--text-muted)" }}>â€¢</span>
+            <span style={{ color: "var(--text-muted)" }}>•</span>
 
             <span style={{ color: "var(--text-muted)" }}>
               {formatLongClock(live.remaining)} left
@@ -391,7 +337,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
             {!isCurrentHidden && live.item.segmentLabel ? (
               <>
-                <span style={{ color: "var(--text-muted)" }}>â€¢</span>
+                <span style={{ color: "var(--text-muted)" }}>•</span>
                 <span style={{ color: "var(--text-muted)" }}>
                   {live.item.segmentLabel}
                 </span>
@@ -436,10 +382,10 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             {nextTitle}
           </div>
 
-          {nextVisible?.item ? (
+          {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisible.item)} â€¢{" "}
-              {formatLongClock(nextVisible.item.duration)}
+              {getDisplayTypeLabel(nextVisibleItem)} •{" "}
+              {formatLongClock(nextVisibleItem.duration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -447,13 +393,9 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             </div>
           )}
 
-          {nextVisible ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <InfoPill>Starts in {formatLongClock(nextVisible.distanceSeconds)}</InfoPill>
-
-              {nextVisible.item.airStartTime ? (
-                <InfoPill>Scheduled {nextVisible.item.airStartTime}</InfoPill>
-              ) : null}
+          {nextVisibleItem?.airStartTime ? (
+            <div className="mt-3">
+              <InfoPill>Scheduled {nextVisibleItem.airStartTime}</InfoPill>
             </div>
           ) : null}
         </div>

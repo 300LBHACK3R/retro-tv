@@ -26,8 +26,8 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function cleanEncoding(value: string): string {
-  return value
+function cleanEncoding(value: string | undefined): string {
+  return String(value ?? "")
     .replaceAll("â€¢", " / ")
     .replaceAll("Â", "")
     .replace(/\s+/g, " ")
@@ -67,6 +67,7 @@ function createVisibleGuideItem(
 ): BroadcastItem {
   const duration = getGuideDuration(item);
   const cleanTitle = getCleanTitle(item);
+  const cleanSourceTitle = cleanEncoding(item.sourceTitle?.trim() || cleanTitle);
 
   return {
     ...item,
@@ -76,7 +77,7 @@ function createVisibleGuideItem(
     guideDuration: duration,
     sourceStart: undefined,
     sourceEnd: undefined,
-    sourceTitle: cleanEncoding(item.sourceTitle ?? item.title),
+    sourceTitle: cleanSourceTitle,
     segmentLabel: undefined,
     isVirtualSegment: false,
     hiddenFromGuide: false,
@@ -87,7 +88,7 @@ function addDurationToGuideItem(
   item: BroadcastItem,
   additionalDuration: number,
 ): BroadcastItem {
-  const safeAdditionalDuration = Math.max(0, Math.floor(additionalDuration));
+  const safeAdditionalDuration = Math.max(0, Math.floor(Number(additionalDuration)));
 
   if (safeAdditionalDuration <= 0) {
     return item;
@@ -114,8 +115,9 @@ function canMergeVisibleItem(
 
   /*
    * Only merge visible items when they are virtual segments from the same
-   * original media item. Do not merge separate normal episodes, movies, or songs
-   * into one huge guide block.
+   * original media item. This keeps one episode/movie block together when
+   * it has internal commercial breaks, but does not merge separate episodes,
+   * movies, songs, or music videos into one oversized guide block.
    */
   return active.canMergeVisibleSegments && nextItem.isVirtualSegment === true;
 }
