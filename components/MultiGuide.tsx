@@ -30,6 +30,7 @@ const SLOT_SECONDS = SLOT_MINUTES * 60;
 const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 const LIVE_TICK_MS = 15_000;
 
+const MIN_CELL_WIDTH = 52;
 const SLOT_INDEXES = Array.from({ length: SLOT_COUNT }, (_, index) => index);
 
 type GuideRowInput = {
@@ -160,7 +161,11 @@ function getDisplayTitle(item: BroadcastItem): string {
 }
 
 function getStableItemKey(item: BroadcastItem): string {
-  return cleanDisplayText(item.id || item.parentMediaId || item.title);
+  if (item.isVirtualSegment && item.parentMediaId) {
+    return cleanDisplayText(item.parentMediaId);
+  }
+
+  return cleanDisplayText(item.id || item.title);
 }
 
 function getChannelLabel(channel: Channel): string {
@@ -275,6 +280,21 @@ function findSchedulePosition(
   };
 }
 
+function canMergeVisibleGuideSegment(
+  previous: GuideCell | undefined,
+  item: BroadcastItem,
+): boolean {
+  if (!previous) {
+    return false;
+  }
+
+  if (!item.isVirtualSegment || !item.parentMediaId) {
+    return false;
+  }
+
+  return previous.stableKey === cleanDisplayText(item.parentMediaId);
+}
+
 function pushCell(
   cells: GuideCell[],
   item: BroadcastItem,
@@ -345,10 +365,15 @@ function buildDisplayCellsForWindow(
     const segmentEnd = cursor + segmentDuration;
 
     if (isGuideVisibleItem(item)) {
+      const shouldMergeVisibleSegment = canMergeVisibleGuideSegment(
+        cells[cells.length - 1],
+        item,
+      );
+
       lastVisibleItem = item;
 
       pushCell(cells, item, segmentStart, segmentEnd, {
-        mergeWithPrevious: false,
+        mergeWithPrevious: shouldMergeVisibleSegment,
       });
     } else if (lastVisibleItem) {
       pushCell(cells, lastVisibleItem, segmentStart, segmentEnd, {
@@ -888,7 +913,7 @@ function GuideRow({
         {cells.map((cell, index) => {
           const left = getCellLeft(cell.startSec);
           const rawWidth = getCellWidth(cell.startSec, cell.endSec);
-          const width = Math.max(rawWidth, 52);
+          const width = Math.max(rawWidth, MIN_CELL_WIDTH);
           const isCurrent =
             cell.startSec <= liveOffsetSec && cell.endSec > liveOffsetSec;
 
