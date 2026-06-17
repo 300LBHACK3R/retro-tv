@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
 import {
   createMediaItemFromUrl,
@@ -20,10 +20,16 @@ import {
   WEEKDAYS,
 } from "@/lib/mediaUtils";
 import { useStore } from "@/lib/store";
-import type { Channel, CommercialStrategy, MediaType, Weekday } from "@/lib/types";
+import type {
+  Channel,
+  CommercialStrategy,
+  MediaItem,
+  MediaType,
+  Weekday,
+} from "@/lib/types";
 
 type DurationMode = "seconds" | "minutes";
-type UploadPreset = "cartoon" | "sitcom" | "drama";
+type UploadPreset = "cartoon" | "sitcom" | "drama" | "movie" | "music";
 
 type ValidationResult = {
   ok: boolean;
@@ -71,6 +77,10 @@ function shouldShowCommercialFields(type: MediaType): boolean {
   return type === "commercial" || type === "bumper";
 }
 
+function isMusicType(type: MediaType): boolean {
+  return type === "music" || type === "music-video";
+}
+
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
     return "CH --";
@@ -98,7 +108,7 @@ function sortChannels(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return a.id.localeCompare(b.id);
+      return String(a.id).localeCompare(String(b.id));
     });
 }
 
@@ -108,7 +118,23 @@ function getTypeLabel(type: MediaType): string {
   if (type === "music-video") return "Music Video";
   if (type === "commercial") return "Commercial";
   if (type === "bumper") return "Bumper";
+
   return "Show";
+}
+
+function getExistingUrlMatch(
+  media: MediaItem[],
+  normalizedFile: string,
+): MediaItem | null {
+  if (!normalizedFile) {
+    return null;
+  }
+
+  const normalizedTarget = normalizeUrl(normalizedFile);
+
+  return (
+    media.find((item) => normalizeUrl(item.file) === normalizedTarget) ?? null
+  );
 }
 
 function validateUpload({
@@ -249,6 +275,7 @@ function PresetButton({
 
 export default function UploadPanel() {
   const channels = useStore((state) => state.channels);
+  const media = useStore((state) => state.media);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const addMedia = useStore((state) => state.addMedia);
   const assignMediaToChannel = useStore((state) => state.assignMediaToChannel);
@@ -311,6 +338,11 @@ export default function UploadPanel() {
     [channelId, enabledChannels],
   );
 
+  const existingUrlMatch = useMemo(
+    () => getExistingUrlMatch(media, normalizedFile),
+    [media, normalizedFile],
+  );
+
   const normalizedTitle = title.trim().replace(/\s+/g, " ");
 
   const validation = useMemo(
@@ -339,6 +371,20 @@ export default function UploadPanel() {
 
   const canAdd = validation.ok;
 
+  useEffect(() => {
+    if (selectedChannel) {
+      return;
+    }
+
+    const fallbackChannel =
+      enabledChannels.find((channel) => channel.id === currentChannelId) ??
+      enabledChannels[0];
+
+    if (fallbackChannel) {
+      setChannelId(fallbackChannel.id);
+    }
+  }, [currentChannelId, enabledChannels, selectedChannel]);
+
   const toggleAirDay = (day: Weekday) => {
     setSelectedAirDays((current) =>
       current.includes(day)
@@ -354,31 +400,61 @@ export default function UploadPanel() {
 
   const applyPreset = (preset: UploadPreset) => {
     if (preset === "cartoon") {
+      setType("show");
       setSlotLengthInput("30:00");
       setBreakpointsInput("7:30, 15:00");
       setBreakDurationsInput("2:00, 2:00");
       setFillSlotWithCommercials(true);
       setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
       setStatus("Applied 30-minute cartoon/anime broadcast preset.");
       return;
     }
 
     if (preset === "sitcom") {
+      setType("show");
       setSlotLengthInput("30:00");
       setBreakpointsInput("11:00");
       setBreakDurationsInput("3:00");
       setFillSlotWithCommercials(true);
       setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
       setStatus("Applied 30-minute sitcom broadcast preset.");
       return;
     }
 
-    setSlotLengthInput("60:00");
-    setBreakpointsInput("12:00, 24:00, 36:00");
-    setBreakDurationsInput("3:00, 3:00, 3:00");
-    setFillSlotWithCommercials(true);
+    if (preset === "drama") {
+      setType("show");
+      setSlotLengthInput("60:00");
+      setBreakpointsInput("12:00, 24:00, 36:00");
+      setBreakDurationsInput("3:00, 3:00, 3:00");
+      setFillSlotWithCommercials(true);
+      setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
+      setStatus("Applied 60-minute drama broadcast preset.");
+      return;
+    }
+
+    if (preset === "movie") {
+      setType("movie");
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
+      setStatus("Applied movie preset. Runtime controls the full movie block.");
+      return;
+    }
+
+    setType("music-video");
+    setSlotLengthInput("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setFillSlotWithCommercials(false);
     setCommercialStrategy("best-fit");
-    setStatus("Applied 60-minute drama broadcast preset.");
+    setAllowCommercialSlicing(false);
+    setStatus("Applied music video preset.");
   };
 
   const detectDuration = async (url: string) => {
@@ -457,7 +533,7 @@ export default function UploadPanel() {
       return;
     }
 
-    if (nextType === "music" || nextType === "music-video") {
+    if (isMusicType(nextType)) {
       setBreakpointsInput("");
       setBreakDurationsInput("");
       setSlotLengthInput("");
@@ -506,6 +582,14 @@ export default function UploadPanel() {
       return;
     }
 
+    if (existingUrlMatch) {
+      const confirmed = window.confirm(
+        `"${existingUrlMatch.title}" already uses this URL. Add a duplicate anyway?`,
+      );
+
+      if (!confirmed) return;
+    }
+
     if (!isLikelyVideoUrl(normalizedFile)) {
       const confirmed = window.confirm(
         "This URL does not clearly look like a supported video file. Add it anyway?",
@@ -552,7 +636,9 @@ export default function UploadPanel() {
   };
 
   const slotTone =
-    fillSlotWithCommercials && parsedSlotLengthSeconds <= parsedDurationSeconds
+    shouldShowBroadcastFields(type) &&
+    fillSlotWithCommercials &&
+    parsedSlotLengthSeconds <= parsedDurationSeconds
       ? "danger"
       : parsedSlotLengthSeconds > parsedDurationSeconds
         ? "good"
@@ -573,15 +659,15 @@ export default function UploadPanel() {
           </div>
 
           <h2 className="mt-1 text-base font-black tracking-tight">
-            Cloudflare/R2 Video Entry
+            Cloudflare R2 / Public URL Entry
           </h2>
 
           <p
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Add videos, commercials, runtime, broadcast slots, ad blocks,
-            commercial pool settings, and optional air days.
+            Add shows, movies, music videos, commercials, runtime, broadcast
+            slots, ad blocks, commercial pool settings, and optional air days.
           </p>
         </div>
 
@@ -672,11 +758,27 @@ export default function UploadPanel() {
               borderColor:
                 normalizedFile && !normalizedFile.startsWith("https://")
                   ? "#f87171"
-                  : "var(--border)",
+                  : existingUrlMatch
+                    ? "rgba(250, 204, 21, 0.55)"
+                    : "var(--border)",
               color: "var(--text)",
             }}
           />
         </div>
+
+        {existingUrlMatch ? (
+          <div
+            className="rounded-2xl border px-3 py-2 text-xs leading-5"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "rgba(250, 204, 21, 0.35)",
+              color: "#fde68a",
+            }}
+          >
+            Duplicate warning: this URL is already saved as “
+            {existingUrlMatch.title}”.
+          </div>
+        ) : null}
 
         {compatibilityWarning ? (
           <div
@@ -780,6 +882,14 @@ export default function UploadPanel() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-5">
+          <PresetButton label="30m Cartoon" onClick={() => applyPreset("cartoon")} />
+          <PresetButton label="30m Sitcom" onClick={() => applyPreset("sitcom")} />
+          <PresetButton label="60m Drama" onClick={() => applyPreset("drama")} />
+          <PresetButton label="Movie" onClick={() => applyPreset("movie")} />
+          <PresetButton label="Music Video" onClick={() => applyPreset("music")} />
         </div>
 
         {shouldShowBroadcastFields(type) ? (
@@ -901,23 +1011,6 @@ export default function UploadPanel() {
                     "Auto commercial filler"}
                 </div>
               </div>
-            </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <PresetButton
-                label="30m Cartoon"
-                onClick={() => applyPreset("cartoon")}
-              />
-
-              <PresetButton
-                label="30m Sitcom"
-                onClick={() => applyPreset("sitcom")}
-              />
-
-              <PresetButton
-                label="60m Drama"
-                onClick={() => applyPreset("drama")}
-              />
             </div>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
