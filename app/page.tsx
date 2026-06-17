@@ -170,7 +170,7 @@ export default function Home() {
 
         return {
           channel,
-          schedule: buildGuideSchedule(playbackSchedule),
+          schedule: playbackSchedule,
           media: channelMedia,
         };
       }),
