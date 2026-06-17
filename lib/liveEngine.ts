@@ -21,6 +21,8 @@ export type LiveState = {
  */
 export const BROADCAST_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
+const FALLBACK_ITEM_DURATION_SECONDS = 1;
+
 function normalizeSecond(value: unknown): number {
   const numberValue = Math.floor(Number(value));
 
@@ -31,14 +33,35 @@ function normalizeSecond(value: unknown): number {
   return numberValue;
 }
 
+function normalizePositiveSecond(value: unknown): number {
+  const numberValue = normalizeSecond(value);
+
+  return numberValue > 0 ? numberValue : 0;
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function safeDuration(item: BroadcastItem): number {
-  const duration = normalizeSecond(item.duration);
+function createEmptyLiveState(totalDuration = 0): LiveState {
+  return {
+    item: null,
+    index: -1,
+    elapsed: 0,
+    remaining: 0,
+    offsetInLoop: 0,
+    totalDuration,
+    sourceElapsed: 0,
+    sourceStart: 0,
+    sourceEnd: null,
+    progress: 0,
+  };
+}
 
-  return duration > 0 ? duration : 1;
+export function safeDuration(item: BroadcastItem): number {
+  const duration = normalizePositiveSecond(item.duration);
+
+  return duration > 0 ? duration : FALLBACK_ITEM_DURATION_SECONDS;
 }
 
 export function getScheduleDuration(schedule: BroadcastItem[]): number {
@@ -60,19 +83,27 @@ export function getOffsetInLoop(totalDuration: number, nowMs = Date.now()): numb
 }
 
 export function getItemSourceStart(item: BroadcastItem): number {
-  const sourceStart = normalizeSecond(item.sourceStart ?? 0);
-
-  return sourceStart > 0 ? sourceStart : 0;
+  return normalizePositiveSecond(item.sourceStart ?? 0);
 }
 
 export function getItemSourceEnd(item: BroadcastItem): number | null {
-  const sourceEnd = normalizeSecond(item.sourceEnd);
+  const sourceEnd = normalizePositiveSecond(item.sourceEnd);
 
-  if (sourceEnd <= 0) {
-    return null;
-  }
+  return sourceEnd > 0 ? sourceEnd : null;
+}
 
-  return sourceEnd;
+function getSourceRange(item: BroadcastItem): {
+  sourceStart: number;
+  sourceEnd: number | null;
+} {
+  const sourceStart = getItemSourceStart(item);
+  const rawSourceEnd = getItemSourceEnd(item);
+
+  return {
+    sourceStart,
+    sourceEnd:
+      rawSourceEnd !== null && rawSourceEnd > sourceStart ? rawSourceEnd : null,
+  };
 }
 
 function getSourceElapsed(
@@ -83,34 +114,18 @@ function getSourceElapsed(
   sourceStart: number;
   sourceEnd: number | null;
 } {
-  const sourceStart = getItemSourceStart(item);
-  const sourceEnd = getItemSourceEnd(item);
+  const { sourceStart, sourceEnd } = getSourceRange(item);
 
-  let sourceElapsed = sourceStart + Math.max(0, normalizeSecond(elapsed));
-
-  if (sourceEnd !== null && sourceEnd > sourceStart) {
-    sourceElapsed = clampNumber(sourceElapsed, sourceStart, sourceEnd);
-  }
+  const safeElapsed = Math.max(0, normalizeSecond(elapsed));
+  const unclampedSourceElapsed = sourceStart + safeElapsed;
 
   return {
-    sourceElapsed,
+    sourceElapsed:
+      sourceEnd !== null
+        ? clampNumber(unclampedSourceElapsed, sourceStart, sourceEnd)
+        : unclampedSourceElapsed,
     sourceStart,
     sourceEnd,
-  };
-}
-
-function createEmptyLiveState(totalDuration = 0): LiveState {
-  return {
-    item: null,
-    index: -1,
-    elapsed: 0,
-    remaining: 0,
-    offsetInLoop: 0,
-    totalDuration,
-    sourceElapsed: 0,
-    sourceStart: 0,
-    sourceEnd: null,
-    progress: 0,
   };
 }
 
@@ -137,27 +152,29 @@ function createLiveState({
     index,
     elapsed: safeElapsed,
     remaining,
-    offsetInLoop,
-    totalDuration,
+    offsetInLoop: clampNumber(normalizeSecond(offsetInLoop), 0, Math.max(0, totalDuration)),
+    totalDuration: Math.max(0, normalizeSecond(totalDuration)),
     sourceElapsed: source.sourceElapsed,
     sourceStart: source.sourceStart,
     sourceEnd: source.sourceEnd,
-    progress:
-      duration > 0 ? clampNumber(safeElapsed / duration, 0, 1) : 0,
+    progress: clampNumber(safeElapsed / duration, 0, 1),
   };
 }
 
-export function getLiveState(
+export function getLiveStateAtOffset(
   schedule: BroadcastItem[],
-  nowMs = Date.now(),
+  offsetInLoop: number,
 ): LiveState {
   const totalDuration = getScheduleDuration(schedule);
 
   if (!schedule.length || totalDuration <= 0) {
-    return createEmptyLiveState();
+    return createEmptyLiveState(totalDuration);
   }
 
-  const offsetInLoop = getOffsetInLoop(totalDuration, nowMs);
+  const normalizedOffset =
+    ((normalizeSecond(offsetInLoop) % totalDuration) + totalDuration) %
+    totalDuration;
+
   let cursor = 0;
 
   for (let index = 0; index < schedule.length; index += 1) {
@@ -170,12 +187,12 @@ export function getLiveState(
     const duration = safeDuration(item);
     const end = cursor + duration;
 
-    if (offsetInLoop >= cursor && offsetInLoop < end) {
+    if (normalizedOffset >= cursor && normalizedOffset < end) {
       return createLiveState({
         item,
         index,
-        elapsed: offsetInLoop - cursor,
-        offsetInLoop,
+        elapsed: normalizedOffset - cursor,
+        offsetInLoop: normalizedOffset,
         totalDuration,
       });
     }
@@ -196,6 +213,19 @@ export function getLiveState(
     offsetInLoop: 0,
     totalDuration,
   });
+}
+
+export function getLiveState(
+  schedule: BroadcastItem[],
+  nowMs = Date.now(),
+): LiveState {
+  const totalDuration = getScheduleDuration(schedule);
+
+  if (!schedule.length || totalDuration <= 0) {
+    return createEmptyLiveState(totalDuration);
+  }
+
+  return getLiveStateAtOffset(schedule, getOffsetInLoop(totalDuration, nowMs));
 }
 
 export function getNextLiveItem(
@@ -219,16 +249,18 @@ export function getPreviousLiveItem(
     return null;
   }
 
-  const previousIndex =
-    (currentIndex - 1 + schedule.length) % schedule.length;
+  const previousIndex = (currentIndex - 1 + schedule.length) % schedule.length;
 
   return schedule[previousIndex] ?? null;
 }
 
 export function isVirtualSlice(item: BroadcastItem | null | undefined): boolean {
-  return Boolean(
-    item?.isVirtualSegment &&
-      typeof item.sourceStart === "number" &&
-      typeof item.sourceEnd === "number",
-  );
+  if (!item?.isVirtualSegment) {
+    return false;
+  }
+
+  const sourceStart = getItemSourceStart(item);
+  const sourceEnd = getItemSourceEnd(item);
+
+  return sourceEnd !== null && sourceEnd > sourceStart;
 }
