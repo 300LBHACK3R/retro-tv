@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useStore } from "@/lib/store";
 import type { AppMode } from "@/lib/types";
 
@@ -26,7 +34,14 @@ type AdminLogoutResponse = {
 
 type AccessStatus = "checking" | "locked" | "authorized" | "error";
 
+type RequestResult<T> = {
+  response: Response;
+  data: T | null;
+};
+
 const MAX_PASSWORD_LENGTH = 128;
+const REQUEST_TIMEOUT_MS = 12_000;
+const SESSION_RECHECK_MS = 60_000;
 
 async function readJsonSafe<T>(response: Response): Promise<T | null> {
   try {
@@ -36,16 +51,49 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
   }
 }
 
+async function requestJson<T>(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<RequestResult<T>> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(input, {
+      ...init,
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
+
+    const data = await readJsonSafe<T>(response);
+
+    return { response, data };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Request timed out. Check the connection and try again.";
+  }
+
   return error instanceof Error ? error.message : fallback;
+}
+
+function isAuthorizedResponse(
+  response: Response,
+  data: AdminSessionResponse | null,
+): boolean {
+  return Boolean(response.ok && data?.isAdmin);
 }
 
 function getStatusCopy(status: AccessStatus, isAdminAuthorized: boolean): string {
   if (status === "checking") return "Checking secure session...";
   if (status === "error") return "Session check failed.";
-  if (isAdminAuthorized) {
-    return "Secure controls are available for this browser session.";
-  }
+  if (isAdminAuthorized) return "Secure controls are available for this browser session.";
 
   return "Viewer mode is public. Admin tools unlock after password entry.";
 }
@@ -54,6 +102,7 @@ function getBadgeCopy(status: AccessStatus, isAdminAuthorized: boolean): string 
   if (status === "checking") return "Checking";
   if (status === "error") return "Offline";
   if (isAdminAuthorized) return "Unlocked";
+
   return "Viewer Only";
 }
 
@@ -89,10 +138,6 @@ function getBadgeStyles(status: AccessStatus, isAdminAuthorized: boolean) {
   };
 }
 
-function isAuthorizedResponse(response: Response, data: AdminSessionResponse | null): boolean {
-  return Boolean(response.ok && data?.isAdmin);
-}
-
 function StatusBadge({
   status,
   isAdminAuthorized,
@@ -116,7 +161,7 @@ function AccessShell({
   isAdminAuthorized,
   label = "Admin Access",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   status: AccessStatus;
   isAdminAuthorized: boolean;
   label?: string;
@@ -125,6 +170,8 @@ function AccessShell({
     <section
       className="ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-4 shadow-2xl shadow-black/30"
       aria-label={label}
+      data-admin-status={status}
+      data-admin-authorized={isAdminAuthorized ? "true" : "false"}
     >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -136,9 +183,7 @@ function AccessShell({
 
       <div className="pointer-events-none absolute -right-20 -top-24 h-48 w-48 rounded-full bg-[var(--primary)]/10 blur-3xl" />
 
-      <div className="relative z-10">
-        {children}
-      </div>
+      <div className="relative z-10">{children}</div>
     </section>
   );
 }
@@ -167,7 +212,9 @@ function ModeButton({
           ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 56%, transparent))"
           : "var(--button-bg)",
         color: "var(--text)",
-        boxShadow: active ? "0 0 22px color-mix(in srgb, var(--primary) 24%, transparent)" : "none",
+        boxShadow: active
+          ? "0 0 22px color-mix(in srgb, var(--primary) 24%, transparent)"
+          : "none",
       }}
       aria-pressed={active}
     >
@@ -179,6 +226,12 @@ function ModeButton({
 export default function AdminAccessPanel({
   onAuthChange,
 }: AdminAccessPanelProps) {
+  const passwordInputId = useId();
+  const statusId = useId();
+
+  const mountedRef = useRef(false);
+  const sessionCheckInFlightRef = useRef(false);
+
   const appMode = useStore((state) => state.appMode);
   const setAppMode = useStore((state) => state.setAppMode);
 
@@ -190,9 +243,14 @@ export default function AdminAccessPanel({
   const [error, setError] = useState("");
 
   const cleanPassword = useMemo(() => password.trim(), [password]);
+  const isCheckingSession = status === "checking";
 
   const syncAuthorizedState = useCallback(
-    (authorized: boolean) => {
+    (authorized: boolean, nextMessage?: string) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
       setIsAdminAuthorized(authorized);
       onAuthChange?.(authorized);
 
@@ -202,56 +260,93 @@ export default function AdminAccessPanel({
 
       setStatus(authorized ? "authorized" : "locked");
       setMessage(
-        authorized
-          ? "Authorized session active."
-          : "Admin tools are locked.",
+        nextMessage ??
+          (authorized ? "Authorized session active." : "Admin tools are locked."),
       );
     },
     [onAuthChange, setAppMode],
   );
 
-  const checkSession = useCallback(async () => {
-    setStatus("checking");
-    setMessage("Checking secure session...");
-    setError("");
-
-    try {
-      const response = await fetch("/api/admin/session", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-
-      const data = await readJsonSafe<AdminSessionResponse>(response);
-      const authorized = isAuthorizedResponse(response, data);
-
-      syncAuthorizedState(authorized);
-
-      if (!authorized && data?.error) {
-        setMessage(data.error);
+  const checkSession = useCallback(
+    async (quiet = false) => {
+      if (sessionCheckInFlightRef.current) {
+        return;
       }
-    } catch (error) {
-      syncAuthorizedState(false);
-      setStatus("error");
-      setError(getErrorMessage(error, "Unable to verify admin session."));
-      setMessage("Unable to verify admin session.");
-    }
-  }, [syncAuthorizedState]);
+
+      sessionCheckInFlightRef.current = true;
+
+      if (!quiet) {
+        setStatus("checking");
+        setMessage("Checking secure session...");
+        setError("");
+      }
+
+      try {
+        const { response, data } = await requestJson<AdminSessionResponse>(
+          "/api/admin/session",
+        );
+
+        const authorized = isAuthorizedResponse(response, data);
+
+        syncAuthorizedState(
+          authorized,
+          authorized
+            ? "Authorized session active."
+            : data?.error || "Admin tools are locked.",
+        );
+
+        if (!authorized && data?.error) {
+          setMessage(data.error);
+        }
+      } catch (error) {
+        syncAuthorizedState(false);
+        setStatus("error");
+        setError(getErrorMessage(error, "Unable to verify admin session."));
+        setMessage("Unable to verify admin session.");
+      } finally {
+        sessionCheckInFlightRef.current = false;
+      }
+    },
+    [syncAuthorizedState],
+  );
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+    void checkSession();
 
-    const run = async () => {
-      await checkSession();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [checkSession]);
 
-      if (!mounted) {
-        return;
+  useEffect(() => {
+    const handleFocus = () => {
+      void checkSession(true);
+    };
+
+    const handleOnline = () => {
+      void checkSession(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkSession(true);
       }
     };
 
-    void run();
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const interval = window.setInterval(() => {
+      void checkSession(true);
+    }, SESSION_RECHECK_MS);
 
     return () => {
-      mounted = false;
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(interval);
     };
   }, [checkSession]);
 
@@ -271,38 +366,34 @@ export default function AdminAccessPanel({
     setMessage("Unlocking admin session...");
 
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
+      const { response, data } = await requestJson<AdminLoginResponse>(
+        "/api/admin/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ password: cleanPassword }),
         },
-        body: JSON.stringify({ password: cleanPassword }),
-      });
-
-      const data = await readJsonSafe<AdminLoginResponse>(response);
+      );
 
       if (!response.ok || !data?.ok) {
-        syncAuthorizedState(false);
+        syncAuthorizedState(false, "Admin unlock failed.");
         setError(data?.error ?? "Login failed. Check the admin password.");
-        setMessage("Admin unlock failed.");
         return;
       }
 
       setPassword("");
-      syncAuthorizedState(true);
+      syncAuthorizedState(true, "Admin unlocked.");
       setAppMode("admin");
-      setMessage("Admin unlocked.");
     } catch (error) {
-      syncAuthorizedState(false);
+      syncAuthorizedState(false, "Unable to unlock admin.");
       setError(
         getErrorMessage(
           error,
           "Unable to log in. Check the connection and try again.",
         ),
       );
-      setMessage("Unable to unlock admin.");
     } finally {
       setIsSubmitting(false);
     }
@@ -318,13 +409,12 @@ export default function AdminAccessPanel({
     setMessage("Signing out...");
 
     try {
-      const response = await fetch("/api/admin/logout", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-
-      const data = await readJsonSafe<AdminLogoutResponse>(response);
+      const { response, data } = await requestJson<AdminLogoutResponse>(
+        "/api/admin/logout",
+        {
+          method: "POST",
+        },
+      );
 
       if (!response.ok || data?.ok === false) {
         setError(data?.error ?? "Logout endpoint returned an error.");
@@ -333,8 +423,7 @@ export default function AdminAccessPanel({
       setError("Unable to contact logout endpoint. Local session was still cleared.");
     } finally {
       setPassword("");
-      syncAuthorizedState(false);
-      setMessage("Signed out. Viewer mode restored.");
+      syncAuthorizedState(false, "Signed out. Viewer mode restored.");
       setIsSubmitting(false);
     }
   };
@@ -349,8 +438,6 @@ export default function AdminAccessPanel({
     setMessage(mode === "admin" ? "Admin mode active." : "Viewer mode active.");
   };
 
-  const isCheckingSession = status === "checking";
-
   if (isCheckingSession) {
     return (
       <AccessShell status={status} isAdminAuthorized={isAdminAuthorized}>
@@ -363,7 +450,12 @@ export default function AdminAccessPanel({
               Admin Access
             </div>
 
-            <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
+            <div
+              id={statusId}
+              className="mt-2 text-sm"
+              style={{ color: "var(--text-muted)" }}
+              aria-live="polite"
+            >
               {getStatusCopy(status, isAdminAuthorized)}
             </div>
           </div>
@@ -394,7 +486,12 @@ export default function AdminAccessPanel({
               Authorized Session
             </div>
 
-            <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+            <div
+              id={statusId}
+              className="mt-1 text-xs leading-5"
+              style={{ color: "var(--text-muted)" }}
+              aria-live="polite"
+            >
               {message || getStatusCopy(status, isAdminAuthorized)}
             </div>
           </div>
@@ -426,7 +523,10 @@ export default function AdminAccessPanel({
         </div>
 
         {error ? (
-          <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">
+          <div
+            className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200"
+            role="alert"
+          >
             {error}
           </div>
         ) : null}
@@ -449,11 +549,14 @@ export default function AdminAccessPanel({
             Admin Access
           </div>
 
-          <div className="mt-1 text-base font-black tracking-tight">
-            Locked
-          </div>
+          <div className="mt-1 text-base font-black tracking-tight">Locked</div>
 
-          <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+          <div
+            id={statusId}
+            className="mt-1 text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+            aria-live="polite"
+          >
             {message || getStatusCopy(status, isAdminAuthorized)}
           </div>
         </div>
@@ -463,7 +566,7 @@ export default function AdminAccessPanel({
 
       <div className="grid gap-2">
         <label
-          htmlFor="admin-password"
+          htmlFor={passwordInputId}
           className="text-xs font-medium"
           style={{ color: "var(--text-muted)" }}
         >
@@ -472,7 +575,7 @@ export default function AdminAccessPanel({
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
-            id="admin-password"
+            id={passwordInputId}
             type="password"
             value={password}
             onChange={(event) => {
@@ -487,6 +590,7 @@ export default function AdminAccessPanel({
             }}
             placeholder="Enter password"
             autoComplete="current-password"
+            aria-describedby={statusId}
             className="min-w-0 flex-1 rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "rgba(255,255,255,0.045)",
@@ -512,7 +616,10 @@ export default function AdminAccessPanel({
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">
+        <div
+          className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}
