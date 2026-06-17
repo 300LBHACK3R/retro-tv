@@ -7,7 +7,6 @@ import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
-import ProgrammingPersistenceGuard from "@/components/ProgrammingPersistenceGuard";
 import MediaPreloader from "@/components/MediaPreloader";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
@@ -283,7 +282,6 @@ export default function Home() {
     >
       <TextEncodingCleaner />
       <GlobalProgrammingSync isAdminAuthorized={isAdminAuthorized} />
-      <ProgrammingPersistenceGuard isAdminAuthorized={isAdminAuthorized} />
       <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
