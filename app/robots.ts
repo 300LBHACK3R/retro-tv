@@ -1,16 +1,16 @@
 import type { MetadataRoute } from "next";
 
-const fallbackSiteUrl = "https://www.tatestv.ca";
+const FALLBACK_SITE_URL = "https://www.tatestv.ca";
 
 function getSiteUrl(): string {
-  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || fallbackSiteUrl;
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || FALLBACK_SITE_URL;
 
   try {
     const url = new URL(rawUrl);
 
     return url.origin.replace(/\/$/, "");
   } catch {
-    return fallbackSiteUrl;
+    return FALLBACK_SITE_URL;
   }
 }
 
@@ -34,7 +34,6 @@ export default function robots(): MetadataRoute.Robots {
           "/api/",
           "/api/admin/",
           "/admin/",
-          "/_next/",
         ],
       },
     ],

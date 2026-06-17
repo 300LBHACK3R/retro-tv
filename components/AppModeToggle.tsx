@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { AppMode } from "@/lib/types";
 
@@ -133,13 +133,29 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
   const appMode = useStore((state) => state.appMode);
   const setAppMode = useStore((state) => state.setAppMode);
 
-  const activeModeLabel = useMemo(() => getModeLabel(appMode), [appMode]);
+  const [mounted, setMounted] = useState(false);
+
+  const safeAppMode: AppMode =
+    mounted && isAdminAuthorized ? appMode : "viewer";
+
+  const activeModeLabel = useMemo(
+    () => getModeLabel(safeAppMode),
+    [safeAppMode],
+  );
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
     if (appMode === "admin" && !isAdminAuthorized) {
       setAppMode("viewer");
     }
-  }, [appMode, isAdminAuthorized, setAppMode]);
+  }, [appMode, isAdminAuthorized, mounted, setAppMode]);
 
   const handleModeChange = (mode: AppMode) => {
     if (mode === "admin" && !isAdminAuthorized) {
@@ -148,6 +164,10 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
 
     setAppMode(mode);
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <section
@@ -201,7 +221,7 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
 
       <div className="relative grid gap-2 sm:grid-cols-2">
         {MODE_OPTIONS.map((option) => {
-          const isActive = appMode === option.value;
+          const isActive = safeAppMode === option.value;
           const isLocked = option.value === "admin" && !isAdminAuthorized;
 
           return (

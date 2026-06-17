@@ -9,6 +9,7 @@ type MediaPreloaderProps = {
 };
 
 type UrlLike = {
+  file?: string;
   url?: string;
   sourceUrl?: string;
   mediaUrl?: string;
@@ -28,9 +29,28 @@ type ChannelLike = {
 
 type IdleCallbackHandle = number;
 
+type IdleCallbackOptions = {
+  timeout?: number;
+};
+
+type IdleCallbackWindow = Window & {
+  requestIdleCallback?: (
+    callback: () => void,
+    options?: IdleCallbackOptions,
+  ) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
+
 const MAX_DESKTOP_PRELOADS = 4;
 const MAX_MOBILE_PRELOADS = 2;
-const PRELOAD_DATA_ATTRIBUTE = "ttvPreload";
+const IDLE_TIMEOUT_MS = 2_000;
+const FALLBACK_DELAY_MS = 250;
+const PRELOAD_DATA_ATTRIBUTE = "ttv-preload";
+const PRELOAD_SELECTOR = `link[data-${PRELOAD_DATA_ATTRIBUTE}="true"]`;
+
+function isBrowser(): boolean {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
 
 function isUsableUrl(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -39,25 +59,33 @@ function isUsableUrl(value: unknown): value is string {
 function getUrlFromUnknown(value: unknown): string | undefined {
   const item = value as UrlLike | undefined;
 
-  if (!item) return undefined;
+  if (!item) {
+    return undefined;
+  }
 
   return (
+    item.file ??
     item.url ??
     item.sourceUrl ??
     item.mediaUrl ??
     item.fileUrl ??
     item.src ??
+    item.media?.file ??
     item.media?.url ??
     item.media?.sourceUrl ??
+    item.mediaItem?.file ??
     item.mediaItem?.url ??
     item.mediaItem?.sourceUrl ??
+    item.item?.file ??
     item.item?.url ??
     item.item?.sourceUrl
   );
 }
 
 function getChannelMediaItems(channel?: Channel): MediaItem[] {
-  if (!channel) return [];
+  if (!channel) {
+    return [];
+  }
 
   const channelLike = channel as unknown as ChannelLike;
 
@@ -71,7 +99,9 @@ function getChannelMediaItems(channel?: Channel): MediaItem[] {
 }
 
 function isLikelyMobile(): boolean {
-  if (typeof window === "undefined") return false;
+  if (!isBrowser()) {
+    return false;
+  }
 
   return (
     window.matchMedia("(max-width: 768px)").matches ||
@@ -84,6 +114,10 @@ function getPreloadLimit(): number {
 }
 
 function toAbsoluteUrl(url: string): string | null {
+  if (!isBrowser()) {
+    return null;
+  }
+
   try {
     return new URL(url, window.location.href).href;
   } catch {
@@ -92,6 +126,10 @@ function toAbsoluteUrl(url: string): string | null {
 }
 
 function getOrigin(url: string): string | null {
+  if (!isBrowser()) {
+    return null;
+  }
+
   try {
     return new URL(url, window.location.href).origin;
   } catch {
@@ -100,14 +138,14 @@ function getOrigin(url: string): string | null {
 }
 
 function getExistingManagedLinks(): HTMLLinkElement[] {
-  return Array.from(
-    document.querySelectorAll<HTMLLinkElement>(
-      `link[data-${PRELOAD_DATA_ATTRIBUTE}="true"]`,
-    ),
-  );
+  if (!isBrowser()) {
+    return [];
+  }
+
+  return Array.from(document.querySelectorAll<HTMLLinkElement>(PRELOAD_SELECTOR));
 }
 
-function cleanupManagedLinks(validHrefs: Set<string>) {
+function cleanupManagedLinks(validHrefs: Set<string>): void {
   for (const link of getExistingManagedLinks()) {
     if (!validHrefs.has(link.href)) {
       link.remove();
@@ -115,18 +153,26 @@ function cleanupManagedLinks(validHrefs: Set<string>) {
   }
 }
 
-function appendLink(rel: string, href: string, as?: string) {
-  const existing = Array.from(document.querySelectorAll<HTMLLinkElement>("link")).some(
+function linkAlreadyExists(rel: string, href: string): boolean {
+  if (!isBrowser()) {
+    return true;
+  }
+
+  return Array.from(document.querySelectorAll<HTMLLinkElement>("link")).some(
     (link) => link.rel === rel && link.href === href,
   );
+}
 
-  if (existing) return;
+function appendLink(rel: string, href: string, as?: string): void {
+  if (!isBrowser() || linkAlreadyExists(rel, href)) {
+    return;
+  }
 
   const link = document.createElement("link");
 
   link.rel = rel;
   link.href = href;
-  link.dataset[PRELOAD_DATA_ATTRIBUTE] = "true";
+  link.setAttribute(`data-${PRELOAD_DATA_ATTRIBUTE}`, "true");
 
   if (as) {
     link.as = as;
@@ -135,7 +181,11 @@ function appendLink(rel: string, href: string, as?: string) {
   document.head.appendChild(link);
 }
 
-function addPerformanceLinks(urls: string[]) {
+function addPerformanceLinks(urls: string[]): void {
+  if (!isBrowser()) {
+    return;
+  }
+
   const absoluteUrls = urls
     .map((url) => toAbsoluteUrl(url))
     .filter((url): url is string => Boolean(url));
@@ -148,10 +198,14 @@ function addPerformanceLinks(urls: string[]) {
     ),
   );
 
-  const validHrefs = new Set<string>(absoluteUrls);
+  const validHrefs = new Set<string>();
+
+  for (const url of absoluteUrls) {
+    validHrefs.add(url);
+  }
 
   for (const origin of origins) {
-    validHrefs.add(origin + "/");
+    validHrefs.add(`${origin}/`);
   }
 
   cleanupManagedLinks(validHrefs);
@@ -167,57 +221,87 @@ function addPerformanceLinks(urls: string[]) {
 }
 
 function scheduleIdleWork(callback: () => void): () => void {
-  if (typeof window === "undefined") {
+  if (!isBrowser()) {
     return () => {};
   }
 
-  const requestIdleCallback = window.requestIdleCallback;
-  const cancelIdleCallback = window.cancelIdleCallback;
+  const idleWindow = window as IdleCallbackWindow;
 
-  if (requestIdleCallback && cancelIdleCallback) {
-    const handle = requestIdleCallback(callback, { timeout: 2000 }) as IdleCallbackHandle;
+  if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+    const handle = idleWindow.requestIdleCallback(callback, {
+      timeout: IDLE_TIMEOUT_MS,
+    });
 
     return () => {
-      cancelIdleCallback(handle);
+      idleWindow.cancelIdleCallback?.(handle);
     };
   }
 
-  const timeout = window.setTimeout(callback, 250);
+  const timeout = window.setTimeout(callback, FALLBACK_DELAY_MS);
 
   return () => {
     window.clearTimeout(timeout);
   };
 }
 
-export function MediaPreloader({ activeSchedule, activeChannel }: MediaPreloaderProps) {
-  const preloadUrls = useMemo(() => {
-    const urls: string[] = [];
+function createPreloadUrlList(
+  activeSchedule: BroadcastItem[],
+  activeChannel?: Channel,
+): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
 
-    for (const item of activeSchedule) {
-      const url = getUrlFromUnknown(item);
+  const addUrl = (value: unknown) => {
+    const url = getUrlFromUnknown(value);
 
-      if (isUsableUrl(url)) {
-        urls.push(url);
-      }
-
-      if (urls.length >= MAX_DESKTOP_PRELOADS) break;
+    if (!isUsableUrl(url)) {
+      return;
     }
 
+    const trimmedUrl = url.trim();
+
+    if (seen.has(trimmedUrl)) {
+      return;
+    }
+
+    seen.add(trimmedUrl);
+    urls.push(trimmedUrl);
+  };
+
+  for (const item of activeSchedule) {
+    addUrl(item);
+
+    if (urls.length >= MAX_DESKTOP_PRELOADS) {
+      break;
+    }
+  }
+
+  if (urls.length < MAX_DESKTOP_PRELOADS) {
     for (const mediaItem of getChannelMediaItems(activeChannel)) {
-      const url = getUrlFromUnknown(mediaItem);
+      addUrl(mediaItem);
 
-      if (isUsableUrl(url)) {
-        urls.push(url);
+      if (urls.length >= MAX_DESKTOP_PRELOADS) {
+        break;
       }
-
-      if (urls.length >= MAX_DESKTOP_PRELOADS) break;
     }
+  }
 
-    return Array.from(new Set(urls));
-  }, [activeSchedule, activeChannel]);
+  return urls;
+}
+
+export function MediaPreloader({
+  activeSchedule,
+  activeChannel,
+}: MediaPreloaderProps) {
+  const preloadUrls = useMemo(
+    () => createPreloadUrlList(activeSchedule, activeChannel),
+    [activeSchedule, activeChannel],
+  );
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
+    if (!isBrowser()) {
+      return;
+    }
 
     const limitedUrls = preloadUrls.slice(0, getPreloadLimit());
 

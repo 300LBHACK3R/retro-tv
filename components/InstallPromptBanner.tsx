@@ -28,9 +28,16 @@ type BrowserProfile = {
 
 const DISMISSED_KEY = "ttv-install-prompt-dismissed-v2";
 const DISMISS_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+const FALLBACK_DELAY_MS = 900;
+
+function canUseBrowserApis(): boolean {
+  return typeof window !== "undefined" && typeof window.navigator !== "undefined";
+}
 
 function isStandaloneMode(): boolean {
-  if (typeof window === "undefined") return false;
+  if (!canUseBrowserApis()) {
+    return false;
+  }
 
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -39,7 +46,7 @@ function isStandaloneMode(): boolean {
 }
 
 function getBrowserProfile(): BrowserProfile {
-  if (typeof window === "undefined") {
+  if (!canUseBrowserApis()) {
     return {
       isIos: false,
       isAndroid: false,
@@ -72,14 +79,22 @@ function getBrowserProfile(): BrowserProfile {
 }
 
 function wasDismissedRecently(): boolean {
+  if (!canUseBrowserApis()) {
+    return false;
+  }
+
   try {
     const raw = window.localStorage.getItem(DISMISSED_KEY);
 
-    if (!raw) return false;
+    if (!raw) {
+      return false;
+    }
 
     const dismissedAt = Number(raw);
 
-    if (!Number.isFinite(dismissedAt)) return false;
+    if (!Number.isFinite(dismissedAt) || dismissedAt <= 0) {
+      return false;
+    }
 
     return Date.now() - dismissedAt < DISMISS_DURATION_MS;
   } catch {
@@ -87,7 +102,11 @@ function wasDismissedRecently(): boolean {
   }
 }
 
-function saveDismissed() {
+function saveDismissed(): void {
+  if (!canUseBrowserApis()) {
+    return;
+  }
+
   try {
     window.localStorage.setItem(DISMISSED_KEY, String(Date.now()));
   } catch {
@@ -123,6 +142,7 @@ export default function InstallPromptBanner() {
     if (mode === "android") return "Add Tate's TV to your phone";
     if (mode === "desktop") return "Use Tate's TV like an app";
     if (mode === "fallback") return "Save Tate's TV for quick access";
+
     return "";
   }, [mode]);
 
@@ -151,7 +171,9 @@ export default function InstallPromptBanner() {
   }, [mode]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!canUseBrowserApis()) {
+      return;
+    }
 
     if (isStandaloneMode() || wasDismissedRecently()) {
       setMode("hidden");
@@ -179,14 +201,14 @@ export default function InstallPromptBanner() {
         return;
       }
 
-      setMode((current) => {
-        if (current === "native") {
-          return current;
+      setMode((currentMode) => {
+        if (currentMode === "native") {
+          return currentMode;
         }
 
         return getFallbackMode(getBrowserProfile());
       });
-    }, 900);
+    }, FALLBACK_DELAY_MS);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -197,6 +219,7 @@ export default function InstallPromptBanner() {
 
   async function handleInstallClick() {
     if (!deferredPrompt) {
+      setMode(getFallbackMode(getBrowserProfile()));
       return;
     }
 
@@ -205,11 +228,14 @@ export default function InstallPromptBanner() {
 
       const choice = await deferredPrompt.userChoice;
 
+      setDeferredPrompt(null);
+
       if (choice.outcome === "accepted") {
         setMode("hidden");
+        return;
       }
 
-      setDeferredPrompt(null);
+      setMode(getFallbackMode(getBrowserProfile()));
     } catch {
       setDeferredPrompt(null);
       setMode(getFallbackMode(getBrowserProfile()));
@@ -228,7 +254,9 @@ export default function InstallPromptBanner() {
 
   return (
     <aside className="ttv-install-prompt" role="region" aria-label="Install Tate's TV">
-      <div className="ttv-install-prompt__icon">TTV</div>
+      <div className="ttv-install-prompt__icon" aria-hidden="true">
+        TTV
+      </div>
 
       <div className="ttv-install-prompt__copy">
         <strong>{title}</strong>

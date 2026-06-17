@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   formatBreakpoints,
   formatDuration,
@@ -21,6 +22,8 @@ const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "show", label: "Shows" },
   { value: "movie", label: "Movies" },
+  { value: "music", label: "Music" },
+  { value: "music-video", label: "Music Videos" },
   { value: "commercial", label: "Commercials" },
   { value: "bumper", label: "Bumpers" },
   { value: "assigned", label: "Assigned" },
@@ -28,6 +31,14 @@ const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
 ];
 
 const MAX_LIBRARY_HEIGHT = 580;
+
+function getChannelMediaIds(channel: Channel | undefined): string[] {
+  if (!channel || !Array.isArray(channel.mediaIds)) {
+    return [];
+  }
+
+  return channel.mediaIds;
+}
 
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
@@ -42,22 +53,23 @@ function getChannelName(channel: Channel | undefined): string {
     return "Unknown Channel";
   }
 
-  return channel.branding?.displayName ?? channel.name;
+  return channel.branding?.displayName?.trim() || channel.name || "Unnamed Channel";
 }
 
 function getProviderLabel(item: MediaItem): string {
+  const file = item.file || "";
+  const lowerFile = file.toLowerCase();
+
   if (item.provider === "cloudflare-r2") return "Cloudflare R2";
   if (item.provider === "external-url") return "External URL";
   if (item.provider === "local-dev") return "Local Dev";
 
-  const lowerFile = item.file.toLowerCase();
-
-  if (item.file.includes(".r2.dev") || lowerFile.includes("cloudflare")) {
+  if (file.includes(".r2.dev") || lowerFile.includes("cloudflare")) {
     return "Cloudflare R2";
   }
 
-  if (item.file.startsWith("https://")) return "Remote URL";
-  if (item.file.startsWith("/")) return "Local Dev";
+  if (file.startsWith("https://")) return "Remote URL";
+  if (file.startsWith("/")) return "Local Dev";
 
   return "Unknown Source";
 }
@@ -97,6 +109,9 @@ function getTypeLabel(type: MediaType): string {
   if (type === "commercial") return "Commercial";
   if (type === "bumper") return "Bumper";
   if (type === "movie") return "Movie";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "Music Video";
+
   return "Show";
 }
 
@@ -172,7 +187,7 @@ function createAssignedChannelMap(
   for (const item of media) {
     map.set(
       item.id,
-      channels.filter((channel) => channel.mediaIds.includes(item.id)),
+      channels.filter((channel) => getChannelMediaIds(channel).includes(item.id)),
     );
   }
 
@@ -265,7 +280,7 @@ function ActionButton({
   disabled,
   danger = false,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
@@ -327,7 +342,7 @@ export default function MediaLibraryPanel() {
   const totalVisibleDuration = useMemo(
     () =>
       filteredMedia.reduce(
-        (sum, item) => sum + Math.max(0, Math.floor(item.duration)),
+        (sum, item) => sum + Math.max(0, Math.floor(Number(item.duration) || 0)),
         0,
       ),
     [filteredMedia],
@@ -349,8 +364,13 @@ export default function MediaLibraryPanel() {
       return 0;
     }
 
-    return media.filter((item) => currentChannel.mediaIds.includes(item.id)).length;
+    const currentChannelMediaIds = getChannelMediaIds(currentChannel);
+
+    return media.filter((item) => currentChannelMediaIds.includes(item.id)).length;
   }, [currentChannel, media]);
+
+  const musicCount = typeCounts.music + typeCounts["music-video"];
+  const adCount = typeCounts.commercial + typeCounts.bumper;
 
   const libraryStats = useMemo<LibraryStat[]>(
     () => [
@@ -370,8 +390,13 @@ export default function MediaLibraryPanel() {
         helper: "Movie-length long-form items.",
       },
       {
+        label: "Music",
+        value: formatCompactNumber(musicCount),
+        helper: "Music and music-video inventory.",
+      },
+      {
         label: "Ads / Bumpers",
-        value: formatCompactNumber(typeCounts.commercial + typeCounts.bumper),
+        value: formatCompactNumber(adCount),
         helper: "Short-form break inventory.",
       },
       {
@@ -385,7 +410,15 @@ export default function MediaLibraryPanel() {
         helper: "Media not currently used by a channel.",
       },
     ],
-    [assignedCount, media.length, typeCounts, unassignedCount],
+    [
+      adCount,
+      assignedCount,
+      media.length,
+      musicCount,
+      typeCounts.movie,
+      typeCounts.show,
+      unassignedCount,
+    ],
   );
 
   const handleDeleteClick = (item: MediaItem) => {
@@ -451,7 +484,7 @@ export default function MediaLibraryPanel() {
       </div>
 
       <div
-        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-7"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
@@ -517,14 +550,14 @@ export default function MediaLibraryPanel() {
           <span>
             Showing {filteredMedia.length} of {media.length}
           </span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Total visible runtime: {formatDuration(totalVisibleDuration)}</span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>
             Current channel: {getChannelLabel(currentChannel)} /{" "}
             {getChannelName(currentChannel)}
           </span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Current channel items: {currentChannelMediaCount}</span>
         </div>
 
@@ -594,11 +627,11 @@ export default function MediaLibraryPanel() {
                       style={{ color: "var(--text-muted)" }}
                     >
                       <span>{formatDurationClock(item.duration)}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{getProviderLabel(item)}</span>
                       {item.mimeType ? (
                         <>
-                          <span>â€¢</span>
+                          <span>•</span>
                           <span>{item.mimeType}</span>
                         </>
                       ) : null}
