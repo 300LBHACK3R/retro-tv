@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import {
@@ -19,7 +19,12 @@ import {
 import { useStore } from "@/lib/store";
 import type { CommercialStrategy, MediaType, Weekday } from "@/lib/types";
 
-type ImportPreset = "cartoon" | "sitcom" | "drama" | "commercial";
+type ImportPreset =
+  | "cartoon"
+  | "sitcom"
+  | "drama"
+  | "music-video"
+  | "commercial";
 
 type ImportSummary = {
   totalLines: number;
@@ -27,12 +32,14 @@ type ImportSummary = {
   invalidUrls: number;
   questionableUrls: number;
   duplicateLines: number;
+  existingUrls: number;
 };
 
 const DEFAULT_BROADCAST_DURATION = "22:00";
 const DEFAULT_BROADCAST_SLOT = "30:00";
 const DEFAULT_CARTOON_BREAKPOINTS = "7:30, 15:00";
 const DEFAULT_CARTOON_BREAK_DURATIONS = "2:00, 2:00";
+const DEFAULT_MUSIC_VIDEO_DURATION = "4:00";
 
 function normalizeInputLines(value: string): string[] {
   return value
@@ -51,7 +58,16 @@ function countDuplicateLines(value: string): number {
 }
 
 function isBroadcastType(type: MediaType): boolean {
-  return type === "show" || type === "movie";
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
+}
+
+function isMusicType(type: MediaType): boolean {
+  return type === "music" || type === "music-video";
 }
 
 function isCommercialType(type: MediaType): boolean {
@@ -105,24 +121,54 @@ function getChannelOptionLabel(channel: {
 function getTypeLabel(type: MediaType): string {
   if (type === "show") return "Shows";
   if (type === "movie") return "Movies";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "Music Videos";
   if (type === "commercial") return "Commercials";
   return "Bumpers";
 }
 
-function createSummary(
-  totalLines: number,
-  validUrls: number,
-  invalidUrls: number,
-  questionableUrls: number,
-  duplicateLines: number,
-): ImportSummary {
+function createSummary({
+  totalLines,
+  validUrls,
+  invalidUrls,
+  questionableUrls,
+  duplicateLines,
+  existingUrls,
+}: ImportSummary): ImportSummary {
   return {
     totalLines,
     validUrls,
     invalidUrls,
     questionableUrls,
     duplicateLines,
+    existingUrls,
   };
+}
+
+function getImportSlotLength({
+  type,
+  duration,
+  parsedSlotLength,
+  fillSlotWithCommercials,
+}: {
+  type: MediaType;
+  duration: number;
+  parsedSlotLength: number;
+  fillSlotWithCommercials: boolean;
+}): number {
+  if (isCommercialType(type)) {
+    return duration;
+  }
+
+  if (isMusicType(type) && !fillSlotWithCommercials) {
+    return duration;
+  }
+
+  if (parsedSlotLength > duration) {
+    return parsedSlotLength;
+  }
+
+  return getDefaultSlotLengthForDuration(duration, type) ?? duration;
 }
 
 function SummaryPill({
@@ -154,6 +200,7 @@ function SummaryPill({
       <div className="text-base font-black" style={{ color }}>
         {value}
       </div>
+
       <div
         className="text-[10px] font-black uppercase tracking-[0.14em]"
         style={{ color: "var(--text-muted)" }}
@@ -183,6 +230,7 @@ function PresetButton({
 }
 
 export default function BulkImporterPanel() {
+  const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const addMedia = useStore((state) => state.addMedia);
@@ -206,6 +254,7 @@ export default function BulkImporterPanel() {
 
   const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
   const [commercialCategory, setCommercialCategory] = useState("");
+  const [skipExistingUrls, setSkipExistingUrls] = useState(true);
 
   const [airStartTime, setAirStartTime] = useState("");
   const [airDays, setAirDays] = useState<Weekday[]>([]);
@@ -216,6 +265,10 @@ export default function BulkImporterPanel() {
   const rawLineCount = useMemo(() => normalizeInputLines(urls).length, [urls]);
   const duplicateLineCount = useMemo(() => countDuplicateLines(urls), [urls]);
   const lines = useMemo(() => splitInputLines(urls), [urls]);
+
+  const existingUrlSet = useMemo(() => {
+    return new Set(media.map((item) => normalizeUrl(item.file)).filter(Boolean));
+  }, [media]);
 
   const parsedDuration = useMemo(
     () => parseManualDuration(defaultDuration, "seconds"),
@@ -252,6 +305,19 @@ export default function BulkImporterPanel() {
     [validUrls],
   );
 
+  const existingUrls = useMemo(
+    () => validUrls.filter((url) => existingUrlSet.has(normalizeUrl(url))),
+    [existingUrlSet, validUrls],
+  );
+
+  const importableUrls = useMemo(() => {
+    if (!skipExistingUrls) {
+      return validUrls;
+    }
+
+    return validUrls.filter((url) => !existingUrlSet.has(normalizeUrl(url)));
+  }, [existingUrlSet, skipExistingUrls, validUrls]);
+
   const enabledChannels = useMemo(
     () => sortChannels(channels.filter((channel) => channel.isEnabled !== false)),
     [channels],
@@ -261,22 +327,32 @@ export default function BulkImporterPanel() {
     (channel) => channel.id === channelId,
   );
 
-  const defaultSlotLength = useMemo(
-    () => getDefaultSlotLengthForDuration(parsedDuration, type),
-    [parsedDuration, type],
+  const effectiveSlotLength = useMemo(
+    () =>
+      parsedDuration > 0
+        ? getImportSlotLength({
+            type,
+            duration: parsedDuration,
+            parsedSlotLength,
+            fillSlotWithCommercials,
+          })
+        : 0,
+    [fillSlotWithCommercials, parsedDuration, parsedSlotLength, type],
   );
 
   const importSummary = useMemo(
     () =>
-      createSummary(
-        rawLineCount,
-        validUrls.length,
-        invalidUrls.length,
-        questionableUrls.length,
-        duplicateLineCount,
-      ),
+      createSummary({
+        totalLines: rawLineCount,
+        validUrls: validUrls.length,
+        invalidUrls: invalidUrls.length,
+        questionableUrls: questionableUrls.length,
+        duplicateLines: duplicateLineCount,
+        existingUrls: existingUrls.length,
+      }),
     [
       duplicateLineCount,
+      existingUrls.length,
       invalidUrls.length,
       questionableUrls.length,
       rawLineCount,
@@ -285,7 +361,7 @@ export default function BulkImporterPanel() {
   );
 
   const canImport =
-    validUrls.length > 0 &&
+    importableUrls.length > 0 &&
     parsedDuration > 0 &&
     selectedChannelExists &&
     isValidAirStartTime(airStartTime) &&
@@ -350,6 +426,19 @@ export default function BulkImporterPanel() {
       return;
     }
 
+    if (preset === "music-video") {
+      setType("music-video");
+      setDefaultDuration(DEFAULT_MUSIC_VIDEO_DURATION);
+      setSlotLengthInput(DEFAULT_MUSIC_VIDEO_DURATION);
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("sequential");
+      setMessage("Applied music-video bulk preset with song-length slots.");
+      return;
+    }
+
     setType("commercial");
     setDefaultDuration("2:00");
     setSlotLengthInput("");
@@ -365,12 +454,25 @@ export default function BulkImporterPanel() {
     setType(nextType);
 
     if (isCommercialType(nextType)) {
+      setDefaultDuration(nextType === "bumper" ? "0:15" : "2:00");
       setSlotLengthInput("");
       setBreakpointsInput("");
       setBreakDurationsInput("");
       setFillSlotWithCommercials(false);
       setAllowCommercialSlicing(true);
       setMessage(`${getTypeLabel(nextType)} mode selected.`);
+      return;
+    }
+
+    if (isMusicType(nextType)) {
+      setDefaultDuration(DEFAULT_MUSIC_VIDEO_DURATION);
+      setSlotLengthInput(DEFAULT_MUSIC_VIDEO_DURATION);
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("sequential");
+      setMessage(`${getTypeLabel(nextType)} mode selected with song-length slots.`);
       return;
     }
 
@@ -393,6 +495,15 @@ export default function BulkImporterPanel() {
   const importAll = () => {
     if (validUrls.length === 0) {
       setMessage("Paste at least one valid https:// URL.");
+      return;
+    }
+
+    if (importableUrls.length === 0) {
+      setMessage(
+        skipExistingUrls
+          ? "All valid URLs already exist in the media library. Nothing new imported."
+          : "No importable URLs found.",
+      );
       return;
     }
 
@@ -436,10 +547,18 @@ export default function BulkImporterPanel() {
       if (!confirmed) return;
     }
 
+    if (skipExistingUrls && existingUrls.length > 0) {
+      const confirmed = window.confirm(
+        `${existingUrls.length} URL(s) already exist in the library and will be skipped. Continue?`,
+      );
+
+      if (!confirmed) return;
+    }
+
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime);
     const cleanCommercialCategory = sanitizeCommercialCategory(commercialCategory);
 
-    const imported = validUrls.map((url) =>
+    const imported = importableUrls.map((url) =>
       createMediaItemFromUrl({
         url,
         type,
@@ -447,10 +566,7 @@ export default function BulkImporterPanel() {
 
         breakpoints: isBroadcastType(type) ? parsedBreakpoints : [],
         breakDurations: isBroadcastType(type) ? parsedBreakDurations : [],
-        slotLengthSeconds:
-          isBroadcastType(type) && parsedSlotLength > parsedDuration
-            ? parsedSlotLength
-            : defaultSlotLength,
+        slotLengthSeconds: effectiveSlotLength,
         fillSlotWithCommercials: isBroadcastType(type)
           ? fillSlotWithCommercials
           : false,
@@ -476,7 +592,7 @@ export default function BulkImporterPanel() {
     setMessage(
       `Imported ${imported.length} ${getTypeLabel(type).toLowerCase()} to CH ${channelId}. Runtime: ${formatDuration(
         parsedDuration,
-      )}.`,
+      )}. Existing skipped: ${skipExistingUrls ? existingUrls.length : 0}.`,
     );
 
     setUrls("");
@@ -507,8 +623,8 @@ export default function BulkImporterPanel() {
             style={{ color: "var(--text-muted)" }}
           >
             Add many videos quickly using one public R2 URL per line. Best for
-            loading full seasons, complete channels, commercial pools, and
-            bumper packs.
+            loading full seasons, complete channels, music-video blocks,
+            commercial pools, and bumper packs.
           </p>
         </div>
 
@@ -516,13 +632,14 @@ export default function BulkImporterPanel() {
           <PresetButton label="30m Cartoon" onClick={() => applyPreset("cartoon")} />
           <PresetButton label="30m Sitcom" onClick={() => applyPreset("sitcom")} />
           <PresetButton label="60m Drama" onClick={() => applyPreset("drama")} />
+          <PresetButton label="Music Video" onClick={() => applyPreset("music-video")} />
           <PresetButton label="2m Ads" onClick={() => applyPreset("commercial")} />
         </div>
       </div>
 
       <div className="grid gap-3">
         <div
-          className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-5"
+          className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
@@ -544,6 +661,11 @@ export default function BulkImporterPanel() {
             label="Duplicates"
             value={importSummary.duplicateLines}
             tone={importSummary.duplicateLines > 0 ? "warn" : "default"}
+          />
+          <SummaryPill
+            label="Existing"
+            value={importSummary.existingUrls}
+            tone={importSummary.existingUrls > 0 ? "warn" : "default"}
           />
         </div>
 
@@ -574,6 +696,8 @@ export default function BulkImporterPanel() {
           >
             <option value="show">Show</option>
             <option value="movie">Movie</option>
+            <option value="music">Music</option>
+            <option value="music-video">Music Video</option>
             <option value="commercial">Commercial</option>
             <option value="bumper">Bumper</option>
           </select>
@@ -780,6 +904,33 @@ export default function BulkImporterPanel() {
           </div>
         ) : null}
 
+        <div
+          className="rounded-2xl border p-3"
+          style={{
+            background: "var(--panel-alt-bg)",
+            borderColor: "var(--border)",
+          }}
+        >
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={skipExistingUrls}
+              onChange={(event) => setSkipExistingUrls(event.target.checked)}
+              className="mt-1 h-5 w-5"
+            />
+            <span>
+              <span className="font-black">Skip URLs already in library</span>
+              <span
+                className="mt-1 block text-xs leading-5"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Prevents accidental duplicate imports when re-pasting a season,
+                music-video pack, or commercial folder.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <div>
           <div
             className="mb-2 flex items-center justify-between gap-2 text-xs"
@@ -826,12 +977,13 @@ export default function BulkImporterPanel() {
           }}
         >
           <span style={{ color: "var(--text)" }}>Import Summary:</span>{" "}
-          {validUrls.length} valid / {lines.length} unique URLs • Invalid:{" "}
+          {validUrls.length} valid / {lines.length} unique URLs • Importable:{" "}
+          {importableUrls.length} • Existing: {existingUrls.length} • Invalid:{" "}
           {invalidUrls.length} • Questionable: {questionableUrls.length} •
           Duplicates removed: {duplicateLineCount} • Duration:{" "}
           {parsedDuration > 0 ? formatDuration(parsedDuration) : "unset"} •
           Slot:{" "}
-          {parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}{" "}
+          {effectiveSlotLength > 0 ? formatDurationClock(effectiveSlotLength) : "none"}{" "}
           • Breaks: {formatBreakpoints(parsedBreakpoints) || "none"} • Ads:{" "}
           {formatBreakpoints(parsedBreakDurations) || "auto"}
         </div>
