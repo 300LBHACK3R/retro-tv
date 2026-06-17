@@ -1,5 +1,11 @@
 ﻿import type { BroadcastItem } from "./types";
 
+type ActiveGuideState = {
+  item: BroadcastItem;
+  groupKey: string;
+  canMergeVisibleSegments: boolean;
+};
+
 export function isHiddenGuideItem(item: BroadcastItem): boolean {
   return (
     item.hiddenFromGuide === true ||
@@ -9,23 +15,37 @@ export function isHiddenGuideItem(item: BroadcastItem): boolean {
 }
 
 function getGuideGroupKey(item: BroadcastItem): string {
-  return item.parentMediaId ?? item.id;
+  if (item.isVirtualSegment && item.parentMediaId) {
+    return item.parentMediaId;
+  }
+
+  return item.id;
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function cleanEncoding(value: string): string {
+  return value
+    .replaceAll("â€¢", " / ")
+    .replaceAll("Â", "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getCleanTitle(item: BroadcastItem): string {
-  const baseTitle = item.sourceTitle?.trim() || item.title;
+  const baseTitle = cleanEncoding(item.sourceTitle?.trim() || item.title);
 
   if (!item.isVirtualSegment || !item.segmentLabel) {
     return baseTitle;
   }
 
-  return baseTitle.replace(
-    new RegExp(`\\s+${escapeRegExp(item.segmentLabel)}$`),
-    "",
+  return cleanEncoding(
+    baseTitle.replace(
+      new RegExp(`\\s+${escapeRegExp(item.segmentLabel)}$`),
+      "",
+    ),
   );
 }
 
@@ -46,16 +66,17 @@ function createVisibleGuideItem(
   groupKey: string,
 ): BroadcastItem {
   const duration = getGuideDuration(item);
+  const cleanTitle = getCleanTitle(item);
 
   return {
     ...item,
-    id: `guide:${groupKey}`,
-    title: getCleanTitle(item),
+    id: `guide:${groupKey}:${item.id}`,
+    title: cleanTitle,
     duration,
     guideDuration: duration,
     sourceStart: undefined,
     sourceEnd: undefined,
-    sourceTitle: item.sourceTitle ?? item.title,
+    sourceTitle: cleanEncoding(item.sourceTitle ?? item.title),
     segmentLabel: undefined,
     isVirtualSegment: false,
     hiddenFromGuide: false,
@@ -72,7 +93,8 @@ function addDurationToGuideItem(
     return item;
   }
 
-  const duration = Math.max(1, Math.floor(item.duration)) + safeAdditionalDuration;
+  const currentDuration = getGuideDuration(item);
+  const duration = currentDuration + safeAdditionalDuration;
 
   return {
     ...item,
@@ -81,27 +103,45 @@ function addDurationToGuideItem(
   };
 }
 
+function canMergeVisibleItem(
+  active: ActiveGuideState,
+  nextItem: BroadcastItem,
+  nextGroupKey: string,
+): boolean {
+  if (active.groupKey !== nextGroupKey) {
+    return false;
+  }
+
+  /*
+   * Only merge visible items when they are virtual segments from the same
+   * original media item. Do not merge separate normal episodes, movies, or songs
+   * into one huge guide block.
+   */
+  return active.canMergeVisibleSegments && nextItem.isVirtualSegment === true;
+}
+
 export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   const guideItems: BroadcastItem[] = [];
 
-  let activeItem: BroadcastItem | undefined;
-  let activeGroupKey = "";
+  let active: ActiveGuideState | undefined;
 
   const flush = () => {
-    if (activeItem) {
-      guideItems.push(activeItem);
+    if (active) {
+      guideItems.push(active.item);
     }
 
-    activeItem = undefined;
-    activeGroupKey = "";
+    active = undefined;
   };
 
   for (const item of schedule) {
     const itemDuration = getGuideDuration(item);
 
     if (isHiddenGuideItem(item)) {
-      if (activeItem) {
-        activeItem = addDurationToGuideItem(activeItem, itemDuration);
+      if (active) {
+        active = {
+          ...active,
+          item: addDurationToGuideItem(active.item, itemDuration),
+        };
       }
 
       continue;
@@ -109,21 +149,30 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
 
     const groupKey = getGuideGroupKey(item);
 
-    if (!activeItem) {
-      activeItem = createVisibleGuideItem(item, groupKey);
-      activeGroupKey = groupKey;
+    if (!active) {
+      active = {
+        item: createVisibleGuideItem(item, groupKey),
+        groupKey,
+        canMergeVisibleSegments: item.isVirtualSegment === true,
+      };
       continue;
     }
 
-    if (groupKey === activeGroupKey) {
-      activeItem = addDurationToGuideItem(activeItem, itemDuration);
+    if (canMergeVisibleItem(active, item, groupKey)) {
+      active = {
+        ...active,
+        item: addDurationToGuideItem(active.item, itemDuration),
+      };
       continue;
     }
 
     flush();
 
-    activeItem = createVisibleGuideItem(item, groupKey);
-    activeGroupKey = groupKey;
+    active = {
+      item: createVisibleGuideItem(item, groupKey),
+      groupKey,
+      canMergeVisibleSegments: item.isVirtualSegment === true,
+    };
   }
 
   flush();
