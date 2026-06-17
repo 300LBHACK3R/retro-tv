@@ -236,6 +236,8 @@ export default function Player({ schedule }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastPlaybackKeyRef = useRef("");
   const lastHardSyncRef = useRef(0);
+  const handledFullscreenRequestRef = useRef(0);
+  const fullscreenBusyRef = useRef(false);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -480,12 +482,30 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
+    if (handledFullscreenRequestRef.current === fullscreenRequestId) {
+      return;
+    }
+
+    if (fullscreenBusyRef.current) {
+      return;
+    }
+
+    handledFullscreenRequestRef.current = fullscreenRequestId;
+    fullscreenBusyRef.current = true;
+
     const shell = shellRef.current;
     const video = videoRef.current;
 
     if (!shell || !video) {
+      fullscreenBusyRef.current = false;
       return;
     }
+
+    const releaseBusyLock = () => {
+      window.setTimeout(() => {
+        fullscreenBusyRef.current = false;
+      }, 900);
+    };
 
     const run = async () => {
       hardSyncPosition();
@@ -494,6 +514,7 @@ export default function Player({ schedule }: PlayerProps) {
       const nativeVideoExited = exitNativeVideoFullscreen(video);
 
       if (nativeVideoExited) {
+        releaseBusyLock();
         return;
       }
 
@@ -501,6 +522,7 @@ export default function Player({ schedule }: PlayerProps) {
         const didExit = await exitElementFullscreen();
 
         if (didExit) {
+          releaseBusyLock();
           return;
         }
       }
@@ -510,10 +532,12 @@ export default function Player({ schedule }: PlayerProps) {
 
         if (didEnterNativeVideoFullscreen) {
           setFallbackFullscreen(false);
+          releaseBusyLock();
           return;
         }
 
         setFallbackFullscreen((value) => !value);
+        releaseBusyLock();
         return;
       }
 
@@ -521,17 +545,12 @@ export default function Player({ schedule }: PlayerProps) {
 
       if (didEnterElementFullscreen) {
         setFallbackFullscreen(false);
-        return;
-      }
-
-      const didEnterNativeVideoFullscreen = enterNativeVideoFullscreen(video);
-
-      if (didEnterNativeVideoFullscreen) {
-        setFallbackFullscreen(false);
+        releaseBusyLock();
         return;
       }
 
       setFallbackFullscreen((value) => !value);
+      releaseBusyLock();
     };
 
     void run();
@@ -643,7 +662,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` â€¢ ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
