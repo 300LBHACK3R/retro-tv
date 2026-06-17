@@ -19,6 +19,7 @@ type SyncStatus =
   | "saved"
   | "dirty"
   | "fallback"
+  | "offline"
   | "error";
 
 type SaveProgrammingResponse = {
@@ -31,10 +32,11 @@ type SaveProgrammingResponse = {
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
 const SAVED_MESSAGE_RESET_MS = 2500;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof DOMException && error.name === "AbortError") {
-    return "Request cancelled.";
+    return "Request timed out.";
   }
 
   return error instanceof Error ? error.message : fallback;
@@ -45,6 +47,23 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
     return (await response.json()) as T;
   } catch {
     return null;
+  }
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: init.signal ?? controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
@@ -60,10 +79,6 @@ function createStatusMessage(
 }
 
 function createSnapshotSignature(snapshot: ProgrammingSnapshot): string {
-  /**
-   * updatedAt changes during save/load cycles, so exclude it from the signature.
-   * This prevents unnecessary repeat saves when the actual programming did not change.
-   */
   return JSON.stringify({
     ...snapshot,
     updatedAt: "",
@@ -80,6 +95,14 @@ function getStatusTone(status: SyncStatus): {
       borderColor: "rgba(248,113,113,0.5)",
       color: "#fca5a5",
       dotColor: "#f87171",
+    };
+  }
+
+  if (status === "offline") {
+    return {
+      borderColor: "rgba(251,146,60,0.5)",
+      color: "#fed7aa",
+      dotColor: "#fb923c",
     };
   }
 
@@ -166,6 +189,13 @@ export default function GlobalProgrammingSync({
         return;
       }
 
+      if (!window.navigator.onLine) {
+        setStatus("offline");
+        setMessage("Offline / save paused");
+        pendingSaveRef.current = true;
+        return;
+      }
+
       const snapshot = exportProgrammingSnapshot();
       const signature = createSnapshotSignature(snapshot);
 
@@ -193,7 +223,7 @@ export default function GlobalProgrammingSync({
           reason === "manual" ? "Saving now" : "Saving global programming",
         );
 
-        const response = await fetch("/api/admin/programming", {
+        const response = await fetchWithTimeout("/api/admin/programming", {
           method: "PUT",
           cache: "no-store",
           credentials: "same-origin",
@@ -256,7 +286,7 @@ export default function GlobalProgrammingSync({
       setMessage("Loading global programming");
 
       try {
-        const response = await fetch("/api/programming", {
+        const response = await fetchWithTimeout("/api/programming", {
           cache: "no-store",
           credentials: "same-origin",
           signal: abortController.signal,
@@ -273,10 +303,6 @@ export default function GlobalProgrammingSync({
         }
 
         if (data.programming) {
-          /**
-           * This flag prevents replaceProgramming() hydration from immediately
-           * saving the exact same remote state back to Supabase.
-           */
           skipNextSaveRef.current = true;
 
           replaceProgramming(data.programming);
@@ -309,8 +335,12 @@ export default function GlobalProgrammingSync({
         console.error("Failed to load global programming:", error);
 
         hasHydratedRef.current = true;
-        setStatus("error");
-        setMessage(getErrorMessage(error, "Global load failed"));
+        setStatus(window.navigator.onLine ? "error" : "offline");
+        setMessage(
+          window.navigator.onLine
+            ? getErrorMessage(error, "Global load failed")
+            : "Offline / using local programming",
+        );
       }
     };
 
@@ -370,6 +400,35 @@ export default function GlobalProgrammingSync({
   ]);
 
   useEffect(() => {
+    const handleOnline = () => {
+      if (pendingSaveRef.current && isAdminAuthorized) {
+        void saveProgramming("auto");
+        return;
+      }
+
+      if (mountedRef.current && status === "offline") {
+        setStatus("loaded");
+        setMessage("Global sync active");
+      }
+    };
+
+    const handleOffline = () => {
+      if (mountedRef.current) {
+        setStatus("offline");
+        setMessage("Offline / sync paused");
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [isAdminAuthorized, saveProgramming, status]);
+
+  useEffect(() => {
     return () => {
       clearSaveTimer();
       clearResetTimer();
@@ -382,7 +441,7 @@ export default function GlobalProgrammingSync({
 
   return (
     <div
-      className="fixed bottom-[calc(5.75rem+var(--safe-bottom))] left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md md:bottom-3"
+      className="fixed bottom-[max(5.75rem,calc(5.75rem+env(safe-area-inset-bottom)))] left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md md:bottom-3"
       style={{
         background: "rgba(0,0,0,0.76)",
         borderColor: tone.borderColor,
