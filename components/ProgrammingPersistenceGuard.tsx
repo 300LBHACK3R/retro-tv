@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useStore } from "@/lib/store";
 
-const PRIMARY_BACKUP_KEY = "tatestv:last-known-good-programming:v2";
-const MIRROR_BACKUP_KEY = "tatestv:last-known-good-programming:mirror:v2";
-const SAVE_DEBOUNCE_MS = 650;
-const FIRST_RESTORE_DELAY_MS = 900;
-const SECOND_RESTORE_DELAY_MS = 2400;
+const LOCAL_BACKUP_KEY = "tatestv:last-known-good-programming:v3";
+const LOCAL_MIRROR_KEY = "tatestv:last-known-good-programming:mirror:v3";
+
+const SAVE_DEBOUNCE_MS = 900;
+const SERVER_PULL_DELAY_MS = 450;
+const SERVER_POLL_MS = 30_000;
 
 type StoreState = ReturnType<typeof useStore.getState>;
 
 type DurableProgrammingSnapshot = {
-  version: 2;
+  version: 3;
   savedAt: string;
   media: StoreState["media"];
   channels: StoreState["channels"];
@@ -22,6 +23,13 @@ type DurableProgrammingSnapshot = {
   sidebarWidth: StoreState["sidebarWidth"];
   guideHeight: StoreState["guideHeight"];
   viewerSettings: StoreState["viewerSettings"];
+};
+
+type ProgrammingPayload = Partial<DurableProgrammingSnapshot> & {
+  updatedAt?: string;
+  programming?: unknown;
+  state?: unknown;
+  data?: unknown;
 };
 
 type ProgrammingPersistenceGuardProps = {
@@ -50,11 +58,29 @@ function getBrandedChannelCount(channels: StoreState["channels"]): number {
   }, 0);
 }
 
+function getSnapshotScore(snapshot: Pick<DurableProgrammingSnapshot, "media" | "channels">): number {
+  return (
+    snapshot.media.length * 10 +
+    getAssignmentCount(snapshot.channels) * 2 +
+    getBrandedChannelCount(snapshot.channels) * 4
+  );
+}
+
+function getDateScore(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
 function createSnapshot(): DurableProgrammingSnapshot {
   const state = useStore.getState();
 
   return {
-    version: 2,
+    version: 3,
     savedAt: new Date().toISOString(),
     media: state.media,
     channels: state.channels,
@@ -67,22 +93,60 @@ function createSnapshot(): DurableProgrammingSnapshot {
   };
 }
 
-function isValidSnapshot(value: unknown): value is DurableProgrammingSnapshot {
+function isSnapshotLike(value: unknown): value is ProgrammingPayload {
   if (!value || typeof value !== "object") {
     return false;
   }
 
-  const snapshot = value as DurableProgrammingSnapshot;
+  const candidate = value as ProgrammingPayload;
 
-  return (
-    snapshot.version === 2 &&
-    Array.isArray(snapshot.media) &&
-    Array.isArray(snapshot.channels) &&
-    typeof snapshot.savedAt === "string"
-  );
+  return Array.isArray(candidate.media) && Array.isArray(candidate.channels);
 }
 
-function readJson(key: string): DurableProgrammingSnapshot | null {
+function unwrapProgrammingPayload(value: unknown): ProgrammingPayload | null {
+  if (isSnapshotLike(value)) {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as ProgrammingPayload;
+
+  const candidates = [record.programming, record.state, record.data];
+
+  for (const candidate of candidates) {
+    if (isSnapshotLike(candidate)) {
+      return candidate as ProgrammingPayload;
+    }
+  }
+
+  return null;
+}
+
+function normalizePayload(value: ProgrammingPayload): DurableProgrammingSnapshot | null {
+  if (!Array.isArray(value.media) || !Array.isArray(value.channels)) {
+    return null;
+  }
+
+  const current = useStore.getState();
+
+  return {
+    version: 3,
+    savedAt: value.savedAt ?? value.updatedAt ?? new Date().toISOString(),
+    media: value.media,
+    channels: value.channels,
+    currentChannelId: value.currentChannelId ?? current.currentChannelId,
+    themeId: value.themeId ?? current.themeId,
+    appMode: value.appMode ?? current.appMode,
+    sidebarWidth: value.sidebarWidth ?? current.sidebarWidth,
+    guideHeight: value.guideHeight ?? current.guideHeight,
+    viewerSettings: value.viewerSettings ?? current.viewerSettings,
+  };
+}
+
+function readLocalSnapshot(key: string): DurableProgrammingSnapshot | null {
   try {
     const raw = window.localStorage.getItem(key);
 
@@ -91,84 +155,61 @@ function readJson(key: string): DurableProgrammingSnapshot | null {
     }
 
     const parsed = JSON.parse(raw);
+    const payload = unwrapProgrammingPayload(parsed);
 
-    return isValidSnapshot(parsed) ? parsed : null;
+    return payload ? normalizePayload(payload) : null;
   } catch {
     return null;
   }
 }
 
-function readBestBackup(): DurableProgrammingSnapshot | null {
-  const primary = readJson(PRIMARY_BACKUP_KEY);
-  const mirror = readJson(MIRROR_BACKUP_KEY);
+function readBestLocalBackup(): DurableProgrammingSnapshot | null {
+  const primary = readLocalSnapshot(LOCAL_BACKUP_KEY);
+  const mirror = readLocalSnapshot(LOCAL_MIRROR_KEY);
 
   if (!primary) return mirror;
   if (!mirror) return primary;
 
-  const primaryScore =
-    primary.media.length +
-    getAssignmentCount(primary.channels) +
-    getBrandedChannelCount(primary.channels);
+  const primaryScore = getSnapshotScore(primary);
+  const mirrorScore = getSnapshotScore(mirror);
 
-  const mirrorScore =
-    mirror.media.length +
-    getAssignmentCount(mirror.channels) +
-    getBrandedChannelCount(mirror.channels);
+  if (mirrorScore > primaryScore) {
+    return mirror;
+  }
 
-  return mirrorScore > primaryScore ? mirror : primary;
+  if (mirrorScore === primaryScore && getDateScore(mirror.savedAt) > getDateScore(primary.savedAt)) {
+    return mirror;
+  }
+
+  return primary;
 }
 
-function writeBackup(snapshot: DurableProgrammingSnapshot): void {
+function writeLocalBackup(snapshot: DurableProgrammingSnapshot): void {
   const payload = JSON.stringify(snapshot);
 
-  window.localStorage.setItem(PRIMARY_BACKUP_KEY, payload);
-  window.localStorage.setItem(MIRROR_BACKUP_KEY, payload);
+  window.localStorage.setItem(LOCAL_BACKUP_KEY, payload);
+  window.localStorage.setItem(LOCAL_MIRROR_KEY, payload);
 }
 
-function shouldRestoreFromBackup(
+function shouldApplySnapshot(
   current: DurableProgrammingSnapshot,
-  backup: DurableProgrammingSnapshot,
+  incoming: DurableProgrammingSnapshot,
 ): boolean {
-  const currentMedia = current.media.length;
-  const backupMedia = backup.media.length;
+  const currentScore = getSnapshotScore(current);
+  const incomingScore = getSnapshotScore(incoming);
 
-  const currentAssignments = getAssignmentCount(current.channels);
-  const backupAssignments = getAssignmentCount(backup.channels);
-
-  const currentBrandedChannels = getBrandedChannelCount(current.channels);
-  const backupBrandedChannels = getBrandedChannelCount(backup.channels);
-
-  if (backupMedia > currentMedia) {
+  if (incomingScore > currentScore) {
     return true;
   }
 
-  if (backupAssignments > currentAssignments) {
-    return true;
-  }
-
-  if (backupBrandedChannels > currentBrandedChannels) {
-    return true;
-  }
-
-  return false;
-}
-
-function shouldWriteBackup(
-  current: DurableProgrammingSnapshot,
-  backup: DurableProgrammingSnapshot | null,
-): boolean {
-  if (current.media.length === 0 && getAssignmentCount(current.channels) === 0) {
+  if (incomingScore < currentScore) {
     return false;
   }
 
-  if (!backup) {
-    return true;
-  }
-
-  return !shouldRestoreFromBackup(current, backup);
+  return getDateScore(incoming.savedAt) > getDateScore(current.savedAt);
 }
 
-function restoreSnapshot(snapshot: DurableProgrammingSnapshot): void {
+function applySnapshot(snapshot: DurableProgrammingSnapshot): void {
   useStore.setState({
     media: snapshot.media,
     channels: snapshot.channels,
@@ -181,21 +222,34 @@ function restoreSnapshot(snapshot: DurableProgrammingSnapshot): void {
   });
 }
 
-async function requestPersistentBrowserStorage(): Promise<void> {
+function hasProgrammingContent(snapshot: DurableProgrammingSnapshot): boolean {
+  return snapshot.media.length > 0 || getAssignmentCount(snapshot.channels) > 0;
+}
+
+async function fetchServerProgramming(): Promise<DurableProgrammingSnapshot | null> {
   try {
-    if (!navigator.storage?.persist) {
-      return;
+    const response = await fetch(`/api/programming?ts=${Date.now()}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
     }
 
-    await navigator.storage.persist();
+    const json = await response.json();
+    const payload = unwrapProgrammingPayload(json);
+
+    return payload ? normalizePayload(payload) : null;
   } catch {
-    // Browser storage persistence is best-effort.
+    return null;
   }
 }
 
-async function pushAdminProgrammingBackup(
-  snapshot: DurableProgrammingSnapshot,
-): Promise<void> {
+async function saveServerProgramming(snapshot: DurableProgrammingSnapshot): Promise<void> {
   const body = JSON.stringify({
     media: snapshot.media,
     channels: snapshot.channels,
@@ -205,6 +259,7 @@ async function pushAdminProgrammingBackup(
     guideHeight: snapshot.guideHeight,
     viewerSettings: snapshot.viewerSettings,
     savedAt: snapshot.savedAt,
+    updatedAt: snapshot.savedAt,
   });
 
   const headers = {
@@ -230,7 +285,15 @@ async function pushAdminProgrammingBackup(
       cache: "no-store",
     });
   } catch {
-    // Local last-known-good backup is still the source of protection.
+    // Local backup still protects the current browser session.
+  }
+}
+
+async function requestPersistentBrowserStorage(): Promise<void> {
+  try {
+    await navigator.storage?.persist?.();
+  } catch {
+    // Best-effort only.
   }
 }
 
@@ -239,6 +302,7 @@ export default function ProgrammingPersistenceGuard({
 }: ProgrammingPersistenceGuardProps) {
   const saveTimerRef = useRef<number | null>(null);
   const lastSavedSignatureRef = useRef("");
+  const isApplyingRemoteRef = useRef(false);
 
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
@@ -251,21 +315,14 @@ export default function ProgrammingPersistenceGuard({
 
   const signature = useMemo(() => {
     return JSON.stringify({
-      mediaCount: media.length,
-      assignmentCount: getAssignmentCount(channels),
-      brandedChannelCount: getBrandedChannelCount(channels),
+      media,
+      channels,
       currentChannelId,
       themeId,
       appMode,
       sidebarWidth,
       guideHeight,
       viewerSettings,
-      mediaIds: media.map((item) => item.id),
-      channelIds: channels.map((channel) => ({
-        id: channel.id,
-        mediaIds: channel.mediaIds,
-        branding: channel.branding,
-      })),
     });
   }, [
     media,
@@ -283,55 +340,76 @@ export default function ProgrammingPersistenceGuard({
   }, []);
 
   useEffect(() => {
-    const restoreIfNeeded = () => {
-      const backup = readBestBackup();
+    let cancelled = false;
 
-      if (!backup) {
+    const syncFromServer = async () => {
+      const serverSnapshot = await fetchServerProgramming();
+
+      if (cancelled) {
         return;
       }
 
       const current = createSnapshot();
 
-      if (shouldRestoreFromBackup(current, backup)) {
-        restoreSnapshot(backup);
+      if (serverSnapshot && hasProgrammingContent(serverSnapshot)) {
+        writeLocalBackup(serverSnapshot);
+
+        if (shouldApplySnapshot(current, serverSnapshot)) {
+          isApplyingRemoteRef.current = true;
+          applySnapshot(serverSnapshot);
+          window.setTimeout(() => {
+            isApplyingRemoteRef.current = false;
+          }, 500);
+        }
+
+        return;
+      }
+
+      const localBackup = readBestLocalBackup();
+
+      if (localBackup && shouldApplySnapshot(current, localBackup)) {
+        isApplyingRemoteRef.current = true;
+        applySnapshot(localBackup);
+        window.setTimeout(() => {
+          isApplyingRemoteRef.current = false;
+        }, 500);
       }
     };
 
-    const first = window.setTimeout(restoreIfNeeded, FIRST_RESTORE_DELAY_MS);
-    const second = window.setTimeout(restoreIfNeeded, SECOND_RESTORE_DELAY_MS);
+    const initialTimer = window.setTimeout(syncFromServer, SERVER_PULL_DELAY_MS);
+    const interval = window.setInterval(syncFromServer, SERVER_POLL_MS);
 
     return () => {
-      window.clearTimeout(first);
-      window.clearTimeout(second);
+      cancelled = true;
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
     };
   }, []);
 
   useEffect(() => {
+    if (isApplyingRemoteRef.current) {
+      return;
+    }
+
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
     }
 
     saveTimerRef.current = window.setTimeout(() => {
-      const current = createSnapshot();
-      const backup = readBestBackup();
+      const snapshot = createSnapshot();
 
-      if (backup && shouldRestoreFromBackup(current, backup)) {
-        restoreSnapshot(backup);
-        return;
-      }
-
-      if (!shouldWriteBackup(current, backup)) {
+      if (!hasProgrammingContent(snapshot)) {
         return;
       }
 
       const nextSignature = JSON.stringify({
-        media: current.media,
-        channels: current.channels,
-        currentChannelId: current.currentChannelId,
-        themeId: current.themeId,
-        sidebarWidth: current.sidebarWidth,
-        guideHeight: current.guideHeight,
-        viewerSettings: current.viewerSettings,
+        media: snapshot.media,
+        channels: snapshot.channels,
+        currentChannelId: snapshot.currentChannelId,
+        themeId: snapshot.themeId,
+        sidebarWidth: snapshot.sidebarWidth,
+        guideHeight: snapshot.guideHeight,
+        viewerSettings: snapshot.viewerSettings,
       });
 
       if (lastSavedSignatureRef.current === nextSignature) {
@@ -339,10 +417,10 @@ export default function ProgrammingPersistenceGuard({
       }
 
       lastSavedSignatureRef.current = nextSignature;
-      writeBackup(current);
+      writeLocalBackup(snapshot);
 
       if (isAdminAuthorized) {
-        void pushAdminProgrammingBackup(current);
+        void saveServerProgramming(snapshot);
       }
     }, SAVE_DEBOUNCE_MS);
 
