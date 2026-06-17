@@ -11,6 +11,16 @@ import {
 import { useStore } from "@/lib/store";
 import type { ThemeDefinition } from "@/lib/themes";
 
+type ThemeAccessList = Parameters<typeof canUseTheme>[1];
+type ThemeMiniFilter = "all" | "free" | "premium" | "unlocked";
+
+const THEME_FILTERS: { id: ThemeMiniFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "free", label: "Free" },
+  { id: "premium", label: "Premium" },
+  { id: "unlocked", label: "Unlocked" },
+];
+
 function getPreviewGradient(theme: ThemeDefinition): string {
   return (
     theme.previewGradient ||
@@ -36,27 +46,91 @@ function formatCategory(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function themeMatchesQuery(theme: ThemeDefinition, query: string): boolean {
+  const cleanQuery = query.trim().toLowerCase();
+
+  if (!cleanQuery) {
+    return true;
+  }
+
+  return [
+    theme.name,
+    theme.id,
+    theme.description,
+    theme.category,
+    theme.recommendedFor.join(" "),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(cleanQuery);
+}
+
+function themeMatchesFilter({
+  theme,
+  filter,
+  ownedPremiumThemes,
+  isAdminMode,
+}: {
+  theme: ThemeDefinition;
+  filter: ThemeMiniFilter;
+  ownedPremiumThemes: ThemeAccessList;
+  isAdminMode: boolean;
+}): boolean {
+  if (filter === "all") return true;
+  if (filter === "free") return !theme.isPremium;
+  if (filter === "premium") return theme.isPremium;
+
+  return canUseTheme(theme.id, ownedPremiumThemes, isAdminMode);
+}
+
 export default function ThemeButton() {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ThemeMiniFilter>("all");
+
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   const appMode = useStore((state) => state.appMode);
   const themeId = useStore((state) => state.themeId);
-  const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
+  const ownedPremiumThemesRaw = useStore((state) => state.ownedPremiumThemes);
   const setTheme = useStore((state) => state.setTheme);
+
+  const ownedPremiumThemes = useMemo(
+    () => ownedPremiumThemesRaw as ThemeAccessList,
+    [ownedPremiumThemesRaw],
+  );
 
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
   const isAdminMode = appMode === "admin";
 
-  const sortedThemes = useMemo(() => [...THEMES].sort(sortThemes), []);
+  const sortedThemes = useMemo(() => {
+    return [...THEMES]
+      .sort(sortThemes)
+      .filter((theme) =>
+        themeMatchesFilter({
+          theme,
+          filter,
+          ownedPremiumThemes,
+          isAdminMode,
+        }),
+      )
+      .filter((theme) => themeMatchesQuery(theme, query));
+  }, [filter, isAdminMode, ownedPremiumThemes, query]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setOpen(false);
       }
     };
@@ -77,6 +151,8 @@ export default function ThemeButton() {
     window.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("pointerdown", handlePointerDown);
     };
@@ -152,7 +228,7 @@ export default function ThemeButton() {
             <div
               className="sticky top-0 z-10 mb-3 rounded-xl border p-3 backdrop-blur-xl"
               style={{
-                background: "rgba(0,0,0,0.42)",
+                background: "rgba(0,0,0,0.72)",
                 borderColor: "var(--border)",
               }}
             >
@@ -188,123 +264,174 @@ export default function ThemeButton() {
                   Close
                 </button>
               </div>
+
+              <div className="mt-3">
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search themes..."
+                  spellCheck={false}
+                  className="w-full rounded-xl border px-3 py-3 text-sm outline-none"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </div>
+
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 ttv-no-scrollbar">
+                {THEME_FILTERS.map((item) => {
+                  const active = item.id === filter;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFilter(item.id)}
+                      className="shrink-0 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em]"
+                      style={{
+                        background: active ? "var(--primary)" : "var(--button-bg)",
+                        borderColor: active ? "var(--primary)" : "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-2">
-              {sortedThemes.map((theme) => {
-                const isActive = themeId === theme.id;
-                const unlocked = canUseTheme(
-                  theme.id,
-                  ownedPremiumThemes,
-                  isAdminMode,
-                );
+              {sortedThemes.length === 0 ? (
+                <div
+                  className="rounded-xl border p-4 text-sm"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  No themes match the current search/filter.
+                </div>
+              ) : (
+                sortedThemes.map((theme) => {
+                  const isActive = themeId === theme.id;
+                  const unlocked = canUseTheme(
+                    theme.id,
+                    ownedPremiumThemes,
+                    isAdminMode,
+                  );
 
-                const accessLabel = getThemeAccessLabel(
-                  theme,
-                  ownedPremiumThemes,
-                  isAdminMode,
-                );
+                  const accessLabel = getThemeAccessLabel(
+                    theme,
+                    ownedPremiumThemes,
+                    isAdminMode,
+                  );
 
-                const priceLabel = getThemePriceLabel(theme);
+                  const priceLabel = getThemePriceLabel(theme);
 
-                return (
-                  <article
-                    key={theme.id}
-                    className={`theme-card overflow-hidden rounded-xl border transition hover:-translate-y-0.5 ${isActive ? "is-active" : ""} ${!unlocked ? "is-locked" : ""}`}
-                    data-theme-card="true"
-                    data-theme-id={theme.id}
-                    data-theme-locked={!unlocked ? "true" : undefined}
-                    aria-pressed={isActive}
-                    style={{
-                      background:
-                        "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 46%), rgba(255,255,255,0.035)",
-                      borderColor: isActive
-                        ? theme.colors.primary
-                        : "var(--border)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => applyTheme(theme)}
-                      disabled={!unlocked || isActive}
-                      className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-65"
+                  return (
+                    <article
+                      key={theme.id}
+                      className={`theme-card overflow-hidden rounded-xl border transition hover:-translate-y-0.5 ${
+                        isActive ? "is-active" : ""
+                      } ${!unlocked ? "is-locked" : ""}`}
+                      data-theme-card="true"
+                      data-theme-id={theme.id}
+                      data-theme-locked={!unlocked ? "true" : undefined}
+                      aria-pressed={isActive}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 46%), rgba(255,255,255,0.035)",
+                        borderColor: isActive
+                          ? theme.colors.primary
+                          : "var(--border)",
+                      }}
                     >
-                      <div
-                        className="theme-preview h-4"
-                        data-theme-preview="true"
-                        style={{
-                          background: getPreviewGradient(theme),
-                        }}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => applyTheme(theme)}
+                        disabled={!unlocked || isActive}
+                        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-65"
+                      >
+                        <div
+                          className="theme-preview h-4"
+                          data-theme-preview="true"
+                          style={{
+                            background: getPreviewGradient(theme),
+                          }}
+                        />
 
-                      <div className="p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-black">
-                              {theme.name}
+                        <div className="p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-black">
+                                {theme.name}
+                              </div>
+
+                              <div
+                                className="mt-1 line-clamp-2 text-xs leading-relaxed"
+                                style={{ color: "var(--text-muted)" }}
+                              >
+                                {theme.description}
+                              </div>
                             </div>
 
                             <div
-                              className="mt-1 line-clamp-2 text-xs leading-relaxed"
-                              style={{ color: "var(--text-muted)" }}
+                              className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
+                              style={{
+                                background: theme.isPremium
+                                  ? "rgba(245, 158, 11, 0.18)"
+                                  : "rgba(34, 197, 94, 0.16)",
+                                color: theme.isPremium ? "#fcd34d" : "#86efac",
+                              }}
                             >
-                              {theme.description}
+                              {accessLabel}
                             </div>
                           </div>
 
-                          <div
-                            className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
-                            style={{
-                              background: theme.isPremium
-                                ? "rgba(245, 158, 11, 0.18)"
-                                : "rgba(34, 197, 94, 0.16)",
-                              color: theme.isPremium ? "#fcd34d" : "#86efac",
-                            }}
-                          >
-                            {accessLabel}
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span
+                              className="rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
+                              style={{
+                                borderColor: "var(--border)",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {formatCategory(theme.category)}
+                            </span>
+
+                            <span
+                              className="rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
+                              style={{
+                                borderColor: "var(--border)",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {priceLabel}
+                            </span>
+
+                            <span
+                              className="ml-auto rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em]"
+                              style={{
+                                background: isActive
+                                  ? "var(--button-bg)"
+                                  : unlocked
+                                    ? "linear-gradient(135deg, var(--primary), rgba(34,211,238,0.72))"
+                                    : "var(--button-bg)",
+                                color: "var(--text)",
+                              }}
+                            >
+                              {isActive ? "Active" : unlocked ? "Apply" : "Locked"}
+                            </span>
                           </div>
                         </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span
-                            className="rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
-                            style={{
-                              borderColor: "var(--border)",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {formatCategory(theme.category)}
-                          </span>
-
-                          <span
-                            className="rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
-                            style={{
-                              borderColor: "var(--border)",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {priceLabel}
-                          </span>
-
-                          <span
-                            className="ml-auto rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em]"
-                            style={{
-                              background: isActive
-                                ? "var(--button-bg)"
-                                : unlocked
-                                  ? "linear-gradient(135deg, var(--primary), rgba(34,211,238,0.72))"
-                                  : "var(--button-bg)",
-                              color: "var(--text)",
-                            }}
-                          >
-                            {isActive ? "Active" : unlocked ? "Apply" : "Locked"}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  </article>
-                );
-              })}
+                      </button>
+                    </article>
+                  );
+                })
+              )}
             </div>
           </div>
         </>
