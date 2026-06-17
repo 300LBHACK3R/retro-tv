@@ -18,7 +18,6 @@ import StaticTransition from "@/components/StaticTransition";
 import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
 import ViewerHeader from "@/components/ViewerHeader";
-import { buildGuideSchedule } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import { getThemeById } from "@/lib/themes";
@@ -82,7 +81,7 @@ function sortChannelsByNumber(channels: Channel[]): Channel[] {
       return aNumber - bNumber;
     }
 
-    return a.id.localeCompare(b.id);
+    return String(a.id).localeCompare(String(b.id));
   });
 }
 
@@ -106,6 +105,51 @@ function getPlayerFrameClass(playerViewMode: "normal" | "mini" | "theater"): str
   return "relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl shadow-black/30";
 }
 
+function getChannelDisplayName(channel: Channel | undefined): string {
+  if (!channel) {
+    return "No channel selected";
+  }
+
+  return channel.branding?.displayName ?? channel.name;
+}
+
+function getChannelLabel(channel: Channel | undefined): string {
+  if (!channel) {
+    return "CH --";
+  }
+
+  return `CH ${channel.number ?? channel.id}`;
+}
+
+function EmptyStationState() {
+  return (
+    <section
+      className="rounded-2xl border p-5 text-sm shadow-2xl shadow-black/20"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+        color: "var(--text-muted)",
+      }}
+    >
+      <div
+        className="text-xs font-black uppercase tracking-[0.18em]"
+        style={{ color: "var(--primary)" }}
+      >
+        Tate&apos;s TV
+      </div>
+
+      <h2 className="mt-2 text-lg font-black tracking-tight text-white">
+        No Enabled Channels
+      </h2>
+
+      <p className="mt-2 leading-6">
+        Enable at least one channel in admin mode so the live player, guide, and
+        schedule engine have a channel to run.
+      </p>
+    </section>
+  );
+}
+
 export default function Home() {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
@@ -127,9 +171,12 @@ export default function Home() {
   const playerViewMode = useStore(
     (state) => state.viewerSettings.playerViewMode,
   );
+  const isSettingsOpen = useStore(
+    (state) => state.viewerSettings.isSettingsOpen,
+  );
+  const setSettingsOpen = useStore((state) => state.setSettingsOpen);
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
-  const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
@@ -204,30 +251,36 @@ export default function Home() {
   }, [channels, setChannel]);
 
   useEffect(() => {
-    if (!activeChannel) {
-      const firstEnabledChannel = enabledChannels[0];
+    if (activeChannel) {
+      return;
+    }
 
-      if (firstEnabledChannel) {
-        setChannel(firstEnabledChannel.id);
-      }
+    const firstEnabledChannel = enabledChannels[0];
+
+    if (firstEnabledChannel) {
+      setChannel(firstEnabledChannel.id);
     }
   }, [activeChannel, enabledChannels, setChannel]);
 
   useEffect(() => {
-    const shouldLockPage = isGuideOpen || localSettingsOpen;
+    const shouldLockPage = isGuideOpen || isSettingsOpen;
+
     const previousOverflow = document.body.style.overflow;
     const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    const previousTouchAction = document.body.style.touchAction;
 
     if (shouldLockPage) {
       document.body.style.overflow = "hidden";
       document.body.style.overscrollBehavior = "none";
+      document.body.style.touchAction = "none";
     }
 
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      document.body.style.touchAction = previousTouchAction;
     };
-  }, [isGuideOpen, localSettingsOpen]);
+  }, [isGuideOpen, isSettingsOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -237,7 +290,7 @@ export default function Home() {
 
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        setLocalSettingsOpen(true);
+        setSettingsOpen(true);
         return;
       }
 
@@ -247,9 +300,9 @@ export default function Home() {
         return;
       }
 
-      if (localSettingsOpen && event.key === "Escape") {
+      if (isSettingsOpen && event.key === "Escape") {
         event.preventDefault();
-        setLocalSettingsOpen(false);
+        setSettingsOpen(false);
       }
     };
 
@@ -258,7 +311,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeGuide, isGuideOpen, localSettingsOpen]);
+  }, [closeGuide, isGuideOpen, isSettingsOpen, setSettingsOpen]);
 
   const guideOverlay = (
     <MultiGuide
@@ -301,152 +354,173 @@ export default function Home() {
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
             <ShowLibrary />
+
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="ttv-touch-target rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
+              style={{
+                background: "var(--button-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              Settings
+            </button>
           </div>
         </header>
 
-        <div
-          className={`grid gap-3 ${
-            showAdminSidebar
-              ? "lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]"
-              : "grid-cols-1"
-          }`}
-          style={
-            showAdminSidebar
-              ? {
-                  gridTemplateColumns: `minmax(340px, ${sidebarWidth}px) minmax(0, 1fr)`,
-                }
-              : undefined
-          }
-        >
-          {showAdminSidebar ? (
-            <aside className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
-              <section
-                className="rounded-2xl border p-4"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-              >
-                <div
-                  className="mb-3 text-xs font-semibold uppercase tracking-[0.16em]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Layout Controls
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="sidebar-width"
-                      className="mb-1 block text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Sidebar Width
-                    </label>
-
-                    <input
-                      id="sidebar-width"
-                      type="range"
-                      min={340}
-                      max={560}
-                      value={sidebarWidth}
-                      onChange={(event) =>
-                        setSidebarWidth(Number(event.target.value))
-                      }
-                      className="w-full accent-current"
-                    />
-
-                    <div
-                      className="text-[11px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {sidebarWidth}px
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="guide-height"
-                      className="mb-1 block text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Guide Height
-                    </label>
-
-                    <input
-                      id="guide-height"
-                      type="range"
-                      min={220}
-                      max={560}
-                      value={guideHeight}
-                      onChange={(event) =>
-                        setGuideHeight(Number(event.target.value))
-                      }
-                      className="w-full accent-current"
-                    />
-
-                    <div
-                      className="text-[11px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {guideHeight}px
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <AdminDashboard />
-            </aside>
-          ) : null}
-
-          <section
-            className={`order-1 flex min-w-0 flex-col gap-3 ${
-              showAdminSidebar ? "lg:order-2" : ""
+        {enabledChannels.length === 0 ? (
+          <EmptyStationState />
+        ) : (
+          <div
+            className={`grid gap-3 ${
+              showAdminSidebar
+                ? "lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]"
+                : "grid-cols-1"
             }`}
+            style={
+              showAdminSidebar
+                ? {
+                    gridTemplateColumns: `minmax(340px, ${sidebarWidth}px) minmax(0, 1fr)`,
+                  }
+                : undefined
+            }
           >
-            <ViewerHeader channel={activeChannel} />
+            {showAdminSidebar ? (
+              <aside className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
+                <section
+                  className="rounded-2xl border p-4"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                >
+                  <div
+                    className="mb-3 text-xs font-semibold uppercase tracking-[0.16em]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Layout Controls
+                  </div>
 
-            <NowNextBar channel={activeChannel} schedule={activeSchedule} />
+                  <div className="space-y-4">
+                    <div>
+                      <label
+                        htmlFor="sidebar-width"
+                        className="mb-1 block text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Sidebar Width
+                      </label>
 
-            <QuickTuneBar />
+                      <input
+                        id="sidebar-width"
+                        type="range"
+                        min={340}
+                        max={560}
+                        value={sidebarWidth}
+                        onChange={(event) =>
+                          setSidebarWidth(Number(event.target.value))
+                        }
+                        className="w-full accent-current"
+                      />
 
-            {playerViewMode === "mini" ? (
-              <section
-                className="rounded-2xl border p-4 text-sm"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Mini-player is active. Use the floating player in the bottom
-                right, or switch back to Normal/Theater from the remote.
-              </section>
+                      <div
+                        className="text-[11px]"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {sidebarWidth}px
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="guide-height"
+                        className="mb-1 block text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Guide Height
+                      </label>
+
+                      <input
+                        id="guide-height"
+                        type="range"
+                        min={220}
+                        max={560}
+                        value={guideHeight}
+                        onChange={(event) =>
+                          setGuideHeight(Number(event.target.value))
+                        }
+                        className="w-full accent-current"
+                      />
+
+                      <div
+                        className="text-[11px]"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {guideHeight}px
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <AdminDashboard />
+              </aside>
             ) : null}
 
-            <div className={playerFrameClass} style={{ borderColor: "var(--border)" }}>
-              <Player schedule={activeSchedule} />
+            <section
+              className={`order-1 flex min-w-0 flex-col gap-3 ${
+                showAdminSidebar ? "lg:order-2" : ""
+              }`}
+            >
+              <ViewerHeader channel={activeChannel} />
 
-              <ChannelOverlay compact={playerViewMode === "mini"} />
-              <StaticTransition trigger={activeChannel?.id ?? ""} />
-              <Remote />
-            </div>
+              <NowNextBar channel={activeChannel} schedule={activeSchedule} />
 
-            {!isGuideOpen ? (
-              <section
-                className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                }}
+              <QuickTuneBar />
+
+              {playerViewMode === "mini" ? (
+                <section
+                  className="rounded-2xl border p-4 text-sm"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Mini-player is active. Use the floating player in the bottom
+                  right, or switch back to Normal/Theater from the remote.
+                </section>
+              ) : null}
+
+              <div
+                className={playerFrameClass}
+                style={{ borderColor: "var(--border)" }}
               >
-                Press <span style={{ color: "var(--text)" }}>Guide</span> on the remote to open the premium live guide.
-              </section>
-            ) : null}
-          </section>
-        </div>
+                <Player schedule={activeSchedule} />
+
+                <ChannelOverlay compact={playerViewMode === "mini"} />
+                <StaticTransition trigger={activeChannel?.id ?? ""} />
+                <Remote />
+              </div>
+
+              {!isGuideOpen ? (
+                <section
+                  className="rounded-2xl border p-4 text-sm shadow-2xl shadow-black/20"
+                  style={{
+                    background: "var(--panel-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Press <span style={{ color: "var(--text)" }}>Guide</span> on
+                  the remote to open the premium live guide.
+                </section>
+              ) : null}
+            </section>
+          </div>
+        )}
 
         <footer
           className="rounded-2xl border px-4 py-4 text-center text-xs shadow-2xl shadow-black/20 sm:px-5"
@@ -507,13 +581,11 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {guideOverlay}
-          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">{guideOverlay}</div>
         </div>
       ) : null}
 
-      {localSettingsOpen ? (
+      {isSettingsOpen ? (
         <div
           className="fixed inset-0 z-[95] overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-4"
           role="dialog"
@@ -551,7 +623,7 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setLocalSettingsOpen(false)}
+                onClick={() => setSettingsOpen(false)}
                 className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
                 style={{
                   background: "var(--button-bg)",
@@ -560,6 +632,20 @@ export default function Home() {
               >
                 Close
               </button>
+            </div>
+
+            <div
+              className="rounded-xl border px-3 py-2 text-xs leading-5"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              Current station:{" "}
+              <span style={{ color: "var(--text)" }}>
+                {getChannelLabel(activeChannel)} / {getChannelDisplayName(activeChannel)}
+              </span>
             </div>
 
             <AdminAccessPanel onAuthChange={setIsAdminAuthorized} />

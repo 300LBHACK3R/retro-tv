@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getLiveState } from "@/lib/liveEngine";
+import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { usePlayerControls } from "@/lib/playerControls";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem } from "@/lib/types";
@@ -256,7 +256,7 @@ export default function Player({ schedule }: PlayerProps) {
     (state) => state.fullscreenRequestId,
   );
 
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
   const [status, setStatus] = useState<PlaybackStatus>("idle");
   const [message, setMessage] = useState("");
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
@@ -348,6 +348,8 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
+    setNowMs(Date.now());
+
     const interval = window.setInterval(() => {
       setNowMs(Date.now());
     }, LIVE_TICK_MS);
@@ -696,7 +698,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` â€¢ ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 

@@ -100,7 +100,10 @@ function clonePreset(preset: BroadcastPreset): BroadcastPreset {
   };
 }
 
-function cleanBreakpoints(values: readonly number[], durationSeconds: number): number[] {
+function cleanBreakpoints(
+  values: readonly number[],
+  durationSeconds: number,
+): number[] {
   return values
     .map(normalizePositiveSecond)
     .filter((value) => value > 0 && value < durationSeconds);
@@ -112,13 +115,48 @@ function cleanBreakDurations(values: readonly number[]): number[] {
     .filter((value) => value > 0);
 }
 
+function hasRealBreakpoints(item: MediaItem): boolean {
+  return Array.isArray(item.breakpoints) && item.breakpoints.length > 0;
+}
+
+function hasRealBreakDurations(item: MediaItem): boolean {
+  return Array.isArray(item.breakDurations) && item.breakDurations.length > 0;
+}
+
+function hasCustomSlotLength(item: MediaItem): boolean {
+  const slotLength = normalizePositiveSecond(item.slotLengthSeconds);
+
+  if (slotLength <= 0) {
+    return false;
+  }
+
+  const duration = normalizePositiveSecond(item.duration);
+
+  if (duration >= 18 * 60 && duration <= 26 * 60) {
+    return slotLength !== THIRTY_MINUTE_SLOT_SECONDS;
+  }
+
+  if (duration >= 38 * 60 && duration <= 52 * 60) {
+    return slotLength !== SIXTY_MINUTE_SLOT_SECONDS;
+  }
+
+  return true;
+}
+
+function hasCustomCommercialStrategy(item: MediaItem): boolean {
+  return Boolean(
+    item.commercialStrategy &&
+      item.commercialStrategy !== STANDARD_COMMERCIAL_STRATEGY,
+  );
+}
+
 function hasCustomBroadcastSettings(item: MediaItem): boolean {
   return Boolean(
-    item.breakpoints?.length ||
-      item.breakDurations?.length ||
-      item.fillSlotWithCommercials ||
-      item.commercialStrategy ||
-      item.slotLengthSeconds,
+    hasRealBreakpoints(item) ||
+      hasRealBreakDurations(item) ||
+      item.fillSlotWithCommercials === true ||
+      hasCustomCommercialStrategy(item) ||
+      hasCustomSlotLength(item),
   );
 }
 
@@ -176,10 +214,6 @@ export function isThirtyMinuteShowCandidate(item: MediaItem): boolean {
 
   const duration = normalizePositiveSecond(item.duration);
 
-  /*
-   * Designed for normal 30-minute TV episodes:
-   * cartoons, anime, sitcoms, and most syndicated half-hour programming.
-   */
   return duration >= 18 * 60 && duration <= 26 * 60;
 }
 
@@ -190,9 +224,6 @@ export function isSixtyMinuteBroadcastCandidate(item: MediaItem): boolean {
 
   const duration = normalizePositiveSecond(item.duration);
 
-  /*
-   * Designed for hour-long drama/documentary style programming.
-   */
   return duration >= 38 * 60 && duration <= 52 * 60;
 }
 
@@ -205,11 +236,6 @@ export function shouldUseThirtyMinuteBroadcastStandard(
 
   const slotLength = normalizePositiveSecond(item.slotLengthSeconds);
 
-  /*
-   * If slotLengthSeconds is missing, normal half-hour shows should behave
-   * like real broadcast TV by default. If the user already set a different
-   * slot length, do not override it.
-   */
   return slotLength <= 0 || slotLength === THIRTY_MINUTE_SLOT_SECONDS;
 }
 
@@ -272,10 +298,6 @@ export function standardizeBroadcastItem(item: MediaItem): MediaItem {
     return item;
   }
 
-  /*
-   * Respect fully custom user programming. This prevents the standardizer from
-   * fighting manual edits made in Quick Edit or Bulk Import.
-   */
   if (hasCustomBroadcastSettings(item)) {
     return item;
   }
