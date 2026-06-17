@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
@@ -11,10 +11,28 @@ interface PlayerProps {
 
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
+type WebKitVideoElement = HTMLVideoElement & {
+  webkitSupportsFullscreen?: boolean;
+  webkitDisplayingFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+  webkitEnterFullScreen?: () => void;
+  webkitExitFullScreen?: () => void;
+};
+
+type WebKitFullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  webkitRequestFullScreen?: () => Promise<void> | void;
+};
+
+type WebKitDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  webkitCancelFullScreen?: () => void;
+};
+
 const LIVE_TICK_MS = 1000;
-const SOFT_SYNC_INTERVAL_MS = 10_000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
-const HARD_SYNC_THROTTLE_MS = 8_000;
 const SOURCE_END_PADDING_SECONDS = 0.4;
 
 function formatTime(seconds: number): string {
@@ -112,13 +130,112 @@ function getErrorMessage(video: HTMLVideoElement): string {
   return "Playback failed. Check the video URL or encoding.";
 }
 
+function isIPhoneSafariFullscreenPath(): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /iPhone|iPod/i.test(navigator.userAgent);
+}
+
+function getFullscreenElement(): Element | null {
+  const webkitDocument = document as WebKitDocument;
+
+  return document.fullscreenElement ?? webkitDocument.webkitFullscreenElement ?? null;
+}
+
+async function exitElementFullscreen(): Promise<boolean> {
+  const webkitDocument = document as WebKitDocument;
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return true;
+    }
+
+    if (webkitDocument.webkitFullscreenElement && webkitDocument.webkitExitFullscreen) {
+      await webkitDocument.webkitExitFullscreen();
+      return true;
+    }
+
+    if (webkitDocument.webkitFullscreenElement && webkitDocument.webkitCancelFullScreen) {
+      webkitDocument.webkitCancelFullScreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+async function requestElementFullscreen(element: HTMLElement): Promise<boolean> {
+  const fullscreenElement = element as WebKitFullscreenElement;
+
+  try {
+    if (element.requestFullscreen) {
+      await element.requestFullscreen();
+      return true;
+    }
+
+    if (fullscreenElement.webkitRequestFullscreen) {
+      await fullscreenElement.webkitRequestFullscreen();
+      return true;
+    }
+
+    if (fullscreenElement.webkitRequestFullScreen) {
+      await fullscreenElement.webkitRequestFullScreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+function enterNativeVideoFullscreen(video: HTMLVideoElement): boolean {
+  const webkitVideo = video as WebKitVideoElement;
+  const enter =
+    webkitVideo.webkitEnterFullscreen ?? webkitVideo.webkitEnterFullScreen;
+
+  if (!enter) {
+    return false;
+  }
+
+  if (webkitVideo.webkitSupportsFullscreen === false) {
+    return false;
+  }
+
+  try {
+    enter.call(webkitVideo);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function exitNativeVideoFullscreen(video: HTMLVideoElement): boolean {
+  const webkitVideo = video as WebKitVideoElement;
+  const exit = webkitVideo.webkitExitFullscreen ?? webkitVideo.webkitExitFullScreen;
+
+  if (!webkitVideo.webkitDisplayingFullscreen || !exit) {
+    return false;
+  }
+
+  try {
+    exit.call(webkitVideo);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastPlaybackKeyRef = useRef("");
   const lastHardSyncRef = useRef(0);
-  const isSwitchingSourceRef = useRef(false);
-  const fallbackFullscreenRef = useRef(false);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -146,38 +263,29 @@ export default function Player({ schedule }: PlayerProps) {
     video.muted = muted || volume <= 0;
   }, [muted, volume]);
 
-  const syncPosition = useCallback(
-    (force = false) => {
-      const video = videoRef.current;
-      const item = live.item;
+  const hardSyncPosition = useCallback(() => {
+    const video = videoRef.current;
+    const item = live.item;
 
-      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-        return;
-      }
+    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      return;
+    }
 
-      const target = getSafeTargetTime(video, item, live.sourceElapsed);
-      const drift = Math.abs(video.currentTime - target);
-      const now = Date.now();
+    const target = getSafeTargetTime(video, item, live.sourceElapsed);
+    const drift = Math.abs(video.currentTime - target);
+    const now = Date.now();
 
-      if (!force) {
-        if (drift < HARD_SYNC_DRIFT_SECONDS) {
-          return;
-        }
+    if (drift < HARD_SYNC_DRIFT_SECONDS && now - lastHardSyncRef.current < 8000) {
+      return;
+    }
 
-        if (now - lastHardSyncRef.current < HARD_SYNC_THROTTLE_MS) {
-          return;
-        }
-      }
-
-      try {
-        video.currentTime = target;
-        lastHardSyncRef.current = now;
-      } catch {
-        // Browser may reject seeking before metadata settles.
-      }
-    },
-    [live.item, live.sourceElapsed],
-  );
+    try {
+      video.currentTime = target;
+      lastHardSyncRef.current = now;
+    } catch {
+      // Seeking can be rejected briefly while metadata settles.
+    }
+  }, [live.item, live.sourceElapsed]);
 
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -197,31 +305,11 @@ export default function Player({ schedule }: PlayerProps) {
     }
   }, [applyAudio]);
 
-  const clearVideoSource = useCallback(() => {
-    const video = videoRef.current;
-
-    if (!video) {
-      return;
-    }
-
-    try {
-      isSwitchingSourceRef.current = true;
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    } catch {
-      // Ignore browser cleanup errors.
-    } finally {
-      isSwitchingSourceRef.current = false;
-    }
-  }, []);
-
   const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
     const item = live.item;
 
     if (!video || !item?.file) {
-      clearVideoSource();
       setStatus("idle");
       setMessage("");
       return;
@@ -229,33 +317,23 @@ export default function Player({ schedule }: PlayerProps) {
 
     setStatus("loading");
     setMessage("");
-    lastHardSyncRef.current = 0;
-    isSwitchingSourceRef.current = true;
 
     try {
       video.pause();
-      video.removeAttribute("src");
-      video.load();
-
       video.preload = "auto";
       video.src = item.file;
       video.load();
     } catch {
-      isSwitchingSourceRef.current = false;
       setStatus("error");
       setMessage("Could not load this media source.");
     }
-  }, [clearVideoSource, live.item]);
+  }, [live.item]);
 
   const resume = useCallback(() => {
     setNowMs(Date.now());
-    syncPosition(true);
+    hardSyncPosition();
     void tryPlay();
-  }, [syncPosition, tryPlay]);
-
-  useEffect(() => {
-    fallbackFullscreenRef.current = fallbackFullscreen;
-  }, [fallbackFullscreen]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -268,16 +346,16 @@ export default function Player({ schedule }: PlayerProps) {
   }, []);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        syncPosition(false);
-      }
-    }, SOFT_SYNC_INTERVAL_MS);
+    const video = videoRef.current;
 
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [syncPosition]);
+    if (!video) {
+      return;
+    }
+
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.setAttribute("x5-playsinline", "true");
+  }, []);
 
   useEffect(() => {
     applyAudio();
@@ -288,8 +366,6 @@ export default function Player({ schedule }: PlayerProps) {
     const item = live.item;
 
     if (!video || !item) {
-      lastPlaybackKeyRef.current = "empty";
-      clearVideoSource();
       setStatus("idle");
       setMessage("");
       return;
@@ -299,7 +375,7 @@ export default function Player({ schedule }: PlayerProps) {
       lastPlaybackKeyRef.current = playbackKey;
       loadCurrentSource();
     }
-  }, [clearVideoSource, live.item, loadCurrentSource, playbackKey]);
+  }, [live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -309,8 +385,7 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     const handleLoadedMetadata = () => {
-      isSwitchingSourceRef.current = false;
-      syncPosition(true);
+      hardSyncPosition();
       void tryPlay();
     };
 
@@ -322,48 +397,28 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handlePlaying = () => {
-      isSwitchingSourceRef.current = false;
       setStatus("playing");
       setMessage("");
     };
 
     const handleWaiting = () => {
-      /**
-       * Avoid showing a false blocking overlay during normal stream buffering.
-       * Some browsers fire waiting while playback is still visibly progressing.
-       */
       setStatus((current) => (current === "loading" ? "loading" : "playing"));
     };
 
-    const handleStalled = () => {
-      if (!video.paused && document.visibilityState === "visible") {
-        setStatus("loading");
-        window.setTimeout(() => {
-          syncPosition(false);
-          void tryPlay();
-        }, 500);
-      }
-    };
-
     const handlePause = () => {
-      if (isSwitchingSourceRef.current) {
-        return;
-      }
-
-      if (!video.ended && document.visibilityState === "visible") {
+      if (document.visibilityState === "visible") {
         setStatus("paused");
       }
     };
 
     const handleError = () => {
-      isSwitchingSourceRef.current = false;
       setStatus("error");
       setMessage(getErrorMessage(video));
     };
 
     const handleEnded = () => {
       setNowMs(Date.now());
-      syncPosition(true);
+      hardSyncPosition();
       void tryPlay();
     };
 
@@ -371,7 +426,6 @@ export default function Player({ schedule }: PlayerProps) {
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("waiting", handleWaiting);
-    video.addEventListener("stalled", handleStalled);
     video.addEventListener("pause", handlePause);
     video.addEventListener("error", handleError);
     video.addEventListener("ended", handleEnded);
@@ -381,12 +435,11 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("waiting", handleWaiting);
-      video.removeEventListener("stalled", handleStalled);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("error", handleError);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [syncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -403,15 +456,14 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
-      syncPosition(true);
     }
-  }, [live.item, nowMs, syncPosition]);
+  }, [live.item, nowMs]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setNowMs(Date.now());
-        syncPosition(true);
+        hardSyncPosition();
         void tryPlay();
       }
     };
@@ -421,21 +473,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [syncPosition, tryPlay]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setNowMs(Date.now());
-      syncPosition(true);
-      void tryPlay();
-    };
-
-    window.addEventListener("online", handleOnline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-    };
-  }, [syncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -443,61 +481,110 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     const shell = shellRef.current;
+    const video = videoRef.current;
 
-    if (!shell) {
+    if (!shell || !video) {
       return;
     }
 
     const run = async () => {
-      try {
-        if (fallbackFullscreenRef.current) {
-          setFallbackFullscreen(false);
-          return;
-        }
+      hardSyncPosition();
+      await tryPlay();
 
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-          setFallbackFullscreen(false);
-          return;
-        }
+      const nativeVideoExited = exitNativeVideoFullscreen(video);
 
-        await shell.requestFullscreen();
-        setFallbackFullscreen(false);
-      } catch {
-        setFallbackFullscreen(true);
+      if (nativeVideoExited) {
+        return;
       }
+
+      if (getFullscreenElement()) {
+        const didExit = await exitElementFullscreen();
+
+        if (didExit) {
+          return;
+        }
+      }
+
+      if (isIPhoneSafariFullscreenPath()) {
+        const didEnterNativeVideoFullscreen = enterNativeVideoFullscreen(video);
+
+        if (didEnterNativeVideoFullscreen) {
+          setFallbackFullscreen(false);
+          return;
+        }
+
+        setFallbackFullscreen((value) => !value);
+        return;
+      }
+
+      const didEnterElementFullscreen = await requestElementFullscreen(shell);
+
+      if (didEnterElementFullscreen) {
+        setFallbackFullscreen(false);
+        return;
+      }
+
+      const didEnterNativeVideoFullscreen = enterNativeVideoFullscreen(video);
+
+      if (didEnterNativeVideoFullscreen) {
+        setFallbackFullscreen(false);
+        return;
+      }
+
+      setFallbackFullscreen((value) => !value);
     };
 
     void run();
-  }, [fullscreenRequestId]);
+  }, [fullscreenRequestId, hardSyncPosition, tryPlay]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (document.fullscreenElement) {
-        setFallbackFullscreen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && fallbackFullscreenRef.current) {
-        setFallbackFullscreen(false);
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("keydown", handleKeyDown);
+    document.documentElement.classList.toggle(
+      "ttv-fallback-fullscreen-active",
+      fallbackFullscreen,
+    );
+    document.body.classList.toggle("ttv-scroll-locked", fallbackFullscreen);
 
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.documentElement.classList.remove("ttv-fallback-fullscreen-active");
+      document.body.classList.remove("ttv-scroll-locked");
+    };
+  }, [fallbackFullscreen]);
+
+  useEffect(() => {
+    const handleNativeVideoFullscreenEnd = () => {
+      setNowMs(Date.now());
+      hardSyncPosition();
+      void tryPlay();
+    };
+
+    const video = videoRef.current;
+
+    video?.addEventListener(
+      "webkitendfullscreen",
+      handleNativeVideoFullscreenEnd,
+    );
+
+    return () => {
+      video?.removeEventListener(
+        "webkitendfullscreen",
+        handleNativeVideoFullscreenEnd,
+      );
+    };
+  }, [hardSyncPosition, tryPlay]);
+
+  useEffect(() => {
+    return () => {
+      const video = videoRef.current;
+
+      if (!video) {
+        return;
+      }
+
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
   }, []);
-
-  useEffect(() => {
-    return () => {
-      clearVideoSource();
-    };
-  }, [clearVideoSource]);
 
   if (!live.item) {
     return (
@@ -507,7 +594,6 @@ export default function Player({ schedule }: PlayerProps) {
       >
         <div>
           <div className="text-lg font-semibold">No media scheduled</div>
-
           <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
             Add media to this channel from the admin panel.
           </div>
@@ -525,36 +611,39 @@ export default function Player({ schedule }: PlayerProps) {
   return (
     <div
       ref={shellRef}
-      className={`ttv-player-shell group relative h-full w-full bg-black ${
+      className={`ttv-player-shell relative h-full w-full bg-black ${
         fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
-      data-playback-status={status}
-      aria-label={`Tate's TV player: ${isBreak ? "Commercial Break" : title}`}
     >
       <video
-  ref={videoRef}
-  playsInline
-  autoPlay
-  preload="auto"
-  controls={false}
-  muted={muted || volume <= 0}
-  controlsList="nodownload"
-  className="h-full w-full bg-black"
-  style={{
-    objectFit: fitMode,
-  }}
-/>
+        ref={videoRef}
+        playsInline
+        autoPlay
+        preload="auto"
+        controls={false}
+        muted={muted || volume <= 0}
+        className="h-full w-full bg-black"
+        style={{
+          objectFit: fitMode,
+        }}
+      />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
+      <button
+        type="button"
+        onClick={resume}
+        className="absolute inset-0 z-[1] cursor-default"
+        aria-label="Resume playback"
+        tabIndex={-1}
+      />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {isBreak ? "Commercial Break" : title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak
-            ? ` • ${live.item.segmentLabel}`
-            : ""}
+          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
@@ -575,7 +664,7 @@ export default function Player({ schedule }: PlayerProps) {
       ) : null}
 
       <div
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-100 backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100"
+        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 hover:opacity-100"
         aria-hidden="true"
       >
         {status}

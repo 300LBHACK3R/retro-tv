@@ -14,3 +14,66 @@
 @import "./styles/themes/electric-command.css";
 @import "./styles/themes/gold.css";
 @import "./styles/themes/retro.css";
+
+/* === TTV_IOS_SAFARI_FULLSCREEN_V2_START === */
+html.ttv-fallback-fullscreen-active,
+html.ttv-fallback-fullscreen-active body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  background: #000 !important;
+}
+
+.ttv-player-expanded {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100svh !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  overflow: hidden !important;
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+.ttv-player-expanded video {
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100svh !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+.ttv-player-expanded::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #000;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .ttv-player-expanded {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .ttv-player-expanded video {
+    height: calc(
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    ) !important;
+  }
+}
+/* === TTV_IOS_SAFARI_FULLSCREEN_V2_END === */
