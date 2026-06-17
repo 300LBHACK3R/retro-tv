@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getLiveState } from "@/lib/liveEngine";
 import { usePlayerControls } from "@/lib/playerControls";
+import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem } from "@/lib/types";
 
 interface PlayerProps {
@@ -34,6 +35,7 @@ type WebKitDocument = Document & {
 const LIVE_TICK_MS = 1000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
 const SOURCE_END_PADDING_SECONDS = 0.4;
+const FULLSCREEN_BUSY_UNLOCK_MS = 900;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -65,7 +67,7 @@ function getPlaybackKey(item: BroadcastItem | null): string {
 }
 
 function getDisplayTitle(item: BroadcastItem): string {
-  return item.sourceTitle?.trim() || item.title;
+  return cleanDisplayText(item.sourceTitle?.trim() || item.title || "Untitled");
 }
 
 function getSourceStart(item: BroadcastItem): number {
@@ -78,6 +80,14 @@ function getSourceEnd(item: BroadcastItem): number | null {
   }
 
   return Math.max(0, Math.floor(item.sourceEnd));
+}
+
+function isBreakItem(item: BroadcastItem): boolean {
+  return (
+    item.hiddenFromGuide ||
+    item.type === "commercial" ||
+    item.type === "bumper"
+  );
 }
 
 function getSafeTargetTime(
@@ -458,8 +468,9 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
+      hardSyncPosition();
     }
-  }, [live.item, nowMs]);
+  }, [hardSyncPosition, live.item, nowMs]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -504,7 +515,7 @@ export default function Player({ schedule }: PlayerProps) {
     const releaseBusyLock = () => {
       window.setTimeout(() => {
         fullscreenBusyRef.current = false;
-      }, 900);
+      }, FULLSCREEN_BUSY_UNLOCK_MS);
     };
 
     const run = async () => {
@@ -514,6 +525,7 @@ export default function Player({ schedule }: PlayerProps) {
       const nativeVideoExited = exitNativeVideoFullscreen(video);
 
       if (nativeVideoExited) {
+        setFallbackFullscreen(false);
         releaseBusyLock();
         return;
       }
@@ -522,6 +534,7 @@ export default function Player({ schedule }: PlayerProps) {
         const didExit = await exitElementFullscreen();
 
         if (didExit) {
+          setFallbackFullscreen(false);
           releaseBusyLock();
           return;
         }
@@ -570,7 +583,31 @@ export default function Player({ schedule }: PlayerProps) {
   }, [fallbackFullscreen]);
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (getFullscreenElement()) {
+        setFallbackFullscreen(false);
+      }
+
+      setNowMs(Date.now());
+      hardSyncPosition();
+      void tryPlay();
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange,
+      );
+    };
+  }, [hardSyncPosition, tryPlay]);
+
+  useEffect(() => {
     const handleNativeVideoFullscreenEnd = () => {
+      setFallbackFullscreen(false);
       setNowMs(Date.now());
       hardSyncPosition();
       void tryPlay();
@@ -622,15 +659,12 @@ export default function Player({ schedule }: PlayerProps) {
   }
 
   const title = getDisplayTitle(live.item);
-  const isBreak =
-    live.item.hiddenFromGuide ||
-    live.item.type === "commercial" ||
-    live.item.type === "bumper";
+  const isBreak = isBreakItem(live.item);
 
   return (
     <div
       ref={shellRef}
-      className={`ttv-player-shell relative h-full w-full bg-black ${
+      className={`ttv-player-shell group relative h-full w-full bg-black ${
         fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
     >
@@ -655,14 +689,14 @@ export default function Player({ schedule }: PlayerProps) {
         tabIndex={-1}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {isBreak ? "Commercial Break" : title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` â€¢ ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` • ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
@@ -683,7 +717,7 @@ export default function Player({ schedule }: PlayerProps) {
       ) : null}
 
       <div
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 hover:opacity-100"
+        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100"
         aria-hidden="true"
       >
         {status}
