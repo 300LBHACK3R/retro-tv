@@ -15,12 +15,112 @@
 @import "./styles/themes/gold.css";
 @import "./styles/themes/retro.css";
 
-/* === TTV_IOS_SAFARI_FULLSCREEN_V2_START === */
+@layer base {
+  :root {
+    color-scheme: dark;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  html {
+    min-height: 100%;
+    background: #020617;
+    overscroll-behavior: none;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100%;
+    background: #020617;
+    overscroll-behavior-x: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  video,
+  canvas,
+  img,
+  svg {
+    max-width: 100%;
+  }
+
+  video {
+    display: block;
+  }
+
+  ::selection {
+    background: rgba(103, 232, 249, 0.3);
+    color: #ffffff;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  .ttv-no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .ttv-no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ttv-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .ttv-safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .ttv-safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
+
+/* === TTV_FULLSCREEN_FALLBACK_START === */
 html.ttv-fallback-fullscreen-active,
 html.ttv-fallback-fullscreen-active body {
+  width: 100%;
+  height: 100%;
   overflow: hidden !important;
   overscroll-behavior: none !important;
   background: #000 !important;
+}
+
+html.ttv-fallback-fullscreen-active body {
+  position: fixed;
+  inset: 0;
 }
 
 .ttv-player-expanded {
@@ -28,30 +128,29 @@ html.ttv-fallback-fullscreen-active body {
   inset: 0 !important;
   z-index: 2147483647 !important;
   width: 100vw !important;
-  width: 100dvw !important;
   height: 100vh !important;
-  height: 100svh !important;
-  height: 100dvh !important;
   max-width: none !important;
   max-height: none !important;
+  margin: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: #000 !important;
   overflow: hidden !important;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
   isolation: isolate;
+  contain: layout paint size;
 }
 
-.ttv-player-expanded video {
-  width: 100vw !important;
-  width: 100dvw !important;
-  height: 100vh !important;
-  height: 100svh !important;
-  height: 100dvh !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-  background: #000 !important;
+@supports (width: 100dvw) {
+  .ttv-player-expanded {
+    width: 100dvw !important;
+  }
+}
+
+@supports (height: 100dvh) {
+  .ttv-player-expanded {
+    height: 100dvh !important;
+  }
 }
 
 .ttv-player-expanded::before {
@@ -60,6 +159,21 @@ html.ttv-fallback-fullscreen-active body {
   inset: 0;
   z-index: -1;
   background: #000;
+}
+
+.ttv-player-expanded video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+.ttv-player-expanded iframe,
+.ttv-player-expanded canvas {
+  max-width: none !important;
+  max-height: none !important;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -76,4 +190,20 @@ html.ttv-fallback-fullscreen-active body {
     ) !important;
   }
 }
-/* === TTV_IOS_SAFARI_FULLSCREEN_V2_END === */
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .ttv-player-expanded {
+    padding: 0 !important;
+  }
+
+  .ttv-player-expanded video {
+    height: 100vh !important;
+  }
+
+  @supports (height: 100dvh) {
+    .ttv-player-expanded video {
+      height: 100dvh !important;
+    }
+  }
+}
+/* === TTV_FULLSCREEN_FALLBACK_END === */
