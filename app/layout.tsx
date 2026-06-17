@@ -8,8 +8,13 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const FALLBACK_SITE_URL = "https://www.tatestv.ca";
 const DEFAULT_OG_IMAGE = "/opengraph-image.png";
+
 const APP_NAME = "Tate's TV";
 const APP_SHORT_NAME = "TTV";
+const APP_AUTHOR = "Tate Byers";
+const APP_LOCALE = "en_CA";
+const APP_THEME_COLOR = "#020617";
+
 const APP_DESCRIPTION =
   "Tate's TV is a retro live-TV simulator with custom channels, scheduled programming, nostalgic guide styling, and premium visual themes.";
 
@@ -24,7 +29,13 @@ function getSiteUrl(): string {
   }
 }
 
+function createAbsoluteUrl(path: string): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${siteUrl}${cleanPath}`;
+}
+
 const siteUrl = getSiteUrl();
+const ogImageUrl = createAbsoluteUrl(DEFAULT_OG_IMAGE);
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -50,11 +61,15 @@ export const metadata: Metadata = {
     "nostalgic TV guide",
     "retro streaming",
     "PWA TV app",
+    "browser TV app",
+    "retro channel guide",
   ],
 
-  authors: [{ name: "Tate Byers" }],
-  creator: "Tate Byers",
+  authors: [{ name: APP_AUTHOR }],
+  creator: APP_AUTHOR,
   publisher: APP_NAME,
+  category: "entertainment",
+  referrer: "origin-when-cross-origin",
 
   alternates: {
     canonical: "/",
@@ -62,7 +77,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     type: "website",
-    locale: "en_CA",
+    locale: APP_LOCALE,
     url: "/",
     siteName: APP_NAME,
     title: `${APP_NAME} | Retro Live TV Simulator`,
@@ -99,12 +114,18 @@ export const metadata: Metadata = {
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/favicon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/apple-icon-180.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      {
+        url: "/apple-icon-180.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
     other: [
       {
         rel: "mask-icon",
         url: "/safari-pinned-tab.svg",
-        color: "#020617",
+        color: APP_THEME_COLOR,
       },
     ],
   },
@@ -117,15 +138,14 @@ export const metadata: Metadata = {
     email: false,
   },
 
-  category: "entertainment",
-
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-title": APP_SHORT_NAME,
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "msapplication-TileColor": "#020617",
-    "theme-color": "#020617",
+    "msapplication-TileColor": APP_THEME_COLOR,
+    "msapplication-config": "/browserconfig.xml",
+    "theme-color": APP_THEME_COLOR,
   },
 };
 
@@ -134,7 +154,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#020617",
+  themeColor: APP_THEME_COLOR,
   colorScheme: "dark",
 };
 
@@ -142,10 +162,72 @@ type RootLayoutProps = Readonly<{
   children: ReactNode;
 }>;
 
+function JsonLd() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        name: APP_NAME,
+        alternateName: [APP_SHORT_NAME, "TatesTV"],
+        url: siteUrl,
+        description: APP_DESCRIPTION,
+        inLanguage: "en-CA",
+        publisher: {
+          "@id": `${siteUrl}/#organization`,
+        },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: APP_NAME,
+        url: siteUrl,
+        founder: {
+          "@type": "Person",
+          name: APP_AUTHOR,
+        },
+        logo: {
+          "@type": "ImageObject",
+          url: createAbsoluteUrl("/favicon-512.png"),
+        },
+      },
+      {
+        "@type": "WebApplication",
+        "@id": `${siteUrl}/#webapp`,
+        name: APP_NAME,
+        alternateName: APP_SHORT_NAME,
+        url: siteUrl,
+        image: ogImageUrl,
+        description: APP_DESCRIPTION,
+        applicationCategory: "EntertainmentApplication",
+        operatingSystem: "Web browser",
+        browserRequirements: "Requires a modern browser with HTML5 video support.",
+        inLanguage: "en-CA",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "CAD",
+        },
+      },
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+      }}
+    />
+  );
+}
+
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en-CA" suppressHydrationWarning>
       <body className="min-h-screen bg-[#020617] antialiased selection:bg-cyan-300/30 selection:text-white">
+        <JsonLd />
         <ServiceWorkerRegister />
         <InstallPromptBanner />
         {children}
