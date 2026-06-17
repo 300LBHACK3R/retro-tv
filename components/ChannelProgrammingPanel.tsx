@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   formatBreakpoints,
   formatDuration,
@@ -28,6 +28,8 @@ type PlaylistStat = {
   helper: string;
 };
 
+type PlaylistFilter = "all" | "programs" | "ads" | "missing" | "duplicates";
+
 const MAX_PLAYLIST_HEIGHT = 620;
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -44,6 +46,23 @@ function getChannelName(channel: Channel | undefined): string {
   }
 
   return channel.branding?.displayName ?? channel.name;
+}
+
+function sortChannels(channels: Channel[]): Channel[] {
+  return [...channels].sort((a, b) => {
+    const aNumber = Number(a.number ?? a.id);
+    const bNumber = Number(b.number ?? b.id);
+
+    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+      return aNumber - bNumber;
+    }
+
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function getChannelOptionLabel(channel: Channel): string {
+  return `${getChannelLabel(channel)} / ${getChannelName(channel)}`;
 }
 
 function getProviderLabel(item: MediaItem): string {
@@ -152,17 +171,49 @@ function formatCompactNumber(value: number): string {
   }).format(value);
 }
 
+function createDuplicateMediaIdSet(programmedItems: ProgrammedItem[]): Set<string> {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  programmedItems.forEach((entry) => {
+    if (seen.has(entry.mediaId)) {
+      duplicates.add(entry.mediaId);
+      return;
+    }
+
+    seen.add(entry.mediaId);
+  });
+
+  return duplicates;
+}
+
+function matchesFilter(
+  entry: ProgrammedItem,
+  filter: PlaylistFilter,
+  duplicateMediaIds: Set<string>,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "programs") return isLongForm(entry.item);
+  if (filter === "ads") return isShortForm(entry.item);
+  if (filter === "missing") return !entry.item;
+  if (filter === "duplicates") return duplicateMediaIds.has(entry.mediaId);
+
+  return true;
+}
+
 function createPlaylistStats({
   programmedItems,
   visibleItems,
   validProgrammedItems,
   missingProgrammedItems,
+  duplicateSlotCount,
   totalRuntime,
 }: {
   programmedItems: ProgrammedItem[];
   visibleItems: ProgrammedItem[];
   validProgrammedItems: ProgrammedItem[];
   missingProgrammedItems: ProgrammedItem[];
+  duplicateSlotCount: number;
   totalRuntime: number;
 }): PlaylistStat[] {
   const longFormCount = validProgrammedItems.filter((entry) =>
@@ -182,7 +233,7 @@ function createPlaylistStats({
     {
       label: "Visible",
       value: formatCompactNumber(visibleItems.length),
-      helper: "Items currently matching search.",
+      helper: "Items currently matching search/filter.",
     },
     {
       label: "Programs",
@@ -197,7 +248,12 @@ function createPlaylistStats({
     {
       label: "Missing",
       value: formatCompactNumber(missingProgrammedItems.length),
-      helper: "Channel slots pointing to deleted media.",
+      helper: "Slots pointing to deleted media.",
+    },
+    {
+      label: "Duplicates",
+      value: formatCompactNumber(duplicateSlotCount),
+      helper: "Repeated media IDs inside this channel.",
     },
     {
       label: "Runtime",
@@ -256,7 +312,7 @@ function ActionButton({
   disabled,
   danger = false,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
@@ -277,6 +333,33 @@ function ActionButton({
   );
 }
 
+function FilterButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ttv-touch-target rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition hover:opacity-90"
+      style={{
+        background: active
+          ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))"
+          : "var(--button-bg)",
+        borderColor: active ? "var(--primary)" : "var(--border)",
+        color: "var(--text)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ChannelProgrammingPanel() {
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
@@ -288,16 +371,27 @@ export default function ChannelProgrammingPanel() {
   const clearChannelMedia = useStore((state) => state.clearChannelMedia);
   const updateChannelSettings = useStore((state) => state.updateChannelSettings);
 
+  const [selectedChannelId, setSelectedChannelId] = useState(currentChannelId);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<PlaylistFilter>("all");
   const [targetSlots, setTargetSlots] = useState<Record<string, string>>({});
   const [slotLengthInput, setSlotLengthInput] = useState("");
   const [message, setMessage] = useState(
     "Playback follows this channel configuration.",
   );
 
+  useEffect(() => {
+    setSelectedChannelId(currentChannelId);
+  }, [currentChannelId]);
+
+  const sortedChannels = useMemo(() => sortChannels(channels), [channels]);
+
   const activeChannel = useMemo(
-    () => channels.find((channel) => channel.id === currentChannelId),
-    [channels, currentChannelId],
+    () =>
+      sortedChannels.find((channel) => channel.id === selectedChannelId) ??
+      sortedChannels.find((channel) => channel.id === currentChannelId) ??
+      sortedChannels[0],
+    [currentChannelId, selectedChannelId, sortedChannels],
   );
 
   const mediaById = useMemo(() => {
@@ -316,9 +410,26 @@ export default function ChannelProgrammingPanel() {
     }));
   }, [activeChannel, mediaById]);
 
+  const duplicateMediaIds = useMemo(
+    () => createDuplicateMediaIdSet(programmedItems),
+    [programmedItems],
+  );
+
+  const duplicateSlotCount = useMemo(
+    () =>
+      programmedItems.filter((entry) => duplicateMediaIds.has(entry.mediaId))
+        .length,
+    [duplicateMediaIds, programmedItems],
+  );
+
   const visibleItems = useMemo(
-    () => programmedItems.filter((entry) => matchesQuery(entry, query)),
-    [programmedItems, query],
+    () =>
+      programmedItems.filter(
+        (entry) =>
+          matchesQuery(entry, query) &&
+          matchesFilter(entry, filter, duplicateMediaIds),
+      ),
+    [duplicateMediaIds, filter, programmedItems, query],
   );
 
   const validProgrammedItems = useMemo(
@@ -347,9 +458,11 @@ export default function ChannelProgrammingPanel() {
         visibleItems,
         validProgrammedItems,
         missingProgrammedItems,
+        duplicateSlotCount,
         totalRuntime,
       }),
     [
+      duplicateSlotCount,
       missingProgrammedItems,
       programmedItems,
       totalRuntime,
@@ -469,7 +582,7 @@ export default function ChannelProgrammingPanel() {
             style={{ color: "var(--text-muted)" }}
           >
             Control order, randomization, commercial behavior, slot defaults,
-            and the exact playlist for this channel.
+            and exact channel playlists.
           </p>
         </div>
 
@@ -485,6 +598,46 @@ export default function ChannelProgrammingPanel() {
             ? `${getChannelLabel(activeChannel)} / ${programmedItems.length} Slots`
             : "No Channel"}
         </div>
+      </div>
+
+      <div
+        className="mb-3 rounded-2xl border p-3"
+        style={{
+          background: "var(--panel-alt-bg)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <label
+          htmlFor="programming-channel"
+          className="mb-1 block text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Edit Channel Playlist
+        </label>
+
+        <select
+          id="programming-channel"
+          value={activeChannel?.id ?? ""}
+          onChange={(event) => {
+            setSelectedChannelId(event.target.value);
+            setQuery("");
+            setFilter("all");
+            setTargetSlots({});
+            setMessage("Channel playlist selected.");
+          }}
+          className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
+          style={{
+            background: "var(--panel-bg)",
+            borderColor: "var(--border)",
+            color: "var(--text)",
+          }}
+        >
+          {sortedChannels.map((channel) => (
+            <option key={channel.id} value={channel.id}>
+              {getChannelOptionLabel(channel)}
+            </option>
+          ))}
+        </select>
       </div>
 
       {activeChannel ? (
@@ -657,7 +810,7 @@ export default function ChannelProgrammingPanel() {
       ) : null}
 
       <div
-        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-7"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
@@ -721,7 +874,8 @@ export default function ChannelProgrammingPanel() {
           type="button"
           onClick={() => {
             setQuery("");
-            setMessage("Search cleared.");
+            setFilter("all");
+            setMessage("Search and filters cleared.");
           }}
           className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.1em]"
         >
@@ -751,22 +905,55 @@ export default function ChannelProgrammingPanel() {
         </button>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <FilterButton
+          label="All"
+          active={filter === "all"}
+          onClick={() => setFilter("all")}
+        />
+        <FilterButton
+          label="Programs"
+          active={filter === "programs"}
+          onClick={() => setFilter("programs")}
+        />
+        <FilterButton
+          label="Ads"
+          active={filter === "ads"}
+          onClick={() => setFilter("ads")}
+        />
+        <FilterButton
+          label="Missing"
+          active={filter === "missing"}
+          onClick={() => setFilter("missing")}
+        />
+        <FilterButton
+          label="Duplicates"
+          active={filter === "duplicates"}
+          onClick={() => setFilter("duplicates")}
+        />
+      </div>
+
       <div
         className="mb-3 rounded-2xl border px-3 py-2 text-xs leading-5"
         style={{
           background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
+          borderColor:
+            missingProgrammedItems.length > 0 || duplicateSlotCount > 0
+              ? "rgba(250, 204, 21, 0.45)"
+              : "var(--border)",
           color: "var(--text-muted)",
         }}
       >
         <div className="flex flex-wrap gap-2">
           <span>Visible: {visibleItems.length}</span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Total slots: {programmedItems.length}</span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Playable: {validProgrammedItems.length}</span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Missing: {missingProgrammedItems.length}</span>
+          <span>•</span>
+          <span>Duplicates: {duplicateSlotCount}</span>
         </div>
 
         <div className="mt-1" style={{ color: "var(--text-muted)" }}>
@@ -783,12 +970,14 @@ export default function ChannelProgrammingPanel() {
         ) : programmedItems.length === 0 ? (
           <EmptyState message="No programmed items for this channel yet." />
         ) : visibleItems.length === 0 ? (
-          <EmptyState message="No playlist items match your search." />
+          <EmptyState message="No playlist items match your search/filter." />
         ) : (
           visibleItems.map(({ mediaId, item, index }) => {
             const isFirst = index === 0;
             const isLast = index === programmedItems.length - 1;
-            const targetSlotValue = targetSlots[`${mediaId}-${index}`] ?? String(index + 1);
+            const slotKey = `${mediaId}-${index}`;
+            const targetSlotValue = targetSlots[slotKey] ?? String(index + 1);
+            const isDuplicateSlot = duplicateMediaIds.has(mediaId);
 
             if (!item) {
               return (
@@ -820,7 +1009,9 @@ export default function ChannelProgrammingPanel() {
                     <ActionButton
                       danger
                       onClick={() => {
-                        removeMediaFromChannel(currentChannelId, mediaId);
+                        if (!activeChannel) return;
+
+                        removeMediaFromChannel(activeChannel.id, mediaId);
                         setMessage(`Removed missing slot ${index + 1}.`);
                       }}
                     >
@@ -832,15 +1023,18 @@ export default function ChannelProgrammingPanel() {
             }
 
             const badges = getItemBadges(item);
-            const slotKey = `${mediaId}-${index}`;
 
             return (
               <article
                 key={`${item.id}-${index}`}
                 className="rounded-2xl border p-3"
                 style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
+                  background: isDuplicateSlot
+                    ? "rgba(250, 204, 21, 0.08)"
+                    : "var(--panel-alt-bg)",
+                  borderColor: isDuplicateSlot
+                    ? "rgba(250, 204, 21, 0.35)"
+                    : "var(--border)",
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -856,6 +1050,12 @@ export default function ChannelProgrammingPanel() {
                         Slot {index + 1}
                       </div>
 
+                      {isDuplicateSlot ? (
+                        <div className="rounded-full border border-yellow-300/40 bg-yellow-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-yellow-100">
+                          Duplicate
+                        </div>
+                      ) : null}
+
                       <div
                         className="truncate text-sm font-black"
                         title={item.title}
@@ -869,9 +1069,9 @@ export default function ChannelProgrammingPanel() {
                       style={{ color: "var(--text-muted)" }}
                     >
                       <span>{item.type.toUpperCase()}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{formatDurationClock(item.duration)}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{getProviderLabel(item)}</span>
                     </div>
 
@@ -906,7 +1106,9 @@ export default function ChannelProgrammingPanel() {
                   <div className="flex flex-wrap gap-2">
                     <ActionButton
                       onClick={() => {
-                        moveMediaInChannel(currentChannelId, index, 0);
+                        if (!activeChannel) return;
+
+                        moveMediaInChannel(activeChannel.id, index, 0);
                         setMessage(`Moved slot ${index + 1} to the top.`);
                       }}
                       disabled={isFirst}
@@ -916,7 +1118,9 @@ export default function ChannelProgrammingPanel() {
 
                     <ActionButton
                       onClick={() => {
-                        moveMediaInChannel(currentChannelId, index, index - 1);
+                        if (!activeChannel) return;
+
+                        moveMediaInChannel(activeChannel.id, index, index - 1);
                         setMessage(`Moved slot ${index + 1} up.`);
                       }}
                       disabled={isFirst}
@@ -926,7 +1130,9 @@ export default function ChannelProgrammingPanel() {
 
                     <ActionButton
                       onClick={() => {
-                        moveMediaInChannel(currentChannelId, index, index + 1);
+                        if (!activeChannel) return;
+
+                        moveMediaInChannel(activeChannel.id, index, index + 1);
                         setMessage(`Moved slot ${index + 1} down.`);
                       }}
                       disabled={isLast}
@@ -936,8 +1142,10 @@ export default function ChannelProgrammingPanel() {
 
                     <ActionButton
                       onClick={() => {
+                        if (!activeChannel) return;
+
                         moveMediaInChannel(
-                          currentChannelId,
+                          activeChannel.id,
                           index,
                           programmedItems.length - 1,
                         );
@@ -962,7 +1170,9 @@ export default function ChannelProgrammingPanel() {
                     <ActionButton
                       danger
                       onClick={() => {
-                        removeMediaFromChannel(currentChannelId, item.id);
+                        if (!activeChannel) return;
+
+                        removeMediaFromChannel(activeChannel.id, item.id);
                         setMessage(`Removed "${item.title}" from channel.`);
                       }}
                     >
