@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { buildSchedule } from "@/lib/scheduler";
@@ -31,7 +38,7 @@ type GuideRowInput = {
 
 type GuideCell = {
   item: BroadcastItem;
-  groupKey: string;
+  stableKey: string;
   startSec: number;
   endSec: number;
 };
@@ -145,10 +152,8 @@ function getDisplayTitle(item: BroadcastItem): string {
   return cleanDisplayText(item.sourceTitle?.trim() || item.title);
 }
 
-function getGuideGroupKey(item: BroadcastItem): string {
-  return cleanDisplayText(
-    item.parentMediaId ?? item.sourceTitle?.trim() ?? item.title ?? item.id,
-  );
+function getStableItemKey(item: BroadcastItem): string {
+  return cleanDisplayText(item.id || item.parentMediaId || item.title);
 }
 
 function getChannelLabel(channel: Channel): string {
@@ -188,11 +193,14 @@ function sortRows(data: GuideRowInput[]): GuideRowInput[] {
         return aNumber - bNumber;
       }
 
-      return a.channel.id.localeCompare(b.channel.id);
+      return String(a.channel.id).localeCompare(String(b.channel.id));
     });
 }
 
-function getScheduleOffset(schedule: BroadcastItem[], broadcastSeconds: number): number {
+function getScheduleOffset(
+  schedule: BroadcastItem[],
+  broadcastSeconds: number,
+): number {
   const totalDuration = getScheduleDuration(schedule);
 
   if (totalDuration <= 0) {
@@ -261,23 +269,29 @@ function findSchedulePosition(
   };
 }
 
-function pushOrMergeCell(
+function pushCell(
   cells: GuideCell[],
   item: BroadcastItem,
   startSec: number,
   endSec: number,
+  options: { mergeWithPrevious?: boolean } = {},
 ): void {
-  const groupKey = getGuideGroupKey(item);
+  const stableKey = getStableItemKey(item);
   const previous = cells[cells.length - 1];
 
-  if (previous && previous.groupKey === groupKey && previous.endSec >= startSec - 1) {
+  if (
+    options.mergeWithPrevious &&
+    previous &&
+    previous.stableKey === stableKey &&
+    previous.endSec >= startSec - 1
+  ) {
     previous.endSec = Math.max(previous.endSec, endSec);
     return;
   }
 
   cells.push({
     item,
-    groupKey,
+    stableKey,
     startSec,
     endSec,
   });
@@ -321,9 +335,23 @@ function buildDisplayCellsForWindow(
 
     if (isGuideVisibleItem(item)) {
       lastVisibleItem = item;
-      pushOrMergeCell(cells, item, segmentStart, segmentEnd);
+
+      /**
+       * Important:
+       * Visible programs are intentionally NOT merged by title/group.
+       * This keeps separate episodes/songs from becoming one giant guide block.
+       */
+      pushCell(cells, item, segmentStart, segmentEnd, {
+        mergeWithPrevious: false,
+      });
     } else if (lastVisibleItem) {
-      pushOrMergeCell(cells, lastVisibleItem, segmentStart, segmentEnd);
+      /**
+       * Hidden commercials/bumpers can extend the previous visible program cell,
+       * so guide rows still look like broadcast slots without exposing filler.
+       */
+      pushCell(cells, lastVisibleItem, segmentStart, segmentEnd, {
+        mergeWithPrevious: true,
+      });
     }
 
     cursor = segmentEnd;
@@ -334,7 +362,11 @@ function buildDisplayCellsForWindow(
   return cells;
 }
 
-function getScheduleForSlice(row: GuideRowInput, sliceStart: Date, now: Date): BroadcastItem[] {
+function getScheduleForSlice(
+  row: GuideRowInput,
+  sliceStart: Date,
+  now: Date,
+): BroadcastItem[] {
   if (!row.media || isSameLocalDay(sliceStart, now)) {
     return row.schedule;
   }
@@ -351,12 +383,9 @@ function appendCells(
   offsetSeconds: number,
 ): void {
   for (const cell of source) {
-    pushOrMergeCell(
-      target,
-      cell.item,
-      cell.startSec + offsetSeconds,
-      cell.endSec + offsetSeconds,
-    );
+    pushCell(target, cell.item, cell.startSec + offsetSeconds, cell.endSec + offsetSeconds, {
+      mergeWithPrevious: false,
+    });
   }
 }
 
@@ -447,6 +476,8 @@ function EmptyGuideState() {
 }
 
 export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const guideDensity = useStore((state) => state.viewerSettings.guideDensity);
@@ -495,6 +526,47 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     return buildGuideMarkers(windowStart);
   }, [windowStart]);
 
+  const scrollToMarker = useCallback(
+    (marker: GuideMarker, markerIndex: number): void => {
+      setActiveMarkerIndex(markerIndex);
+
+      const scrollElement = scrollRef.current;
+
+      if (!scrollElement) {
+        return;
+      }
+
+      const left = (marker.offsetSec / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
+
+      scrollElement.scrollTo({
+        left: Math.max(0, left),
+        behavior: "smooth",
+      });
+    },
+    [],
+  );
+
+  const handleGuideScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>): void => {
+      const scrollElement = event.currentTarget;
+      const centerLeft = scrollElement.scrollLeft + scrollElement.clientWidth * 0.35;
+      const centerSeconds = (centerLeft / TIMELINE_WIDTH) * GUIDE_WINDOW_SECONDS;
+
+      let nextIndex = 0;
+
+      for (let index = 0; index < guideMarkers.length; index += 1) {
+        const marker = guideMarkers[index];
+
+        if (marker && centerSeconds >= marker.offsetSec) {
+          nextIndex = index;
+        }
+      }
+
+      setActiveMarkerIndex((current) => (current === nextIndex ? current : nextIndex));
+    },
+    [guideMarkers],
+  );
+
   if (!mounted || !now || !windowStart) {
     return null;
   }
@@ -510,43 +582,6 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
 
   const nowLineLeft =
     (secondsSinceWindowStart / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
-
-  function scrollToMarker(marker: GuideMarker, markerIndex: number): void {
-    setActiveMarkerIndex(markerIndex);
-
-    const scrollElement = document.querySelector<HTMLDivElement>(
-      "[data-ttv-guide-scroll='true']",
-    );
-
-    if (!scrollElement) {
-      return;
-    }
-
-    const left = (marker.offsetSec / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
-
-    scrollElement.scrollTo({
-      left: Math.max(0, left),
-      behavior: "smooth",
-    });
-  }
-
-  function handleGuideScroll(event: React.UIEvent<HTMLDivElement>): void {
-    const scrollElement = event.currentTarget;
-    const centerLeft = scrollElement.scrollLeft + scrollElement.clientWidth * 0.35;
-    const centerSeconds = (centerLeft / TIMELINE_WIDTH) * GUIDE_WINDOW_SECONDS;
-
-    let nextIndex = 0;
-
-    for (let index = 0; index < guideMarkers.length; index += 1) {
-      const marker = guideMarkers[index];
-
-      if (marker && centerSeconds >= marker.offsetSec) {
-        nextIndex = index;
-      }
-    }
-
-    setActiveMarkerIndex((current) => (current === nextIndex ? current : nextIndex));
-  }
 
   return (
     <section
@@ -636,6 +671,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       </div>
 
       <div
+        ref={scrollRef}
         data-ttv-guide-scroll="true"
         className="min-h-0 flex-1 overflow-auto overscroll-contain"
         onScroll={handleGuideScroll}
@@ -837,7 +873,7 @@ function GuideRow({
 
           return (
             <button
-              key={`${channel.id}-${cell.groupKey}-${index}-${cell.startSec}`}
+              key={`${channel.id}-${cell.stableKey}-${index}-${cell.startSec}`}
               type="button"
               onClick={() =>
                 onProgramSelect?.({
