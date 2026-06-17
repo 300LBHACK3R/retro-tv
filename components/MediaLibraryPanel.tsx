@@ -188,6 +188,8 @@ function createTypeCounts(media: MediaItem[]): Record<MediaType, number> {
     {
       show: 0,
       movie: 0,
+      music: 0,
+      "music-video": 0,
       commercial: 0,
       bumper: 0,
     },
@@ -515,14 +517,14 @@ export default function MediaLibraryPanel() {
           <span>
             Showing {filteredMedia.length} of {media.length}
           </span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>Total visible runtime: {formatDuration(totalVisibleDuration)}</span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>
             Current channel: {getChannelLabel(currentChannel)} /{" "}
             {getChannelName(currentChannel)}
           </span>
-          <span>•</span>
+          <span>â€¢</span>
           <span>Current channel items: {currentChannelMediaCount}</span>
         </div>
 
@@ -592,11 +594,11 @@ export default function MediaLibraryPanel() {
                       style={{ color: "var(--text-muted)" }}
                     >
                       <span>{formatDurationClock(item.duration)}</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{getProviderLabel(item)}</span>
                       {item.mimeType ? (
                         <>
-                          <span>•</span>
+                          <span>â€¢</span>
                           <span>{item.mimeType}</span>
                         </>
                       ) : null}

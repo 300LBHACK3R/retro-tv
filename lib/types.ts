@@ -1,4 +1,4 @@
-export type MediaType = "show" | "commercial" | "movie" | "bumper";
+export type MediaType = "show" | "movie" | "music" | "music-video" | "commercial" | "bumper";
 export type AppMode = "viewer" | "admin";
 
 export type PlayerViewMode = "normal" | "mini" | "theater";
