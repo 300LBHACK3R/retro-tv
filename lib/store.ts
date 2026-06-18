@@ -1,10 +1,6 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
-import {
-  getThirtyMinuteBroadcastPatch,
-  shouldUseThirtyMinuteBroadcastStandard,
-} from "./broadcastSlots";
 import type {
   AppMode,
   Channel,
@@ -89,6 +85,8 @@ interface AppState {
 export const programmingStoreName = "retro-tv-programming-v1";
 export const programmingStoreVersion = 5;
 
+const DEFAULT_CHANNEL_COUNT = 20;
+
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
 const DEFAULT_SIDEBAR_WIDTH = 420;
@@ -159,77 +157,225 @@ export const defaultMedia: MediaItem[] = [
 ];
 
 function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
-  if (channelNumber === 1) {
-    return {
-      displayName: "Tate's TV Main",
-      callsign: "TTV",
-      description: "Main network feed",
-      accentColor: DEFAULT_ACCENT_COLOR,
-      logoText: "TATE'S TV",
-    };
-  }
+  switch (channelNumber) {
+    case 1:
+      return {
+        displayName: "TTV Retro",
+        callsign: "TTVR",
+        description: "Main retro network feed.",
+        accentColor: "#ef4444",
+        logoText: "TTV RETRO",
+      };
 
-  if (channelNumber === 2) {
-    return {
-      displayName: "The True Standard",
-      callsign: "TTS",
-      description: "Christian channel",
-      accentColor: "#7c3aed",
-      logoText: "TRUE STANDARD",
-    };
-  }
+    case 2:
+      return {
+        displayName: "TTV Movies",
+        callsign: "MOVIES",
+        description: "Movie rotation and feature blocks.",
+        accentColor: "#f97316",
+        logoText: "TTV MOVIES",
+      };
 
-  if (channelNumber === 3) {
-    return {
-      displayName: "Gaming Clips",
-      callsign: "GAME",
-      description: "Gaming promos and highlights",
-      accentColor: DEFAULT_ACCENT_COLOR,
-      logoText: "GAMING",
-    };
-  }
+    case 3:
+      return {
+        displayName: "Little World",
+        callsign: "LITTLE",
+        description: "Kids and family channel.",
+        accentColor: "#22c55e",
+        logoText: "LITTLE WORLD",
+      };
 
-  if (channelNumber === 4) {
-    return {
-      displayName: "Retro TV",
-      callsign: "RETRO",
-      description: "Retro television channel",
-      accentColor: DEFAULT_ACCENT_COLOR,
-      logoText: "RETRO TV",
-    };
-  }
+    case 4:
+      return {
+        displayName: "Christian TV",
+        callsign: "FAITH",
+        description: "Christian television and faith programming.",
+        accentColor: "#7c3aed",
+        logoText: "CHRISTIAN TV",
+      };
 
+    case 5:
+      return {
+        displayName: "Main Street",
+        callsign: "MAIN",
+        description: "Canadian-style sitcom and comfort TV block.",
+        accentColor: "#0ea5e9",
+        logoText: "MAIN STREET",
+      };
+
+    case 6:
+      return {
+        displayName: "The Loft",
+        callsign: "LOFT",
+        description: "Sitcoms, friends, hangout shows, and comfort TV.",
+        accentColor: "#ec4899",
+        logoText: "THE LOFT",
+      };
+
+    case 7:
+      return {
+        displayName: "The Pulse",
+        callsign: "PULSE",
+        description: "Music videos, hip hop, rap, and culture blocks.",
+        accentColor: "#facc15",
+        logoText: "THE PULSE",
+      };
+
+    case 8:
+      return {
+        displayName: "TTV Anime",
+        callsign: "ANIME",
+        description: "Anime blocks and action animation.",
+        accentColor: "#a855f7",
+        logoText: "TTV ANIME",
+      };
+
+    case 9:
+      return {
+        displayName: "TTV Retro 2",
+        callsign: "TTVR2",
+        description: "Second retro channel feed.",
+        accentColor: "#38bdf8",
+        logoText: "TTV RETRO 2",
+      };
+
+    case 10:
+      return {
+        displayName: "TTV Epic",
+        callsign: "EPIC",
+        description: "Epic movies, fantasy, adventure, and long-form specials.",
+        accentColor: "#d4af37",
+        logoText: "TTV EPIC",
+      };
+
+    case 11:
+      return {
+        displayName: "NOW TV",
+        callsign: "NOW",
+        description: "Modern TV programming.",
+        accentColor: "#14b8a6",
+        logoText: "NOW TV",
+      };
+
+    case 12:
+      return {
+        displayName: "NOW Movies",
+        callsign: "NOWMOV",
+        description: "Modern movies and current feature blocks.",
+        accentColor: "#2563eb",
+        logoText: "NOW MOVIES",
+      };
+
+    case 13:
+      return {
+        displayName: "Christian Kids TV",
+        callsign: "CKIDS",
+        description: "Christian kids shows, faith-based family content, and safe daytime programming.",
+        accentColor: "#84cc16",
+        logoText: "CHRISTIAN KIDS",
+      };
+
+    case 14:
+      return {
+        displayName: "Faith TV",
+        callsign: "FAITHTV",
+        description: "Christian teaching, worship, sermons, and adult faith programming.",
+        accentColor: "#8b5cf6",
+        logoText: "FAITH TV",
+      };
+
+    case 15:
+      return {
+        displayName: "Tate's Gaming",
+        callsign: "GAMING",
+        description: "Gaming clips, promos, highlights, streams, and creator content.",
+        accentColor: "#39ff14",
+        logoText: "TATE'S GAMING",
+      };
+
+    case 16:
+      return {
+        displayName: "L&L Tech Solutions",
+        callsign: "LLTECH",
+        description: "Tech promos, tutorials, service videos, and client showcase content.",
+        accentColor: "#22d3ee",
+        logoText: "L&L TECH",
+      };
+
+    case 17:
+      return {
+        displayName: "Indie Spotlight",
+        callsign: "INDIE",
+        description: "Independent short films, trailers, creator submissions, and local features.",
+        accentColor: "#fb7185",
+        logoText: "INDIE SPOTLIGHT",
+      };
+
+    case 18:
+      return {
+        displayName: "Local Music",
+        callsign: "LOCAL",
+        description: "Local artists, music videos, interviews, and community music blocks.",
+        accentColor: "#f59e0b",
+        logoText: "LOCAL MUSIC",
+      };
+
+    case 19:
+      return {
+        displayName: "Creator Channel",
+        callsign: "CREATE",
+        description: "Creator submissions, podcasts, web series, highlight reels, and community programming.",
+        accentColor: "#06b6d4",
+        logoText: "CREATOR CHANNEL",
+      };
+
+    case 20:
+      return {
+        displayName: "TTV Vault",
+        callsign: "VAULT",
+        description: "Archive blocks, backup rotations, specials, pilots, and overflow programming.",
+        accentColor: "#64748b",
+        logoText: "TTV VAULT",
+      };
+
+    default:
+      return {
+        displayName: `Channel ${channelNumber}`,
+        callsign: `CH${channelNumber}`,
+        description: `Channel ${channelNumber} programming.`,
+        accentColor: DEFAULT_ACCENT_COLOR,
+        logoText: `CHANNEL ${channelNumber}`,
+      };
+  }
+}
+
+function createDefaultChannel(channelNumber: number): Channel {
   return {
-    displayName: `Channel ${channelNumber}`,
-    callsign: `CH${channelNumber}`,
-    description: `Channel ${channelNumber} programming`,
-    accentColor: DEFAULT_ACCENT_COLOR,
-    logoText: `CHANNEL ${channelNumber}`,
+    id: String(channelNumber),
+    number: channelNumber,
+    name: `Channel ${channelNumber}`,
+    mediaIds:
+      channelNumber === 1
+        ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
+        : [],
+    isEnabled: true,
+    scheduleMode: "ordered",
+    commercialBreakMode: "none",
+    randomSeed: `channel-${channelNumber}`,
+    defaultSlotLengthSeconds: 1800,
+    commercialStrategy: "best-fit",
+    branding: createDefaultChannelBranding(channelNumber),
   };
 }
 
-export const defaultChannels: Channel[] = Array.from(
-  { length: 12 },
-  (_, index) => {
-    const channelNumber = index + 1;
+function createDefaultChannels(channelCount: number): Channel[] {
+  return Array.from({ length: channelCount }, (_, index) =>
+    createDefaultChannel(index + 1),
+  );
+}
 
-    return {
-      id: String(channelNumber),
-      number: channelNumber,
-      name: `Channel ${channelNumber}`,
-      mediaIds:
-        channelNumber === 1
-          ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
-          : [],
-      isEnabled: true,
-      scheduleMode: "ordered",
-      commercialBreakMode: "none",
-      randomSeed: `channel-${channelNumber}`,
-      defaultSlotLengthSeconds: 1800,
-      commercialStrategy: "best-fit",
-      branding: createDefaultChannelBranding(channelNumber),
-    };
-  },
+export const defaultChannels: Channel[] = createDefaultChannels(
+  DEFAULT_CHANNEL_COUNT,
 );
 
 function clamp(value: number, min: number, max: number): number {
@@ -408,10 +554,14 @@ function normalizeChannel(channel: Channel): Channel {
     channel.defaultSlotLengthSeconds,
   );
 
+  const fallbackChannelName = `Channel ${
+    Number.isFinite(channelNumber) ? channelNumber : channel.id || 1
+  }`;
+
   return {
     ...channel,
     id: normalizeText(channel.id, String(channelNumber || 1)),
-    name: normalizeText(channel.name, `Channel ${channelNumber || 1}`),
+    name: normalizeText(channel.name, fallbackChannelName),
     mediaIds: dedupeStrings(Array.isArray(channel.mediaIds) ? channel.mediaIds : []),
     number: Number.isFinite(channelNumber) ? channelNumber : undefined,
     isEnabled: channel.isEnabled ?? true,
@@ -519,6 +669,25 @@ function normalizeViewerSettings(value: unknown): ViewerSettings {
 function getChannelSortNumber(channel: Channel): number {
   const value = Number(channel.number ?? channel.id);
   return Number.isFinite(value) ? value : 9999;
+}
+
+function getSafeCurrentChannelId(
+  requestedChannelId: unknown,
+  channels: Channel[],
+): string {
+  const fallbackChannelId = channels[0]?.id ?? "1";
+
+  if (typeof requestedChannelId !== "string") {
+    return fallbackChannelId;
+  }
+
+  return channels.some((channel) => channel.id === requestedChannelId)
+    ? requestedChannelId
+    : fallbackChannelId;
+}
+
+function normalizeChannelsWithDefaults(channels: Channel[]): Channel[] {
+  return mergeById(defaultChannels, channels.map(normalizeChannel));
 }
 
 export const useStore = create<AppState>()(
@@ -839,6 +1008,7 @@ export const useStore = create<AppState>()(
 
       setSettingsOpen: (isOpen) =>
         set((state) => ({
+          isSettingsOpen: isOpen,
           viewerSettings: {
             ...state.viewerSettings,
             isSettingsOpen: isOpen,
@@ -889,26 +1059,34 @@ export const useStore = create<AppState>()(
         }),
 
       replaceProgramming: (snapshot) =>
-        set({
-          media: snapshot.media.map(normalizeMediaItem),
-          channels: snapshot.channels.map(normalizeChannel),
-          currentChannelId: snapshot.currentChannelId,
-          sidebarWidth: clamp(
-            snapshot.sidebarWidth,
-            MIN_SIDEBAR_WIDTH,
-            MAX_SIDEBAR_WIDTH,
-          ),
-          guideHeight: clamp(
-            snapshot.guideHeight,
-            MIN_GUIDE_HEIGHT,
-            MAX_GUIDE_HEIGHT,
-          ),
-          appMode: "viewer",
-      isSettingsOpen: false,
-      themeId: getValidThemeId(snapshot.themeId),
-          ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
-          deletedMediaIds: [],
-          viewerSettings: defaultViewerSettings,
+        set(() => {
+          const nextMedia = snapshot.media.map(normalizeMediaItem);
+          const nextChannels = normalizeChannelsWithDefaults(snapshot.channels);
+
+          return {
+            media: nextMedia,
+            channels: nextChannels,
+            currentChannelId: getSafeCurrentChannelId(
+              snapshot.currentChannelId,
+              nextChannels,
+            ),
+            sidebarWidth: clamp(
+              snapshot.sidebarWidth,
+              MIN_SIDEBAR_WIDTH,
+              MAX_SIDEBAR_WIDTH,
+            ),
+            guideHeight: clamp(
+              snapshot.guideHeight,
+              MIN_GUIDE_HEIGHT,
+              MAX_GUIDE_HEIGHT,
+            ),
+            appMode: "viewer",
+            isSettingsOpen: false,
+            themeId: getValidThemeId(snapshot.themeId),
+            ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
+            deletedMediaIds: [],
+            viewerSettings: defaultViewerSettings,
+          };
         }),
 
       exportProgrammingSnapshot: () => {
@@ -921,8 +1099,8 @@ export const useStore = create<AppState>()(
           sidebarWidth: state.sidebarWidth,
           guideHeight: state.guideHeight,
           appMode: "viewer",
-      isSettingsOpen: false,
-      themeId: state.themeId,
+          isSettingsOpen: false,
+          themeId: state.themeId,
           ownedPremiumThemes: state.ownedPremiumThemes,
           updatedAt: new Date().toISOString(),
         };
@@ -950,13 +1128,8 @@ export const useStore = create<AppState>()(
         );
 
         const mergedChannels = removeMediaIdsFromChannels(
-          mergeById(defaultChannels, savedChannels.map(normalizeChannel)),
+          normalizeChannelsWithDefaults(savedChannels),
           deletedMediaIds,
-        );
-
-        const fallbackChannelId = mergedChannels[0]?.id ?? "1";
-        const savedChannelExists = mergedChannels.some(
-          (channel) => channel.id === saved?.currentChannelId,
         );
 
         return {
@@ -964,9 +1137,10 @@ export const useStore = create<AppState>()(
           ...saved,
           media: mergedMedia,
           channels: mergedChannels,
-          currentChannelId: savedChannelExists
-            ? saved?.currentChannelId ?? fallbackChannelId
-            : fallbackChannelId,
+          currentChannelId: getSafeCurrentChannelId(
+            saved?.currentChannelId,
+            mergedChannels,
+          ),
           isGuideOpen: false,
           sidebarWidth: clamp(
             Number(saved?.sidebarWidth ?? currentState.sidebarWidth),
@@ -979,6 +1153,7 @@ export const useStore = create<AppState>()(
             MAX_GUIDE_HEIGHT,
           ),
           appMode: getValidAppMode(saved?.appMode),
+          isSettingsOpen: false,
           themeId: getValidThemeId(saved?.themeId),
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
           deletedMediaIds,
@@ -1002,8 +1177,3 @@ export const useStore = create<AppState>()(
     },
   ),
 );
-
-
-
-
-
