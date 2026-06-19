@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
@@ -11,7 +11,8 @@ const AXIS_SLOTS = 6;
 const WINDOW_MINUTES = SLOT_MINUTES * AXIS_SLOTS;
 const WINDOW_SECONDS = WINDOW_MINUTES * 60;
 const MIN_ITEM_WIDTH = 64;
-const LIVE_TICK_MS = 15_000;
+const LIVE_TICK_MS = 5_000;
+const MAX_GUIDE_SEGMENTS = 240;
 
 type GuideSegment = {
   item: BroadcastItem;
@@ -258,7 +259,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
     return (
       <EmptyGuideState
         title="No schedule loaded."
-        message="Assign shows or movies to this channel to generate public listings."
+        message="Assign shows, movies, or music videos to this channel to generate public listings."
       />
     );
   }
@@ -284,7 +285,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
             className="text-[11px] font-black uppercase tracking-[0.2em]"
             style={{ color: "var(--text-muted)" }}
           >
-            TatesTv
+            Tate’s TV
           </div>
 
           <div className="mt-1 font-black">Listings</div>
@@ -294,7 +295,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
           <div className="font-black">{formatTime(now)}</div>
 
           <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {WINDOW_MINUTES} minute view • commercials hidden
+            {WINDOW_MINUTES} minute view â€¢ commercials hidden
           </div>
         </div>
       </div>
@@ -386,7 +387,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
                       ? "inset 0 0 0 1px var(--primary), 0 0 20px rgba(255,255,255,0.10)"
                       : "none",
                   }}
-                  title={`${title} • ${formatDuration(duration)}`}
+                  title={`${title} â€¢ ${formatDuration(duration)}`}
                   aria-label={`${title}, ${displayType}, ${formatDuration(
                     duration,
                   )}`}
@@ -396,7 +397,7 @@ export default function GuideGrid({ schedule }: GuideGridProps) {
                   </div>
 
                   <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.75 }}>
-                    {displayType} • {formatDuration(duration)}
+                    {displayType} â€¢ {formatDuration(duration)}
                   </div>
                 </button>
               );
