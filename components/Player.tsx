@@ -57,41 +57,6 @@ const HARD_SYNC_DRIFT_SECONDS = 18;
 const SOURCE_END_PADDING_SECONDS = 0.4;
 const FULLSCREEN_BUSY_UNLOCK_MS = 900;
 
-const PULSE_COUNTS_STORAGE_KEY = "tatestv:pulse-counts:v1";
-const PULSE_REACTIONS_STORAGE_KEY = "tatestv:pulse-user-reactions:v1";
-
-const PULSE_REACTIONS = [
-  {
-    id: "fire",
-    emoji: "🔥",
-    label: "Fire",
-  },
-  {
-    id: "funny",
-    emoji: "😂",
-    label: "Funny",
-  },
-  {
-    id: "nostalgia",
-    emoji: "📼",
-    label: "Nostalgia",
-  },
-  {
-    id: "classic",
-    emoji: "⭐",
-    label: "Classic",
-  },
-  {
-    id: "faith",
-    emoji: "🙏",
-    label: "Faith Pick",
-  },
-] as const;
-
-type PulseReactionId = (typeof PULSE_REACTIONS)[number]["id"];
-type PulseCountsByMedia = Record<string, Partial<Record<PulseReactionId, number>>>;
-type PulseUserReactions = Record<string, PulseReactionId>;
-
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safeSeconds / 3600);
@@ -143,65 +108,6 @@ function isBreakItem(item: BroadcastItem): boolean {
     item.type === "commercial" ||
     item.type === "bumper"
   );
-}
-
-function getPulseMediaKey(item: BroadcastItem | null): string {
-  if (!item) {
-    return "empty";
-  }
-
-  return cleanDisplayText(item.parentMediaId || item.id || item.title || "media");
-}
-
-function isPulseReactionId(value: unknown): value is PulseReactionId {
-  return PULSE_REACTIONS.some((reaction) => reaction.id === value);
-}
-
-function readLocalJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(key);
-
-    if (!raw) {
-      return fallback;
-    }
-
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeLocalJson(key: string, value: unknown): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Local engagement storage is best-effort.
-  }
-}
-
-function getReactionCount(
-  counts: PulseCountsByMedia,
-  mediaKey: string,
-  reactionId: PulseReactionId,
-): number {
-  const value = counts[mediaKey]?.[reactionId];
-
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : 0;
-}
-
-function getTotalPulseCount(
-  counts: PulseCountsByMedia,
-  mediaKey: string,
-): number {
-  return PULSE_REACTIONS.reduce((total, reaction) => {
-    return total + getReactionCount(counts, mediaKey, reaction.id);
-  }, 0);
 }
 
 function getSafeTargetTime(
@@ -426,14 +332,6 @@ export default function Player({ schedule }: PlayerProps) {
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
   const [isElementFullscreen, setIsElementFullscreen] = useState(false);
   const [isNativeVideoFullscreen, setIsNativeVideoFullscreen] = useState(false);
-  const [isPulseOpen, setIsPulseOpen] = useState(true);
-  const [pulseCounts, setPulseCounts] = useState<PulseCountsByMedia>(() =>
-    readLocalJson<PulseCountsByMedia>(PULSE_COUNTS_STORAGE_KEY, {}),
-  );
-  const [pulseUserReactions, setPulseUserReactions] =
-    useState<PulseUserReactions>(() =>
-      readLocalJson<PulseUserReactions>(PULSE_REACTIONS_STORAGE_KEY, {}),
-    );
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
@@ -444,9 +342,6 @@ export default function Player({ schedule }: PlayerProps) {
     [currentChannelId, orderedChannels],
   );
 
-  const pulseMediaKey = useMemo(() => getPulseMediaKey(live.item), [live.item]);
-  const selectedPulseReaction = pulseUserReactions[pulseMediaKey];
-  const totalPulseCount = getTotalPulseCount(pulseCounts, pulseMediaKey);
   const isBreak = Boolean(live.item && isBreakItem(live.item));
   const fullscreenActive =
     fallbackFullscreen || isElementFullscreen || isNativeVideoFullscreen;
@@ -613,6 +508,91 @@ export default function Player({ schedule }: PlayerProps) {
     setIsNativeVideoFullscreen(false);
   }, []);
 
+  const toggleFullscreenView = useCallback(async () => {
+    if (fullscreenBusyRef.current) {
+      return;
+    }
+
+    fullscreenBusyRef.current = true;
+
+    const releaseBusyLock = () => {
+      window.setTimeout(() => {
+        fullscreenBusyRef.current = false;
+      }, FULLSCREEN_BUSY_UNLOCK_MS);
+    };
+
+    const shell = shellRef.current;
+    const video = videoRef.current;
+
+    if (!shell || !video) {
+      fullscreenBusyRef.current = false;
+      return;
+    }
+
+    try {
+      hardSyncPosition();
+      await tryPlay();
+
+      if (fallbackFullscreen) {
+        setFallbackFullscreen(false);
+        setIsElementFullscreen(false);
+        setIsNativeVideoFullscreen(false);
+        releaseBusyLock();
+        return;
+      }
+
+      const nativeVideoExited = exitNativeVideoFullscreen(video);
+
+      if (nativeVideoExited) {
+        setFallbackFullscreen(false);
+        setIsNativeVideoFullscreen(false);
+        releaseBusyLock();
+        return;
+      }
+
+      if (getFullscreenElement()) {
+        const didExit = await exitElementFullscreen();
+
+        if (didExit) {
+          setFallbackFullscreen(false);
+          setIsElementFullscreen(false);
+          releaseBusyLock();
+          return;
+        }
+      }
+
+      if (isIPhoneSafariFullscreenPath()) {
+        const didEnterNativeVideoFullscreen = enterNativeVideoFullscreen(video);
+
+        if (didEnterNativeVideoFullscreen) {
+          setFallbackFullscreen(false);
+          setIsNativeVideoFullscreen(true);
+          releaseBusyLock();
+          return;
+        }
+
+        setFallbackFullscreen(true);
+        releaseBusyLock();
+        return;
+      }
+
+      const didEnterElementFullscreen = await requestElementFullscreen(shell);
+
+      if (didEnterElementFullscreen) {
+        setFallbackFullscreen(false);
+        setIsElementFullscreen(true);
+        releaseBusyLock();
+        return;
+      }
+
+      setFallbackFullscreen(true);
+      releaseBusyLock();
+    } catch {
+      setFallbackFullscreen((value) => !value);
+      releaseBusyLock();
+    }
+  }, [fallbackFullscreen, hardSyncPosition, tryPlay]);
+
   const openGuideFromFullscreen = useCallback(() => {
     void exitFullscreenView().finally(() => {
       toggleGuide();
@@ -633,51 +613,6 @@ export default function Player({ schedule }: PlayerProps) {
       setCastMessage("");
     }, 3500);
   }, []);
-
-  const reactToCurrentProgram = useCallback(
-    (reactionId: PulseReactionId) => {
-      const item = live.item;
-
-      if (!item || isBreakItem(item)) {
-        return;
-      }
-
-      const mediaKey = getPulseMediaKey(item);
-      const previousReaction = pulseUserReactions[mediaKey];
-
-      if (previousReaction === reactionId) {
-        return;
-      }
-
-      setPulseCounts((currentCounts) => {
-        const currentMediaCounts = currentCounts[mediaKey] ?? {};
-        const nextMediaCounts: Partial<Record<PulseReactionId, number>> = {
-          ...currentMediaCounts,
-        };
-
-        if (previousReaction && isPulseReactionId(previousReaction)) {
-          nextMediaCounts[previousReaction] = Math.max(
-            0,
-            getReactionCount(currentCounts, mediaKey, previousReaction) - 1,
-          );
-        }
-
-        nextMediaCounts[reactionId] =
-          getReactionCount(currentCounts, mediaKey, reactionId) + 1;
-
-        return {
-          ...currentCounts,
-          [mediaKey]: nextMediaCounts,
-        };
-      });
-
-      setPulseUserReactions((current) => ({
-        ...current,
-        [mediaKey]: reactionId,
-      }));
-    },
-    [live.item, pulseUserReactions],
-  );
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -705,36 +640,6 @@ export default function Player({ schedule }: PlayerProps) {
     video.setAttribute("x5-playsinline", "true");
     video.setAttribute("x-webkit-airplay", "allow");
     castVideo.disableRemotePlayback = false;
-  }, []);
-
-  useEffect(() => {
-    writeLocalJson(PULSE_COUNTS_STORAGE_KEY, pulseCounts);
-  }, [pulseCounts]);
-
-  useEffect(() => {
-    writeLocalJson(PULSE_REACTIONS_STORAGE_KEY, pulseUserReactions);
-  }, [pulseUserReactions]);
-
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === PULSE_COUNTS_STORAGE_KEY) {
-        setPulseCounts(
-          readLocalJson<PulseCountsByMedia>(PULSE_COUNTS_STORAGE_KEY, {}),
-        );
-      }
-
-      if (event.key === PULSE_REACTIONS_STORAGE_KEY) {
-        setPulseUserReactions(
-          readLocalJson<PulseUserReactions>(PULSE_REACTIONS_STORAGE_KEY, {}),
-        );
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-    };
   }, []);
 
   useEffect(() => {
@@ -875,81 +780,9 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    if (fullscreenBusyRef.current) {
-      return;
-    }
-
     handledFullscreenRequestRef.current = fullscreenRequestId;
-    fullscreenBusyRef.current = true;
-
-    const shell = shellRef.current;
-    const video = videoRef.current;
-
-    if (!shell || !video) {
-      fullscreenBusyRef.current = false;
-      return;
-    }
-
-    const releaseBusyLock = () => {
-      window.setTimeout(() => {
-        fullscreenBusyRef.current = false;
-      }, FULLSCREEN_BUSY_UNLOCK_MS);
-    };
-
-    const run = async () => {
-      hardSyncPosition();
-      await tryPlay();
-
-      const nativeVideoExited = exitNativeVideoFullscreen(video);
-
-      if (nativeVideoExited) {
-        setFallbackFullscreen(false);
-        setIsNativeVideoFullscreen(false);
-        releaseBusyLock();
-        return;
-      }
-
-      if (getFullscreenElement()) {
-        const didExit = await exitElementFullscreen();
-
-        if (didExit) {
-          setFallbackFullscreen(false);
-          setIsElementFullscreen(false);
-          releaseBusyLock();
-          return;
-        }
-      }
-
-      if (isIPhoneSafariFullscreenPath()) {
-        const didEnterNativeVideoFullscreen = enterNativeVideoFullscreen(video);
-
-        if (didEnterNativeVideoFullscreen) {
-          setFallbackFullscreen(false);
-          setIsNativeVideoFullscreen(true);
-          releaseBusyLock();
-          return;
-        }
-
-        setFallbackFullscreen((value) => !value);
-        releaseBusyLock();
-        return;
-      }
-
-      const didEnterElementFullscreen = await requestElementFullscreen(shell);
-
-      if (didEnterElementFullscreen) {
-        setFallbackFullscreen(false);
-        setIsElementFullscreen(true);
-        releaseBusyLock();
-        return;
-      }
-
-      setFallbackFullscreen((value) => !value);
-      releaseBusyLock();
-    };
-
-    void run();
-  }, [fullscreenRequestId, hardSyncPosition, tryPlay]);
+    void toggleFullscreenView();
+  }, [fullscreenRequestId, toggleFullscreenView]);
 
   useEffect(() => {
     document.documentElement.classList.toggle(
@@ -1107,16 +940,8 @@ export default function Player({ schedule }: PlayerProps) {
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
-        <div className="flex max-w-full flex-wrap items-center gap-2 text-white drop-shadow">
-          <div className="max-w-[70%] truncate text-sm font-semibold">
-            {isBreak ? "Commercial Break" : title}
-          </div>
-
-          {!isBreak && totalPulseCount > 0 ? (
-            <div className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/80 backdrop-blur-md">
-              Pulse {totalPulseCount}
-            </div>
-          ) : null}
+        <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
+          {isBreak ? "Commercial Break" : title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
@@ -1124,40 +949,6 @@ export default function Player({ schedule }: PlayerProps) {
           {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
         </div>
       </div>
-
-      {!isBreak && isPulseOpen ? (
-        <div className="absolute bottom-20 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-2 shadow-2xl backdrop-blur-md md:bottom-16">
-          {PULSE_REACTIONS.map((reaction) => {
-            const count = getReactionCount(pulseCounts, pulseMediaKey, reaction.id);
-            const active = selectedPulseReaction === reaction.id;
-
-            return (
-              <button
-                key={reaction.id}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  reactToCurrentProgram(reaction.id);
-                }}
-                className="ttv-touch-target rounded-full border px-2.5 py-1.5 text-xs font-black text-white transition hover:scale-105"
-                style={{
-                  borderColor: active
-                    ? "var(--primary)"
-                    : "rgba(255,255,255,0.14)",
-                  background: active
-                    ? "color-mix(in srgb, var(--primary) 34%, rgba(0,0,0,0.72))"
-                    : "rgba(255,255,255,0.08)",
-                }}
-                aria-label={`React ${reaction.label}`}
-                title={reaction.label}
-              >
-                <span className="mr-1">{reaction.emoji}</span>
-                <span>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
 
       <div className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
         <button
@@ -1201,11 +992,11 @@ export default function Player({ schedule }: PlayerProps) {
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            setIsPulseOpen((value) => !value);
+            void toggleFullscreenView();
           }}
           className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
         >
-          React
+          Full
         </button>
 
         <button
