@@ -12,6 +12,7 @@ import {
   inferNameFromUrl,
   isLikelyVideoUrl,
   normalizeUrl,
+  normalizeAirStartTime,
   parseBreakpoints,
   parseDurationList,
   parseManualDuration,
@@ -37,7 +38,7 @@ type ValidationResult = {
 };
 
 const DEFAULT_STATUS =
-  "Add videos, commercials, runtime, broadcast slots, ad blocks, and optional air days.";
+  "Add videos, commercials, runtime, broadcast slots, ad blocks, fixed air time, and optional air days.";
 
 const DEFAULT_DURATION_STATUS =
   "Auto-detect will try first. Manual duration always works.";
@@ -79,6 +80,10 @@ function shouldShowCommercialFields(type: MediaType): boolean {
 
 function isMusicType(type: MediaType): boolean {
   return type === "music" || type === "music-video";
+}
+
+function shouldShowSchedulingFields(type: MediaType): boolean {
+  return !shouldShowCommercialFields(type);
 }
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -298,6 +303,7 @@ export default function UploadPanel() {
   const [commercialCategory, setCommercialCategory] = useState("");
 
   const [selectedAirDays, setSelectedAirDays] = useState<Weekday[]>([]);
+  const [airStartTime, setAirStartTime] = useState("");
   const [channelId, setChannelId] = useState(currentChannelId);
 
   const [status, setStatus] = useState(DEFAULT_STATUS);
@@ -598,7 +604,10 @@ export default function UploadPanel() {
       if (!confirmed) return;
     }
 
-    const item = createMediaItemFromUrl({
+    const normalizedAirStartTime = normalizeAirStartTime(airStartTime.trim());
+
+    const item = {
+      ...createMediaItemFromUrl({
       url: normalizedFile,
       title: normalizedTitle,
       type,
@@ -621,7 +630,9 @@ export default function UploadPanel() {
         ? sanitizeCommercialCategory(commercialCategory)
         : undefined,
       airDays: selectedAirDays,
-    });
+    }),
+    airStartTime: shouldShowSchedulingFields(type) ? normalizedAirStartTime : "",
+  };
 
     addMedia(item);
     assignMediaToChannel(channelId, item.id);
@@ -688,7 +699,7 @@ export default function UploadPanel() {
       </div>
 
       <div
-        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-5"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
@@ -775,8 +786,8 @@ export default function UploadPanel() {
               color: "#fde68a",
             }}
           >
-            Duplicate warning: this URL is already saved as â€œ
-            {existingUrlMatch.title}â€.
+            Duplicate warning: this URL is already saved as "
+            {existingUrlMatch.title}".
           </div>
         ) : null}
 
@@ -1166,7 +1177,7 @@ export default function UploadPanel() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={() => window.open(normalizedFile, "_blank", "noopener")}
+            onClick={() => window.open(normalizedFile, "_blank", "noopener,noreferrer")}
             disabled={!normalizedFile.startsWith("https://")}
             className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
           >
