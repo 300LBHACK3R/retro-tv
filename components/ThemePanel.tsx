@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -250,9 +250,15 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Theme selection panel"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
         className="ttv-theme-marketplace theme-panel mx-auto my-4 max-w-6xl overflow-hidden rounded-2xl border shadow-2xl sm:my-6"
+        onMouseDown={(event) => event.stopPropagation()}
         style={{
           background: "var(--panel-bg)",
           borderColor: "var(--border)",
@@ -273,7 +279,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                 className="text-xs font-semibold uppercase tracking-[0.18em]"
                 style={{ color: "var(--text-muted)" }}
               >
-                Theme Store
+                Theme Marketplace
               </div>
 
               <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
@@ -290,6 +296,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
               </p>
 
               <div className="mt-3 flex flex-wrap gap-2">
+                <ThemeStat label="showing" value={sortedThemes.length} />
                 <ThemeStat label="total" value={THEMES.length} />
                 <ThemeStat label="free" value={freeCount} tone="good" />
                 <ThemeStat label="premium" value={premiumCount} tone="premium" />
@@ -317,6 +324,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              aria-label="Search themes"
               placeholder="Search themes, categories, moods..."
               className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
               spellCheck={false}
@@ -334,6 +342,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                 setFilter("all");
                 setAccessFilter("all");
               }}
+              aria-label="Reset theme filters"
               className="rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:opacity-90"
               style={{
                 background: "var(--button-bg)",
@@ -399,7 +408,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                 color: "var(--text-muted)",
               }}
             >
-              No themes match the current search/filter.
+              No themes match the current search or filters. Try resetting the marketplace view.
             </div>
           ) : (
             sortedThemes.map((theme) => {
@@ -422,7 +431,7 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                   data-theme-card="true"
                   data-theme-id={theme.id}
                   data-theme-locked={!isUnlocked ? "true" : undefined}
-                  aria-pressed={isSelected}
+                  aria-current={isSelected ? "true" : undefined}
                   style={{
                     borderColor: isSelected
                       ? theme.colors.primary
@@ -435,6 +444,12 @@ export default function ThemePanel({ open, onClose }: ThemePanelProps) {
                     type="button"
                     onClick={() => handleThemeSelect(theme)}
                     disabled={!isUnlocked}
+                    aria-label={`${isUnlocked ? "Select" : "Locked"} ${theme.name} theme`}
+                    title={
+                      isUnlocked
+                        ? `Select ${theme.name}`
+                        : `${theme.name} is locked`
+                    }
                     className="block w-full p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <div
