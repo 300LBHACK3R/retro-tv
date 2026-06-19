@@ -1,4 +1,4 @@
-﻿import { create } from "zustand";
+import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 import type {
@@ -85,7 +85,7 @@ interface AppState {
 export const programmingStoreName = "retro-tv-programming-v1";
 export const programmingStoreVersion = 5;
 
-const DEFAULT_CHANNEL_COUNT = 20;
+const DEFAULT_CHANNEL_COUNT = 23;
 
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 720;
@@ -112,6 +112,61 @@ const VALID_COMMERCIAL_STRATEGIES: CommercialStrategy[] = [
   "best-fit",
   "random",
 ];
+
+const LEGACY_DEFAULT_BRANDING_MARKERS: Record<
+  number,
+  Partial<ChannelBranding>[]
+> = {
+  4: [
+    {
+      displayName: "Christian TV",
+      callsign: "FAITH",
+      logoText: "CHRISTIAN TV",
+    },
+  ],
+  7: [
+    {
+      displayName: "The Pulse",
+      callsign: "PULSE",
+      logoText: "THE PULSE",
+    },
+  ],
+  10: [
+    {
+      displayName: "TTV Epic",
+      callsign: "EPIC",
+      logoText: "TTV EPIC",
+    },
+  ],
+  14: [
+    {
+      displayName: "Faith TV",
+      callsign: "FAITHTV",
+      logoText: "FAITH TV",
+    },
+  ],
+  18: [
+    {
+      displayName: "Local Music",
+      callsign: "LOCAL",
+      logoText: "LOCAL MUSIC",
+    },
+  ],
+  19: [
+    {
+      displayName: "Creator Channel",
+      callsign: "CREATE",
+      logoText: "CREATOR CHANNEL",
+    },
+  ],
+  20: [
+    {
+      displayName: "TTV Vault",
+      callsign: "VAULT",
+      logoText: "TTV VAULT",
+    },
+  ],
+};
 
 const defaultViewerSettings: ViewerSettings = {
   playerViewMode: "normal",
@@ -187,20 +242,22 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 
     case 4:
       return {
-        displayName: "Christian TV",
-        callsign: "FAITH",
-        description: "Christian television and faith programming.",
-        accentColor: "#7c3aed",
-        logoText: "CHRISTIAN TV",
+        displayName: "ToonCore",
+        callsign: "TOON",
+        description:
+          "Cartoons, animated classics, and high-energy animated blocks.",
+        accentColor: "#f97316",
+        logoText: "TOONCORE",
       };
 
     case 5:
       return {
-        displayName: "Main Street",
+        displayName: "MainStreet",
         callsign: "MAIN",
-        description: "Canadian-style sitcom and comfort TV block.",
+        description:
+          "Canadian comfort TV, small-town comedy, and familiar everyday stories.",
         accentColor: "#0ea5e9",
-        logoText: "MAIN STREET",
+        logoText: "MAINSTREET",
       };
 
     case 6:
@@ -214,11 +271,12 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 
     case 7:
       return {
-        displayName: "The Pulse",
-        callsign: "PULSE",
-        description: "Music videos, hip hop, rap, and culture blocks.",
+        displayName: "FailZone",
+        callsign: "FAIL",
+        description:
+          "Viral laughs, classic internet clips, fail videos, weird web nostalgia, and chaotic comedy.",
         accentColor: "#facc15",
-        logoText: "THE PULSE",
+        logoText: "FAILZONE",
       };
 
     case 8:
@@ -241,11 +299,12 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 
     case 10:
       return {
-        displayName: "TTV Epic",
-        callsign: "EPIC",
-        description: "Epic movies, fantasy, adventure, and long-form specials.",
+        displayName: "Realms",
+        callsign: "REALMS",
+        description:
+          "Fantasy worlds, epic adventures, heroic quests, and long-form specials.",
         accentColor: "#d4af37",
-        logoText: "TTV EPIC",
+        logoText: "REALMS",
       };
 
     case 11:
@@ -270,25 +329,28 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
       return {
         displayName: "Christian Kids TV",
         callsign: "CKIDS",
-        description: "Christian kids shows, faith-based family content, and safe daytime programming.",
+        description:
+          "Christian kids shows, faith-based family content, and safe daytime programming.",
         accentColor: "#84cc16",
         logoText: "CHRISTIAN KIDS",
       };
 
     case 14:
       return {
-        displayName: "Faith TV",
-        callsign: "FAITHTV",
-        description: "Christian teaching, worship, sermons, and adult faith programming.",
+        displayName: "True Standard",
+        callsign: "TRUE",
+        description:
+          "Christian teaching, encouragement, faith programming, and truth-centered media.",
         accentColor: "#8b5cf6",
-        logoText: "FAITH TV",
+        logoText: "TRUE STANDARD",
       };
 
     case 15:
       return {
         displayName: "Tate's Gaming",
         callsign: "GAMING",
-        description: "Gaming clips, promos, highlights, streams, and creator content.",
+        description:
+          "Gaming clips, promos, highlights, streams, and creator content.",
         accentColor: "#39ff14",
         logoText: "TATE'S GAMING",
       };
@@ -297,45 +359,80 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
       return {
         displayName: "L&L Tech Solutions",
         callsign: "LLTECH",
-        description: "Tech promos, tutorials, service videos, and client showcase content.",
+        description:
+          "Tech promos, tutorials, service videos, and client showcase content.",
         accentColor: "#22d3ee",
         logoText: "L&L TECH",
       };
 
     case 17:
       return {
-        displayName: "Indie Spotlight",
+        displayName: "Indie",
         callsign: "INDIE",
-        description: "Independent short films, trailers, creator submissions, and local features.",
+        description:
+          "Independent films, creators, trailers, submissions, and local features.",
         accentColor: "#fb7185",
-        logoText: "INDIE SPOTLIGHT",
+        logoText: "INDIE",
       };
 
     case 18:
       return {
-        displayName: "Local Music",
-        callsign: "LOCAL",
-        description: "Local artists, music videos, interviews, and community music blocks.",
-        accentColor: "#f59e0b",
-        logoText: "LOCAL MUSIC",
+        displayName: "Sunset",
+        callsign: "SUNSET",
+        description:
+          "Teen adventures, unforgettable friendships, school life, first crushes, and iconic family and teen series from the 2000s.",
+        accentColor: "#fb923c",
+        logoText: "SUNSET",
       };
 
     case 19:
       return {
-        displayName: "Creator Channel",
-        callsign: "CREATE",
-        description: "Creator submissions, podcasts, web series, highlight reels, and community programming.",
+        displayName: "Discover",
+        callsign: "DISC",
+        description:
+          "History, science, nature, documentaries, mysteries, and real-world stories for curious viewers.",
         accentColor: "#06b6d4",
-        logoText: "CREATOR CHANNEL",
+        logoText: "DISCOVER",
       };
 
     case 20:
       return {
-        displayName: "TTV Vault",
-        callsign: "VAULT",
-        description: "Archive blocks, backup rotations, specials, pilots, and overflow programming.",
-        accentColor: "#64748b",
-        logoText: "TTV VAULT",
+        displayName: "The Pulse",
+        callsign: "PULSE",
+        description:
+          "The biggest beats, legendary artists, and iconic music videos from the golden age of hip-hop and rap.",
+        accentColor: "#f43f5e",
+        logoText: "THE PULSE",
+      };
+
+    case 21:
+      return {
+        displayName: "Amplify",
+        callsign: "AMP",
+        description:
+          "Classic rock, hard rock, alternative hits, and legendary performances from the 70s through the early 2000s.",
+        accentColor: "#dc2626",
+        logoText: "AMPLIFY",
+      };
+
+    case 22:
+      return {
+        displayName: "Little Praise",
+        callsign: "PRAISEK",
+        description:
+          "Joyful songs, uplifting messages, and faith-filled music for children and families.",
+        accentColor: "#a3e635",
+        logoText: "LITTLE PRAISE",
+      };
+
+    case 23:
+      return {
+        displayName: "Worship",
+        callsign: "WORSHIP",
+        description:
+          "Worship, praise, inspiration, and songs that strengthen faith and encourage believers.",
+        accentColor: "#c084fc",
+        logoText: "WORSHIP",
       };
 
     default:
@@ -350,10 +447,12 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 }
 
 function createDefaultChannel(channelNumber: number): Channel {
+  const branding = createDefaultChannelBranding(channelNumber);
+
   return {
     id: String(channelNumber),
     number: channelNumber,
-    name: `Channel ${channelNumber}`,
+    name: branding.displayName,
     mediaIds:
       channelNumber === 1
         ? ["martin-mystery-s01e01", "martin-mystery-s01e02"]
@@ -364,7 +463,7 @@ function createDefaultChannel(channelNumber: number): Channel {
     randomSeed: `channel-${channelNumber}`,
     defaultSlotLengthSeconds: 1800,
     commercialStrategy: "best-fit",
-    branding: createDefaultChannelBranding(channelNumber),
+    branding,
   };
 }
 
@@ -387,6 +486,12 @@ function normalizeText(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizeComparableText(value: unknown): string {
+  return normalizeText(value, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 function dedupeStrings(values: string[]): string[] {
@@ -544,26 +649,110 @@ function isValidCommercialBreakMode(
   );
 }
 
+function matchesBrandingMarker(
+  branding: ChannelBranding | undefined,
+  marker: Partial<ChannelBranding>,
+): boolean {
+  if (!branding) return false;
+
+  return Object.entries(marker).every(([key, markerValue]) => {
+    const brandingValue = branding[key as keyof ChannelBranding];
+
+    return normalizeComparableText(brandingValue) === normalizeComparableText(markerValue);
+  });
+}
+
+function isGenericBrandingForChannel(
+  branding: ChannelBranding | undefined,
+  channelNumber: number,
+): boolean {
+  if (!branding) return true;
+
+  const genericValues = [
+    `channel${channelNumber}`,
+    `ch${channelNumber}`,
+    `channel-${channelNumber}`,
+  ];
+
+  const displayName = normalizeComparableText(branding.displayName);
+  const callsign = normalizeComparableText(branding.callsign);
+  const logoText = normalizeComparableText(branding.logoText);
+
+  return (
+    genericValues.includes(displayName) ||
+    genericValues.includes(callsign) ||
+    genericValues.includes(logoText)
+  );
+}
+
+function shouldRefreshOfficialBranding(channel: Channel): boolean {
+  const channelNumber = Number(channel.number ?? channel.id);
+
+  if (
+    !Number.isFinite(channelNumber) ||
+    channelNumber < 1 ||
+    channelNumber > DEFAULT_CHANNEL_COUNT
+  ) {
+    return false;
+  }
+
+  const branding = channel.branding;
+  const legacyMarkers = LEGACY_DEFAULT_BRANDING_MARKERS[channelNumber] ?? [];
+
+  return (
+    !branding ||
+    isGenericBrandingForChannel(branding, channelNumber) ||
+    legacyMarkers.some((marker) => matchesBrandingMarker(branding, marker))
+  );
+}
+
+function mergeChannelBranding(
+  channel: Channel,
+  fallbackBranding: ChannelBranding,
+): ChannelBranding {
+  if (shouldRefreshOfficialBranding(channel)) {
+    return fallbackBranding;
+  }
+
+  return {
+    ...fallbackBranding,
+    ...channel.branding,
+    displayName: channel.branding?.displayName ?? fallbackBranding.displayName,
+    callsign: channel.branding?.callsign ?? fallbackBranding.callsign,
+    description: channel.branding?.description ?? fallbackBranding.description,
+    accentColor: channel.branding?.accentColor ?? fallbackBranding.accentColor,
+    logoText: channel.branding?.logoText ?? fallbackBranding.logoText,
+    logoUrl: channel.branding?.logoUrl ?? fallbackBranding.logoUrl,
+  };
+}
+
 function normalizeChannel(channel: Channel): Channel {
   const channelNumber = Number(channel.number ?? channel.id);
+  const resolvedChannelNumber = Number.isFinite(channelNumber)
+    ? channelNumber
+    : undefined;
+
   const fallbackBranding = createDefaultChannelBranding(
-    Number.isFinite(channelNumber) ? channelNumber : 1,
+    resolvedChannelNumber ?? 1,
   );
 
   const defaultSlotLengthSeconds = normalizePositiveInteger(
     channel.defaultSlotLengthSeconds,
   );
 
-  const fallbackChannelName = `Channel ${
-    Number.isFinite(channelNumber) ? channelNumber : channel.id || 1
-  }`;
+  const fallbackChannelName =
+    resolvedChannelNumber && resolvedChannelNumber <= DEFAULT_CHANNEL_COUNT
+      ? fallbackBranding.displayName
+      : `Channel ${(resolvedChannelNumber ?? channel.id) || 1}`;
+
+  const branding = mergeChannelBranding(channel, fallbackBranding);
 
   return {
     ...channel,
-    id: normalizeText(channel.id, String(channelNumber || 1)),
+    id: normalizeText(channel.id, String(resolvedChannelNumber || 1)),
     name: normalizeText(channel.name, fallbackChannelName),
     mediaIds: dedupeStrings(Array.isArray(channel.mediaIds) ? channel.mediaIds : []),
-    number: Number.isFinite(channelNumber) ? channelNumber : undefined,
+    number: resolvedChannelNumber,
     isEnabled: channel.isEnabled ?? true,
     scheduleMode: isValidScheduleMode(channel.scheduleMode)
       ? channel.scheduleMode
@@ -573,29 +762,14 @@ function normalizeChannel(channel: Channel): Channel {
       : "none",
     randomSeed: normalizeText(
       channel.randomSeed,
-      `channel-${Number.isFinite(channelNumber) ? channelNumber : channel.id}`,
+      `channel-${resolvedChannelNumber ?? channel.id}`,
     ),
     defaultSlotLengthSeconds:
       defaultSlotLengthSeconds > 0 ? defaultSlotLengthSeconds : 1800,
     commercialStrategy: isCommercialStrategy(channel.commercialStrategy)
       ? channel.commercialStrategy
       : "best-fit",
-    branding: {
-      displayName:
-        channel.branding?.displayName ??
-        fallbackBranding.displayName ??
-        channel.name,
-      callsign:
-        channel.branding?.callsign ?? fallbackBranding.callsign ?? channel.name,
-      description:
-        channel.branding?.description ?? fallbackBranding.description ?? "",
-      accentColor:
-        channel.branding?.accentColor ??
-        fallbackBranding.accentColor ??
-        DEFAULT_ACCENT_COLOR,
-      logoText:
-        channel.branding?.logoText ?? fallbackBranding.logoText ?? channel.name,
-    },
+    branding,
   };
 }
 
@@ -686,8 +860,66 @@ function getSafeCurrentChannelId(
     : fallbackChannelId;
 }
 
-function normalizeChannelsWithDefaults(channels: Channel[]): Channel[] {
-  return mergeById(defaultChannels, channels.map(normalizeChannel));
+function isMusicMediaType(item: MediaItem | undefined): boolean {
+  return item?.type === "music" || item?.type === "music-video";
+}
+
+function migrateLegacyPulseMusicToChannel20(
+  channels: Channel[],
+  media: MediaItem[],
+): Channel[] {
+  const channel7 = channels.find((channel) => channel.id === "7");
+  const channel20 = channels.find((channel) => channel.id === "20");
+
+  if (!channel7 || !channel20) {
+    return channels;
+  }
+
+  const mediaById = new Map(media.map((item) => [item.id, item]));
+  const channel20AlreadyHasMusic = channel20.mediaIds.some((mediaId) =>
+    isMusicMediaType(mediaById.get(mediaId)),
+  );
+
+  if (channel20AlreadyHasMusic) {
+    return channels;
+  }
+
+  const musicIdsToMove = channel7.mediaIds.filter((mediaId) =>
+    isMusicMediaType(mediaById.get(mediaId)),
+  );
+
+  if (musicIdsToMove.length === 0) {
+    return channels;
+  }
+
+  const moveSet = new Set(musicIdsToMove);
+
+  return channels.map((channel) => {
+    if (channel.id === "7") {
+      return {
+        ...channel,
+        mediaIds: channel.mediaIds.filter((mediaId) => !moveSet.has(mediaId)),
+      };
+    }
+
+    if (channel.id === "20") {
+      return {
+        ...channel,
+        mediaIds: dedupeStrings([...channel.mediaIds, ...musicIdsToMove]),
+      };
+    }
+
+    return channel;
+  });
+}
+
+function normalizeChannelsWithDefaults(
+  channels: Channel[],
+  media: MediaItem[],
+): Channel[] {
+  const mergedChannels = mergeById(defaultChannels, channels).map(normalizeChannel);
+
+  return migrateLegacyPulseMusicToChannel20(mergedChannels, media);
 }
 
 export const useStore = create<AppState>()(
@@ -858,6 +1090,7 @@ export const useStore = create<AppState>()(
                 accentColor:
                   fallbackBranding.accentColor ?? DEFAULT_ACCENT_COLOR,
                 logoText: fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
+                logoUrl: fallbackBranding.logoUrl,
                 ...brandingPatch,
               },
             };
@@ -1061,7 +1294,10 @@ export const useStore = create<AppState>()(
       replaceProgramming: (snapshot) =>
         set(() => {
           const nextMedia = snapshot.media.map(normalizeMediaItem);
-          const nextChannels = normalizeChannelsWithDefaults(snapshot.channels);
+          const nextChannels = normalizeChannelsWithDefaults(
+            snapshot.channels,
+            nextMedia,
+          );
 
           return {
             media: nextMedia,
@@ -1128,7 +1364,7 @@ export const useStore = create<AppState>()(
         );
 
         const mergedChannels = removeMediaIdsFromChannels(
-          normalizeChannelsWithDefaults(savedChannels),
+          normalizeChannelsWithDefaults(savedChannels, mergedMedia),
           deletedMediaIds,
         );
 
