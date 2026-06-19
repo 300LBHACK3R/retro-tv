@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { usePlayerControls } from "@/lib/playerControls";
+import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
-import type { BroadcastItem } from "@/lib/types";
+import type { BroadcastItem, Channel } from "@/lib/types";
 
 interface PlayerProps {
   schedule: BroadcastItem[];
@@ -12,13 +13,32 @@ interface PlayerProps {
 
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
+type RemotePlaybackLike = {
+  prompt?: () => Promise<void>;
+};
+
+type ScreenWakeLockSentinelLike = {
+  released?: boolean;
+  release: () => Promise<void>;
+  addEventListener?: (type: "release", listener: () => void) => void;
+};
+
+type NavigatorWithWakeLock = Navigator & {
+  wakeLock?: {
+    request?: (type: "screen") => Promise<ScreenWakeLockSentinelLike>;
+  };
+};
+
 type WebKitVideoElement = HTMLVideoElement & {
+  disableRemotePlayback?: boolean;
+  remote?: RemotePlaybackLike;
   webkitSupportsFullscreen?: boolean;
   webkitDisplayingFullscreen?: boolean;
   webkitEnterFullscreen?: () => void;
   webkitExitFullscreen?: () => void;
   webkitEnterFullScreen?: () => void;
   webkitExitFullScreen?: () => void;
+  webkitShowPlaybackTargetPicker?: () => void;
 };
 
 type WebKitFullscreenElement = HTMLElement & {
@@ -36,6 +56,41 @@ const LIVE_TICK_MS = 1000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
 const SOURCE_END_PADDING_SECONDS = 0.4;
 const FULLSCREEN_BUSY_UNLOCK_MS = 900;
+
+const PULSE_COUNTS_STORAGE_KEY = "tatestv:pulse-counts:v1";
+const PULSE_REACTIONS_STORAGE_KEY = "tatestv:pulse-user-reactions:v1";
+
+const PULSE_REACTIONS = [
+  {
+    id: "fire",
+    emoji: "🔥",
+    label: "Fire",
+  },
+  {
+    id: "funny",
+    emoji: "😂",
+    label: "Funny",
+  },
+  {
+    id: "nostalgia",
+    emoji: "📼",
+    label: "Nostalgia",
+  },
+  {
+    id: "classic",
+    emoji: "⭐",
+    label: "Classic",
+  },
+  {
+    id: "faith",
+    emoji: "🙏",
+    label: "Faith Pick",
+  },
+] as const;
+
+type PulseReactionId = (typeof PULSE_REACTIONS)[number]["id"];
+type PulseCountsByMedia = Record<string, Partial<Record<PulseReactionId, number>>>;
+type PulseUserReactions = Record<string, PulseReactionId>;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -88,6 +143,65 @@ function isBreakItem(item: BroadcastItem): boolean {
     item.type === "commercial" ||
     item.type === "bumper"
   );
+}
+
+function getPulseMediaKey(item: BroadcastItem | null): string {
+  if (!item) {
+    return "empty";
+  }
+
+  return cleanDisplayText(item.parentMediaId || item.id || item.title || "media");
+}
+
+function isPulseReactionId(value: unknown): value is PulseReactionId {
+  return PULSE_REACTIONS.some((reaction) => reaction.id === value);
+}
+
+function readLocalJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+
+    if (!raw) {
+      return fallback;
+    }
+
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJson(key: string, value: unknown): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local engagement storage is best-effort.
+  }
+}
+
+function getReactionCount(
+  counts: PulseCountsByMedia,
+  mediaKey: string,
+  reactionId: PulseReactionId,
+): number {
+  const value = counts[mediaKey]?.[reactionId];
+
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : 0;
+}
+
+function getTotalPulseCount(
+  counts: PulseCountsByMedia,
+  mediaKey: string,
+): number {
+  return PULSE_REACTIONS.reduce((total, reaction) => {
+    return total + getReactionCount(counts, mediaKey, reaction.id);
+  }, 0);
 }
 
 function getSafeTargetTime(
@@ -241,6 +355,49 @@ function exitNativeVideoFullscreen(video: HTMLVideoElement): boolean {
   }
 }
 
+function sortChannelsByNumber(channels: Channel[]): Channel[] {
+  return [...channels]
+    .filter((channel) => channel.isEnabled !== false)
+    .sort((a, b) => {
+      const aNumber = Number(a.number ?? a.id);
+      const bNumber = Number(b.number ?? b.id);
+
+      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+        return aNumber - bNumber;
+      }
+
+      return String(a.id).localeCompare(String(b.id));
+    });
+}
+
+function getChannelLabel(channel: Channel | undefined): string {
+  if (!channel) {
+    return "CH --";
+  }
+
+  return `CH ${channel.number ?? channel.id}`;
+}
+
+async function requestPlaybackTarget(video: HTMLVideoElement): Promise<string> {
+  const castVideo = video as WebKitVideoElement;
+
+  try {
+    if (castVideo.webkitShowPlaybackTargetPicker) {
+      castVideo.webkitShowPlaybackTargetPicker();
+      return "Opening AirPlay.";
+    }
+
+    if (castVideo.remote?.prompt) {
+      await castVideo.remote.prompt();
+      return "Opening TV playback picker.";
+    }
+  } catch {
+    return "Could not open TV playback picker.";
+  }
+
+  return "AirPlay or remote playback is not available in this browser.";
+}
+
 export default function Player({ schedule }: PlayerProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -248,6 +405,7 @@ export default function Player({ schedule }: PlayerProps) {
   const lastHardSyncRef = useRef(0);
   const handledFullscreenRequestRef = useRef(0);
   const fullscreenBusyRef = useRef(false);
+  const wakeLockRef = useRef<ScreenWakeLockSentinelLike | null>(null);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -256,13 +414,42 @@ export default function Player({ schedule }: PlayerProps) {
     (state) => state.fullscreenRequestId,
   );
 
+  const channels = useStore((state) => state.channels);
+  const currentChannelId = useStore((state) => state.currentChannelId);
+  const setChannel = useStore((state) => state.setChannel);
+  const toggleGuide = useStore((state) => state.toggleGuide);
+
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
   const [status, setStatus] = useState<PlaybackStatus>("idle");
   const [message, setMessage] = useState("");
+  const [castMessage, setCastMessage] = useState("");
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
+  const [isElementFullscreen, setIsElementFullscreen] = useState(false);
+  const [isNativeVideoFullscreen, setIsNativeVideoFullscreen] = useState(false);
+  const [isPulseOpen, setIsPulseOpen] = useState(true);
+  const [pulseCounts, setPulseCounts] = useState<PulseCountsByMedia>(() =>
+    readLocalJson<PulseCountsByMedia>(PULSE_COUNTS_STORAGE_KEY, {}),
+  );
+  const [pulseUserReactions, setPulseUserReactions] =
+    useState<PulseUserReactions>(() =>
+      readLocalJson<PulseUserReactions>(PULSE_REACTIONS_STORAGE_KEY, {}),
+    );
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+
+  const orderedChannels = useMemo(() => sortChannelsByNumber(channels), [channels]);
+  const currentChannel = useMemo(
+    () => orderedChannels.find((channel) => channel.id === currentChannelId),
+    [currentChannelId, orderedChannels],
+  );
+
+  const pulseMediaKey = useMemo(() => getPulseMediaKey(live.item), [live.item]);
+  const selectedPulseReaction = pulseUserReactions[pulseMediaKey];
+  const totalPulseCount = getTotalPulseCount(pulseCounts, pulseMediaKey);
+  const isBreak = Boolean(live.item && isBreakItem(live.item));
+  const fullscreenActive =
+    fallbackFullscreen || isElementFullscreen || isNativeVideoFullscreen;
 
   const applyAudio = useCallback(() => {
     const video = videoRef.current;
@@ -274,6 +461,46 @@ export default function Player({ schedule }: PlayerProps) {
     video.volume = Math.min(Math.max(volume, 0), 1);
     video.muted = muted || volume <= 0;
   }, [muted, volume]);
+
+  const requestWakeLock = useCallback(async () => {
+    const navigatorWithWakeLock = navigator as NavigatorWithWakeLock;
+
+    if (!navigatorWithWakeLock.wakeLock?.request) {
+      return;
+    }
+
+    if (wakeLockRef.current && wakeLockRef.current.released !== true) {
+      return;
+    }
+
+    try {
+      const wakeLock = await navigatorWithWakeLock.wakeLock.request("screen");
+
+      wakeLock.addEventListener?.("release", () => {
+        wakeLockRef.current = null;
+      });
+
+      wakeLockRef.current = wakeLock;
+    } catch {
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    const wakeLock = wakeLockRef.current;
+
+    if (!wakeLock) {
+      return;
+    }
+
+    wakeLockRef.current = null;
+
+    try {
+      await wakeLock.release();
+    } catch {
+      // Wake lock may already be released by the browser.
+    }
+  }, []);
 
   const hardSyncPosition = useCallback(() => {
     const video = videoRef.current;
@@ -329,6 +556,7 @@ export default function Player({ schedule }: PlayerProps) {
 
     setStatus("loading");
     setMessage("");
+    setCastMessage("");
 
     try {
       video.pause();
@@ -346,6 +574,110 @@ export default function Player({ schedule }: PlayerProps) {
     hardSyncPosition();
     void tryPlay();
   }, [hardSyncPosition, tryPlay]);
+
+  const stepChannel = useCallback(
+    (direction: "previous" | "next") => {
+      if (orderedChannels.length === 0) {
+        return;
+      }
+
+      const currentIndex = Math.max(
+        0,
+        orderedChannels.findIndex((channel) => channel.id === currentChannelId),
+      );
+
+      const nextIndex =
+        direction === "next"
+          ? (currentIndex + 1) % orderedChannels.length
+          : (currentIndex - 1 + orderedChannels.length) % orderedChannels.length;
+
+      const nextChannel = orderedChannels[nextIndex];
+
+      if (nextChannel) {
+        setChannel(nextChannel.id);
+      }
+    },
+    [currentChannelId, orderedChannels, setChannel],
+  );
+
+  const exitFullscreenView = useCallback(async () => {
+    const video = videoRef.current;
+
+    if (video) {
+      exitNativeVideoFullscreen(video);
+    }
+
+    await exitElementFullscreen();
+    setFallbackFullscreen(false);
+    setIsElementFullscreen(false);
+    setIsNativeVideoFullscreen(false);
+  }, []);
+
+  const openGuideFromFullscreen = useCallback(() => {
+    void exitFullscreenView().finally(() => {
+      toggleGuide();
+    });
+  }, [exitFullscreenView, toggleGuide]);
+
+  const openPlaybackTarget = useCallback(async () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const result = await requestPlaybackTarget(video);
+    setCastMessage(result);
+
+    window.setTimeout(() => {
+      setCastMessage("");
+    }, 3500);
+  }, []);
+
+  const reactToCurrentProgram = useCallback(
+    (reactionId: PulseReactionId) => {
+      const item = live.item;
+
+      if (!item || isBreakItem(item)) {
+        return;
+      }
+
+      const mediaKey = getPulseMediaKey(item);
+      const previousReaction = pulseUserReactions[mediaKey];
+
+      if (previousReaction === reactionId) {
+        return;
+      }
+
+      setPulseCounts((currentCounts) => {
+        const currentMediaCounts = currentCounts[mediaKey] ?? {};
+        const nextMediaCounts: Partial<Record<PulseReactionId, number>> = {
+          ...currentMediaCounts,
+        };
+
+        if (previousReaction && isPulseReactionId(previousReaction)) {
+          nextMediaCounts[previousReaction] = Math.max(
+            0,
+            getReactionCount(currentCounts, mediaKey, previousReaction) - 1,
+          );
+        }
+
+        nextMediaCounts[reactionId] =
+          getReactionCount(currentCounts, mediaKey, reactionId) + 1;
+
+        return {
+          ...currentCounts,
+          [mediaKey]: nextMediaCounts,
+        };
+      });
+
+      setPulseUserReactions((current) => ({
+        ...current,
+        [mediaKey]: reactionId,
+      }));
+    },
+    [live.item, pulseUserReactions],
+  );
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -366,9 +698,43 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
+    const castVideo = video as WebKitVideoElement;
+
     video.setAttribute("playsinline", "true");
     video.setAttribute("webkit-playsinline", "true");
     video.setAttribute("x5-playsinline", "true");
+    video.setAttribute("x-webkit-airplay", "allow");
+    castVideo.disableRemotePlayback = false;
+  }, []);
+
+  useEffect(() => {
+    writeLocalJson(PULSE_COUNTS_STORAGE_KEY, pulseCounts);
+  }, [pulseCounts]);
+
+  useEffect(() => {
+    writeLocalJson(PULSE_REACTIONS_STORAGE_KEY, pulseUserReactions);
+  }, [pulseUserReactions]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === PULSE_COUNTS_STORAGE_KEY) {
+        setPulseCounts(
+          readLocalJson<PulseCountsByMedia>(PULSE_COUNTS_STORAGE_KEY, {}),
+        );
+      }
+
+      if (event.key === PULSE_REACTIONS_STORAGE_KEY) {
+        setPulseUserReactions(
+          readLocalJson<PulseUserReactions>(PULSE_REACTIONS_STORAGE_KEY, {}),
+        );
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -480,6 +846,10 @@ export default function Player({ schedule }: PlayerProps) {
         setNowMs(Date.now());
         hardSyncPosition();
         void tryPlay();
+
+        if (fullscreenActive && status === "playing") {
+          void requestWakeLock();
+        }
       }
     };
 
@@ -488,7 +858,13 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [
+    fullscreenActive,
+    hardSyncPosition,
+    requestWakeLock,
+    status,
+    tryPlay,
+  ]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -528,6 +904,7 @@ export default function Player({ schedule }: PlayerProps) {
 
       if (nativeVideoExited) {
         setFallbackFullscreen(false);
+        setIsNativeVideoFullscreen(false);
         releaseBusyLock();
         return;
       }
@@ -537,6 +914,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         if (didExit) {
           setFallbackFullscreen(false);
+          setIsElementFullscreen(false);
           releaseBusyLock();
           return;
         }
@@ -547,6 +925,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         if (didEnterNativeVideoFullscreen) {
           setFallbackFullscreen(false);
+          setIsNativeVideoFullscreen(true);
           releaseBusyLock();
           return;
         }
@@ -560,6 +939,7 @@ export default function Player({ schedule }: PlayerProps) {
 
       if (didEnterElementFullscreen) {
         setFallbackFullscreen(false);
+        setIsElementFullscreen(true);
         releaseBusyLock();
         return;
       }
@@ -586,7 +966,11 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (getFullscreenElement()) {
+      const active = Boolean(getFullscreenElement());
+
+      setIsElementFullscreen(active);
+
+      if (active) {
         setFallbackFullscreen(false);
       }
 
@@ -608,22 +992,43 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
-    const handleNativeVideoFullscreenEnd = () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const handleNativeVideoFullscreenStart = () => {
+      setIsNativeVideoFullscreen(true);
       setFallbackFullscreen(false);
       setNowMs(Date.now());
       hardSyncPosition();
       void tryPlay();
     };
 
-    const video = videoRef.current;
+    const handleNativeVideoFullscreenEnd = () => {
+      setIsNativeVideoFullscreen(false);
+      setFallbackFullscreen(false);
+      setNowMs(Date.now());
+      hardSyncPosition();
+      void tryPlay();
+    };
 
-    video?.addEventListener(
+    video.addEventListener(
+      "webkitbeginfullscreen",
+      handleNativeVideoFullscreenStart,
+    );
+    video.addEventListener(
       "webkitendfullscreen",
       handleNativeVideoFullscreenEnd,
     );
 
     return () => {
-      video?.removeEventListener(
+      video.removeEventListener(
+        "webkitbeginfullscreen",
+        handleNativeVideoFullscreenStart,
+      );
+      video.removeEventListener(
         "webkitendfullscreen",
         handleNativeVideoFullscreenEnd,
       );
@@ -631,7 +1036,18 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
+    if (fullscreenActive && status === "playing") {
+      void requestWakeLock();
+      return;
+    }
+
+    void releaseWakeLock();
+  }, [fullscreenActive, releaseWakeLock, requestWakeLock, status]);
+
+  useEffect(() => {
     return () => {
+      void releaseWakeLock();
+
       const video = videoRef.current;
 
       if (!video) {
@@ -642,7 +1058,7 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeAttribute("src");
       video.load();
     };
-  }, []);
+  }, [releaseWakeLock]);
 
   if (!live.item) {
     return (
@@ -661,7 +1077,6 @@ export default function Player({ schedule }: PlayerProps) {
   }
 
   const title = getDisplayTitle(live.item);
-  const isBreak = isBreakItem(live.item);
 
   return (
     <div
@@ -691,16 +1106,138 @@ export default function Player({ schedule }: PlayerProps) {
         tabIndex={-1}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-4 py-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-        <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
-          {isBreak ? "Commercial Break" : title}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
+        <div className="flex max-w-full flex-wrap items-center gap-2 text-white drop-shadow">
+          <div className="max-w-[70%] truncate text-sm font-semibold">
+            {isBreak ? "Commercial Break" : title}
+          </div>
+
+          {!isBreak && totalPulseCount > 0 ? (
+            <div className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/80 backdrop-blur-md">
+              Pulse {totalPulseCount}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
-          {live.item.segmentLabel && !isBreak ? ` â€¢ ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
         </div>
       </div>
+
+      {!isBreak && isPulseOpen ? (
+        <div className="absolute bottom-20 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-2 shadow-2xl backdrop-blur-md md:bottom-16">
+          {PULSE_REACTIONS.map((reaction) => {
+            const count = getReactionCount(pulseCounts, pulseMediaKey, reaction.id);
+            const active = selectedPulseReaction === reaction.id;
+
+            return (
+              <button
+                key={reaction.id}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  reactToCurrentProgram(reaction.id);
+                }}
+                className="ttv-touch-target rounded-full border px-2.5 py-1.5 text-xs font-black text-white transition hover:scale-105"
+                style={{
+                  borderColor: active
+                    ? "var(--primary)"
+                    : "rgba(255,255,255,0.14)",
+                  background: active
+                    ? "color-mix(in srgb, var(--primary) 34%, rgba(0,0,0,0.72))"
+                    : "rgba(255,255,255,0.08)",
+                }}
+                aria-label={`React ${reaction.label}`}
+                title={reaction.label}
+              >
+                <span className="mr-1">{reaction.emoji}</span>
+                <span>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            stepChannel("previous");
+          }}
+          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+        >
+          CH -
+        </button>
+
+        <div className="hidden min-w-[4.5rem] rounded-xl bg-white/10 px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.1em] sm:block">
+          {getChannelLabel(currentChannel)}
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            stepChannel("next");
+          }}
+          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+        >
+          CH +
+        </button>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openGuideFromFullscreen();
+          }}
+          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+        >
+          Guide
+        </button>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsPulseOpen((value) => !value);
+          }}
+          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+        >
+          React
+        </button>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void openPlaybackTarget();
+          }}
+          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+        >
+          TV
+        </button>
+
+        {fullscreenActive ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void exitFullscreenView();
+            }}
+            className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+          >
+            Exit
+          </button>
+        ) : null}
+      </div>
+
+      {castMessage ? (
+        <div className="pointer-events-none absolute bottom-[5.8rem] left-1/2 z-40 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl border border-white/15 bg-black/80 px-3 py-2 text-center text-xs font-semibold text-white shadow-2xl backdrop-blur-md">
+          {castMessage}
+        </div>
+      ) : null}
 
       {status === "loading" ? (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
@@ -712,14 +1249,14 @@ export default function Player({ schedule }: PlayerProps) {
         <button
           type="button"
           onClick={resume}
-          className="absolute left-1/2 top-1/2 z-20 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/80 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
+          className="absolute left-1/2 top-1/2 z-40 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/80 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
         >
           {message}
         </button>
       ) : null}
 
       <div
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100"
+        className="pointer-events-none absolute left-3 top-16 z-10 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/70 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100"
         aria-hidden="true"
       >
         {status}
