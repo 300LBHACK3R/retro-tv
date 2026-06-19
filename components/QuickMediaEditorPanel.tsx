@@ -34,6 +34,8 @@ const MEDIA_FILTERS: { id: MediaFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "show", label: "Shows" },
   { id: "movie", label: "Movies" },
+  { id: "music", label: "Music" },
+  { id: "music-video", label: "Music Videos" },
   { id: "commercial", label: "Ads" },
   { id: "bumper", label: "Bumpers" },
 ];
@@ -114,6 +116,8 @@ function getMediaTypeLabel(type: MediaType): string {
   if (type === "commercial") return "Commercial";
   if (type === "bumper") return "Bumper";
   if (type === "movie") return "Movie";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "Music Video";
   return "Show";
 }
 
@@ -571,21 +575,20 @@ export default function QuickMediaEditorPanel() {
       updatedAt: new Date().toISOString(),
     });
 
-    assignedChannelIds.forEach((channelId) => {
-      if (channelId !== targetChannelId) {
-        removeMediaFromChannel(channelId, selectedMedia.id);
-      }
-    });
+    const wasAlreadyAssigned =
+      targetChannelId && assignedChannelIds.includes(targetChannelId);
 
-    if (targetChannelId && !assignedChannelIds.includes(targetChannelId)) {
+    if (targetChannelId && !wasAlreadyAssigned) {
       assignMediaToChannel(targetChannelId, selectedMedia.id);
     }
 
     setMessage(
-      `Saved "${cleanTitle}" and assigned it to CH ${getChannelNumber(
-        targetChannelId,
-        channels,
-      )}.`,
+      wasAlreadyAssigned
+        ? `Saved "${cleanTitle}". Channel assignments were left unchanged.`
+        : `Saved "${cleanTitle}" and added it to CH ${getChannelNumber(
+            targetChannelId,
+            channels,
+          )}.`,
     );
   };
 
@@ -608,15 +611,15 @@ export default function QuickMediaEditorPanel() {
           </div>
 
           <h2 className="mt-1 text-base font-black tracking-tight">
-            Edit Loaded Media
+            Safe Media Editor
           </h2>
 
           <p
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Edit runtime, commercial blocks, slot length, air days, title, type,
-            commercial pool settings, and channel assignment without
+            Edit runtime, commercial blocks, slot length, fixed air time, air days, title,
+            type, commercial pool settings, and safe channel assignment without
             deleting/re-uploading.
           </p>
         </div>
@@ -1019,7 +1022,7 @@ export default function QuickMediaEditorPanel() {
                   onChange={(event) =>
                     setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
                   }
-                  placeholder="Optional air time/order 16:00"
+                  placeholder="Optional fixed air time 16:00"
                   className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                   style={{
                     background: "var(--panel-bg)",
