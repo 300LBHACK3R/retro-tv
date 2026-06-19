@@ -1,4 +1,4 @@
-ï»¿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -203,7 +203,7 @@ function getBroadcastSummary({
     `Breaks: ${formatBreakpoints(parsedBreakpoints) || "none"}`,
     `Ad blocks: ${formatBreakpoints(parsedBreakDurations) || "auto"}`,
     `Current channel: ${selectedChannelLabel}`,
-  ].join(" â€¢ ");
+  ].join(" • ");
 }
 
 function validateEditorState({
@@ -706,9 +706,9 @@ export default function QuickMediaEditorPanel() {
                       style={{ color: "var(--text-muted)" }}
                     >
                       <span>{getMediaTypeLabel(item.type).toUpperCase()}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{formatDurationClock(item.duration)}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{itemChannels}</span>
                     </div>
 
@@ -754,7 +754,7 @@ export default function QuickMediaEditorPanel() {
                 >
                   Editing:{" "}
                   <span style={{ color: "var(--text)" }}>{selectedMedia.title}</span>{" "}
-                  â€¢ Current channel: {selectedChannelLabel}
+                  • Current channel: {selectedChannelLabel}
                 </div>
 
                 <div>
@@ -795,6 +795,8 @@ export default function QuickMediaEditorPanel() {
                   >
                     <option value="show">Show</option>
                     <option value="movie">Movie</option>
+                    <option value="music">Music</option>
+                    <option value="music-video">Music Video</option>
                     <option value="commercial">Commercial</option>
                     <option value="bumper">Bumper</option>
                   </select>
