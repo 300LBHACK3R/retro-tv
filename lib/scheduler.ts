@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BroadcastItem,
   Channel,
   CommercialBreakMode,
@@ -26,6 +26,18 @@ type SlotSettings = {
   commercialStrategy: CommercialStrategy;
 };
 
+type FixedAirBlock = {
+  startSecond: number;
+  item: MediaItem;
+  schedule: BroadcastItem[];
+  duration: number;
+};
+
+type FillerCursor = {
+  index: number;
+  offsetInsideItem: number;
+};
+
 const DEFAULT_BREAK_ITEM_COUNT = 1;
 const CLASSIC_BREAK_ITEM_COUNT = 2;
 
@@ -33,6 +45,7 @@ const MIN_SEGMENT_SECONDS = 90;
 
 const DEFAULT_30_MIN_SLOT_SECONDS = 30 * 60;
 const DEFAULT_60_MIN_SLOT_SECONDS = 60 * 60;
+const DAILY_FIXED_SCHEDULE_SECONDS = 24 * 60 * 60;
 
 const DEFAULT_30_MIN_BREAKPOINTS = [7 * 60 + 30, 15 * 60];
 const DEFAULT_30_MIN_BREAK_DURATIONS = [2 * 60, 2 * 60];
@@ -40,6 +53,7 @@ const DEFAULT_30_MIN_BREAK_DURATIONS = [2 * 60, 2 * 60];
 const DEFAULT_INTERNAL_BREAK_SECONDS = 2 * 60;
 const COMMERCIAL_MATCH_TOLERANCE_SECONDS = 12;
 const MAX_COMMERCIAL_SEGMENTS_PER_BLOCK = 60;
+const MAX_FIXED_DAY_FILLER_SEGMENTS = 720;
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -177,6 +191,47 @@ function parseAirStartTime(value: string | undefined): number {
   return hours * 60 + minutes;
 }
 
+function hasFixedAirStartTime(item: MediaItem): boolean {
+  return Number.isFinite(parseAirStartTime(item.airStartTime));
+}
+
+function getUtcDayOffsetForLocalAirStart(
+  airStartTime: string | undefined,
+  now: Date,
+): number | null {
+  const minutesSinceLocalMidnight = parseAirStartTime(airStartTime);
+
+  if (!Number.isFinite(minutesSinceLocalMidnight)) {
+    return null;
+  }
+
+  const hours = Math.floor(minutesSinceLocalMidnight / 60);
+  const minutes = minutesSinceLocalMidnight % 60;
+
+  const localAirDate = new Date(now);
+  localAirDate.setHours(hours, minutes, 0, 0);
+
+  const utcMidnightMs = Date.UTC(
+    localAirDate.getUTCFullYear(),
+    localAirDate.getUTCMonth(),
+    localAirDate.getUTCDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+
+  const offsetSeconds = Math.floor(
+    (localAirDate.getTime() - utcMidnightMs) / 1000,
+  );
+
+  return (
+    ((offsetSeconds % DAILY_FIXED_SCHEDULE_SECONDS) +
+      DAILY_FIXED_SCHEDULE_SECONDS) %
+    DAILY_FIXED_SCHEDULE_SECONDS
+  );
+}
+
 function sortByAirStartTime(items: MediaItem[]): MediaItem[] {
   return [...items].sort((a, b) => {
     const aTime = parseAirStartTime(a.airStartTime);
@@ -191,6 +246,12 @@ function sortByAirStartTime(items: MediaItem[]): MediaItem[] {
 }
 
 function getSafeDuration(item: MediaItem): number {
+  const duration = Math.floor(Number(item.duration) || 0);
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 1;
+}
+
+function getBroadcastItemDuration(item: BroadcastItem): number {
   const duration = Math.floor(Number(item.duration) || 0);
 
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
@@ -333,6 +394,41 @@ function createVirtualSegment(
     segmentLabel,
     isVirtualSegment: true,
     hiddenFromGuide: false,
+  };
+}
+
+function createTimedSlice(
+  item: BroadcastItem,
+  sourceOffset: number,
+  duration: number,
+  dayStartSecond: number,
+): BroadcastItem {
+  const itemDuration = getBroadcastItemDuration(item);
+  const safeOffset = Math.max(0, Math.floor(sourceOffset));
+  const safeDuration = Math.max(1, Math.min(Math.floor(duration), itemDuration));
+  const baseSourceStart = Math.max(0, Math.floor(item.sourceStart ?? 0));
+  const sourceStart = baseSourceStart + safeOffset;
+  const sourceEnd = sourceStart + safeDuration;
+  const isFullItem = safeOffset === 0 && safeDuration >= itemDuration;
+
+  if (isFullItem) {
+    return {
+      ...item,
+      id: `${item.id}:fixed-day:${dayStartSecond}`,
+      duration: safeDuration,
+    };
+  }
+
+  return {
+    ...item,
+    id: `${item.id}:fixed-day:${dayStartSecond}:${sourceStart}:${sourceEnd}`,
+    parentMediaId: item.parentMediaId ?? item.id,
+    sourceStart,
+    sourceEnd,
+    sourceTitle: item.sourceTitle ?? item.title,
+    duration: safeDuration,
+    segmentLabel: item.segmentLabel ?? "Timed Fill",
+    isVirtualSegment: true,
   };
 }
 
@@ -795,6 +891,254 @@ function buildWithCommercialBreaks(
   return schedule;
 }
 
+function createFixedAirBlock(
+  item: MediaItem,
+  shortFormItems: MediaItem[],
+  mode: CommercialBreakMode,
+  channel: Channel | undefined,
+  now: Date,
+  cursor: CommercialCursor,
+): FixedAirBlock | null {
+  const startSecond = getUtcDayOffsetForLocalAirStart(item.airStartTime, now);
+
+  if (startSecond === null) {
+    return null;
+  }
+
+  const schedule = buildAutomaticBreakSchedule(
+    item,
+    shortFormItems,
+    mode,
+    channel,
+    cursor,
+  );
+
+  const duration = getScheduleDurationForItems(schedule);
+
+  if (schedule.length === 0 || duration <= 0) {
+    return null;
+  }
+
+  return {
+    startSecond,
+    item,
+    schedule,
+    duration,
+  };
+}
+
+function appendFillerForDuration(
+  target: BroadcastItem[],
+  fillerSchedule: BroadcastItem[],
+  durationSeconds: number,
+  cursor: FillerCursor,
+  dayCursorSecond: number,
+): number {
+  const targetDuration = Math.max(0, Math.floor(durationSeconds));
+
+  if (targetDuration <= 0 || fillerSchedule.length === 0) {
+    return 0;
+  }
+
+  let remaining = targetDuration;
+  let appended = 0;
+  let guard = 0;
+
+  while (remaining > 0 && guard < MAX_FIXED_DAY_FILLER_SEGMENTS) {
+    const filler = fillerSchedule[cursor.index % fillerSchedule.length];
+
+    if (!filler) {
+      break;
+    }
+
+    const fillerDuration = getBroadcastItemDuration(filler);
+    const available = Math.max(1, fillerDuration - cursor.offsetInsideItem);
+    const segmentDuration = Math.min(available, remaining);
+
+    target.push(
+      createTimedSlice(
+        filler,
+        cursor.offsetInsideItem,
+        segmentDuration,
+        dayCursorSecond + appended,
+      ),
+    );
+
+    remaining -= segmentDuration;
+    appended += segmentDuration;
+
+    if (cursor.offsetInsideItem + segmentDuration >= fillerDuration) {
+      cursor.index = (cursor.index + 1) % fillerSchedule.length;
+      cursor.offsetInsideItem = 0;
+    } else {
+      cursor.offsetInsideItem += segmentDuration;
+    }
+
+    guard += 1;
+  }
+
+  return appended;
+}
+
+function appendFixedBlock(
+  target: BroadcastItem[],
+  block: FixedAirBlock,
+  dayCursorSecond: number,
+): number {
+  let appended = 0;
+
+  for (const item of block.schedule) {
+    const duration = getBroadcastItemDuration(item);
+
+    target.push(
+      createTimedSlice(
+        item,
+        0,
+        duration,
+        dayCursorSecond + appended,
+      ),
+    );
+
+    appended += duration;
+  }
+
+  return appended;
+}
+
+function buildFixedAirTimeSchedule(
+  fixedItems: MediaItem[],
+  rotatingItems: MediaItem[],
+  shortFormItems: MediaItem[],
+  mode: CommercialBreakMode,
+  channel: Channel | undefined,
+  now: Date,
+  scheduleMode: ScheduleMode,
+): BroadcastItem[] {
+  if (fixedItems.length === 0) {
+    return [];
+  }
+
+  const fixedCursor: CommercialCursor = {
+    index: 0,
+    sourceOffsets: {},
+  };
+
+  const fixedBlocks = fixedItems
+    .map((item) =>
+      createFixedAirBlock(
+        item,
+        shortFormItems,
+        mode,
+        channel,
+        now,
+        fixedCursor,
+      ),
+    )
+    .filter((block): block is FixedAirBlock => Boolean(block))
+    .sort((a, b) => {
+      if (a.startSecond !== b.startSecond) {
+        return a.startSecond - b.startSecond;
+      }
+
+      return a.item.title.localeCompare(b.item.title);
+    });
+
+  if (fixedBlocks.length === 0) {
+    return [];
+  }
+
+  const fillerSource =
+    rotatingItems.length > 0
+      ? rotatingItems
+      : shortFormItems.length > 0
+        ? shortFormItems
+        : [];
+
+  if (fillerSource.length === 0) {
+    return fixedBlocks.flatMap((block) => block.schedule);
+  }
+
+  const orderedFillerSource =
+    scheduleMode === "daily-random"
+      ? seededShuffle(
+          fillerSource,
+          `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
+            now,
+          )}:fixed-fill`,
+        )
+      : sortByAirStartTime(fillerSource);
+
+  const fillerCommercialCursor: CommercialCursor = {
+    index: fixedCursor.index,
+    sourceOffsets: { ...fixedCursor.sourceOffsets },
+  };
+
+  const fillerSchedule =
+    rotatingItems.length > 0
+      ? buildWithCommercialBreaks(
+          orderedFillerSource.filter(isLongForm),
+          shortFormItems,
+          mode,
+          channel,
+        )
+      : orderedFillerSource.map((item, index) => ({
+          ...item,
+          id: `${item.id}:fixed-filler:${index}`,
+          hiddenFromGuide: isShortForm(item),
+          sourceTitle: item.title,
+        }));
+
+  if (fillerSchedule.length === 0) {
+    return fixedBlocks.flatMap((block) => block.schedule);
+  }
+
+  const schedule: BroadcastItem[] = [];
+  const fillerCursor: FillerCursor = {
+    index: 0,
+    offsetInsideItem: 0,
+  };
+
+  let dayCursorSecond = 0;
+
+  for (const block of fixedBlocks) {
+    if (dayCursorSecond < block.startSecond) {
+      const fillerDuration = block.startSecond - dayCursorSecond;
+
+      dayCursorSecond += appendFillerForDuration(
+        schedule,
+        fillerSchedule,
+        fillerDuration,
+        fillerCursor,
+        dayCursorSecond,
+      );
+    }
+
+    if (dayCursorSecond > block.startSecond) {
+      continue;
+    }
+
+    dayCursorSecond += appendFixedBlock(schedule, block, dayCursorSecond);
+  }
+
+  if (dayCursorSecond < DAILY_FIXED_SCHEDULE_SECONDS) {
+    appendFillerForDuration(
+      schedule,
+      fillerSchedule,
+      DAILY_FIXED_SCHEDULE_SECONDS - dayCursorSecond,
+      fillerCursor,
+      dayCursorSecond,
+    );
+  }
+
+  const fixedScheduleDuration = getScheduleDurationForItems(schedule);
+
+  if (fixedScheduleDuration <= 0) {
+    return fixedBlocks.flatMap((block) => block.schedule);
+  }
+
+  return schedule;
+}
+
 export function buildSchedule(
   media: MediaItem[],
   options: BuildScheduleOptions = {},
@@ -825,17 +1169,20 @@ export function buildSchedule(
       : sortByAirStartTime(playableMedia);
   }
 
-  const timeSortedLongForm = sortByAirStartTime(longForm);
+  const fixedLongForm = longForm.filter(hasFixedAirStartTime);
+  const rotatingLongForm = longForm.filter((item) => !hasFixedAirStartTime(item));
 
-  const orderedLongForm =
+  const timeSortedRotatingLongForm = sortByAirStartTime(rotatingLongForm);
+
+  const orderedRotatingLongForm =
     scheduleMode === "daily-random"
       ? seededShuffle(
-          timeSortedLongForm,
+          timeSortedRotatingLongForm,
           `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
             now,
           )}:long-form`,
         )
-      : timeSortedLongForm;
+      : timeSortedRotatingLongForm;
 
   const orderedShortForm =
     scheduleMode === "daily-random"
@@ -847,8 +1194,24 @@ export function buildSchedule(
         )
       : shortForm;
 
+  if (fixedLongForm.length > 0) {
+    const fixedSchedule = buildFixedAirTimeSchedule(
+      sortByAirStartTime(fixedLongForm),
+      orderedRotatingLongForm,
+      orderedShortForm,
+      breakMode,
+      channel,
+      now,
+      scheduleMode,
+    );
+
+    if (fixedSchedule.length > 0) {
+      return fixedSchedule;
+    }
+  }
+
   return buildWithCommercialBreaks(
-    orderedLongForm,
+    orderedRotatingLongForm.length > 0 ? orderedRotatingLongForm : sortByAirStartTime(longForm),
     orderedShortForm,
     breakMode,
     channel,
