@@ -1,4 +1,11 @@
-export type MediaType = "show" | "movie" | "music" | "music-video" | "commercial" | "bumper";
+export type MediaType =
+  | "show"
+  | "movie"
+  | "music"
+  | "music-video"
+  | "commercial"
+  | "bumper";
+
 export type AppMode = "viewer" | "admin";
 
 export type PlayerViewMode = "normal" | "mini" | "theater";
@@ -21,10 +28,7 @@ export type CommercialBreakMode =
   | "midpoint-and-end"
   | "classic-tv";
 
-export type CommercialStrategy =
-  | "sequential"
-  | "best-fit"
-  | "random";
+export type CommercialStrategy = "sequential" | "best-fit" | "random";
 
 export type Weekday =
   | "sunday"
@@ -35,12 +39,70 @@ export type Weekday =
   | "friday"
   | "saturday";
 
+export const TTV_PULSE_REACTIONS = [
+  {
+    id: "fire",
+    emoji: "🔥",
+    label: "Fire",
+  },
+  {
+    id: "funny",
+    emoji: "😂",
+    label: "Funny",
+  },
+  {
+    id: "nostalgia",
+    emoji: "📼",
+    label: "Nostalgia",
+  },
+  {
+    id: "classic",
+    emoji: "⭐",
+    label: "Classic",
+  },
+  {
+    id: "faith",
+    emoji: "🙏",
+    label: "Faith Pick",
+  },
+] as const;
+
+export type PulseReactionId = (typeof TTV_PULSE_REACTIONS)[number]["id"];
+
+export interface PulseReactionDefinition {
+  id: PulseReactionId;
+  emoji: string;
+  label: string;
+}
+
+export type PulseReactionCounts = Partial<Record<PulseReactionId, number>>;
+
+export type PulseCountsByMedia = Record<string, PulseReactionCounts>;
+
+export type PulseUserReactions = Record<string, PulseReactionId>;
+
+export interface PulseEngagementSummary {
+  mediaKey: string;
+  total: number;
+  reactions: PulseReactionCounts;
+  userReaction?: PulseReactionId;
+  updatedAt?: string;
+}
+
 export interface ChannelBranding {
   displayName: string;
   callsign: string;
   description: string;
   accentColor: string;
   logoText: string;
+
+  /**
+   * Optional uploaded/channel logo.
+   *
+   * Existing channels can keep using logoText.
+   * Branded channels can later use a real image without changing the schema again.
+   */
+  logoUrl?: string;
 }
 
 export interface MediaItem {
@@ -57,6 +119,14 @@ export interface MediaItem {
   provider?: "cloudflare-r2" | "external-url" | "local-dev" | "unknown";
   createdAt?: string;
   updatedAt?: string;
+
+  /**
+   * Optional analytics/engagement-safe grouping key.
+   *
+   * Useful when several virtual slices, restored files, or re-uploaded files
+   * should count as the same program for TTV Pulse.
+   */
+  engagementKey?: string;
 
   /**
    * Manual show cut points in seconds.
@@ -98,7 +168,7 @@ export interface MediaItem {
    *
    * sequential = rotate through commercial pool in order.
    * best-fit = prefer commercials close to the needed duration.
-   * random = future random pool support.
+   * random = random pool support.
    */
   commercialStrategy?: CommercialStrategy;
 
@@ -126,7 +196,7 @@ export interface MediaItem {
   /**
    * Commercial/bumpers only.
    *
-   * Optional grouping for future channel-safe ad pools.
+   * Optional grouping for channel-safe ad pools.
    *
    * Examples:
    * general, kids, anime, gaming, christian, movies
@@ -191,5 +261,3 @@ export interface ViewerSettings {
   guideDensity: "compact" | "comfortable";
   preferReducedMotion: boolean;
 }
-
-
