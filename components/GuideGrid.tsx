@@ -75,14 +75,20 @@ function getGuideDuration(item: BroadcastItem): number {
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
 }
 
+function getPlayableSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
+  return schedule.filter((item) => item.file && getGuideDuration(item) > 0);
+}
+
 function getVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
-  return schedule.filter(
-    (item) => item.file && getGuideDuration(item) > 0 && !isHiddenGuideItem(item),
-  );
+  return getPlayableSchedule(schedule).filter((item) => !isHiddenGuideItem(item));
 }
 
 function getTotalScheduleDuration(schedule: BroadcastItem[]): number {
   return schedule.reduce((sum, item) => sum + getGuideDuration(item), 0);
+}
+
+function shouldRenderGuideItem(item: BroadcastItem): boolean {
+  return Boolean(item.file) && getGuideDuration(item) > 0 && !isHiddenGuideItem(item);
 }
 
 function getSecondsSinceBroadcastEpoch(dateMs: number): number {
@@ -106,28 +112,28 @@ function buildGuideSegments(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
 ): GuideSegment[] {
-  const visibleSchedule = getVisibleSchedule(schedule);
+  const playableSchedule = getPlayableSchedule(schedule);
 
-  if (visibleSchedule.length === 0) {
+  if (playableSchedule.length === 0) {
     return [];
   }
 
-  const totalDuration = getTotalScheduleDuration(visibleSchedule);
+  const totalDuration = getTotalScheduleDuration(playableSchedule);
 
   if (totalDuration <= 0) {
     return [];
   }
 
   const offset = getScheduleOffsetAtBroadcastSecond(
-    visibleSchedule,
+    playableSchedule,
     windowStartBroadcastSeconds,
   );
 
   let scheduleIndex = 0;
   let accumulated = 0;
 
-  for (let index = 0; index < visibleSchedule.length; index += 1) {
-    const item = visibleSchedule[index];
+  for (let index = 0; index < playableSchedule.length; index += 1) {
+    const item = playableSchedule[index];
 
     if (!item) {
       continue;
@@ -146,10 +152,11 @@ function buildGuideSegments(
 
   let offsetInsideCurrent = Math.max(0, offset - accumulated);
   let cursor = 0;
+  let guard = 0;
   const segments: GuideSegment[] = [];
 
-  while (cursor < WINDOW_SECONDS) {
-    const item = visibleSchedule[scheduleIndex];
+  while (cursor < WINDOW_SECONDS && guard < MAX_GUIDE_SEGMENTS) {
+    const item = playableSchedule[scheduleIndex];
 
     if (!item) {
       break;
@@ -159,16 +166,19 @@ function buildGuideSegments(
     const remainingInItem = Math.max(itemDuration - offsetInsideCurrent, 1);
     const segmentDuration = Math.min(remainingInItem, WINDOW_SECONDS - cursor);
 
-    segments.push({
-      item,
-      startSec: cursor,
-      endSec: cursor + segmentDuration,
-      scheduleIndex,
-    });
+    if (shouldRenderGuideItem(item)) {
+      segments.push({
+        item,
+        startSec: cursor,
+        endSec: cursor + segmentDuration,
+        scheduleIndex,
+      });
+    }
 
     cursor += segmentDuration;
-    scheduleIndex = (scheduleIndex + 1) % visibleSchedule.length;
+    scheduleIndex = (scheduleIndex + 1) % playableSchedule.length;
     offsetInsideCurrent = 0;
+    guard += 1;
   }
 
   return segments;
