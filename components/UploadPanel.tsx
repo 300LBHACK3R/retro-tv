@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { probeVideoDuration } from "@/lib/mediaDuration";
@@ -775,8 +775,8 @@ export default function UploadPanel() {
               color: "#fde68a",
             }}
           >
-            Duplicate warning: this URL is already saved as “
-            {existingUrlMatch.title}”.
+            Duplicate warning: this URL is already saved as â€œ
+            {existingUrlMatch.title}â€.
           </div>
         ) : null}
 
