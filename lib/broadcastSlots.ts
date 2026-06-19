@@ -1,8 +1,4 @@
-﻿import type {
-  CommercialStrategy,
-  MediaItem,
-  MediaType,
-} from "./types";
+﻿import type { CommercialStrategy, MediaItem, MediaType } from "./types";
 
 export const THIRTY_MINUTE_SLOT_SECONDS = 30 * 60;
 export const SIXTY_MINUTE_SLOT_SECONDS = 60 * 60;
@@ -13,24 +9,23 @@ export const CARTOON_30_MINUTE_BREAK_DURATIONS = [2 * 60, 2 * 60] as const;
 export const SITCOM_30_MINUTE_BREAKPOINTS = [11 * 60] as const;
 export const SITCOM_30_MINUTE_BREAK_DURATIONS = [3 * 60] as const;
 
-export const DRAMA_60_MINUTE_BREAKPOINTS = [
-  12 * 60,
-  24 * 60,
-  36 * 60,
-] as const;
-
-export const DRAMA_60_MINUTE_BREAK_DURATIONS = [
-  3 * 60,
-  3 * 60,
-  3 * 60,
-] as const;
+export const DRAMA_60_MINUTE_BREAKPOINTS = [12 * 60, 24 * 60, 36 * 60] as const;
+export const DRAMA_60_MINUTE_BREAK_DURATIONS = [3 * 60, 3 * 60, 3 * 60] as const;
 
 export const STANDARD_COMMERCIAL_STRATEGY: CommercialStrategy = "best-fit";
 
-export type BroadcastPresetId =
-  | "cartoon-30"
-  | "sitcom-30"
-  | "drama-60";
+const PLAYABLE_BROADCAST_TYPES: readonly MediaType[] = [
+  "show",
+  "movie",
+  "music",
+  "music-video",
+];
+
+const AUTO_STANDARDIZED_BROADCAST_TYPES: readonly MediaType[] = ["show", "movie"];
+
+const COMMERCIAL_MEDIA_TYPES: readonly MediaType[] = ["commercial", "bumper"];
+
+export type BroadcastPresetId = "cartoon-30" | "sitcom-30" | "drama-60";
 
 export type BroadcastPreset = {
   id: BroadcastPresetId;
@@ -41,6 +36,11 @@ export type BroadcastPreset = {
   breakDurations: number[];
   fillSlotWithCommercials: boolean;
   commercialStrategy: CommercialStrategy;
+};
+
+type BreakPlan = {
+  breakpoints: number[];
+  breakDurations: number[];
 };
 
 export const CARTOON_30_MINUTE_PRESET: BroadcastPreset = {
@@ -100,27 +100,79 @@ function clonePreset(preset: BroadcastPreset): BroadcastPreset {
   };
 }
 
+function includesMediaType(types: readonly MediaType[], type: MediaType): boolean {
+  return types.includes(type);
+}
+
 function cleanBreakpoints(
   values: readonly number[],
   durationSeconds: number,
 ): number[] {
-  return values
-    .map(normalizePositiveSecond)
-    .filter((value) => value > 0 && value < durationSeconds);
+  const durationLimit = normalizePositiveSecond(durationSeconds);
+
+  if (durationLimit <= 0) {
+    return [];
+  }
+
+  const uniqueBreakpoints = new Set<number>();
+
+  values.forEach((value) => {
+    const normalized = normalizePositiveSecond(value);
+
+    if (normalized > 0 && normalized < durationLimit) {
+      uniqueBreakpoints.add(normalized);
+    }
+  });
+
+  return [...uniqueBreakpoints].sort((a, b) => a - b);
 }
 
 function cleanBreakDurations(values: readonly number[]): number[] {
-  return values
-    .map(normalizePositiveSecond)
-    .filter((value) => value > 0);
+  return values.map(normalizePositiveSecond).filter((value) => value > 0);
+}
+
+function cleanBreakPlan(
+  breakpoints: readonly number[],
+  breakDurations: readonly number[],
+  durationSeconds: number,
+): BreakPlan {
+  const cleanedBreakpoints = cleanBreakpoints(breakpoints, durationSeconds);
+  const cleanedDurations = cleanBreakDurations(breakDurations);
+
+  return {
+    breakpoints: cleanedBreakpoints,
+    breakDurations: cleanedBreakpoints.map((_, index) => {
+      return cleanedDurations[index] ?? cleanedDurations[cleanedDurations.length - 1] ?? 0;
+    }).filter((value) => value > 0),
+  };
+}
+
+function getCleanPresetBreakPlan(
+  preset: BroadcastPreset,
+  durationSeconds?: number,
+): BreakPlan {
+  const safeDuration = normalizePositiveSecond(durationSeconds);
+  const durationLimit = safeDuration > 0 ? safeDuration : preset.slotLengthSeconds;
+
+  return cleanBreakPlan(preset.breakpoints, preset.breakDurations, durationLimit);
 }
 
 function hasRealBreakpoints(item: MediaItem): boolean {
-  return Array.isArray(item.breakpoints) && item.breakpoints.length > 0;
+  if (!Array.isArray(item.breakpoints)) {
+    return false;
+  }
+
+  const duration = normalizePositiveSecond(item.duration || item.slotLengthSeconds);
+
+  return cleanBreakpoints(item.breakpoints, duration).length > 0;
 }
 
 function hasRealBreakDurations(item: MediaItem): boolean {
-  return Array.isArray(item.breakDurations) && item.breakDurations.length > 0;
+  if (!Array.isArray(item.breakDurations)) {
+    return false;
+  }
+
+  return cleanBreakDurations(item.breakDurations).length > 0;
 }
 
 function hasCustomSlotLength(item: MediaItem): boolean {
@@ -154,18 +206,22 @@ function hasCustomBroadcastSettings(item: MediaItem): boolean {
   return Boolean(
     hasRealBreakpoints(item) ||
       hasRealBreakDurations(item) ||
-      item.fillSlotWithCommercials === true ||
+      item.fillSlotWithCommercials === false ||
       hasCustomCommercialStrategy(item) ||
       hasCustomSlotLength(item),
   );
 }
 
+function shouldAutoStandardizeMediaType(type: MediaType): boolean {
+  return includesMediaType(AUTO_STANDARDIZED_BROADCAST_TYPES, type);
+}
+
 export function isBroadcastMediaType(type: MediaType): boolean {
-  return type === "show" || type === "movie";
+  return includesMediaType(PLAYABLE_BROADCAST_TYPES, type);
 }
 
 export function isCommercialMediaType(type: MediaType): boolean {
-  return type === "commercial" || type === "bumper";
+  return includesMediaType(COMMERCIAL_MEDIA_TYPES, type);
 }
 
 export function getBroadcastPresetById(
@@ -193,15 +249,12 @@ export function createBroadcastPatchFromPreset(
   durationSeconds?: number,
 ): Partial<MediaItem> {
   const preset = getBroadcastPresetById(presetId);
-  const safeDuration = normalizePositiveSecond(durationSeconds);
+  const breakPlan = getCleanPresetBreakPlan(preset, durationSeconds);
 
   return {
     slotLengthSeconds: preset.slotLengthSeconds,
-    breakpoints:
-      safeDuration > 0
-        ? cleanBreakpoints(preset.breakpoints, safeDuration)
-        : [...preset.breakpoints],
-    breakDurations: cleanBreakDurations(preset.breakDurations),
+    breakpoints: breakPlan.breakpoints,
+    breakDurations: breakPlan.breakDurations,
     fillSlotWithCommercials: preset.fillSlotWithCommercials,
     commercialStrategy: preset.commercialStrategy,
   };
@@ -218,7 +271,7 @@ export function isThirtyMinuteShowCandidate(item: MediaItem): boolean {
 }
 
 export function isSixtyMinuteBroadcastCandidate(item: MediaItem): boolean {
-  if (!isBroadcastMediaType(item.type)) {
+  if (!shouldAutoStandardizeMediaType(item.type)) {
     return false;
   }
 
@@ -298,6 +351,10 @@ export function standardizeBroadcastItem(item: MediaItem): MediaItem {
     return item;
   }
 
+  if (!shouldAutoStandardizeMediaType(item.type)) {
+    return item;
+  }
+
   if (hasCustomBroadcastSettings(item)) {
     return item;
   }
@@ -326,7 +383,11 @@ export function getRecommendedBroadcastPresetId(
     return "cartoon-30";
   }
 
-  if (isBroadcastMediaType(item.type) && duration >= 38 * 60 && duration <= 52 * 60) {
+  if (
+    shouldAutoStandardizeMediaType(item.type) &&
+    duration >= 38 * 60 &&
+    duration <= 52 * 60
+  ) {
     return "drama-60";
   }
 
