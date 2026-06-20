@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AppMode,
   Channel,
   ChannelBranding,
@@ -31,7 +31,14 @@ export interface ProgrammingApiResponse {
   error?: string;
 }
 
-const VALID_MEDIA_TYPES: MediaType[] = ["show", "commercial", "movie", "bumper"];
+const VALID_MEDIA_TYPES: MediaType[] = [
+  "show",
+  "commercial",
+  "movie",
+  "bumper",
+  "music",
+  "music-video",
+];
 
 const VALID_WEEKDAYS: Weekday[] = [
   "sunday",
@@ -381,6 +388,79 @@ function sanitizeBranding(value: unknown, fallbackName: string): ChannelBranding
     description: validString(branding.description, ""),
     accentColor: validString(branding.accentColor, "#2563eb"),
     logoText: validString(branding.logoText, fallbackName.toUpperCase()),
+  };
+}
+
+
+const VALID_AD_PLACEMENTS = [
+  "between-programs",
+  "mid-roll",
+  "post-roll",
+  "filler",
+] as const;
+
+type SanitizedAdPlacement = (typeof VALID_AD_PLACEMENTS)[number];
+
+function validAdCategory(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const clean = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_\s]/g, "")
+    .replace(/\s+/g, "-");
+
+  return clean || undefined;
+}
+
+function validAdCategories(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map(validAdCategory)
+        .filter((item): item is string => Boolean(item)),
+    ),
+  );
+}
+
+function validAdPlacement(value: unknown): SanitizedAdPlacement | undefined {
+  return VALID_AD_PLACEMENTS.includes(value as SanitizedAdPlacement)
+    ? (value as SanitizedAdPlacement)
+    : undefined;
+}
+
+function validAdPlacements(value: unknown): SanitizedAdPlacement[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map(validAdPlacement)
+        .filter((item): item is SanitizedAdPlacement => Boolean(item)),
+    ),
+  );
+}
+function sanitizeAdPolicy(value: unknown): NonNullable<Channel["adPolicy"]> {
+  const policy = isObject(value) ? value : {};
+
+  return {
+    enabled: validBoolean(policy.enabled, true),
+    placements: validAdPlacements(policy.placements),
+    allowedCategories: validAdCategories(policy.allowedCategories),
+    allowGlobalAds: validBoolean(policy.allowGlobalAds, true),
+    allowChannelTargetedAds: validBoolean(
+      policy.allowChannelTargetedAds,
+      true,
+    ),
+    strategy: validCommercialStrategy(policy.strategy),
   };
 }
 
