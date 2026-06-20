@@ -39,6 +39,117 @@ export type Weekday =
   | "friday"
   | "saturday";
 
+/**
+ * Ad placement controls where an ad is allowed to run.
+ *
+ * pre-roll = before a program/music video.
+ * mid-roll = inside a program slot/break.
+ * post-roll = after a program/music video.
+ * between-programs = between lineup items.
+ * top-of-hour = exact clock-style insertion point.
+ * filler = safe fallback when the scheduler needs to fill remaining time.
+ */
+export type AdPlacement =
+  | "pre-roll"
+  | "mid-roll"
+  | "post-roll"
+  | "between-programs"
+  | "top-of-hour"
+  | "filler";
+
+/**
+ * Reserved global ad target.
+ *
+ * An ad with "all" in adChannelIds can run across every eligible channel,
+ * subject to each channel ad policy.
+ */
+export const GLOBAL_AD_CHANNEL_TARGET = "all" as const;
+
+export type AdChannelTarget = typeof GLOBAL_AD_CHANNEL_TARGET | string;
+
+export type AdCategory =
+  | "general"
+  | "kids"
+  | "music"
+  | "gaming"
+  | "christian"
+  | "movies"
+  | "anime"
+  | "local-business"
+  | "house-promo"
+  | string;
+
+export interface ChannelAdPolicy {
+  /**
+   * Master switch for channel-level ad insertion.
+   *
+   * If false, this channel should not insert ads unless the admin manually
+   * places commercials directly in the lineup.
+   */
+  enabled?: boolean;
+
+  /**
+   * Which ad placements this channel allows.
+   */
+  placements?: AdPlacement[];
+
+  /**
+   * Commercial picking behaviour for this channel.
+   */
+  strategy?: CommercialStrategy;
+
+  /**
+   * Maximum number of ad items in one break.
+   *
+   * Example:
+   * 1 = one ad per break.
+   * 2 = two ads per break.
+   */
+  maxAdsPerBreak?: number;
+
+  /**
+   * Target break length in seconds.
+   *
+   * Example:
+   * 120 = fill around 2 minutes.
+   * 240 = fill around 4 minutes.
+   */
+  targetBreakSeconds?: number;
+
+  /**
+   * Prevents one ad from repeating too quickly on the same channel.
+   */
+  minSecondsBetweenSameAd?: number;
+
+  /**
+   * Optional channel-level play cap.
+   */
+  maxAdsPerHour?: number;
+
+  /**
+   * Empty/undefined means all categories are allowed.
+   *
+   * Example:
+   * ["general", "local-business"].
+   */
+  allowedCategories?: AdCategory[];
+
+  /**
+   * Allows ads targeted to "all" channels.
+   */
+  allowGlobalAds?: boolean;
+
+  /**
+   * Allows ads explicitly assigned to this channel id.
+   */
+  allowChannelTargetedAds?: boolean;
+
+  /**
+   * Allows Tate's TV house promos.
+   */
+  allowHouseAds?: boolean;
+}
+
 export const TTV_PULSE_REACTIONS = [
   {
     id: "fire",
@@ -129,7 +240,7 @@ export interface MediaItem {
   engagementKey?: string;
 
   /**
-   * Manual show cut points in seconds.
+   * Manual show/movie cut points in seconds.
    *
    * Example:
    * 450 = 07:30
@@ -158,8 +269,8 @@ export interface MediaItem {
    * If true, the scheduler fills remaining slot time with commercials/fillers.
    *
    * Example:
-   * 21:56 show inside a 30:00 block with two 2:00 ad breaks
-   * gets the remaining 4:04 filled automatically.
+   * A 21:56 show inside a 30:00 block with two 2:00 ad breaks
+   * gets the remaining time filled automatically.
    */
   fillSlotWithCommercials?: boolean;
 
@@ -168,7 +279,7 @@ export interface MediaItem {
    *
    * sequential = rotate through commercial pool in order.
    * best-fit = prefer commercials close to the needed duration.
-   * random = random pool support.
+   * random = deterministic random pool support.
    */
   commercialStrategy?: CommercialStrategy;
 
@@ -194,14 +305,96 @@ export interface MediaItem {
   allowCommercialSlicing?: boolean;
 
   /**
-   * Commercial/bumpers only.
+   * Legacy commercial category.
    *
-   * Optional grouping for channel-safe ad pools.
+   * Keep this for backwards compatibility. New ad tools should prefer
+   * adCategories, but the scheduler/store can still map this into adCategories.
    *
    * Examples:
    * general, kids, anime, gaming, christian, movies
    */
   commercialCategory?: string;
+
+  /**
+   * Ad campaign controls.
+   *
+   * These fields let one uploaded commercial run on multiple channels without
+   * duplicating the media file or placing the ad directly into each lineup.
+   */
+
+  /**
+   * Channels this ad is allowed to run on.
+   *
+   * Use ["all"] for global availability.
+   * Use ["1", "3", "20"] for selected channels.
+   */
+  adChannelIds?: AdChannelTarget[];
+
+  /**
+   * Where this ad is allowed to run.
+   *
+   * Empty/undefined means scheduler can use normal safe defaults.
+   */
+  adPlacements?: AdPlacement[];
+
+  /**
+   * Ad categories for matching against channel policies.
+   */
+  adCategories?: AdCategory[];
+
+  /**
+   * Higher priority ads are preferred when multiple ads match.
+   *
+   * Suggested range:
+   * 0 = normal
+   * 50 = preferred
+   * 100 = house/paid priority
+   */
+  adPriority?: number;
+
+  /**
+   * Optional per-ad hourly cap.
+   */
+  adMaxPlaysPerHour?: number;
+
+  /**
+   * Optional per-ad repeat protection.
+   */
+  adMinSecondsBetweenPlays?: number;
+
+  /**
+   * Optional campaign active days.
+   *
+   * Empty/undefined means every day.
+   */
+  adDays?: Weekday[];
+
+  /**
+   * Optional daily start time for the campaign window.
+   *
+   * Format: HH:mm
+   * Example: 09:00
+   */
+  adStartTime?: string;
+
+  /**
+   * Optional daily end time for the campaign window.
+   *
+   * Format: HH:mm
+   * Example: 21:00
+   */
+  adEndTime?: string;
+
+  /**
+   * House ads are Tate's TV / internal promos.
+   */
+  isHouseAd?: boolean;
+
+  /**
+   * Optional human-facing campaign details.
+   */
+  advertiserName?: string;
+  campaignName?: string;
 }
 
 export interface Channel {
@@ -226,6 +419,14 @@ export interface Channel {
    * Optional default commercial strategy for this channel.
    */
   commercialStrategy?: CommercialStrategy;
+
+  /**
+   * Senior ad system.
+   *
+   * Programs stay in mediaIds.
+   * Ads stay in the global media library and are selected through this policy.
+   */
+  adPolicy?: ChannelAdPolicy;
 }
 
 export type BroadcastItem = MediaItem & {
@@ -252,6 +453,13 @@ export type BroadcastItem = MediaItem & {
    * playback secretly contains show parts + commercials.
    */
   guideDuration?: number;
+
+  /**
+   * Optional ad playback metadata.
+   */
+  adPlacement?: AdPlacement;
+  adBreakIndex?: number;
+  adCampaignKey?: string;
 };
 
 export interface ViewerSettings {
