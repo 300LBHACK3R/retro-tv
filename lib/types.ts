@@ -39,16 +39,6 @@ export type Weekday =
   | "friday"
   | "saturday";
 
-/**
- * Ad placement controls where an ad is allowed to run.
- *
- * pre-roll = before a program/music video.
- * mid-roll = inside a program slot/break.
- * post-roll = after a program/music video.
- * between-programs = between lineup items.
- * top-of-hour = exact clock-style insertion point.
- * filler = safe fallback when the scheduler needs to fill remaining time.
- */
 export type AdPlacement =
   | "pre-roll"
   | "mid-roll"
@@ -57,95 +47,65 @@ export type AdPlacement =
   | "top-of-hour"
   | "filler";
 
-/**
- * Reserved global ad target.
- *
- * An ad with "all" in adChannelIds can run across every eligible channel,
- * subject to each channel ad policy.
- */
 export const GLOBAL_AD_CHANNEL_TARGET = "all" as const;
 
 export type AdChannelTarget = typeof GLOBAL_AD_CHANNEL_TARGET | string;
 
-export type AdCategory =
-  | "general"
-  | "kids"
-  | "music"
-  | "gaming"
-  | "christian"
-  | "movies"
-  | "anime"
-  | "local-business"
-  | "house-promo"
-  | string;
+export type AdCategory = string;
 
 export interface ChannelAdPolicy {
   /**
-   * Master switch for channel-level ad insertion.
-   *
-   * If false, this channel should not insert ads unless the admin manually
-   * places commercials directly in the lineup.
+   * Master switch for automatic ad insertion on this channel.
    */
   enabled?: boolean;
 
   /**
-   * Which ad placements this channel allows.
+   * Where ads are allowed to run on this channel.
    */
   placements?: AdPlacement[];
 
   /**
-   * Commercial picking behaviour for this channel.
+   * How ads should be selected from the eligible ad pool.
    */
   strategy?: CommercialStrategy;
 
   /**
-   * Maximum number of ad items in one break.
-   *
-   * Example:
-   * 1 = one ad per break.
-   * 2 = two ads per break.
+   * Maximum number of ad items in a single break.
    */
   maxAdsPerBreak?: number;
 
   /**
-   * Target break length in seconds.
-   *
-   * Example:
-   * 120 = fill around 2 minutes.
-   * 240 = fill around 4 minutes.
+   * Target ad break length in seconds.
    */
   targetBreakSeconds?: number;
 
   /**
-   * Prevents one ad from repeating too quickly on the same channel.
+   * Minimum time before the same ad can repeat on this channel.
    */
   minSecondsBetweenSameAd?: number;
 
   /**
-   * Optional channel-level play cap.
+   * Optional cap for all ads on this channel per hour.
    */
   maxAdsPerHour?: number;
 
   /**
-   * Empty/undefined means all categories are allowed.
-   *
-   * Example:
-   * ["general", "local-business"].
+   * Empty or undefined means all categories are allowed.
    */
   allowedCategories?: AdCategory[];
 
   /**
-   * Allows ads targeted to "all" channels.
+   * Allows ads targeted to every channel using "all".
    */
   allowGlobalAds?: boolean;
 
   /**
-   * Allows ads explicitly assigned to this channel id.
+   * Allows ads explicitly targeted to this channel id.
    */
   allowChannelTargetedAds?: boolean;
 
   /**
-   * Allows Tate's TV house promos.
+   * Allows Tate's TV internal promos.
    */
   allowHouseAds?: boolean;
 }
@@ -153,27 +113,27 @@ export interface ChannelAdPolicy {
 export const TTV_PULSE_REACTIONS = [
   {
     id: "fire",
-    emoji: "ðŸ”¥",
+    emoji: "\u{1F525}",
     label: "Fire",
   },
   {
     id: "funny",
-    emoji: "ðŸ˜‚",
+    emoji: "\u{1F602}",
     label: "Funny",
   },
   {
     id: "nostalgia",
-    emoji: "ðŸ“¼",
+    emoji: "\u{1F4FC}",
     label: "Nostalgia",
   },
   {
     id: "classic",
-    emoji: "â­",
+    emoji: "\u2B50",
     label: "Classic",
   },
   {
     id: "faith",
-    emoji: "ðŸ™",
+    emoji: "\u{1F64F}",
     label: "Faith Pick",
   },
 ] as const;
@@ -208,10 +168,10 @@ export interface ChannelBranding {
   logoText: string;
 
   /**
-   * Optional uploaded/channel logo.
+   * Uploaded channel logo / network bug / real station image.
    *
-   * Existing channels can keep using logoText.
-   * Branded channels can later use a real image without changing the schema again.
+   * This is what we will wire into the UI so channels can show actual images
+   * instead of fake initials like "TP".
    */
   logoUrl?: string;
 }
@@ -225,22 +185,29 @@ export interface MediaItem {
 
   mimeType?: string;
   originalName?: string;
+
+  /**
+   * Uploaded poster/card art/thumbnail.
+   *
+   * This is the media-level image holder for cards, guide rows, and library UI.
+   */
   poster?: string;
+
   description?: string;
   provider?: "cloudflare-r2" | "external-url" | "local-dev" | "unknown";
   createdAt?: string;
   updatedAt?: string;
 
   /**
-   * Optional analytics/engagement-safe grouping key.
+   * Stable analytics/reaction key.
    *
-   * Useful when several virtual slices, restored files, or re-uploaded files
-   * should count as the same program for TTV Pulse.
+   * Useful when a file is restored, re-uploaded, sliced, or duplicated but
+   * should still count as the same title for TTV Pulse.
    */
   engagementKey?: string;
 
   /**
-   * Manual show/movie cut points in seconds.
+   * Manual program cut points in seconds.
    *
    * Example:
    * 450 = 07:30
@@ -266,30 +233,22 @@ export interface MediaItem {
   slotLengthSeconds?: number;
 
   /**
-   * If true, the scheduler fills remaining slot time with commercials/fillers.
-   *
-   * Example:
-   * A 21:56 show inside a 30:00 block with two 2:00 ad breaks
-   * gets the remaining time filled automatically.
+   * If true, scheduler may fill remaining slot time with commercials/fillers.
    */
   fillSlotWithCommercials?: boolean;
 
   /**
-   * Commercial selection behaviour for this item.
-   *
-   * sequential = rotate through commercial pool in order.
-   * best-fit = prefer commercials close to the needed duration.
-   * random = deterministic random pool support.
+   * Commercial selection behavior for this item/channel context.
    */
   commercialStrategy?: CommercialStrategy;
 
   /**
-   * Empty/undefined means every day.
+   * Empty or undefined means every day.
    */
   airDays?: Weekday[];
 
   /**
-   * Optional planned schedule label/order time.
+   * Optional fixed schedule time.
    *
    * Format: HH:mm
    * Example: 16:00
@@ -299,56 +258,39 @@ export interface MediaItem {
   /**
    * Commercial/bumpers only.
    *
-   * If true, this item can be sliced virtually when a break needs
-   * only part of a longer commercial reel.
+   * If true, this item can be sliced virtually when a break needs only part of
+   * a longer commercial reel.
    */
   allowCommercialSlicing?: boolean;
 
   /**
-   * Legacy commercial category.
+   * Current/legacy single category field.
    *
-   * Keep this for backwards compatibility. New ad tools should prefer
-   * adCategories, but the scheduler/store can still map this into adCategories.
-   *
-   * Examples:
-   * general, kids, anime, gaming, christian, movies
+   * Keep this because the existing Quick Edit panel already reads/writes it.
    */
   commercialCategory?: string;
 
   /**
-   * Ad campaign controls.
+   * Channels this commercial/bumper is allowed to run on.
    *
-   * These fields let one uploaded commercial run on multiple channels without
-   * duplicating the media file or placing the ad directly into each lineup.
-   */
-
-  /**
-   * Channels this ad is allowed to run on.
-   *
-   * Use ["all"] for global availability.
-   * Use ["1", "3", "20"] for selected channels.
+   * Examples:
+   * ["all"]
+   * ["1", "3", "20"]
    */
   adChannelIds?: AdChannelTarget[];
 
   /**
    * Where this ad is allowed to run.
-   *
-   * Empty/undefined means scheduler can use normal safe defaults.
    */
   adPlacements?: AdPlacement[];
 
   /**
-   * Ad categories for matching against channel policies.
+   * Multi-category version of commercialCategory.
    */
   adCategories?: AdCategory[];
 
   /**
    * Higher priority ads are preferred when multiple ads match.
-   *
-   * Suggested range:
-   * 0 = normal
-   * 50 = preferred
-   * 100 = house/paid priority
    */
   adPriority?: number;
 
@@ -363,35 +305,33 @@ export interface MediaItem {
   adMinSecondsBetweenPlays?: number;
 
   /**
-   * Optional campaign active days.
+   * Optional ad campaign active days.
    *
-   * Empty/undefined means every day.
+   * Empty or undefined means every day.
    */
   adDays?: Weekday[];
 
   /**
-   * Optional daily start time for the campaign window.
+   * Optional daily campaign start window.
    *
    * Format: HH:mm
-   * Example: 09:00
    */
   adStartTime?: string;
 
   /**
-   * Optional daily end time for the campaign window.
+   * Optional daily campaign end window.
    *
    * Format: HH:mm
-   * Example: 21:00
    */
   adEndTime?: string;
 
   /**
-   * House ads are Tate's TV / internal promos.
+   * Internal Tate's TV promo.
    */
   isHouseAd?: boolean;
 
   /**
-   * Optional human-facing campaign details.
+   * Optional admin-facing campaign labels.
    */
   advertiserName?: string;
   campaignName?: string;
@@ -410,7 +350,7 @@ export interface Channel {
   randomSeed?: string;
 
   /**
-   * Optional default slot length for shows on this channel.
+   * Optional default slot length for shows/movies on this channel.
    * Media item slotLengthSeconds overrides this.
    */
   defaultSlotLengthSeconds?: number;
@@ -421,10 +361,11 @@ export interface Channel {
   commercialStrategy?: CommercialStrategy;
 
   /**
-   * Senior ad system.
+   * Channel-level ad policy.
    *
-   * Programs stay in mediaIds.
-   * Ads stay in the global media library and are selected through this policy.
+   * Normal programs stay in mediaIds.
+   * Commercials and bumpers can be targeted through adChannelIds and selected
+   * by scheduler/admin ad tools.
    */
   adPolicy?: ChannelAdPolicy;
 }
@@ -449,8 +390,6 @@ export type BroadcastItem = MediaItem & {
 
   /**
    * Optional display duration for clean guide blocks.
-   * Useful when the viewer guide shows one 30-minute block while
-   * playback secretly contains show parts + commercials.
    */
   guideDuration?: number;
 

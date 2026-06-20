@@ -1,46 +1,78 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 
 const STATIC_ASSET_PATTERN =
-  /\.(?:avif|gif|ico|jpg|jpeg|png|svg|webp|css|js|mjs|map|txt|xml|webmanifest|woff|woff2)$/i;
+  /\.(?:avif|gif|ico|jpg|jpeg|png|svg|webp|css|js|mjs|txt|xml|json|webmanifest|woff|woff2)$/i;
+
+const MEDIA_ASSET_PATTERN =
+  /\.(?:mp4|m4v|mov|webm|mp3|m4a|aac|wav|ogg)$/i;
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-DNS-Prefetch-Control": "on",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": [
+    "camera=()",
+    "microphone=()",
+    "geolocation=()",
+    "payment=()",
+    "usb=()",
+    "magnetometer=()",
+    "gyroscope=()",
+    "accelerometer=()",
+  ].join(", "),
+  "X-Tates-TV": "online",
+};
+
+function isAdminApi(pathname: string): boolean {
+  return pathname.startsWith("/api/admin");
+}
+
+function isHealthApi(pathname: string): boolean {
+  return pathname === "/api/health";
+}
+
+function isProgrammingApi(pathname: string): boolean {
+  return pathname === "/api/programming";
+}
+
+function isManifestOrSeoFile(pathname: string): boolean {
+  return (
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/site.webmanifest" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml"
+  );
+}
+
+function isStaticAsset(pathname: string): boolean {
+  return STATIC_ASSET_PATTERN.test(pathname);
+}
+
+function isMediaAsset(pathname: string): boolean {
+  return MEDIA_ASSET_PATTERN.test(pathname);
+}
 
 function applySecurityHeaders(response: NextResponse): NextResponse {
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("X-DNS-Prefetch-Control", "on");
-
-  response.headers.set(
-    "Permissions-Policy",
-    [
-      "camera=()",
-      "microphone=()",
-      "geolocation=()",
-      "payment=()",
-      "usb=()",
-      "magnetometer=()",
-      "gyroscope=()",
-      "accelerometer=()",
-    ].join(", "),
-  );
-
-  response.headers.set("X-Tates-TV", "online");
+  Object.entries(SECURITY_HEADERS).forEach(([header, value]) => {
+    response.headers.set(header, value);
+  });
 
   return response;
 }
 
-function applyCacheHeaders(request: NextRequest, response: NextResponse): NextResponse {
-  const pathname = request.nextUrl.pathname;
+function applyCacheHeaders(
+  request: NextRequest,
+  response: NextResponse,
+): NextResponse {
+  const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api/admin")) {
+  if (isAdminApi(pathname) || isHealthApi(pathname)) {
     response.headers.set("Cache-Control", "no-store, max-age=0");
     return response;
   }
 
-  if (pathname === "/api/health") {
-    response.headers.set("Cache-Control", "no-store, max-age=0");
-    return response;
-  }
-
-  if (pathname === "/api/programming") {
+  if (isProgrammingApi(pathname)) {
     response.headers.set(
       "Cache-Control",
       "public, max-age=0, s-maxage=15, stale-while-revalidate=60",
@@ -48,17 +80,20 @@ function applyCacheHeaders(request: NextRequest, response: NextResponse): NextRe
     return response;
   }
 
-  if (
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/site.webmanifest" ||
-    pathname === "/robots.txt" ||
-    pathname === "/sitemap.xml" ||
-    STATIC_ASSET_PATTERN.test(pathname)
-  ) {
+  if (isManifestOrSeoFile(pathname) || isStaticAsset(pathname)) {
     response.headers.set(
       "Cache-Control",
       "public, max-age=86400, stale-while-revalidate=604800",
     );
+    return response;
+  }
+
+  if (isMediaAsset(pathname)) {
+    response.headers.set(
+      "Cache-Control",
+      "public, max-age=86400, stale-while-revalidate=604800",
+    );
+    response.headers.set("Accept-Ranges", "bytes");
     return response;
   }
 
@@ -82,9 +117,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all routes except Next internals and raw source-map chunks.
+     * Match all app routes except Next internals and source maps.
      */
     "/((?!_next/static|_next/image|.*\\.map$).*)",
   ],
 };
-
