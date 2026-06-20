@@ -1,4 +1,4 @@
-export type MediaType =
+﻿export type MediaType =
   | "show"
   | "movie"
   | "music"
@@ -153,27 +153,27 @@ export interface ChannelAdPolicy {
 export const TTV_PULSE_REACTIONS = [
   {
     id: "fire",
-    emoji: "🔥",
+    emoji: "ðŸ”¥",
     label: "Fire",
   },
   {
     id: "funny",
-    emoji: "😂",
+    emoji: "ðŸ˜‚",
     label: "Funny",
   },
   {
     id: "nostalgia",
-    emoji: "📼",
+    emoji: "ðŸ“¼",
     label: "Nostalgia",
   },
   {
     id: "classic",
-    emoji: "⭐",
+    emoji: "â­",
     label: "Classic",
   },
   {
     id: "faith",
-    emoji: "🙏",
+    emoji: "ðŸ™",
     label: "Faith Pick",
   },
 ] as const;

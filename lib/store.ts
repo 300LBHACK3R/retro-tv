@@ -1,13 +1,18 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 import type {
+  AdCategory,
+  AdChannelTarget,
+  AdPlacement,
   AppMode,
   Channel,
+  ChannelAdPolicy,
   ChannelBranding,
   CommercialBreakMode,
   CommercialStrategy,
   MediaItem,
+  MediaType,
   PlayerViewMode,
   ScheduleMode,
   ThemeId,
@@ -113,6 +118,33 @@ const VALID_COMMERCIAL_STRATEGIES: CommercialStrategy[] = [
   "random",
 ];
 
+
+const VALID_MEDIA_TYPES: MediaType[] = [
+  "show",
+  "movie",
+  "music",
+  "music-video",
+  "commercial",
+  "bumper",
+];
+
+const DEFAULT_AD_PLACEMENTS: AdPlacement[] = [
+  "between-programs",
+  "filler",
+];
+
+const DEFAULT_AD_POLICY: ChannelAdPolicy = {
+  enabled: true,
+  placements: DEFAULT_AD_PLACEMENTS,
+  strategy: "best-fit",
+  maxAdsPerBreak: 1,
+  targetBreakSeconds: 120,
+  minSecondsBetweenSameAd: 900,
+  allowedCategories: [],
+  allowGlobalAds: true,
+  allowChannelTargetedAds: true,
+  allowHouseAds: true,
+};
 const LEGACY_DEFAULT_BRANDING_MARKERS: Record<
   number,
   Partial<ChannelBranding>[]
@@ -520,6 +552,18 @@ function isCommercialStrategy(value: unknown): value is CommercialStrategy {
   );
 }
 
+
+function isMediaType(value: unknown): value is MediaType {
+  return typeof value === "string" && VALID_MEDIA_TYPES.includes(value as MediaType);
+}
+
+function normalizeMediaType(value: unknown): MediaType {
+  return isMediaType(value) ? value : "show";
+}
+
+function isCommercialMediaType(type: MediaType): boolean {
+  return type === "commercial" || type === "bumper";
+}
 function normalizePositiveInteger(value: unknown, fallback = 0): number {
   const numeric = Math.floor(Number(value));
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
@@ -602,16 +646,125 @@ function normalizeCommercialCategory(value: unknown): string | undefined {
   return clean || undefined;
 }
 
+
+function isAdMedia(item: MediaItem | undefined): boolean {
+  return item?.type === "commercial" || item?.type === "bumper";
+}
+
+function normalizeAdCategoryList(value: unknown, fallback?: string): AdCategory[] {
+  const source = Array.isArray(value) ? value : [];
+
+  const normalized = source
+    .map((item) => normalizeCommercialCategory(item))
+    .filter((item): item is string => Boolean(item));
+
+  if (normalized.length > 0) {
+    return dedupeStrings(normalized);
+  }
+
+  return fallback ? [fallback] : [];
+}
+
+function normalizeAdChannelTargets(value: unknown): AdChannelTarget[] {
+  if (!Array.isArray(value)) return [];
+
+  return dedupeStrings(
+    value
+      .map((item) => normalizeText(item, ""))
+      .filter(Boolean),
+  );
+}
+
+function normalizeAdPlacements(value: unknown): AdPlacement[] {
+  const validPlacements: AdPlacement[] = [
+    "pre-roll",
+    "mid-roll",
+    "post-roll",
+    "between-programs",
+    "top-of-hour",
+    "filler",
+  ];
+
+  if (!Array.isArray(value)) {
+    return DEFAULT_AD_PLACEMENTS;
+  }
+
+  const placements = value.filter((item): item is AdPlacement =>
+    validPlacements.includes(item as AdPlacement),
+  );
+
+  return placements.length > 0
+    ? Array.from(new Set(placements))
+    : DEFAULT_AD_PLACEMENTS;
+}
+
+function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const policy = value as ChannelAdPolicy;
+
+  return {
+    ...DEFAULT_AD_POLICY,
+    ...policy,
+    placements: normalizeAdPlacements(policy.placements),
+    strategy: isCommercialStrategy(policy.strategy) ? policy.strategy : "best-fit",
+    maxAdsPerBreak: clamp(Number(policy.maxAdsPerBreak ?? 1), 1, 10),
+    targetBreakSeconds: clamp(Number(policy.targetBreakSeconds ?? 120), 15, 1800),
+    minSecondsBetweenSameAd: clamp(
+      Number(policy.minSecondsBetweenSameAd ?? 900),
+      0,
+      86400,
+    ),
+    maxAdsPerHour:
+      policy.maxAdsPerHour === undefined
+        ? undefined
+        : clamp(Number(policy.maxAdsPerHour), 1, 120),
+    allowedCategories: normalizeAdCategoryList(policy.allowedCategories),
+    enabled: Boolean(policy.enabled),
+    allowGlobalAds: policy.allowGlobalAds !== false,
+    allowChannelTargetedAds: policy.allowChannelTargetedAds !== false,
+    allowHouseAds: policy.allowHouseAds !== false,
+  };
+}
+
+function ensureChannelAdPolicy(channel: Channel): Channel {
+  return {
+    ...channel,
+    adPolicy: normalizeAdPolicy(channel.adPolicy) ?? DEFAULT_AD_POLICY,
+  };
+}
+
+function addAdTargetToMediaItem(item: MediaItem, channelId: string): MediaItem {
+  const commercialCategory = normalizeCommercialCategory(item.commercialCategory);
+
+  return normalizeMediaItem({
+    ...item,
+    adChannelIds: dedupeStrings([
+      ...normalizeAdChannelTargets(item.adChannelIds),
+      channelId,
+    ]),
+    adPlacements: normalizeAdPlacements(item.adPlacements),
+    adCategories: normalizeAdCategoryList(
+      item.adCategories,
+      commercialCategory ?? "general",
+    ),
+    updatedAt: new Date().toISOString(),
+  });
+}
 function normalizeMediaItem(item: MediaItem): MediaItem {
   const now = new Date().toISOString();
   const duration = Math.max(1, Math.floor(Number(item.duration) || 1));
   const file = normalizeText(item.file, "");
   const slotLengthSeconds = normalizePositiveInteger(item.slotLengthSeconds);
+  const type = normalizeMediaType(item.type);
 
   return {
     ...item,
     id: normalizeText(item.id, createFallbackId()),
     title: normalizeText(item.title, "Untitled Media"),
+    type,
     duration,
     file,
     mimeType: item.mimeType ?? inferMimeType(file),
@@ -620,7 +773,10 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
     breakDurations: normalizeDurationList(item.breakDurations),
     slotLengthSeconds:
       slotLengthSeconds > duration ? slotLengthSeconds : undefined,
-    fillSlotWithCommercials: Boolean(item.fillSlotWithCommercials),
+    fillSlotWithCommercials:
+      type === "show" || type === "movie"
+        ? Boolean(item.fillSlotWithCommercials)
+        : false,
     commercialStrategy: isCommercialStrategy(item.commercialStrategy)
       ? item.commercialStrategy
       : "best-fit",
@@ -629,6 +785,31 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
     allowCommercialSlicing:
       item.allowCommercialSlicing ?? item.type === "commercial",
     commercialCategory: normalizeCommercialCategory(item.commercialCategory),
+    adChannelIds: normalizeAdChannelTargets(item.adChannelIds),
+    adPlacements: isCommercialMediaType(type)
+      ? normalizeAdPlacements(item.adPlacements)
+      : item.adPlacements,
+    adCategories: isCommercialMediaType(type)
+      ? normalizeAdCategoryList(
+          item.adCategories,
+          normalizeCommercialCategory(item.commercialCategory) ?? "general",
+        )
+      : item.adCategories,
+    adPriority: Math.max(0, Math.floor(Number(item.adPriority) || 0)),
+    adMaxPlaysPerHour:
+      item.adMaxPlaysPerHour === undefined
+        ? undefined
+        : normalizePositiveInteger(item.adMaxPlaysPerHour),
+    adMinSecondsBetweenPlays:
+      item.adMinSecondsBetweenPlays === undefined
+        ? undefined
+        : normalizePositiveInteger(item.adMinSecondsBetweenPlays),
+    adDays: normalizeAirDays(item.adDays),
+    adStartTime: normalizeText(item.adStartTime, ""),
+    adEndTime: normalizeText(item.adEndTime, ""),
+    isHouseAd: Boolean(item.isHouseAd),
+    advertiserName: normalizeText(item.advertiserName, ""),
+    campaignName: normalizeText(item.campaignName, ""),
     createdAt: item.createdAt ?? now,
     updatedAt: now,
   };
@@ -1132,11 +1313,36 @@ export const useStore = create<AppState>()(
 
       assignMediaToChannel: (channelId, mediaId) =>
         set((state) => {
-          const mediaExists = state.media.some((item) => item.id === mediaId);
+          const mediaItem = state.media.find((item) => item.id === mediaId);
+          const channelExists = state.channels.some(
+            (channel) => channel.id === channelId,
+          );
 
-          if (!mediaExists) return state;
+          if (!mediaItem || !channelExists) return state;
+
+          if (isAdMedia(mediaItem)) {
+            return {
+              media: state.media.map((item) =>
+                item.id === mediaId
+                  ? addAdTargetToMediaItem(item, channelId)
+                  : item,
+              ),
+              channels: state.channels.map((channel) =>
+                channel.id === channelId ? ensureChannelAdPolicy(channel) : channel,
+              ),
+            };
+          }
 
           return {
+            media: state.media.map((item) =>
+              item.id === mediaId
+                ? normalizeMediaItem({
+                    ...item,
+                    type: normalizeMediaType(item.type),
+                    updatedAt: new Date().toISOString(),
+                  })
+                : item,
+            ),
             channels: state.channels.map((channel) => {
               if (channel.id !== channelId) return channel;
               if (channel.mediaIds.includes(mediaId)) return channel;
