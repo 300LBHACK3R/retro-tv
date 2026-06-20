@@ -722,7 +722,7 @@ function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
         ? undefined
         : clamp(Number(policy.maxAdsPerHour), 1, 120),
     allowedCategories: normalizeAdCategoryList(policy.allowedCategories),
-    enabled: Boolean(policy.enabled),
+    enabled: policy.enabled !== false,
     allowGlobalAds: policy.allowGlobalAds !== false,
     allowChannelTargetedAds: policy.allowChannelTargetedAds !== false,
     allowHouseAds: policy.allowHouseAds !== false,
@@ -752,6 +752,64 @@ function addAdTargetToMediaItem(item: MediaItem, channelId: string): MediaItem {
     ),
     updatedAt: new Date().toISOString(),
   });
+}
+
+function extractAdsFromChannelLineups(
+  channels: Channel[],
+  media: MediaItem[],
+): { channels: Channel[]; media: MediaItem[] } {
+  const mediaById = new Map(media.map((item) => [item.id, item]));
+  const targetsByMediaId = new Map<string, string[]>();
+
+  const cleanedChannels = channels.map((channel) => {
+    const keptMediaIds: string[] = [];
+
+    for (const mediaId of channel.mediaIds) {
+      const item = mediaById.get(mediaId);
+
+      if (!isAdMedia(item)) {
+        keptMediaIds.push(mediaId);
+        continue;
+      }
+
+      const previousTargets = targetsByMediaId.get(mediaId) ?? [];
+      targetsByMediaId.set(mediaId, [
+        ...previousTargets,
+        String(channel.id),
+      ]);
+    }
+
+    return {
+      ...channel,
+      mediaIds: dedupeStrings(keptMediaIds),
+    };
+  });
+
+  const cleanedMedia = media.map((item) => {
+    if (!isAdMedia(item)) {
+      return item;
+    }
+
+    const extractedTargets = targetsByMediaId.get(item.id) ?? [];
+    const existingTargets = normalizeAdChannelTargets(item.adChannelIds);
+    const nextTargets = dedupeStrings([...existingTargets, ...extractedTargets]);
+
+    return normalizeMediaItem({
+      ...item,
+      adChannelIds: nextTargets,
+      adPlacements: normalizeAdPlacements(item.adPlacements),
+      adCategories: normalizeAdCategoryList(
+        item.adCategories,
+        normalizeCommercialCategory(item.commercialCategory) ?? "general",
+      ),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  return {
+    channels: cleanedChannels,
+    media: cleanedMedia,
+  };
 }
 function normalizeMediaItem(item: MediaItem): MediaItem {
   const now = new Date().toISOString();
