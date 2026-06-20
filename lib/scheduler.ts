@@ -1,4 +1,6 @@
 ﻿import type {
+  AdCategory,
+  AdPlacement,
   BroadcastItem,
   Channel,
   CommercialBreakMode,
@@ -11,10 +13,21 @@
 type BuildScheduleOptions = {
   channel?: Channel;
   now?: Date;
+
+  /**
+   * Optional global ad pool.
+   *
+   * Normal channel media can stay clean with only shows/movies/music in mediaIds.
+   * When the caller passes the full media library here, this scheduler can pull
+   * eligible commercials/bumpers by adChannelIds/adPolicy without polluting the
+   * channel lineup.
+   */
+  availableAds?: MediaItem[];
 };
 
 type CommercialCursor = {
   index: number;
+  breakIndex: number;
   sourceOffsets: Record<string, number>;
 };
 
@@ -38,6 +51,12 @@ type FillerCursor = {
   offsetInsideItem: number;
 };
 
+type CommercialPickContext = {
+  channel?: Channel;
+  now: Date;
+  placement: AdPlacement;
+};
+
 const DEFAULT_BREAK_ITEM_COUNT = 1;
 const CLASSIC_BREAK_ITEM_COUNT = 2;
 
@@ -52,8 +71,17 @@ const DEFAULT_30_MIN_BREAK_DURATIONS = [2 * 60, 2 * 60];
 
 const DEFAULT_INTERNAL_BREAK_SECONDS = 2 * 60;
 const COMMERCIAL_MATCH_TOLERANCE_SECONDS = 12;
+
 const MAX_COMMERCIAL_SEGMENTS_PER_BLOCK = 60;
 const MAX_FIXED_DAY_FILLER_SEGMENTS = 720;
+const MAX_RETURNED_SCHEDULE_ITEMS = 4000;
+
+const DEFAULT_AD_PLACEMENTS: AdPlacement[] = [
+  "between-programs",
+  "filler",
+  "mid-roll",
+  "post-roll",
+];
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -78,6 +106,10 @@ function isLongForm(item: MediaItem): boolean {
   );
 }
 
+function isSlotManagedLongForm(item: MediaItem): boolean {
+  return item.type === "show" || item.type === "movie";
+}
+
 function isShortForm(item: MediaItem): boolean {
   return item.type === "commercial" || item.type === "bumper";
 }
@@ -97,6 +129,14 @@ function canAirToday(item: MediaItem, now: Date): boolean {
   }
 
   return item.airDays.includes(getToday(now));
+}
+
+function canAdAirToday(item: MediaItem, now: Date): boolean {
+  if (item.adDays && item.adDays.length > 0) {
+    return item.adDays.includes(getToday(now));
+  }
+
+  return canAirToday(item, now);
 }
 
 function getDateSeed(now: Date): string {
@@ -160,10 +200,15 @@ function getCommercialStrategy(
   item: MediaItem,
   channel?: Channel,
 ): CommercialStrategy {
-  return item.commercialStrategy ?? channel?.commercialStrategy ?? "best-fit";
+  return (
+    item.commercialStrategy ??
+    channel?.adPolicy?.strategy ??
+    channel?.commercialStrategy ??
+    "best-fit"
+  );
 }
 
-function parseAirStartTime(value: string | undefined): number {
+function parseClockTime(value: string | undefined): number {
   if (!value) {
     return Number.POSITIVE_INFINITY;
   }
@@ -191,8 +236,49 @@ function parseAirStartTime(value: string | undefined): number {
   return hours * 60 + minutes;
 }
 
+function parseAirStartTime(value: string | undefined): number {
+  return parseClockTime(value);
+}
+
 function hasFixedAirStartTime(item: MediaItem): boolean {
   return Number.isFinite(parseAirStartTime(item.airStartTime));
+}
+
+function getLocalMinuteOfDay(now: Date): number {
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function isWithinClockWindow(
+  startTime: string | undefined,
+  endTime: string | undefined,
+  now: Date,
+): boolean {
+  const start = parseClockTime(startTime);
+  const end = parseClockTime(endTime);
+
+  if (!Number.isFinite(start) && !Number.isFinite(end)) {
+    return true;
+  }
+
+  const current = getLocalMinuteOfDay(now);
+
+  if (Number.isFinite(start) && !Number.isFinite(end)) {
+    return current >= start;
+  }
+
+  if (!Number.isFinite(start) && Number.isFinite(end)) {
+    return current <= end;
+  }
+
+  if (start === end) {
+    return true;
+  }
+
+  if (start < end) {
+    return current >= start && current <= end;
+  }
+
+  return current >= start || current <= end;
 }
 
 function getUtcDayOffsetForLocalAirStart(
@@ -241,7 +327,10 @@ function sortByAirStartTime(items: MediaItem[]): MediaItem[] {
       return aTime - bTime;
     }
 
-    return a.title.localeCompare(b.title);
+    return a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 
@@ -260,7 +349,7 @@ function getBroadcastItemDuration(item: BroadcastItem): number {
 function getSlotLength(item: MediaItem, channel?: Channel): number {
   const duration = getSafeDuration(item);
 
-  if (item.type !== "show") {
+  if (!isSlotManagedLongForm(item)) {
     return 0;
   }
 
@@ -276,18 +365,21 @@ function getSlotLength(item: MediaItem, channel?: Channel): number {
     return channelSlot;
   }
 
-  if (duration <= 28 * 60) {
+  if (item.type === "show" && duration <= 28 * 60) {
     return DEFAULT_30_MIN_SLOT_SECONDS;
   }
 
-  if (duration <= 58 * 60) {
+  if (item.type === "show" && duration <= 58 * 60) {
     return DEFAULT_60_MIN_SLOT_SECONDS;
   }
 
   return 0;
 }
 
-function isStandardThirtyMinuteShow(item: MediaItem, channel?: Channel): boolean {
+function isStandardThirtyMinuteShow(
+  item: MediaItem,
+  channel?: Channel,
+): boolean {
   return (
     item.type === "show" &&
     item.duration > 0 &&
@@ -346,7 +438,9 @@ function normalizeBreakDurations(
     }
 
     if (standardThirty) {
-      return DEFAULT_30_MIN_BREAK_DURATIONS[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
+      return (
+        DEFAULT_30_MIN_BREAK_DURATIONS[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS
+      );
     }
 
     return DEFAULT_INTERNAL_BREAK_SECONDS;
@@ -366,10 +460,174 @@ function getSlotSettings(
     breakpoints,
     breakDurations: normalizeBreakDurations(item, breakpoints.length, channel),
     fillSlotWithCommercials:
-      item.type === "show" &&
+      isSlotManagedLongForm(item) &&
       (Boolean(item.fillSlotWithCommercials) || standardThirty),
     commercialStrategy: getCommercialStrategy(item, channel),
   };
+}
+
+function normalizeCategory(value: unknown): AdCategory | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_\s]/g, "")
+    .replace(/\s+/g, "-");
+
+  return normalized || undefined;
+}
+
+function getAdCategories(item: MediaItem): AdCategory[] {
+  const categories = [
+    ...(Array.isArray(item.adCategories) ? item.adCategories : []),
+    item.commercialCategory,
+  ]
+    .map(normalizeCategory)
+    .filter((category): category is AdCategory => Boolean(category));
+
+  return Array.from(new Set(categories.length > 0 ? categories : ["general"]));
+}
+
+function isAdPlacementAllowed(
+  item: MediaItem,
+  context: CommercialPickContext,
+): boolean {
+  const policy = context.channel?.adPolicy;
+
+  if (policy?.enabled === false) {
+    return false;
+  }
+
+  const channelPlacements =
+    policy?.placements && policy.placements.length > 0
+      ? policy.placements
+      : DEFAULT_AD_PLACEMENTS;
+
+  if (!channelPlacements.includes(context.placement)) {
+    return false;
+  }
+
+  if (!item.adPlacements || item.adPlacements.length === 0) {
+    return true;
+  }
+
+  return item.adPlacements.includes(context.placement);
+}
+
+function isAdTargetAllowed(item: MediaItem, channel?: Channel): boolean {
+  if (!channel) {
+    return true;
+  }
+
+  const targets = Array.isArray(item.adChannelIds) ? item.adChannelIds : [];
+
+  if (targets.length === 0) {
+    return true;
+  }
+
+  const channelIds = new Set([
+    String(channel.id),
+    String(channel.number ?? channel.id),
+  ]);
+
+  if (targets.includes("all")) {
+    return channel.adPolicy?.allowGlobalAds !== false;
+  }
+
+  const targetsThisChannel = targets.some((target) =>
+    channelIds.has(String(target)),
+  );
+
+  if (!targetsThisChannel) {
+    return false;
+  }
+
+  return channel.adPolicy?.allowChannelTargetedAds !== false;
+}
+
+function isAdCategoryAllowed(item: MediaItem, channel?: Channel): boolean {
+  const allowedCategories = channel?.adPolicy?.allowedCategories;
+
+  if (!allowedCategories || allowedCategories.length === 0) {
+    return true;
+  }
+
+  const allowedSet = new Set(
+    allowedCategories
+      .map(normalizeCategory)
+      .filter((category): category is AdCategory => Boolean(category)),
+  );
+
+  if (allowedSet.size === 0) {
+    return true;
+  }
+
+  return getAdCategories(item).some((category) => allowedSet.has(category));
+}
+
+function canAdRunInContext(
+  item: MediaItem,
+  context: CommercialPickContext,
+): boolean {
+  return (
+    isShortForm(item) &&
+    hasPlayableDuration(item) &&
+    canAdAirToday(item, context.now) &&
+    isWithinClockWindow(item.adStartTime, item.adEndTime, context.now) &&
+    isAdPlacementAllowed(item, context) &&
+    isAdTargetAllowed(item, context.channel) &&
+    isAdCategoryAllowed(item, context.channel)
+  );
+}
+
+function sortCommercialPool(items: MediaItem[]): MediaItem[] {
+  return [...items].sort((a, b) => {
+    const priorityDifference =
+      Math.floor(Number(b.adPriority) || 0) -
+      Math.floor(Number(a.adPriority) || 0);
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    const durationDifference = getSafeDuration(a) - getSafeDuration(b);
+
+    if (durationDifference !== 0) {
+      return durationDifference;
+    }
+
+    return a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+}
+
+function dedupeMediaById(items: MediaItem[]): MediaItem[] {
+  const map = new Map<string, MediaItem>();
+
+  for (const item of items) {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function createCommercialPool(
+  directChannelMedia: MediaItem[],
+  availableAds: MediaItem[] | undefined,
+): MediaItem[] {
+  const directShortForm = directChannelMedia.filter(isShortForm);
+  const globalShortForm = Array.isArray(availableAds)
+    ? availableAds.filter(isShortForm)
+    : [];
+
+  return sortCommercialPool(dedupeMediaById([...directShortForm, ...globalShortForm]));
 }
 
 function createVirtualSegment(
@@ -432,45 +690,76 @@ function createTimedSlice(
   };
 }
 
+function canSliceCommercial(item: MediaItem): boolean {
+  return item.allowCommercialSlicing !== false;
+}
+
+function canFitCommercialInExactBlock(
+  item: MediaItem,
+  targetSeconds: number,
+): boolean {
+  const duration = getSafeDuration(item);
+
+  return duration <= targetSeconds || canSliceCommercial(item);
+}
+
+function createAdCampaignKey(item: MediaItem): string {
+  return (
+    item.campaignName?.trim() ||
+    item.advertiserName?.trim() ||
+    item.engagementKey?.trim() ||
+    item.id
+  );
+}
+
 function createCommercialSegment(
   item: MediaItem,
-  duration: number,
+  requestedDuration: number,
   cursor: CommercialCursor,
+  placement: AdPlacement,
+  breakIndex: number,
 ): BroadcastItem {
-  const requestedDuration = Math.max(1, Math.floor(duration));
   const sourceDuration = getSafeDuration(item);
-  const allowSlicing = item.allowCommercialSlicing !== false;
+  const safeRequestedDuration = Math.max(1, Math.floor(requestedDuration));
+  const allowSlicing = canSliceCommercial(item);
 
-  if (!allowSlicing || requestedDuration >= sourceDuration) {
+  if (!allowSlicing || safeRequestedDuration >= sourceDuration) {
     return {
       ...item,
-      id: `${item.id}:break:${cursor.index}`,
+      id: `${item.id}:break:${breakIndex}:${cursor.index}`,
       duration: sourceDuration,
       hiddenFromGuide: true,
       sourceTitle: item.title,
       isVirtualSegment: false,
+      adPlacement: placement,
+      adBreakIndex: breakIndex,
+      adCampaignKey: createAdCampaignKey(item),
     };
   }
 
-  const maxStart = Math.max(0, sourceDuration - requestedDuration);
+  const segmentDuration = Math.min(safeRequestedDuration, sourceDuration);
+  const maxStart = Math.max(0, sourceDuration - segmentDuration);
   const previousOffset = cursor.sourceOffsets[item.id] ?? 0;
-  const sourceStart = maxStart > 0 ? previousOffset % maxStart : 0;
-  const sourceEnd = sourceStart + requestedDuration;
+  const sourceStart = maxStart > 0 ? previousOffset % (maxStart + 1) : 0;
+  const sourceEnd = sourceStart + segmentDuration;
 
   cursor.sourceOffsets[item.id] = sourceEnd >= sourceDuration ? 0 : sourceEnd;
 
   return {
     ...item,
-    id: `${item.id}:slice:${sourceStart}:${sourceEnd}:${cursor.index}`,
+    id: `${item.id}:slice:${sourceStart}:${sourceEnd}:${breakIndex}:${cursor.index}`,
     parentMediaId: item.id,
     sourceStart,
     sourceEnd,
     sourceTitle: item.title,
-    duration: requestedDuration,
+    duration: segmentDuration,
     title: item.title,
     segmentLabel: "Commercial Slice",
     isVirtualSegment: true,
     hiddenFromGuide: true,
+    adPlacement: placement,
+    adBreakIndex: breakIndex,
+    adCampaignKey: createAdCampaignKey(item),
   };
 }
 
@@ -529,6 +818,7 @@ function pickBestFitCommercial(
   const rotated = getRotatedCommercialPool(shortForm, cursor);
 
   const exactOrNear = rotated
+    .filter((item) => canFitCommercialInExactBlock(item, remaining))
     .filter(
       (item) =>
         Math.abs(getSafeDuration(item) - remaining) <=
@@ -544,15 +834,15 @@ function pickBestFitCommercial(
     return exactOrNear;
   }
 
-  const underOrEqual = rotated
-    .filter((item) => getSafeDuration(item) <= remaining)
+  const underOrSliceable = rotated
+    .filter((item) => canFitCommercialInExactBlock(item, remaining))
     .sort((a, b) => getSafeDuration(b) - getSafeDuration(a))[0];
 
-  if (underOrEqual) {
-    return underOrEqual;
+  if (underOrSliceable) {
+    return underOrSliceable;
   }
 
-  return rotated.sort((a, b) => getSafeDuration(a) - getSafeDuration(b))[0];
+  return undefined;
 }
 
 function pickCommercial(
@@ -560,16 +850,34 @@ function pickCommercial(
   targetSeconds: number,
   cursor: CommercialCursor,
   strategy: CommercialStrategy,
+  options: {
+    allowOversized: boolean;
+    context: CommercialPickContext;
+  },
 ): MediaItem | undefined {
+  const eligible = shortForm.filter((item) => {
+    if (!canAdRunInContext(item, options.context)) {
+      return false;
+    }
+
+    return (
+      options.allowOversized || canFitCommercialInExactBlock(item, targetSeconds)
+    );
+  });
+
+  if (eligible.length === 0) {
+    return undefined;
+  }
+
   if (strategy === "sequential") {
-    return pickSequentialCommercial(shortForm, cursor);
+    return pickSequentialCommercial(eligible, cursor);
   }
 
   if (strategy === "random") {
-    return pickRandomCommercial(shortForm, targetSeconds, cursor);
+    return pickRandomCommercial(eligible, targetSeconds, cursor);
   }
 
-  return pickBestFitCommercial(shortForm, targetSeconds, cursor);
+  return pickBestFitCommercial(eligible, targetSeconds, cursor);
 }
 
 function fillCommercialDuration(
@@ -577,6 +885,7 @@ function fillCommercialDuration(
   targetSeconds: number,
   cursor: CommercialCursor,
   strategy: CommercialStrategy,
+  context: CommercialPickContext,
 ): BroadcastItem[] {
   const target = Math.max(0, Math.floor(targetSeconds));
 
@@ -587,22 +896,44 @@ function fillCommercialDuration(
   const items: BroadcastItem[] = [];
   let remaining = target;
   let guard = 0;
+  const breakIndex = cursor.breakIndex;
 
   while (remaining > 0 && guard < MAX_COMMERCIAL_SEGMENTS_PER_BLOCK) {
-    const selected = pickCommercial(shortForm, remaining, cursor, strategy);
+    const selected = pickCommercial(shortForm, remaining, cursor, strategy, {
+      allowOversized: false,
+      context,
+    });
 
     if (!selected) {
       break;
     }
 
     const selectedDuration = getSafeDuration(selected);
-    const segmentDuration = Math.min(selectedDuration, remaining);
+    const segmentDuration = canSliceCommercial(selected)
+      ? Math.min(selectedDuration, remaining)
+      : selectedDuration;
 
-    items.push(createCommercialSegment(selected, segmentDuration, cursor));
+    if (segmentDuration <= 0 || segmentDuration > remaining) {
+      break;
+    }
+
+    items.push(
+      createCommercialSegment(
+        selected,
+        segmentDuration,
+        cursor,
+        context.placement,
+        breakIndex,
+      ),
+    );
 
     cursor.index += 1;
     remaining -= segmentDuration;
     guard += 1;
+  }
+
+  if (items.length > 0) {
+    cursor.breakIndex += 1;
   }
 
   return items;
@@ -613,12 +944,14 @@ function takeBreakItems(
   count: number,
   cursor: CommercialCursor,
   strategy: CommercialStrategy,
+  context: CommercialPickContext,
 ): BroadcastItem[] {
   if (shortForm.length === 0 || count <= 0) {
     return [];
   }
 
   const items: BroadcastItem[] = [];
+  const breakIndex = cursor.breakIndex;
 
   for (let offset = 0; offset < count; offset += 1) {
     const selected = pickCommercial(
@@ -626,14 +959,31 @@ function takeBreakItems(
       DEFAULT_INTERNAL_BREAK_SECONDS,
       cursor,
       strategy,
+      {
+        allowOversized: true,
+        context,
+      },
     );
 
     if (!selected) {
       break;
     }
 
-    items.push(createCommercialSegment(selected, getSafeDuration(selected), cursor));
+    items.push(
+      createCommercialSegment(
+        selected,
+        getSafeDuration(selected),
+        cursor,
+        context.placement,
+        breakIndex,
+      ),
+    );
+
     cursor.index += 1;
+  }
+
+  if (items.length > 0) {
+    cursor.breakIndex += 1;
   }
 
   return items;
@@ -658,10 +1008,23 @@ function getScheduleDurationForItems(items: BroadcastItem[]): number {
   );
 }
 
+function createCommercialContext(
+  channel: Channel | undefined,
+  now: Date,
+  placement: AdPlacement,
+): CommercialPickContext {
+  return {
+    channel,
+    now,
+    placement,
+  };
+}
+
 function buildSlotFillerSchedule(
   item: MediaItem,
   shortFormItems: MediaItem[],
   channel: Channel | undefined,
+  now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const settings = getSlotSettings(item, channel);
@@ -702,6 +1065,7 @@ function buildSlotFillerSchedule(
           requestedBreakDuration,
           cursor,
           settings.commercialStrategy,
+          createCommercialContext(channel, now, "mid-roll"),
         ),
       );
     }
@@ -719,6 +1083,7 @@ function buildSlotFillerSchedule(
         remainingSlotSeconds,
         cursor,
         settings.commercialStrategy,
+        createCommercialContext(channel, now, "filler"),
       ),
     );
   }
@@ -731,12 +1096,14 @@ function buildManualBreakpointSchedule(
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
   channel: Channel | undefined,
+  now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const slotSchedule = buildSlotFillerSchedule(
     item,
     shortFormItems,
     channel,
+    now,
     cursor,
   );
 
@@ -779,6 +1146,11 @@ function buildManualBreakpointSchedule(
           breakDuration,
           cursor,
           strategy,
+          createCommercialContext(
+            channel,
+            now,
+            isLastSegment ? "post-roll" : "mid-roll",
+          ),
         ),
       );
     }
@@ -792,6 +1164,7 @@ function buildAutomaticBreakSchedule(
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
   channel: Channel | undefined,
+  now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const duration = getSafeDuration(item);
@@ -801,6 +1174,7 @@ function buildAutomaticBreakSchedule(
     item,
     shortFormItems,
     channel,
+    now,
     cursor,
   );
 
@@ -814,6 +1188,7 @@ function buildAutomaticBreakSchedule(
       shortFormItems,
       mode,
       channel,
+      now,
       cursor,
     );
   }
@@ -827,7 +1202,13 @@ function buildAutomaticBreakSchedule(
   if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
     return [
       item,
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "post-roll"),
+      ),
     ];
   }
 
@@ -837,9 +1218,21 @@ function buildAutomaticBreakSchedule(
 
     return [
       createVirtualSegment(item, 0, firstHalf, "Part 1"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "mid-roll"),
+      ),
       createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "post-roll"),
+      ),
     ];
   }
 
@@ -850,31 +1243,61 @@ function buildAutomaticBreakSchedule(
 
     return [
       createVirtualSegment(item, 0, first, "Act 1"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "mid-roll"),
+      ),
       createVirtualSegment(item, first, second, "Act 2"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "mid-roll"),
+      ),
       createVirtualSegment(item, first + second, third, "Act 3"),
-      ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+      ...takeBreakItems(
+        shortFormItems,
+        breakCount,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "post-roll"),
+      ),
     ];
   }
 
   return [
     item,
-    ...takeBreakItems(shortFormItems, breakCount, cursor, strategy),
+    ...takeBreakItems(
+      shortFormItems,
+      breakCount,
+      cursor,
+      strategy,
+      createCommercialContext(channel, now, "post-roll"),
+    ),
   ];
+}
+
+function createCommercialCursor(): CommercialCursor {
+  return {
+    index: 0,
+    breakIndex: 0,
+    sourceOffsets: {},
+  };
 }
 
 function buildWithCommercialBreaks(
   longFormItems: MediaItem[],
   shortFormItems: MediaItem[],
   mode: CommercialBreakMode,
-  channel?: Channel,
+  channel: Channel | undefined,
+  now: Date,
 ): BroadcastItem[] {
   const schedule: BroadcastItem[] = [];
-  const cursor: CommercialCursor = {
-    index: 0,
-    sourceOffsets: {},
-  };
+  const cursor = createCommercialCursor();
 
   for (const item of longFormItems) {
     schedule.push(
@@ -883,12 +1306,17 @@ function buildWithCommercialBreaks(
         shortFormItems,
         mode,
         channel,
+        now,
         cursor,
       ),
     );
+
+    if (schedule.length >= MAX_RETURNED_SCHEDULE_ITEMS) {
+      break;
+    }
   }
 
-  return schedule;
+  return schedule.slice(0, MAX_RETURNED_SCHEDULE_ITEMS);
 }
 
 function createFixedAirBlock(
@@ -910,6 +1338,7 @@ function createFixedAirBlock(
     shortFormItems,
     mode,
     channel,
+    now,
     cursor,
   );
 
@@ -944,7 +1373,11 @@ function appendFillerForDuration(
   let appended = 0;
   let guard = 0;
 
-  while (remaining > 0 && guard < MAX_FIXED_DAY_FILLER_SEGMENTS) {
+  while (
+    remaining > 0 &&
+    guard < MAX_FIXED_DAY_FILLER_SEGMENTS &&
+    target.length < MAX_RETURNED_SCHEDULE_ITEMS
+  ) {
     const filler = fillerSchedule[cursor.index % fillerSchedule.length];
 
     if (!filler) {
@@ -952,6 +1385,14 @@ function appendFillerForDuration(
     }
 
     const fillerDuration = getBroadcastItemDuration(filler);
+
+    if (cursor.offsetInsideItem >= fillerDuration) {
+      cursor.index = (cursor.index + 1) % fillerSchedule.length;
+      cursor.offsetInsideItem = 0;
+      guard += 1;
+      continue;
+    }
+
     const available = Math.max(1, fillerDuration - cursor.offsetInsideItem);
     const segmentDuration = Math.min(available, remaining);
 
@@ -988,16 +1429,13 @@ function appendFixedBlock(
   let appended = 0;
 
   for (const item of block.schedule) {
+    if (target.length >= MAX_RETURNED_SCHEDULE_ITEMS) {
+      break;
+    }
+
     const duration = getBroadcastItemDuration(item);
 
-    target.push(
-      createTimedSlice(
-        item,
-        0,
-        duration,
-        dayCursorSecond + appended,
-      ),
-    );
+    target.push(createTimedSlice(item, 0, duration, dayCursorSecond + appended));
 
     appended += duration;
   }
@@ -1018,10 +1456,7 @@ function buildFixedAirTimeSchedule(
     return [];
   }
 
-  const fixedCursor: CommercialCursor = {
-    index: 0,
-    sourceOffsets: {},
-  };
+  const fixedCursor = createCommercialCursor();
 
   const fixedBlocks = fixedItems
     .map((item) =>
@@ -1040,56 +1475,44 @@ function buildFixedAirTimeSchedule(
         return a.startSecond - b.startSecond;
       }
 
-      return a.item.title.localeCompare(b.item.title);
+      return a.item.title.localeCompare(b.item.title, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 
   if (fixedBlocks.length === 0) {
     return [];
   }
 
-  const fillerSource =
-    rotatingItems.length > 0
-      ? rotatingItems
-      : shortFormItems.length > 0
-        ? shortFormItems
-        : [];
-
-  if (fillerSource.length === 0) {
-    return fixedBlocks.flatMap((block) => block.schedule);
+  if (rotatingItems.length === 0) {
+    return fixedBlocks
+      .flatMap((block) => block.schedule)
+      .slice(0, MAX_RETURNED_SCHEDULE_ITEMS);
   }
 
   const orderedFillerSource =
     scheduleMode === "daily-random"
       ? seededShuffle(
-          fillerSource,
+          rotatingItems,
           `${channel?.randomSeed ?? channel?.id ?? "channel"}:${getDateSeed(
             now,
           )}:fixed-fill`,
         )
-      : sortByAirStartTime(fillerSource);
+      : sortByAirStartTime(rotatingItems);
 
-  const fillerCommercialCursor: CommercialCursor = {
-    index: fixedCursor.index,
-    sourceOffsets: { ...fixedCursor.sourceOffsets },
-  };
-
-  const fillerSchedule =
-    rotatingItems.length > 0
-      ? buildWithCommercialBreaks(
-          orderedFillerSource.filter(isLongForm),
-          shortFormItems,
-          mode,
-          channel,
-        )
-      : orderedFillerSource.map((item, index) => ({
-          ...item,
-          id: `${item.id}:fixed-filler:${index}`,
-          hiddenFromGuide: isShortForm(item),
-          sourceTitle: item.title,
-        }));
+  const fillerSchedule = buildWithCommercialBreaks(
+    orderedFillerSource,
+    shortFormItems,
+    mode,
+    channel,
+    now,
+  );
 
   if (fillerSchedule.length === 0) {
-    return fixedBlocks.flatMap((block) => block.schedule);
+    return fixedBlocks
+      .flatMap((block) => block.schedule)
+      .slice(0, MAX_RETURNED_SCHEDULE_ITEMS);
   }
 
   const schedule: BroadcastItem[] = [];
@@ -1101,6 +1524,10 @@ function buildFixedAirTimeSchedule(
   let dayCursorSecond = 0;
 
   for (const block of fixedBlocks) {
+    if (schedule.length >= MAX_RETURNED_SCHEDULE_ITEMS) {
+      break;
+    }
+
     if (dayCursorSecond < block.startSecond) {
       const fillerDuration = block.startSecond - dayCursorSecond;
 
@@ -1120,7 +1547,10 @@ function buildFixedAirTimeSchedule(
     dayCursorSecond += appendFixedBlock(schedule, block, dayCursorSecond);
   }
 
-  if (dayCursorSecond < DAILY_FIXED_SCHEDULE_SECONDS) {
+  if (
+    dayCursorSecond < DAILY_FIXED_SCHEDULE_SECONDS &&
+    schedule.length < MAX_RETURNED_SCHEDULE_ITEMS
+  ) {
     appendFillerForDuration(
       schedule,
       fillerSchedule,
@@ -1130,13 +1560,11 @@ function buildFixedAirTimeSchedule(
     );
   }
 
-  const fixedScheduleDuration = getScheduleDurationForItems(schedule);
-
-  if (fixedScheduleDuration <= 0) {
-    return fixedBlocks.flatMap((block) => block.schedule);
-  }
-
-  return schedule;
+  return getScheduleDurationForItems(schedule) > 0
+    ? schedule.slice(0, MAX_RETURNED_SCHEDULE_ITEMS)
+    : fixedBlocks
+        .flatMap((block) => block.schedule)
+        .slice(0, MAX_RETURNED_SCHEDULE_ITEMS);
 }
 
 export function buildSchedule(
@@ -1146,31 +1574,32 @@ export function buildSchedule(
   const now = options.now ?? new Date();
   const channel = options.channel;
 
-  const playableMedia = media
+  const playableChannelMedia = media
     .filter(hasPlayableDuration)
     .filter((item) => canAirToday(item, now));
 
-  if (playableMedia.length === 0) {
+  if (playableChannelMedia.length === 0) {
     return [];
   }
 
   const scheduleMode = getScheduleMode(channel);
   const breakMode = getCommercialBreakMode(channel);
 
-  const longForm = playableMedia.filter(isLongForm);
-  const shortForm = playableMedia.filter(isShortForm);
+  const longForm = playableChannelMedia.filter(isLongForm);
 
   if (longForm.length === 0) {
-    return scheduleMode === "daily-random"
-      ? seededShuffle(
-          playableMedia,
-          `${channel?.id ?? "channel"}:${getDateSeed(now)}:fallback`,
-        )
-      : sortByAirStartTime(playableMedia);
+    return [];
   }
 
+  const shortForm = createCommercialPool(
+    playableChannelMedia,
+    options.availableAds,
+  );
+
   const fixedLongForm = longForm.filter(hasFixedAirStartTime);
-  const rotatingLongForm = longForm.filter((item) => !hasFixedAirStartTime(item));
+  const rotatingLongForm = longForm.filter(
+    (item) => !hasFixedAirStartTime(item),
+  );
 
   const timeSortedRotatingLongForm = sortByAirStartTime(rotatingLongForm);
 
@@ -1211,10 +1640,13 @@ export function buildSchedule(
   }
 
   return buildWithCommercialBreaks(
-    orderedRotatingLongForm.length > 0 ? orderedRotatingLongForm : sortByAirStartTime(longForm),
+    orderedRotatingLongForm.length > 0
+      ? orderedRotatingLongForm
+      : sortByAirStartTime(longForm),
     orderedShortForm,
     breakMode,
     channel,
+    now,
   );
 }
 
