@@ -1,0 +1,13 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="TATE GAMING">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#39ff14"/>
+      <stop offset="55%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="8"/>
+  <text x="256" y="238" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="900" letter-spacing="3">TATE GAMING</text>
+  <text x="256" y="302" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing="5">CH 15</text>
+</svg>
