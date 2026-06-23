@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Image from "next/image";
@@ -13,7 +13,6 @@ import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
 import QuickTuneBar from "@/components/QuickTuneBar";
 import Remote from "@/components/Remote";
-import ShowLibrary from "@/components/ShowLibrary";
 import StaticTransition from "@/components/StaticTransition";
 import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
@@ -353,9 +352,32 @@ export default function Home() {
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
-            <ShowLibrary />
+<section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_60px_rgba(244,63,94,0.12)] backdrop-blur-xl sm:p-8">
+    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.32em] text-pink-300">
+          Coming Soon
+        </p>
+        <h2 className="mt-3 text-3xl font-black uppercase tracking-[0.08em] text-white sm:text-4xl">
+          TTV Library
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-white/65 sm:text-base">
+          Live channels stay free. The on-demand library is being prepared as a future
+          TTV Plus feature with premium access, creator extras, favorites, and bonus content.
+        </p>
+      </div>
 
-            <button
+      <a
+        href="/library"
+        className="inline-flex items-center justify-center rounded-full border border-pink-300/30 bg-pink-500/15 px-6 py-3 text-sm font-black uppercase tracking-[0.22em] text-pink-100 transition hover:bg-pink-500/25"
+      >
+        View Library Preview
+      </a>
+    </div>
+  </div>
+</section>
+<button
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="ttv-touch-target rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
