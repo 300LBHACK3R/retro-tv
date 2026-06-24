@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
@@ -301,7 +301,7 @@ async function requestPlaybackTarget(video: HTMLVideoElement): Promise<string> {
     return "Could not open TV playback picker.";
   }
 
-  return "AirPlay or remote playback is not available in this browser.";
+  return "TV casting is not available in this browser. On Apple, use AirPlay. On Samsung, use Smart View. On Android/Chrome, use Cast or screen mirroring.";
 }
 
 export default function Player({ schedule }: PlayerProps) {
@@ -629,6 +629,12 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     const video = videoRef.current;
 
+    if (video) {
+      const castVideo = video as WebKitVideoElement;
+      castVideo.setAttribute("x-webkit-airplay", "allow");
+      castVideo.disableRemotePlayback = false;
+    }
+
     if (!video) {
       return;
     }
@@ -664,6 +670,12 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     const video = videoRef.current;
+
+    if (video) {
+      const castVideo = video as WebKitVideoElement;
+      castVideo.setAttribute("x-webkit-airplay", "allow");
+      castVideo.disableRemotePlayback = false;
+    }
 
     if (!video) {
       return;
@@ -728,6 +740,12 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     const video = videoRef.current;
+
+    if (video) {
+      const castVideo = video as WebKitVideoElement;
+      castVideo.setAttribute("x-webkit-airplay", "allow");
+      castVideo.disableRemotePlayback = false;
+    }
 
     if (!video || !live.item) {
       return;
@@ -826,6 +844,12 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     const video = videoRef.current;
+
+    if (video) {
+      const castVideo = video as WebKitVideoElement;
+      castVideo.setAttribute("x-webkit-airplay", "allow");
+      castVideo.disableRemotePlayback = false;
+    }
 
     if (!video) {
       return;
@@ -1007,7 +1031,7 @@ export default function Player({ schedule }: PlayerProps) {
           }}
           className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
         >
-          TV
+          Cast
         </button>
 
         {fullscreenActive ? (
