@@ -1,6 +1,11 @@
 ﻿export type CleanTextInput = string | number | boolean | null | undefined;
 
-const TEXT_REPLACEMENTS: Array<[string, string]> = [
+type TextReplacement = readonly [searchValue: string | RegExp, replacement: string];
+
+const DEFAULT_SAFE_TEXT_KEY = "item";
+const MAX_SAFE_TEXT_KEY_LENGTH = 96;
+
+const TEXT_REPLACEMENTS: readonly TextReplacement[] = [
   // Bullets / separators
   ["\u00e2\u20ac\u00a2", " / "],
   ["â€¢", " / "],
@@ -29,19 +34,23 @@ const TEXT_REPLACEMENTS: Array<[string, string]> = [
   ["‘", "'"],
 
   // Double quotes
-  ["\u00e2\u20ac\u0153", "\""],
-  ["\u00e2\u20ac\ufffd", "\""],
-  ["â€œ", "\""],
-  ["â€�", "\""],
-  ["“", "\""],
-  ["”", "\""],
+  ["\u00e2\u20ac\u0153", '"'],
+  ["\u00e2\u20ac\ufffd", '"'],
+  ["â€œ", '"'],
+  ["â€�", '"'],
+  [/â€[\u009d\ufffd]/g, '"'],
+  ["“", '"'],
+  ["”", '"'],
 
   // Copyright / registered / trademark mojibake
   ["Â©", "(c)"],
+  ["©", "(c)"],
   ["Â®", "(r)"],
+  ["®", "(r)"],
   ["â„¢", "TM"],
+  ["™", "TM"],
 
-  // Spaces / leftovers
+  // Spaces / invisible characters / leftovers
   ["\u00c2\u00a0", " "],
   ["\u00a0", " "],
   ["\u200b", ""],
@@ -52,6 +61,9 @@ const TEXT_REPLACEMENTS: Array<[string, string]> = [
   ["Â", ""],
 ];
 
+const MOJIBAKE_PATTERN =
+  /Ã|Â|â€|â€¢|â€¦|â€“|â€”|â€™|â€œ|â€�|�|\u00e2\u20ac|\u00c2/;
+
 function toText(value: CleanTextInput): string {
   if (value === null || value === undefined) {
     return "";
@@ -60,31 +72,47 @@ function toText(value: CleanTextInput): string {
   return String(value);
 }
 
+function applyTextReplacement(
+  current: string,
+  searchValue: string | RegExp,
+  replacement: string,
+): string {
+  if (searchValue instanceof RegExp) {
+    return current.replace(searchValue, replacement);
+  }
+
+  return current.split(searchValue).join(replacement);
+}
+
 export function collapseWhitespace(value: string): string {
   return value
-    .replace(/[ \t\r\n]+/g, " ")
+    .replace(/[ \t\r\n\f\v]+/g, " ")
     .replace(/\s+\/\s+/g, " / ")
-    .replace(/\s+-\s+/g, " - ")
+    .replace(/\s*-\s*/g, " - ")
+    .replace(/\s+([,.:;!?])/g, "$1")
+    .replace(/([([{])\s+/g, "$1")
+    .replace(/\s+([)\]}])/g, "$1")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 export function cleanDisplayText(value: CleanTextInput): string {
   const rawValue = toText(value);
 
-  const replaced = TEXT_REPLACEMENTS.reduce(
-    (current, [bad, good]) => current.split(bad).join(good),
-    rawValue,
-  );
+  const replaced = TEXT_REPLACEMENTS.reduce((current, [bad, good]) => {
+    return applyTextReplacement(current, bad, good);
+  }, rawValue);
 
   return collapseWhitespace(replaced);
 }
 
 export function cleanTitleText(value: CleanTextInput): string {
   return cleanDisplayText(value)
-    .replace(/\s+\.\s+/g, ". ")
-    .replace(/\s+,\s+/g, ", ")
-    .replace(/\s+:\s+/g, ": ")
-    .replace(/\s+;\s+/g, "; ")
+    .replace(/\s*\.\s*/g, ". ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s*:\s*/g, ": ")
+    .replace(/\s*;\s*/g, "; ")
+    .replace(/\s+([,.:;!?])/g, "$1")
     .trim();
 }
 
@@ -103,19 +131,21 @@ export function createTextSlug(value: CleanTextInput): string {
     .replace(/[/._:]+/g, " ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 96);
+    .slice(0, MAX_SAFE_TEXT_KEY_LENGTH);
 }
 
-export function createSafeTextKey(value: CleanTextInput, fallback = "item"): string {
+export function createSafeTextKey(
+  value: CleanTextInput,
+  fallback = DEFAULT_SAFE_TEXT_KEY,
+): string {
   const slug = createTextSlug(value);
+  const fallbackSlug = createTextSlug(fallback);
 
-  return slug || fallback;
+  return slug || fallbackSlug || DEFAULT_SAFE_TEXT_KEY;
 }
 
 export function hasMojibake(value: CleanTextInput): boolean {
-  const text = toText(value);
-
-  return /Ã|Â|â€|â€¢|â€¦|â€“|â€”|â€™|â€œ|â€�/.test(text);
+  return MOJIBAKE_PATTERN.test(toText(value));
 }
 
 export function cleanMaybeText<T extends CleanTextInput>(value: T): string {

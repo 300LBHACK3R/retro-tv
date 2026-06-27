@@ -7,7 +7,6 @@ import {
   formatBreakpoints,
   formatDuration,
   formatDurationClock,
-  getDefaultSlotLengthForDuration,
   getVideoCompatibilityWarning,
   inferNameFromUrl,
   isLikelyVideoUrl,
@@ -21,16 +20,28 @@ import {
   WEEKDAYS,
 } from "@/lib/mediaUtils";
 import { useStore } from "@/lib/store";
-import type {
-  Channel,
-  CommercialStrategy,
-  MediaItem,
-  MediaType,
-  Weekday,
+import {
+  GLOBAL_AD_CHANNEL_TARGET,
+  type AdPlacement,
+  type Channel,
+  type CommercialStrategy,
+  type MediaItem,
+  type MediaType,
+  type Weekday,
 } from "@/lib/types";
 
 type DurationMode = "seconds" | "minutes";
-type UploadPreset = "cartoon" | "sitcom" | "drama" | "movie" | "music";
+type UploadPreset =
+  | "clean-show"
+  | "cartoon-breaks"
+  | "sitcom-breaks"
+  | "drama-breaks"
+  | "movie"
+  | "music-video"
+  | "commercial"
+  | "bumper";
+
+type AdTargetMode = "all" | "channel";
 
 type ValidationResult = {
   ok: boolean;
@@ -38,10 +49,21 @@ type ValidationResult = {
 };
 
 const DEFAULT_STATUS =
-  "Add videos, commercials, runtime, broadcast slots, ad blocks, fixed air time, and optional air days.";
+  "Add clean programs, movies, music videos, commercials, bumpers, fixed air time, and optional air days.";
 
 const DEFAULT_DURATION_STATUS =
   "Auto-detect will try first. Manual duration always works.";
+
+const DEFAULT_AD_PLACEMENTS: AdPlacement[] = ["between-programs", "filler"];
+
+const AD_PLACEMENT_OPTIONS: Array<{ id: AdPlacement; label: string }> = [
+  { id: "between-programs", label: "Between Programs" },
+  { id: "filler", label: "Filler" },
+  { id: "post-roll", label: "Post-Roll" },
+  { id: "mid-roll", label: "Mid-Roll" },
+  { id: "pre-roll", label: "Pre-Roll" },
+  { id: "top-of-hour", label: "Top Of Hour" },
+];
 
 function getDurationHelperText(value: string, mode: DurationMode): string {
   const seconds = parseManualDuration(value, mode);
@@ -60,14 +82,23 @@ function getSlotHelperText(
   durationSeconds: number,
 ): string {
   if (slotLengthSeconds <= 0) {
-    return "Optional. Example: 30:00 for a half-hour block.";
+    return "Optional. Leave blank for clean runtime-only scheduling.";
   }
 
   if (durationSeconds > 0 && slotLengthSeconds <= durationSeconds) {
     return "Slot must be longer than the media runtime.";
   }
 
-  return `${formatDuration(slotLengthSeconds)} broadcast block`;
+  return `${formatDuration(slotLengthSeconds)} deliberate broadcast block`;
+}
+
+function isProgramType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
 }
 
 function shouldShowBroadcastFields(type: MediaType): boolean {
@@ -80,10 +111,6 @@ function shouldShowCommercialFields(type: MediaType): boolean {
 
 function isMusicType(type: MediaType): boolean {
   return type === "music" || type === "music-video";
-}
-
-function shouldShowSchedulingFields(type: MediaType): boolean {
-  return !shouldShowCommercialFields(type);
 }
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -113,7 +140,10 @@ function sortChannels(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return String(a.id).localeCompare(String(b.id));
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -151,6 +181,7 @@ function validateUpload({
   type,
   fillSlotWithCommercials,
   parsedSlotLengthSeconds,
+  adTargetMode,
 }: {
   normalizedTitle: string;
   normalizedFile: string;
@@ -160,6 +191,7 @@ function validateUpload({
   type: MediaType;
   fillSlotWithCommercials: boolean;
   parsedSlotLengthSeconds: number;
+  adTargetMode: AdTargetMode;
 }): ValidationResult {
   if (!normalizedTitle) {
     return {
@@ -189,18 +221,29 @@ function validateUpload({
     };
   }
 
-  if (!channelId.trim()) {
-    return {
-      ok: false,
-      message: "Select a channel first.",
-    };
+  if (isProgramType(type)) {
+    if (!channelId.trim()) {
+      return {
+        ok: false,
+        message: "Select a channel first.",
+      };
+    }
+
+    if (!enabledChannels.some((channel) => channel.id === channelId)) {
+      return {
+        ok: false,
+        message: "Selected channel is not enabled or does not exist.",
+      };
+    }
   }
 
-  if (!enabledChannels.some((channel) => channel.id === channelId)) {
-    return {
-      ok: false,
-      message: "Selected channel is not enabled or does not exist.",
-    };
+  if (shouldShowCommercialFields(type) && adTargetMode === "channel") {
+    if (!enabledChannels.some((channel) => channel.id === channelId)) {
+      return {
+        ok: false,
+        message: "Select a valid channel target or choose All Channels.",
+      };
+    }
   }
 
   if (
@@ -292,15 +335,18 @@ export default function UploadPanel() {
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
 
-  const [breakpointsInput, setBreakpointsInput] = useState("7:30, 15:00");
-  const [breakDurationsInput, setBreakDurationsInput] = useState("2:00, 2:00");
-  const [slotLengthInput, setSlotLengthInput] = useState("30:00");
-  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(true);
+  const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("");
+  const [slotLengthInput, setSlotLengthInput] = useState("");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
-  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
+  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(false);
   const [commercialCategory, setCommercialCategory] = useState("");
+  const [adTargetMode, setAdTargetMode] = useState<AdTargetMode>("all");
+  const [adPlacements, setAdPlacements] =
+    useState<AdPlacement[]>(DEFAULT_AD_PLACEMENTS);
 
   const [selectedAirDays, setSelectedAirDays] = useState<Weekday[]>([]);
   const [airStartTime, setAirStartTime] = useState("");
@@ -362,8 +408,10 @@ export default function UploadPanel() {
         type,
         fillSlotWithCommercials,
         parsedSlotLengthSeconds,
+        adTargetMode,
       }),
     [
+      adTargetMode,
       channelId,
       enabledChannels,
       fillSlotWithCommercials,
@@ -399,13 +447,45 @@ export default function UploadPanel() {
     );
   };
 
+  const toggleAdPlacement = (placement: AdPlacement) => {
+    setAdPlacements((current) => {
+      if (current.includes(placement)) {
+        const next = current.filter((item) => item !== placement);
+
+        return next.length > 0 ? next : DEFAULT_AD_PLACEMENTS;
+      }
+
+      return [...current, placement];
+    });
+  };
+
   const selectEveryDay = () => {
     setSelectedAirDays([]);
     setStatus("Air days cleared. This media can air every day.");
   };
 
+  const clearBroadcastLogic = () => {
+    setSlotLengthInput("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setFillSlotWithCommercials(false);
+    setStatus("Broadcast break logic cleared. This item will use clean runtime.");
+  };
+
   const applyPreset = (preset: UploadPreset) => {
-    if (preset === "cartoon") {
+    if (preset === "clean-show") {
+      setType("show");
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
+      setStatus("Applied clean show preset. No automatic breaks or slot filler.");
+      return;
+    }
+
+    if (preset === "cartoon-breaks") {
       setType("show");
       setSlotLengthInput("30:00");
       setBreakpointsInput("7:30, 15:00");
@@ -413,11 +493,11 @@ export default function UploadPanel() {
       setFillSlotWithCommercials(true);
       setCommercialStrategy("best-fit");
       setAllowCommercialSlicing(false);
-      setStatus("Applied 30-minute cartoon/anime broadcast preset.");
+      setStatus("Applied deliberate 30-minute cartoon/anime break preset.");
       return;
     }
 
-    if (preset === "sitcom") {
+    if (preset === "sitcom-breaks") {
       setType("show");
       setSlotLengthInput("30:00");
       setBreakpointsInput("11:00");
@@ -425,11 +505,11 @@ export default function UploadPanel() {
       setFillSlotWithCommercials(true);
       setCommercialStrategy("best-fit");
       setAllowCommercialSlicing(false);
-      setStatus("Applied 30-minute sitcom broadcast preset.");
+      setStatus("Applied deliberate 30-minute sitcom break preset.");
       return;
     }
 
-    if (preset === "drama") {
+    if (preset === "drama-breaks") {
       setType("show");
       setSlotLengthInput("60:00");
       setBreakpointsInput("12:00, 24:00, 36:00");
@@ -437,7 +517,7 @@ export default function UploadPanel() {
       setFillSlotWithCommercials(true);
       setCommercialStrategy("best-fit");
       setAllowCommercialSlicing(false);
-      setStatus("Applied 60-minute drama broadcast preset.");
+      setStatus("Applied deliberate 60-minute drama break preset.");
       return;
     }
 
@@ -450,6 +530,34 @@ export default function UploadPanel() {
       setCommercialStrategy("best-fit");
       setAllowCommercialSlicing(false);
       setStatus("Applied movie preset. Runtime controls the full movie block.");
+      return;
+    }
+
+    if (preset === "commercial") {
+      setType("commercial");
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
+      setAdTargetMode("all");
+      setAdPlacements(DEFAULT_AD_PLACEMENTS);
+      setStatus("Applied commercial preset. Saved as global ad inventory.");
+      return;
+    }
+
+    if (preset === "bumper") {
+      setType("bumper");
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setCommercialStrategy("best-fit");
+      setAllowCommercialSlicing(false);
+      setAdTargetMode("all");
+      setAdPlacements(["between-programs"]);
+      setStatus("Applied bumper preset. Saved as global ad inventory.");
       return;
     }
 
@@ -489,19 +597,6 @@ export default function UploadPanel() {
           result.duration,
         )}.`,
       );
-
-      const defaultSlotLength = getDefaultSlotLengthForDuration(
-        result.duration,
-        type,
-      );
-
-      if (
-        defaultSlotLength &&
-        shouldShowBroadcastFields(type) &&
-        !slotLengthInput.trim()
-      ) {
-        setSlotLengthInput(formatDurationClock(defaultSlotLength));
-      }
     } catch {
       setDurationStatus(
         "Auto-detect failed. Enter duration manually as seconds, minutes, or 22:19.",
@@ -534,8 +629,9 @@ export default function UploadPanel() {
       setBreakDurationsInput("");
       setSlotLengthInput("");
       setFillSlotWithCommercials(false);
-      setAllowCommercialSlicing(true);
-      setStatus(`${getTypeLabel(nextType)} mode selected.`);
+      setAllowCommercialSlicing(false);
+      setAdTargetMode("all");
+      setStatus(`${getTypeLabel(nextType)} mode selected. This will save as ad inventory.`);
       return;
     }
 
@@ -550,18 +646,6 @@ export default function UploadPanel() {
     }
 
     setAllowCommercialSlicing(false);
-
-    if (parsedDurationSeconds > 0 && !slotLengthInput.trim()) {
-      const defaultSlotLength = getDefaultSlotLengthForDuration(
-        parsedDurationSeconds,
-        nextType,
-      );
-
-      if (defaultSlotLength) {
-        setSlotLengthInput(formatDurationClock(defaultSlotLength));
-      }
-    }
-
     setStatus(`${getTypeLabel(nextType)} mode selected.`);
   };
 
@@ -571,14 +655,17 @@ export default function UploadPanel() {
     setType("show");
     setDurationInput("");
     setDurationMode("seconds");
-    setBreakpointsInput("7:30, 15:00");
-    setBreakDurationsInput("2:00, 2:00");
-    setSlotLengthInput("30:00");
-    setFillSlotWithCommercials(true);
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setSlotLengthInput("");
+    setFillSlotWithCommercials(false);
     setCommercialStrategy("best-fit");
-    setAllowCommercialSlicing(true);
+    setAllowCommercialSlicing(false);
     setCommercialCategory("");
+    setAdTargetMode("all");
+    setAdPlacements(DEFAULT_AD_PLACEMENTS);
     setSelectedAirDays([]);
+    setAirStartTime("");
     setDurationStatus(DEFAULT_DURATION_STATUS);
   };
 
@@ -605,40 +692,64 @@ export default function UploadPanel() {
     }
 
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime.trim());
+    const isAd = shouldShowCommercialFields(type);
+    const sanitizedCategory = sanitizeCommercialCategory(commercialCategory);
 
-    const item = {
-      ...createMediaItemFromUrl({
+    const baseItem = createMediaItemFromUrl({
       url: normalizedFile,
       title: normalizedTitle,
       type,
       duration: parsedDurationSeconds,
       breakpoints: shouldShowBroadcastFields(type) ? parsedBreakpoints : [],
-      breakDurations: shouldShowBroadcastFields(type) ? parsedBreakDurations : [],
+      breakDurations: shouldShowBroadcastFields(type)
+        ? parsedBreakDurations
+        : [],
       slotLengthSeconds:
         shouldShowBroadcastFields(type) &&
         parsedSlotLengthSeconds > parsedDurationSeconds
           ? parsedSlotLengthSeconds
           : undefined,
-      fillSlotWithCommercials: shouldShowBroadcastFields(type)
-        ? fillSlotWithCommercials
-        : false,
+      fillSlotWithCommercials:
+        shouldShowBroadcastFields(type) &&
+        parsedSlotLengthSeconds > parsedDurationSeconds
+          ? fillSlotWithCommercials
+          : false,
       commercialStrategy,
-      allowCommercialSlicing: shouldShowCommercialFields(type)
-        ? allowCommercialSlicing
-        : false,
-      commercialCategory: shouldShowCommercialFields(type)
-        ? sanitizeCommercialCategory(commercialCategory)
-        : undefined,
-      airDays: selectedAirDays,
-    }),
-    airStartTime: shouldShowSchedulingFields(type) ? normalizedAirStartTime : "",
-  };
+      allowCommercialSlicing: isAd ? allowCommercialSlicing : false,
+      commercialCategory: isAd ? sanitizedCategory : undefined,
+      airDays: isProgramType(type) ? selectedAirDays : [],
+      airStartTime: isProgramType(type) ? normalizedAirStartTime : undefined,
+    });
+
+    const item: MediaItem = isAd
+      ? {
+          ...baseItem,
+          adChannelIds:
+            adTargetMode === "all"
+              ? [GLOBAL_AD_CHANNEL_TARGET]
+              : [String(channelId)],
+          adPlacements,
+          adCategories: sanitizedCategory ? [sanitizedCategory] : ["general"],
+          adDays: selectedAirDays,
+          commercialCategory: sanitizedCategory,
+          allowCommercialSlicing,
+        }
+      : baseItem;
 
     addMedia(item);
-    assignMediaToChannel(channelId, item.id);
+
+    if (!isAd) {
+      assignMediaToChannel(channelId, item.id);
+    }
+
+    const targetLabel = isAd
+      ? adTargetMode === "all"
+        ? "global ad inventory"
+        : `${getChannelLabel(selectedChannel)} ad inventory`
+      : `${getChannelLabel(selectedChannel)} playlist`;
 
     setStatus(
-      `Added "${item.title}" to ${getChannelLabel(selectedChannel)} / ${formatDuration(
+      `Added "${item.title}" to ${targetLabel} / ${formatDuration(
         item.duration,
       )}.`,
     );
@@ -677,8 +788,9 @@ export default function UploadPanel() {
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Add shows, movies, music videos, commercials, runtime, broadcast
-            slots, ad blocks, commercial pool settings, and optional air days.
+            Clean uploads by default. Shows and movies only get breaks when you
+            deliberately add breakpoints or apply a break preset. Commercials
+            and bumpers save as ad inventory, not normal channel playlist items.
           </p>
         </div>
 
@@ -725,17 +837,30 @@ export default function UploadPanel() {
           tone={slotTone}
         />
         <SummaryPill
-          label="Channel"
-          value={getChannelLabel(selectedChannel)}
-          tone={selectedChannel ? "good" : "warn"}
+          label={shouldShowCommercialFields(type) ? "Ad Target" : "Channel"}
+          value={
+            shouldShowCommercialFields(type) && adTargetMode === "all"
+              ? "All Channels"
+              : getChannelLabel(selectedChannel)
+          }
+          tone={selectedChannel || adTargetMode === "all" ? "good" : "warn"}
         />
         <SummaryPill
-          label="Air Days"
+          label={shouldShowCommercialFields(type) ? "Campaign Days" : "Air Days"}
           value={
             selectedAirDays.length === 0
               ? "Every Day"
               : `${selectedAirDays.length} selected`
           }
+        />
+        <SummaryPill
+          label="Breaks"
+          value={
+            parsedBreakpoints.length > 0
+              ? `${parsedBreakpoints.length} saved`
+              : "Clean"
+          }
+          tone={parsedBreakpoints.length > 0 ? "warn" : "good"}
         />
       </div>
 
@@ -880,10 +1005,14 @@ export default function UploadPanel() {
           <select
             value={channelId}
             onChange={(event) => setChannelId(event.target.value)}
-            className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
+            disabled={shouldShowCommercialFields(type) && adTargetMode === "all"}
+            className="w-full rounded-xl border px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
-              borderColor: selectedChannel ? "var(--border)" : "#f87171",
+              borderColor:
+                selectedChannel || shouldShowCommercialFields(type)
+                  ? "var(--border)"
+                  : "#f87171",
               color: "var(--text)",
             }}
           >
@@ -895,12 +1024,15 @@ export default function UploadPanel() {
           </select>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-5">
-          <PresetButton label="30m Cartoon" onClick={() => applyPreset("cartoon")} />
-          <PresetButton label="30m Sitcom" onClick={() => applyPreset("sitcom")} />
-          <PresetButton label="60m Drama" onClick={() => applyPreset("drama")} />
+        <div className="grid gap-2 sm:grid-cols-4 xl:grid-cols-8">
+          <PresetButton label="Clean Show" onClick={() => applyPreset("clean-show")} />
+          <PresetButton label="Cartoon Breaks" onClick={() => applyPreset("cartoon-breaks")} />
+          <PresetButton label="Sitcom Breaks" onClick={() => applyPreset("sitcom-breaks")} />
+          <PresetButton label="Drama Breaks" onClick={() => applyPreset("drama-breaks")} />
           <PresetButton label="Movie" onClick={() => applyPreset("movie")} />
-          <PresetButton label="Music Video" onClick={() => applyPreset("music")} />
+          <PresetButton label="Music Video" onClick={() => applyPreset("music-video")} />
+          <PresetButton label="Commercial" onClick={() => applyPreset("commercial")} />
+          <PresetButton label="Bumper" onClick={() => applyPreset("bumper")} />
         </div>
 
         {shouldShowBroadcastFields(type) ? (
@@ -911,11 +1043,21 @@ export default function UploadPanel() {
               borderColor: "var(--border)",
             }}
           >
-            <div
-              className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
-              style={{ color: "var(--primary)" }}
-            >
-              Broadcast Slot / Commercial Logic
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div
+                className="text-xs font-black uppercase tracking-[0.14em]"
+                style={{ color: "var(--primary)" }}
+              >
+                Broadcast Slot / Commercial Logic
+              </div>
+
+              <button
+                type="button"
+                onClick={clearBroadcastLogic}
+                className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+              >
+                Clear Logic
+              </button>
             </div>
 
             <div className="grid gap-3 lg:grid-cols-3">
@@ -935,7 +1077,7 @@ export default function UploadPanel() {
                     )
                   }
                   className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                  placeholder="30:00"
+                  placeholder="Blank, or 30:00"
                   style={{
                     background: "var(--panel-bg)",
                     borderColor:
@@ -963,7 +1105,7 @@ export default function UploadPanel() {
                   className="mb-1 block text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Breakpoints
+                  Manual Breakpoints
                 </label>
 
                 <input
@@ -974,7 +1116,7 @@ export default function UploadPanel() {
                     )
                   }
                   className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                  placeholder="7:30, 15:00"
+                  placeholder="Blank, or 7:30, 15:00"
                   style={{
                     background: "var(--panel-bg)",
                     borderColor: "var(--border)",
@@ -986,7 +1128,7 @@ export default function UploadPanel() {
                   className="mt-1 text-[11px] leading-5"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  {formatBreakpoints(parsedBreakpoints) || "No breakpoints"}
+                  {formatBreakpoints(parsedBreakpoints) || "No manual breakpoints"}
                 </div>
               </div>
 
@@ -995,7 +1137,7 @@ export default function UploadPanel() {
                   className="mb-1 block text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Ad Blocks
+                  Manual Ad Blocks
                 </label>
 
                 <input
@@ -1006,7 +1148,7 @@ export default function UploadPanel() {
                     )
                   }
                   className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                  placeholder="2:00, 2:00"
+                  placeholder="Blank, or 2:00, 2:00"
                   style={{
                     background: "var(--panel-bg)",
                     borderColor: "var(--border)",
@@ -1019,7 +1161,7 @@ export default function UploadPanel() {
                   style={{ color: "var(--text-muted)" }}
                 >
                   {formatBreakpoints(parsedBreakDurations) ||
-                    "Auto commercial filler"}
+                    "No manual ad block durations"}
                 </div>
               </div>
             </div>
@@ -1040,7 +1182,7 @@ export default function UploadPanel() {
                   }
                   className="h-5 w-5"
                 />
-                <span>Fill remaining slot time with commercials</span>
+                <span>Fill remaining deliberate slot time with commercials</span>
               </label>
 
               <select
@@ -1077,7 +1219,7 @@ export default function UploadPanel() {
               className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
               style={{ color: "var(--primary)" }}
             >
-              Commercial Pool Settings
+              Commercial / Bumper Inventory Settings
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1096,7 +1238,7 @@ export default function UploadPanel() {
                   }
                   className="h-5 w-5"
                 />
-                <span>Allow this commercial to be sliced for exact ad blocks</span>
+                <span>Allow exact-time slicing for this ad</span>
               </label>
 
               <input
@@ -1111,6 +1253,103 @@ export default function UploadPanel() {
                 }}
               />
             </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label
+                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <input
+                  type="radio"
+                  checked={adTargetMode === "all"}
+                  onChange={() => setAdTargetMode("all")}
+                  className="h-5 w-5"
+                />
+                <span>Target all channels</span>
+              </label>
+
+              <label
+                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                style={{
+                  background: "var(--panel-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <input
+                  type="radio"
+                  checked={adTargetMode === "channel"}
+                  onChange={() => setAdTargetMode("channel")}
+                  className="h-5 w-5"
+                />
+                <span>Target selected channel only</span>
+              </label>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {AD_PLACEMENT_OPTIONS.map((placement) => {
+                const active = adPlacements.includes(placement.id);
+
+                return (
+                  <button
+                    key={placement.id}
+                    type="button"
+                    onClick={() => toggleAdPlacement(placement.id)}
+                    className="ttv-touch-target rounded-xl border px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em]"
+                    style={{
+                      background: active ? "var(--primary)" : "var(--panel-bg)",
+                      borderColor: active ? "var(--primary)" : "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {placement.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {isProgramType(type) ? (
+          <div
+            className="rounded-2xl border p-3"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor: "var(--border)",
+            }}
+          >
+            <label
+              className="mb-1 block text-xs"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Fixed Air Time
+            </label>
+
+            <input
+              value={airStartTime}
+              onChange={(event) =>
+                setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+              }
+              className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+              placeholder="Optional HH:mm, like 16:00"
+              style={{
+                background: "var(--panel-bg)",
+                borderColor:
+                  airStartTime && !normalizeAirStartTime(airStartTime)
+                    ? "#f87171"
+                    : "var(--border)",
+                color: "var(--text)",
+              }}
+            />
+
+            <div
+              className="mt-1 text-[11px] leading-5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Leave blank for normal rotation. Use HH:mm for fixed daily slots.
+            </div>
           </div>
         ) : null}
 
@@ -1119,7 +1358,9 @@ export default function UploadPanel() {
             className="mb-2 flex items-center justify-between gap-2 text-xs"
             style={{ color: "var(--text-muted)" }}
           >
-            <span>Air Days</span>
+            <span>
+              {shouldShowCommercialFields(type) ? "Campaign Days" : "Air Days"}
+            </span>
 
             <button
               type="button"
@@ -1170,14 +1411,18 @@ export default function UploadPanel() {
           }}
         >
           {validation.ok
-            ? "Ready to add media to the selected channel."
+            ? shouldShowCommercialFields(type)
+              ? "Ready to add as commercial/bumper inventory."
+              : "Ready to add media to the selected channel playlist."
             : validation.message}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={() => window.open(normalizedFile, "_blank", "noopener,noreferrer")}
+            onClick={() =>
+              window.open(normalizedFile, "_blank", "noopener,noreferrer")
+            }
             disabled={!normalizedFile.startsWith("https://")}
             className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
           >

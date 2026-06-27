@@ -100,7 +100,7 @@ export interface ChannelAdPolicy {
   allowGlobalAds?: boolean;
 
   /**
-   * Allows ads explicitly targeted to this channel id.
+   * Allows ads explicitly targeted to this channel id or channel number.
    */
   allowChannelTargetedAds?: boolean;
 
@@ -169,9 +169,6 @@ export interface ChannelBranding {
 
   /**
    * Uploaded channel logo / network bug / real station image.
-   *
-   * This is what we will wire into the UI so channels can show actual images
-   * instead of fake initials like "TP".
    */
   logoUrl?: string;
 }
@@ -188,8 +185,6 @@ export interface MediaItem {
 
   /**
    * Uploaded poster/card art/thumbnail.
-   *
-   * This is the media-level image holder for cards, guide rows, and library UI.
    */
   poster?: string;
 
@@ -209,17 +204,13 @@ export interface MediaItem {
   /**
    * Manual program cut points in seconds.
    *
-   * Example:
-   * 450 = 07:30
-   * 900 = 15:00
+   * These must be deliberately saved by admin tools. The scheduler should not
+   * invent them automatically.
    */
   breakpoints?: number[];
 
   /**
-   * Target commercial duration after each breakpoint.
-   *
-   * Example:
-   * [120, 120] = two 2-minute ad blocks.
+   * Target commercial duration after each manual breakpoint.
    */
   breakDurations?: number[];
 
@@ -229,11 +220,16 @@ export interface MediaItem {
    * Example:
    * 1800 = 30-minute TV block.
    * 3600 = 60-minute TV block.
+   *
+   * This should only be set deliberately by admin tools or presets.
    */
   slotLengthSeconds?: number;
 
   /**
    * If true, scheduler may fill remaining slot time with commercials/fillers.
+   *
+   * Launch-safe rule: this should only take effect when the item or channel has
+   * an explicit slot length longer than the media duration.
    */
   fillSlotWithCommercials?: boolean;
 
@@ -258,15 +254,13 @@ export interface MediaItem {
   /**
    * Commercial/bumpers only.
    *
-   * If true, this item can be sliced virtually when a break needs only part of
-   * a longer commercial reel.
+   * Launch-safe rule: commercial slicing is opt-in only. Undefined should be
+   * treated as false.
    */
   allowCommercialSlicing?: boolean;
 
   /**
    * Current/legacy single category field.
-   *
-   * Keep this because the existing Quick Edit panel already reads/writes it.
    */
   commercialCategory?: string;
 
@@ -352,6 +346,8 @@ export interface Channel {
   /**
    * Optional default slot length for shows/movies on this channel.
    * Media item slotLengthSeconds overrides this.
+   *
+   * Launch-safe rule: undefined means no slot filling.
    */
   defaultSlotLengthSeconds?: number;
 
@@ -364,7 +360,7 @@ export interface Channel {
    * Channel-level ad policy.
    *
    * Normal programs stay in mediaIds.
-   * Commercials and bumpers can be targeted through adChannelIds and selected
+   * Commercials and bumpers should be targeted through adChannelIds and selected
    * by scheduler/admin ad tools.
    */
   adPolicy?: ChannelAdPolicy;

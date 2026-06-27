@@ -53,10 +53,17 @@ export type ThemeCategoryMeta = {
 };
 
 /**
- * Keep all unlocked while the product is being built/tested.
- * Switch to "premium-locked" later when payment/unlock flow exists.
+ * Launch rule:
+ * Premium themes stay free/unlocked until proper user accounts and payment
+ * processing exist.
+ *
+ * Switch this to "premium-locked" only after account/payment infrastructure is
+ * active and tested.
  */
 export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
+
+export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
+  THEME_ACCESS_MODE === "all-unlocked";
 
 export const DEFAULT_THEME_ID: ThemeId = "shaw-2006";
 
@@ -355,7 +362,9 @@ function getThemeSortValue(theme: ThemeDefinition): number {
   return categoryIndex === -1 ? Number.MAX_SAFE_INTEGER : categoryIndex;
 }
 
-function sortThemesByCategory(themes: readonly ThemeDefinition[]): ThemeDefinition[] {
+function sortThemesByCategory(
+  themes: readonly ThemeDefinition[],
+): ThemeDefinition[] {
   return [...themes].sort((a, b) => {
     const categoryDifference = getThemeSortValue(a) - getThemeSortValue(b);
 
@@ -367,12 +376,26 @@ function sortThemesByCategory(themes: readonly ThemeDefinition[]): ThemeDefiniti
       return a.isPremium ? 1 : -1;
     }
 
-    return a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 
-function isOwnedTheme(themeId: ThemeId, ownedPremiumThemes: readonly ThemeId[]): boolean {
-  return ownedPremiumThemes.includes(themeId);
+function normalizeOwnedThemes(value: readonly ThemeId[] | undefined): ThemeId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(new Set(value.filter(isThemeId)));
+}
+
+function isOwnedTheme(
+  themeId: ThemeId,
+  ownedPremiumThemes: readonly ThemeId[],
+): boolean {
+  return normalizeOwnedThemes(ownedPremiumThemes).includes(themeId);
 }
 
 export function isThemeId(value: unknown): value is ThemeId {
@@ -400,7 +423,9 @@ export function getPremiumThemes(): ThemeDefinition[] {
 }
 
 export function getThemesByCategory(category: ThemeCategory): ThemeDefinition[] {
-  return THEMES.filter((theme) => theme.category === category);
+  return sortThemesByCategory(
+    THEMES.filter((theme) => theme.category === category),
+  );
 }
 
 export function getThemeCategoryMeta(
@@ -420,7 +445,7 @@ export function canUseTheme(
   ownedPremiumThemes: ThemeId[],
   isAdmin: boolean,
 ): boolean {
-  if (THEME_ACCESS_MODE === "all-unlocked") {
+  if (PREMIUM_THEMES_TEMPORARILY_UNLOCKED) {
     return true;
   }
 
@@ -462,7 +487,7 @@ export function getThemeAccessLabel(
     return "Free";
   }
 
-  if (THEME_ACCESS_MODE === "all-unlocked") {
+  if (PREMIUM_THEMES_TEMPORARILY_UNLOCKED) {
     return "Unlocked";
   }
 
@@ -477,19 +502,35 @@ export function getThemeAccessLabel(
   return "Premium";
 }
 
+/**
+ * Current visible price label.
+ *
+ * During the launch/build phase, premium themes are available at no charge.
+ */
 export function getThemePriceLabel(theme: ThemeDefinition): string {
   if (!theme.isPremium) {
     return "Free";
   }
 
-  if (THEME_ACCESS_MODE === "all-unlocked") {
+  if (PREMIUM_THEMES_TEMPORARILY_UNLOCKED) {
     return "Free";
   }
 
   return theme.priceLabel;
 }
 
-export function createThemeCssVars(theme: ThemeDefinition): Record<string, string> {
+/**
+ * Future planned price label.
+ *
+ * Useful for admin copy, planning UI, or later payment screens.
+ */
+export function getThemePlannedPriceLabel(theme: ThemeDefinition): string {
+  return theme.priceLabel;
+}
+
+export function createThemeCssVars(
+  theme: ThemeDefinition,
+): Record<string, string> {
   return {
     "--ttv-app-bg": theme.colors.appBg,
     "--ttv-panel-bg": theme.colors.panelBg,

@@ -575,9 +575,9 @@ function normalizeText(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
 
   const trimmed = value
-    .replace(/•/g, " / ")
-    .replace(/�?/g, " / ")
-    .replace(/�/g, "")
+    .replace(/â€¢/g, " / ")
+    .replace(/â€?/g, " / ")
+    .replace(/Â/g, "")
     .replace(/\s+/g, " ")
     .trim();
 

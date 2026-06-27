@@ -9,6 +9,8 @@ interface ViewerHeaderProps {
 }
 
 const LIVE_TICK_MS = 15_000;
+const DEFAULT_TITLE = "TATE'S TV";
+const DEFAULT_SUBTITLE = "A curated live channel experience";
 
 function getChannelLabel(channel: Channel): string {
   return `CH ${channel.number ?? channel.id}`;
@@ -28,11 +30,77 @@ function getSafeAccent(channel: Channel | undefined): string {
   return "var(--primary)";
 }
 
+function normalizeLogoUrl(value: string | undefined): string | undefined {
+  const clean = value?.trim();
+
+  if (!clean) {
+    return undefined;
+  }
+
+  if (
+    clean.startsWith("/") ||
+    clean.startsWith("data:image/") ||
+    /^https?:\/\//i.test(clean)
+  ) {
+    return clean;
+  }
+
+  return undefined;
+}
+
 function formatHeaderTime(date: Date): string {
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function ChannelLogo({
+  logoUrl,
+  fallbackText,
+  accent,
+}: {
+  logoUrl: string | undefined;
+  fallbackText: string;
+  accent: string;
+}) {
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFailedLogoUrl(null);
+  }, [logoUrl]);
+
+  const canShowImage = Boolean(logoUrl && failedLogoUrl !== logoUrl);
+
+  return (
+    <div
+      className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border text-center text-sm font-black uppercase tracking-tight shadow-2xl shadow-black/20 sm:h-20 sm:w-20"
+      style={{
+        background:
+          "linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, transparent), var(--panel-alt-bg))",
+        borderColor: accent,
+        color: "var(--text)",
+      }}
+      aria-hidden="true"
+    >
+      {canShowImage && logoUrl ? (
+        // Use a plain img here because channel logos can be remote URLs,
+        // data URLs, or locally served public assets.
+        <img
+          src={logoUrl}
+          alt=""
+          className="h-full w-full object-contain p-2"
+          loading="eager"
+          decoding="async"
+          onError={() => setFailedLogoUrl(logoUrl)}
+        />
+      ) : (
+        <span className="line-clamp-2 px-2 leading-4">
+          {fallbackText.slice(0, 18)}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function ViewerHeader({ channel }: ViewerHeaderProps) {
@@ -54,20 +122,29 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
 
   const branding = channel?.branding;
   const accent = getSafeAccent(channel);
+  const logoUrl = normalizeLogoUrl(branding?.logoUrl);
 
   const title = useMemo(
     () =>
       cleanDisplayText(
-        branding?.logoText || branding?.displayName || channel?.name || "TATE'S TV",
+        branding?.displayName ||
+          branding?.logoText ||
+          channel?.name ||
+          DEFAULT_TITLE,
       ),
     [branding?.displayName, branding?.logoText, channel?.name],
   );
 
-  const subtitle = useMemo(
+  const logoText = useMemo(
     () =>
       cleanDisplayText(
-        branding?.description || "A curated live channel experience",
+        branding?.logoText || branding?.callsign || title || DEFAULT_TITLE,
       ),
+    [branding?.callsign, branding?.logoText, title],
+  );
+
+  const subtitle = useMemo(
+    () => cleanDisplayText(branding?.description || DEFAULT_SUBTITLE),
     [branding?.description],
   );
 
@@ -104,38 +181,29 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
       />
 
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className="text-[11px] font-black uppercase tracking-[0.22em]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Tate&apos;s TV
-            </div>
+        <div className="flex min-w-0 gap-4">
+          <ChannelLogo logoUrl={logoUrl} fallbackText={logoText} accent={accent} />
 
-            <div
-              className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
-              style={{
-                borderColor: "var(--border)",
-                background: "var(--panel-alt-bg)",
-                color: accent,
-              }}
-            >
-              ● Live
-            </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="text-[11px] font-black uppercase tracking-[0.22em]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Tate&apos;s TV
+              </div>
 
-            <div
-              className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
-              style={{
-                borderColor: "var(--border)",
-                background: "var(--panel-alt-bg)",
-                color: "var(--text-muted)",
-              }}
-            >
-              {clockLabel}
-            </div>
+              <div
+                className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--panel-alt-bg)",
+                  color: accent,
+                }}
+              >
+                ● Live
+              </div>
 
-            {channel ? (
               <div
                 className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
                 style={{
@@ -144,25 +212,38 @@ export default function ViewerHeader({ channel }: ViewerHeaderProps) {
                   color: "var(--text-muted)",
                 }}
               >
-                {getChannelLabel(channel)}
+                {clockLabel}
               </div>
-            ) : null}
+
+              {channel ? (
+                <div
+                  className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
+                  style={{
+                    borderColor: "var(--border)",
+                    background: "var(--panel-alt-bg)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {getChannelLabel(channel)}
+                </div>
+              ) : null}
+            </div>
+
+            <h1
+              className="mt-4 truncate text-4xl font-black tracking-tight sm:text-5xl"
+              title={title}
+            >
+              {title}
+            </h1>
+
+            <p
+              className="mt-3 line-clamp-2 max-w-5xl text-sm leading-6 sm:text-base"
+              style={{ color: "var(--text-muted)" }}
+              title={subtitle}
+            >
+              {subtitle}
+            </p>
           </div>
-
-          <h1
-            className="mt-4 truncate text-4xl font-black tracking-tight sm:text-5xl"
-            title={title}
-          >
-            {title}
-          </h1>
-
-          <p
-            className="mt-3 line-clamp-2 max-w-5xl text-sm leading-6 sm:text-base"
-            style={{ color: "var(--text-muted)" }}
-            title={subtitle}
-          >
-            {subtitle}
-          </p>
         </div>
 
         {channel ? (
