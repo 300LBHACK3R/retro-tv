@@ -40,6 +40,10 @@ function normalizePositiveSecond(value: unknown): number {
 }
 
 function clampNumber(value: number, min: number, max: number): number {
+  if (max < min) {
+    return min;
+  }
+
   return Math.min(max, Math.max(min, value));
 }
 
@@ -50,7 +54,7 @@ function createEmptyLiveState(totalDuration = 0): LiveState {
     elapsed: 0,
     remaining: 0,
     offsetInLoop: 0,
-    totalDuration,
+    totalDuration: Math.max(0, normalizeSecond(totalDuration)),
     sourceElapsed: 0,
     sourceStart: 0,
     sourceEnd: null,
@@ -72,14 +76,22 @@ export function getSecondsSinceBroadcastEpoch(nowMs = Date.now()): number {
   return Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
 }
 
-export function getOffsetInLoop(totalDuration: number, nowMs = Date.now()): number {
-  if (!Number.isFinite(totalDuration) || totalDuration <= 0) {
+export function getOffsetInLoop(
+  totalDuration: number,
+  nowMs = Date.now(),
+): number {
+  const safeTotalDuration = normalizePositiveSecond(totalDuration);
+
+  if (safeTotalDuration <= 0) {
     return 0;
   }
 
   const secondsSinceEpoch = getSecondsSinceBroadcastEpoch(nowMs);
 
-  return ((secondsSinceEpoch % totalDuration) + totalDuration) % totalDuration;
+  return (
+    ((secondsSinceEpoch % safeTotalDuration) + safeTotalDuration) %
+    safeTotalDuration
+  );
 }
 
 export function getItemSourceStart(item: BroadcastItem): number {
@@ -115,7 +127,6 @@ function getSourceElapsed(
   sourceEnd: number | null;
 } {
   const { sourceStart, sourceEnd } = getSourceRange(item);
-
   const safeElapsed = Math.max(0, normalizeSecond(elapsed));
   const unclampedSourceElapsed = sourceStart + safeElapsed;
 
@@ -146,27 +157,35 @@ function createLiveState({
   const safeElapsed = clampNumber(normalizeSecond(elapsed), 0, duration);
   const remaining = Math.max(0, duration - safeElapsed);
   const source = getSourceElapsed(item, safeElapsed);
+  const safeTotalDuration = Math.max(0, normalizeSecond(totalDuration));
 
   return {
     item,
     index,
     elapsed: safeElapsed,
     remaining,
-    offsetInLoop: clampNumber(normalizeSecond(offsetInLoop), 0, Math.max(0, totalDuration)),
-    totalDuration: Math.max(0, normalizeSecond(totalDuration)),
+    offsetInLoop: clampNumber(
+      normalizeSecond(offsetInLoop),
+      0,
+      Math.max(0, safeTotalDuration),
+    ),
+    totalDuration: safeTotalDuration,
     sourceElapsed: source.sourceElapsed,
     sourceStart: source.sourceStart,
     sourceEnd: source.sourceEnd,
-    progress: clampNumber(safeElapsed / duration, 0, 1),
+    progress: duration > 0 ? clampNumber(safeElapsed / duration, 0, 1) : 0,
   };
 }
 
-export function getLiveStateAtOffset(
-  schedule: BroadcastItem[],
-  offsetInLoop: number,
-): LiveState {
-  const totalDuration = getScheduleDuration(schedule);
-
+function getLiveStateAtOffsetWithDuration({
+  schedule,
+  offsetInLoop,
+  totalDuration,
+}: {
+  schedule: BroadcastItem[];
+  offsetInLoop: number;
+  totalDuration: number;
+}): LiveState {
   if (!schedule.length || totalDuration <= 0) {
     return createEmptyLiveState(totalDuration);
   }
@@ -215,6 +234,19 @@ export function getLiveStateAtOffset(
   });
 }
 
+export function getLiveStateAtOffset(
+  schedule: BroadcastItem[],
+  offsetInLoop: number,
+): LiveState {
+  const totalDuration = getScheduleDuration(schedule);
+
+  return getLiveStateAtOffsetWithDuration({
+    schedule,
+    offsetInLoop,
+    totalDuration,
+  });
+}
+
 export function getLiveState(
   schedule: BroadcastItem[],
   nowMs = Date.now(),
@@ -225,7 +257,11 @@ export function getLiveState(
     return createEmptyLiveState(totalDuration);
   }
 
-  return getLiveStateAtOffset(schedule, getOffsetInLoop(totalDuration, nowMs));
+  return getLiveStateAtOffsetWithDuration({
+    schedule,
+    offsetInLoop: getOffsetInLoop(totalDuration, nowMs),
+    totalDuration,
+  });
 }
 
 export function getNextLiveItem(
