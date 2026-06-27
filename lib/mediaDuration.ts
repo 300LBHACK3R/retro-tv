@@ -4,6 +4,8 @@ export type DurationProbeResult = {
 };
 
 const DEFAULT_PROBE_TIMEOUT_MS = 15000;
+const MIN_PROBE_TIMEOUT_MS = 3000;
+const MAX_PROBE_TIMEOUT_MS = 60000;
 const FALLBACK_SEEK_TIME_SECONDS = 24 * 60 * 60;
 
 function formatDuration(seconds: number): string {
@@ -19,6 +21,69 @@ function formatDuration(seconds: number): string {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
+function normalizeTimeoutMs(timeoutMs: number): number {
+  const safeTimeout = Math.floor(Number(timeoutMs));
+
+  if (!Number.isFinite(safeTimeout)) {
+    return DEFAULT_PROBE_TIMEOUT_MS;
+  }
+
+  return Math.min(
+    MAX_PROBE_TIMEOUT_MS,
+    Math.max(MIN_PROBE_TIMEOUT_MS, safeTimeout),
+  );
+}
+
+function createProbeError(message: string): Error {
+  return new Error(message);
+}
+
+function getMediaErrorMessage(video: HTMLVideoElement): string {
+  const error = video.error;
+
+  if (!error) {
+    return "Failed to load video metadata. Check the file URL, permissions, and format.";
+  }
+
+  if (error.code === MediaError.MEDIA_ERR_ABORTED) {
+    return "Video metadata loading was aborted.";
+  }
+
+  if (error.code === MediaError.MEDIA_ERR_NETWORK) {
+    return "Network error while loading video metadata. Check the URL and CDN access.";
+  }
+
+  if (error.code === MediaError.MEDIA_ERR_DECODE) {
+    return "The browser could not decode this video. MP4/H.264/AAC is recommended.";
+  }
+
+  if (error.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+    return "This video source or format is not supported by the browser.";
+  }
+
+  return "Failed to load video metadata. Check the file URL, permissions, and format.";
+}
+
+function getSeekableDuration(video: HTMLVideoElement): number | null {
+  try {
+    const seekable = video.seekable;
+
+    if (!seekable || seekable.length <= 0) {
+      return null;
+    }
+
+    const end = Math.round(seekable.end(seekable.length - 1));
+
+    if (Number.isFinite(end) && end > 0) {
+      return end;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getReadableDuration(video: HTMLVideoElement): number | null {
   const duration = Math.round(video.duration);
 
@@ -26,11 +91,11 @@ function getReadableDuration(video: HTMLVideoElement): number | null {
     return duration;
   }
 
-  return null;
+  return getSeekableDuration(video);
 }
 
-function createProbeError(message: string): Error {
-  return new Error(message);
+function canUseBrowserVideo(): boolean {
+  return typeof document !== "undefined" && typeof window !== "undefined";
 }
 
 export function probeVideoDuration(
@@ -45,24 +110,38 @@ export function probeVideoDuration(
       return;
     }
 
-    if (typeof document === "undefined") {
+    if (!canUseBrowserVideo()) {
       reject(createProbeError("Video duration probing requires a browser."));
       return;
     }
 
     const video = document.createElement("video");
+    const safeTimeoutMs = normalizeTimeoutMs(timeoutMs);
+
     let settled = false;
     let attemptedFallbackSeek = false;
+    let timeoutId: number | null = null;
 
     const cleanup = () => {
-      video.onloadedmetadata = null;
-      video.ondurationchange = null;
-      video.onseeked = null;
-      video.onerror = null;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
+      video.removeEventListener("loadedmetadata", tryResolveDuration);
+      video.removeEventListener("durationchange", tryResolveDuration);
+      video.removeEventListener("loadeddata", tryResolveDuration);
+      video.removeEventListener("canplay", tryResolveDuration);
+      video.removeEventListener("seeked", tryResolveDuration);
+      video.removeEventListener("error", handleError);
+
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        // Detached probe cleanup should never break the caller.
+      }
     };
 
     const finish = (duration: number) => {
@@ -71,7 +150,6 @@ export function probeVideoDuration(
       }
 
       settled = true;
-      window.clearTimeout(timeout);
       cleanup();
 
       resolve({
@@ -86,12 +164,25 @@ export function probeVideoDuration(
       }
 
       settled = true;
-      window.clearTimeout(timeout);
       cleanup();
       reject(createProbeError(message));
     };
 
-    const tryResolveDuration = () => {
+    function tryFallbackSeek() {
+      if (attemptedFallbackSeek || video.readyState < 1) {
+        return;
+      }
+
+      attemptedFallbackSeek = true;
+
+      try {
+        video.currentTime = FALLBACK_SEEK_TIME_SECONDS;
+      } catch {
+        fail("Video metadata loaded, but duration was not readable.");
+      }
+    }
+
+    function tryResolveDuration() {
       const duration = getReadableDuration(video);
 
       if (duration) {
@@ -100,39 +191,41 @@ export function probeVideoDuration(
       }
 
       /**
-       * Some media/CDN/browser combinations report duration as Infinity
-       * until the video is seeked near the end. This fallback can recover
-       * durations for certain MP4/MKV/transcoded files.
+       * Some media/CDN/browser combinations report duration as Infinity until
+       * the video is seeked near the end. This can recover duration for some
+       * MP4/MKV/transcoded files.
        */
-      if (!attemptedFallbackSeek && video.readyState >= 1) {
-        attemptedFallbackSeek = true;
+      tryFallbackSeek();
+    }
 
-        try {
-          video.currentTime = FALLBACK_SEEK_TIME_SECONDS;
-        } catch {
-          fail("Video metadata loaded, but duration was not readable.");
-        }
-      }
-    };
+    function handleError() {
+      fail(getMediaErrorMessage(video));
+    }
 
-    const timeout = window.setTimeout(() => {
-      fail("Could not detect duration. Check the URL, CORS settings, and video encoding.");
-    }, timeoutMs);
+    timeoutId = window.setTimeout(() => {
+      fail(
+        "Could not detect duration. Check the URL, CDN permissions, and video encoding.",
+      );
+    }, safeTimeoutMs);
+
+    video.addEventListener("loadedmetadata", tryResolveDuration);
+    video.addEventListener("durationchange", tryResolveDuration);
+    video.addEventListener("loadeddata", tryResolveDuration);
+    video.addEventListener("canplay", tryResolveDuration);
+    video.addEventListener("seeked", tryResolveDuration);
+    video.addEventListener("error", handleError);
 
     video.preload = "metadata";
-    video.crossOrigin = "anonymous";
     video.muted = true;
     video.playsInline = true;
+
+    /**
+     * Do not force crossOrigin here.
+     * A video can often play/probe metadata without CORS, while setting
+     * crossOrigin="anonymous" can make public CDN files fail unless headers
+     * are perfect.
+     */
     video.src = cleanSrc;
-
-    video.onloadedmetadata = tryResolveDuration;
-    video.ondurationchange = tryResolveDuration;
-    video.onseeked = tryResolveDuration;
-
-    video.onerror = () => {
-      fail("Failed to load video metadata. Check the file URL, CORS permissions, and format.");
-    };
-
     video.load();
   });
 }

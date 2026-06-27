@@ -15,6 +15,16 @@ export const WEEKDAYS: Array<{ id: Weekday; label: string }> = [
   { id: "saturday", label: "Sat" },
 ];
 
+export const SUPPORTED_VIDEO_EXTENSIONS = [
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".m4v",
+  ".mkv",
+] as const;
+
+export const BROWSER_SAFE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v"] as const;
+
 type DurationMode = "seconds" | "minutes";
 
 type CreateMediaItemFromUrlInput = {
@@ -33,16 +43,97 @@ type CreateMediaItemFromUrlInput = {
   airStartTime?: string;
 };
 
-function createId(): string {
+const WEEKDAY_IDS = new Set<Weekday>(WEEKDAYS.map((day) => day.id));
+
+function getNowIso(): string {
+  return new Date().toISOString();
+}
+
+function createId(title?: string): string {
+  const cleanTitle = (title ?? "media")
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+    return `${cleanTitle || "media"}-${crypto.randomUUID().slice(0, 8)}`;
   }
 
-  return `media-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${cleanTitle || "media"}-${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 6)}`;
+}
+
+function normalizePositiveSecond(value: unknown): number {
+  const numberValue = Math.floor(Number(value));
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    return 0;
+  }
+
+  return numberValue;
+}
+
+function normalizeSecondList(values: readonly number[] | undefined): number[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
+    .map(normalizePositiveSecond)
+    .filter((seconds) => seconds > 0);
+}
+
+function sanitizeAirDays(values: readonly Weekday[] | undefined): Weekday[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(values.filter((value): value is Weekday => WEEKDAY_IDS.has(value))),
+  );
+}
+
+function isProgramType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
+}
+
+function isCommercialType(type: MediaType): boolean {
+  return type === "commercial" || type === "bumper";
 }
 
 export function normalizeUrl(value: string): string {
-  return value.trim();
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : trimmed.includes(".r2.dev/")
+      ? `https://${trimmed}`
+      : trimmed;
+
+  return withProtocol.replace(/\s/g, "%20");
+}
+
+function getCleanUrlPath(value: string): string {
+  return normalizeUrl(value).toLowerCase().split("?")[0] ?? "";
+}
+
+function getFileExtension(value: string): string {
+  const clean = getCleanUrlPath(value);
+  const match = clean.match(/\.[a-z0-9]+$/i);
+
+  return match?.[0] ?? "";
 }
 
 export function titleCase(value: string): string {
@@ -50,55 +141,69 @@ export function titleCase(value: string): string {
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
+    .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function inferNameFromUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const lastPart = parsed.pathname.split("/").filter(Boolean).pop() ?? "";
-    const decoded = decodeURIComponent(lastPart);
-    const withoutExtension = decoded.replace(/\.[a-z0-9]+$/i, "");
+  const normalized = normalizeUrl(url);
 
-    return titleCase(withoutExtension);
-  } catch {
-    const lastPart = url.split("/").filter(Boolean).pop() ?? "";
+  try {
+    const parsed = new URL(normalized);
+    const lastPart = decodeURIComponent(
+      parsed.pathname.split("/").filter(Boolean).at(-1) ?? "",
+    );
+
     return titleCase(lastPart.replace(/\.[a-z0-9]+$/i, ""));
+  } catch {
+    const cleanPath = normalized.split("?")[0] ?? normalized;
+    const lastPart = cleanPath.split("/").filter(Boolean).at(-1) ?? "";
+
+    try {
+      return titleCase(
+        decodeURIComponent(lastPart).replace(/\.[a-z0-9]+$/i, ""),
+      );
+    } catch {
+      return titleCase(lastPart.replace(/\.[a-z0-9]+$/i, ""));
+    }
   }
 }
 
 export function isLikelyVideoUrl(url: string): boolean {
-  const clean = url.toLowerCase();
+  const clean = getCleanUrlPath(url);
 
   return (
-    clean.endsWith(".mp4") ||
-    clean.endsWith(".webm") ||
-    clean.endsWith(".mov") ||
-    clean.endsWith(".m4v") ||
-    clean.includes(".mp4?") ||
-    clean.includes(".webm?") ||
-    clean.includes(".mov?") ||
-    clean.includes(".m4v?")
+    (clean.startsWith("https://") || clean.startsWith("/")) &&
+    SUPPORTED_VIDEO_EXTENSIONS.some((extension) => clean.endsWith(extension))
   );
 }
 
 export function getVideoCompatibilityWarning(url: string): string | null {
-  const clean = url.toLowerCase();
+  const normalized = normalizeUrl(url);
+  const extension = getFileExtension(normalized);
 
-  if (!url.startsWith("https://")) {
+  if (!normalized.startsWith("https://") && !normalized.startsWith("/")) {
     return "Use a full public https:// media URL.";
   }
 
-  if (clean.endsWith(".mov") || clean.includes(".mov?")) {
-    return "MOV files can fail in some browsers. MP4/H.264/AAC is safer.";
+  if (!extension) {
+    return "Could not detect a video file extension.";
   }
 
-  if (clean.endsWith(".webm") || clean.includes(".webm?")) {
-    return "WEBM is okay in many browsers, but MP4/H.264/AAC is safer for wider support.";
+  if (
+    !SUPPORTED_VIDEO_EXTENSIONS.includes(
+      extension as (typeof SUPPORTED_VIDEO_EXTENSIONS)[number],
+    )
+  ) {
+    return "This file extension is not in the supported video list.";
   }
 
-  if (!isLikelyVideoUrl(url)) {
-    return "This URL does not clearly look like a direct video file.";
+  if (
+    !BROWSER_SAFE_VIDEO_EXTENSIONS.includes(
+      extension as (typeof BROWSER_SAFE_VIDEO_EXTENSIONS)[number],
+    )
+  ) {
+    return "This format may not play reliably in all browsers. MP4/H.264/AAC is recommended for launch.";
   }
 
   return null;
@@ -137,26 +242,34 @@ export function formatDurationClock(seconds: number): string {
 }
 
 function parseClockDuration(value: string): number {
-  const parts = value
-    .trim()
-    .split(":")
-    .map((part) => Number(part));
+  const rawParts = value.split(":").map((part) => part.trim());
+
+  if (rawParts.some((part) => part === "")) {
+    return 0;
+  }
+
+  const parts = rawParts.map(Number);
 
   if (parts.some((part) => !Number.isFinite(part) || part < 0)) {
     return 0;
   }
 
   if (parts.length === 3) {
-    const hours = parts[0] ?? 0;
-    const minutes = parts[1] ?? 0;
-    const seconds = parts[2] ?? 0;
+    const [hours = 0, minutes = 0, seconds = 0] = parts;
+
+    if (minutes > 59 || seconds > 59) {
+      return 0;
+    }
 
     return Math.round(hours * 3600 + minutes * 60 + seconds);
   }
 
   if (parts.length === 2) {
-    const minutes = parts[0] ?? 0;
-    const seconds = parts[1] ?? 0;
+    const [minutes = 0, seconds = 0] = parts;
+
+    if (seconds > 59) {
+      return 0;
+    }
 
     return Math.round(minutes * 60 + seconds);
   }
@@ -201,13 +314,13 @@ export function parseDurationList(value: string): number[] {
 export function parseBreakpoints(value: string, mediaDuration?: number): number[] {
   const maxDuration =
     typeof mediaDuration === "number" && Number.isFinite(mediaDuration)
-      ? mediaDuration
+      ? Math.max(1, Math.floor(mediaDuration))
       : Infinity;
 
   return Array.from(
     new Set(
       parseDurationList(value).filter(
-        (seconds) => seconds > 0 && seconds < maxDuration,
+        (seconds) => seconds >= 60 && seconds <= Math.max(0, maxDuration - 60),
       ),
     ),
   ).sort((a, b) => a - b);
@@ -255,64 +368,140 @@ export function sanitizeCommercialCategory(value: string): string | undefined {
   const clean = value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, "")
+    .replace(/[^a-z0-9-_\s]/g, "")
     .replace(/\s+/g, "-")
     .slice(0, 32);
 
   return clean || undefined;
 }
 
+/**
+ * Kept for compatibility with older UI code.
+ *
+ * Do not apply this automatically during media creation. Slot length should only
+ * be set when an admin explicitly chooses a preset or enters a slot length.
+ */
 export function getDefaultSlotLengthForDuration(
   duration: number,
   type: MediaType,
 ): number | undefined {
-  if (type === "commercial" || type === "bumper") {
+  if (type !== "show") {
     return undefined;
   }
 
-  if (duration <= 0) {
+  const safeDuration = normalizePositiveSecond(duration);
+
+  if (safeDuration <= 0) {
     return undefined;
   }
 
-  if (duration <= 30 * 60) {
+  if (safeDuration <= 30 * 60) {
     return 30 * 60;
   }
 
-  if (duration <= 60 * 60) {
+  if (safeDuration <= 60 * 60) {
     return 60 * 60;
   }
 
-  const block = 30 * 60;
-  return Math.ceil(duration / block) * block;
+  return undefined;
 }
 
 function inferMimeType(url: string): string | undefined {
-  const clean = url.toLowerCase();
+  const clean = getCleanUrlPath(url);
 
-  if (clean.includes(".mp4")) return "video/mp4";
-  if (clean.includes(".webm")) return "video/webm";
-  if (clean.includes(".mov")) return "video/quicktime";
-  if (clean.includes(".m4v")) return "video/x-m4v";
+  if (clean.endsWith(".mp4")) return "video/mp4";
+  if (clean.endsWith(".webm")) return "video/webm";
+  if (clean.endsWith(".mov")) return "video/quicktime";
+  if (clean.endsWith(".m4v")) return "video/x-m4v";
+  if (clean.endsWith(".mkv")) return "video/x-matroska";
 
   return undefined;
 }
 
 function inferProvider(url: string): MediaItem["provider"] {
-  const clean = url.toLowerCase();
+  const normalized = normalizeUrl(url);
+  const clean = normalized.toLowerCase();
 
   if (clean.includes(".r2.dev") || clean.includes("cloudflare")) {
     return "cloudflare-r2";
   }
 
-  if (url.startsWith("https://")) {
+  if (normalized.startsWith("https://") || normalized.startsWith("http://")) {
     return "external-url";
   }
 
-  if (url.startsWith("/")) {
+  if (normalized.startsWith("/")) {
     return "local-dev";
   }
 
   return "unknown";
+}
+
+function getOriginalNameFromUrl(url: string, fallbackTitle: string): string {
+  const normalized = normalizeUrl(url);
+  const cleanPath = normalized.split("?")[0] ?? normalized;
+  const lastPart = cleanPath.split("/").filter(Boolean).at(-1);
+
+  if (!lastPart) {
+    return fallbackTitle;
+  }
+
+  try {
+    return decodeURIComponent(lastPart);
+  } catch {
+    return lastPart;
+  }
+}
+
+function getSafeSlotLengthSeconds(
+  slotLengthSeconds: number | undefined,
+  duration: number,
+): number | undefined {
+  const slotLength = normalizePositiveSecond(slotLengthSeconds);
+
+  if (slotLength <= 0) {
+    return undefined;
+  }
+
+  /**
+   * Slot length must be deliberate and longer than the playable item.
+   * Equal/shorter slot lengths do nothing useful and can confuse guide math.
+   */
+  if (slotLength <= duration) {
+    return undefined;
+  }
+
+  return slotLength;
+}
+
+function getCleanBreakpoints(
+  breakpoints: number[] | undefined,
+  duration: number,
+): number[] {
+  const cleanBreakpoints = normalizeSecondList(breakpoints);
+
+  return Array.from(
+    new Set(
+      cleanBreakpoints.filter(
+        (seconds) => seconds >= 60 && seconds <= Math.max(0, duration - 60),
+      ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+function getCleanBreakDurations(
+  breakDurations: number[] | undefined,
+  breakpointCount: number,
+): number[] {
+  const cleanDurations = normalizeSecondList(breakDurations);
+
+  if (breakpointCount <= 0) {
+    return [];
+  }
+
+  return Array.from({ length: breakpointCount })
+    .map((_, index) => cleanDurations[index] ?? 0)
+    .filter((seconds) => seconds > 0);
 }
 
 export function createMediaItemFromUrl({
@@ -331,33 +520,53 @@ export function createMediaItemFromUrl({
   airStartTime,
 }: CreateMediaItemFromUrlInput): MediaItem {
   const cleanUrl = normalizeUrl(url);
-  const now = new Date().toISOString();
-  const safeDuration = Math.max(1, Math.floor(duration));
+  const safeDuration = Math.max(1, Math.floor(Number(duration) || 0));
   const cleanTitle = title?.trim() || inferNameFromUrl(cleanUrl) || "Untitled Media";
+  const cleanBreakpoints = isProgramType(type)
+    ? getCleanBreakpoints(breakpoints, safeDuration)
+    : [];
+  const cleanBreakDurations = isProgramType(type)
+    ? getCleanBreakDurations(breakDurations, cleanBreakpoints.length)
+    : [];
+  const cleanSlotLengthSeconds = isProgramType(type)
+    ? getSafeSlotLengthSeconds(slotLengthSeconds, safeDuration)
+    : undefined;
+  const normalizedAirStartTime =
+    isProgramType(type) && airStartTime
+      ? normalizeAirStartTime(airStartTime)
+      : undefined;
+  const now = getNowIso();
 
   return {
-    id: createId(),
+    id: createId(cleanTitle),
     title: cleanTitle,
     type,
     duration: safeDuration,
     file: cleanUrl,
     mimeType: inferMimeType(cleanUrl),
-    originalName: inferNameFromUrl(cleanUrl),
+    originalName: getOriginalNameFromUrl(cleanUrl, cleanTitle),
     provider: inferProvider(cleanUrl),
     createdAt: now,
     updatedAt: now,
 
-    breakpoints,
-    breakDurations,
-    slotLengthSeconds,
-    fillSlotWithCommercials,
+    breakpoints: cleanBreakpoints,
+    breakDurations: cleanBreakDurations,
+    slotLengthSeconds: cleanSlotLengthSeconds,
+    fillSlotWithCommercials:
+      isProgramType(type) && cleanSlotLengthSeconds
+        ? Boolean(fillSlotWithCommercials)
+        : false,
     commercialStrategy,
 
-    allowCommercialSlicing,
-    commercialCategory: sanitizeCommercialCategory(commercialCategory ?? ""),
+    allowCommercialSlicing: isCommercialType(type)
+      ? Boolean(allowCommercialSlicing)
+      : false,
+    commercialCategory:
+      isCommercialType(type) && commercialCategory
+        ? sanitizeCommercialCategory(commercialCategory)
+        : undefined,
 
-    airDays,
-    airStartTime: normalizeAirStartTime(airStartTime ?? ""),
+    airDays: isProgramType(type) ? sanitizeAirDays(airDays) : [],
+    airStartTime: normalizedAirStartTime,
   };
 }
-
