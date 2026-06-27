@@ -20,26 +20,32 @@ import { useStore } from "@/lib/store";
 import type { CommercialStrategy, MediaType, Weekday } from "@/lib/types";
 
 type ImportPreset =
-  | "cartoon"
-  | "sitcom"
-  | "drama"
+  | "clean-show"
+  | "cartoon-breaks"
+  | "sitcom-breaks"
+  | "drama-breaks"
   | "music-video"
-  | "commercial";
+  | "commercial"
+  | "bumper";
 
 type ImportSummary = {
   totalLines: number;
+  uniqueUrls: number;
   validUrls: number;
   invalidUrls: number;
   questionableUrls: number;
   duplicateLines: number;
   existingUrls: number;
+  importableUrls: number;
 };
 
-const DEFAULT_BROADCAST_DURATION = "22:00";
-const DEFAULT_BROADCAST_SLOT = "30:00";
-const DEFAULT_CARTOON_BREAKPOINTS = "7:30, 15:00";
-const DEFAULT_CARTOON_BREAK_DURATIONS = "2:00, 2:00";
+type Tone = "default" | "good" | "warn" | "danger";
+
+const DEFAULT_SHOW_DURATION = "22:00";
+const DEFAULT_MOVIE_DURATION = "90:00";
 const DEFAULT_MUSIC_VIDEO_DURATION = "4:00";
+const DEFAULT_COMMERCIAL_DURATION = "0:30";
+const DEFAULT_BUMPER_DURATION = "0:15";
 
 function normalizeInputLines(value: string): string[] {
   return value
@@ -57,13 +63,17 @@ function countDuplicateLines(value: string): number {
   return Math.max(0, lines.length - new Set(lines).size);
 }
 
-function isBroadcastType(type: MediaType): boolean {
+function isProgramType(type: MediaType): boolean {
   return (
     type === "show" ||
     type === "movie" ||
     type === "music" ||
     type === "music-video"
   );
+}
+
+function isSlotManagedProgramType(type: MediaType): boolean {
+  return type === "show" || type === "movie";
 }
 
 function isMusicType(type: MediaType): boolean {
@@ -75,11 +85,15 @@ function isCommercialType(type: MediaType): boolean {
 }
 
 function isValidAirStartTime(value: string): boolean {
-  if (!value.trim()) return true;
+  if (!value.trim()) {
+    return true;
+  }
 
   const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
 
-  if (!match) return false;
+  if (!match) {
+    return false;
+  }
 
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -103,7 +117,10 @@ function sortChannels<T extends { id: string; number?: number }>(channels: T[]):
       return aNumber - bNumber;
     }
 
-    return a.id.localeCompare(b.id);
+    return String(a.id).localeCompare(String(b.id), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 
@@ -127,22 +144,20 @@ function getTypeLabel(type: MediaType): string {
   return "Bumpers";
 }
 
-function createSummary({
-  totalLines,
-  validUrls,
-  invalidUrls,
-  questionableUrls,
-  duplicateLines,
-  existingUrls,
-}: ImportSummary): ImportSummary {
-  return {
-    totalLines,
-    validUrls,
-    invalidUrls,
-    questionableUrls,
-    duplicateLines,
-    existingUrls,
-  };
+function getImportTargetLabel(type: MediaType, channelId: string): string {
+  if (isCommercialType(type)) {
+    return "global ad inventory";
+  }
+
+  return `CH ${channelId}`;
+}
+
+function getDefaultDurationForType(type: MediaType): string {
+  if (type === "movie") return DEFAULT_MOVIE_DURATION;
+  if (type === "music" || type === "music-video") return DEFAULT_MUSIC_VIDEO_DURATION;
+  if (type === "commercial") return DEFAULT_COMMERCIAL_DURATION;
+  if (type === "bumper") return DEFAULT_BUMPER_DURATION;
+  return DEFAULT_SHOW_DURATION;
 }
 
 function getImportSlotLength({
@@ -164,7 +179,7 @@ function getImportSlotLength({
     return duration;
   }
 
-  if (parsedSlotLength > duration) {
+  if (fillSlotWithCommercials && parsedSlotLength > duration) {
     return parsedSlotLength;
   }
 
@@ -178,7 +193,7 @@ function SummaryPill({
 }: {
   label: string;
   value: string | number;
-  tone?: "default" | "good" | "warn" | "danger";
+  tone?: Tone;
 }) {
   const color =
     tone === "good"
@@ -240,26 +255,22 @@ export default function BulkImporterPanel() {
   const [type, setType] = useState<MediaType>("show");
   const [channelId, setChannelId] = useState(currentChannelId);
 
-  const [defaultDuration, setDefaultDuration] = useState(DEFAULT_BROADCAST_DURATION);
-  const [slotLengthInput, setSlotLengthInput] = useState(DEFAULT_BROADCAST_SLOT);
-  const [breakpointsInput, setBreakpointsInput] = useState(
-    DEFAULT_CARTOON_BREAKPOINTS,
-  );
-  const [breakDurationsInput, setBreakDurationsInput] = useState(
-    DEFAULT_CARTOON_BREAK_DURATIONS,
-  );
-  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(true);
+  const [defaultDuration, setDefaultDuration] = useState(DEFAULT_SHOW_DURATION);
+  const [slotLengthInput, setSlotLengthInput] = useState("");
+  const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
-  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
+  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(false);
   const [commercialCategory, setCommercialCategory] = useState("");
   const [skipExistingUrls, setSkipExistingUrls] = useState(true);
 
   const [airStartTime, setAirStartTime] = useState("");
   const [airDays, setAirDays] = useState<Weekday[]>([]);
   const [message, setMessage] = useState(
-    "Paste one Cloudflare/R2 public video URL per line.",
+    "Paste one public Cloudflare/R2 video URL per line.",
   );
 
   const rawLineCount = useMemo(() => normalizeInputLines(urls).length, [urls]);
@@ -340,34 +351,42 @@ export default function BulkImporterPanel() {
     [fillSlotWithCommercials, parsedDuration, parsedSlotLength, type],
   );
 
-  const importSummary = useMemo(
-    () =>
-      createSummary({
-        totalLines: rawLineCount,
-        validUrls: validUrls.length,
-        invalidUrls: invalidUrls.length,
-        questionableUrls: questionableUrls.length,
-        duplicateLines: duplicateLineCount,
-        existingUrls: existingUrls.length,
-      }),
+  const importSummary = useMemo<ImportSummary>(
+    () => ({
+      totalLines: rawLineCount,
+      uniqueUrls: lines.length,
+      validUrls: validUrls.length,
+      invalidUrls: invalidUrls.length,
+      questionableUrls: questionableUrls.length,
+      duplicateLines: duplicateLineCount,
+      existingUrls: existingUrls.length,
+      importableUrls: importableUrls.length,
+    }),
     [
       duplicateLineCount,
       existingUrls.length,
+      importableUrls.length,
       invalidUrls.length,
+      lines.length,
       questionableUrls.length,
       rawLineCount,
       validUrls.length,
     ],
   );
 
+  const channelSelectionRequired = isProgramType(type);
+  const hasValidDestination = !channelSelectionRequired || selectedChannelExists;
+  const slotSettingsValid =
+    !fillSlotWithCommercials ||
+    !isSlotManagedProgramType(type) ||
+    parsedSlotLength > parsedDuration;
+
   const canImport =
     importableUrls.length > 0 &&
     parsedDuration > 0 &&
-    selectedChannelExists &&
+    hasValidDestination &&
     isValidAirStartTime(airStartTime) &&
-    (!fillSlotWithCommercials ||
-      !isBroadcastType(type) ||
-      parsedSlotLength > parsedDuration);
+    slotSettingsValid;
 
   const toggleAirDay = (day: Weekday) => {
     setAirDays((current) =>
@@ -379,6 +398,7 @@ export default function BulkImporterPanel() {
 
   const selectEveryDay = () => {
     setAirDays([]);
+    setMessage("Air days cleared. Imported media will be eligible every day.");
   };
 
   const clearForm = () => {
@@ -387,7 +407,20 @@ export default function BulkImporterPanel() {
   };
 
   const applyPreset = (preset: ImportPreset) => {
-    if (preset === "cartoon") {
+    if (preset === "clean-show") {
+      setType("show");
+      setDefaultDuration(DEFAULT_SHOW_DURATION);
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("best-fit");
+      setMessage("Applied clean show preset. No automatic breaks or filler.");
+      return;
+    }
+
+    if (preset === "cartoon-breaks") {
       setType("show");
       setDefaultDuration("22:00");
       setSlotLengthInput("30:00");
@@ -396,11 +429,11 @@ export default function BulkImporterPanel() {
       setFillSlotWithCommercials(true);
       setAllowCommercialSlicing(false);
       setCommercialStrategy("best-fit");
-      setMessage("Applied 30-minute cartoon/anime bulk preset.");
+      setMessage("Applied intentional 30-minute cartoon/anime break preset.");
       return;
     }
 
-    if (preset === "sitcom") {
+    if (preset === "sitcom-breaks") {
       setType("show");
       setDefaultDuration("22:00");
       setSlotLengthInput("30:00");
@@ -409,11 +442,11 @@ export default function BulkImporterPanel() {
       setFillSlotWithCommercials(true);
       setAllowCommercialSlicing(false);
       setCommercialStrategy("best-fit");
-      setMessage("Applied 30-minute sitcom bulk preset.");
+      setMessage("Applied intentional 30-minute sitcom break preset.");
       return;
     }
 
-    if (preset === "drama") {
+    if (preset === "drama-breaks") {
       setType("show");
       setDefaultDuration("45:00");
       setSlotLengthInput("60:00");
@@ -422,74 +455,79 @@ export default function BulkImporterPanel() {
       setFillSlotWithCommercials(true);
       setAllowCommercialSlicing(false);
       setCommercialStrategy("best-fit");
-      setMessage("Applied 60-minute drama bulk preset.");
+      setMessage("Applied intentional 60-minute drama break preset.");
       return;
     }
 
     if (preset === "music-video") {
       setType("music-video");
       setDefaultDuration(DEFAULT_MUSIC_VIDEO_DURATION);
-      setSlotLengthInput(DEFAULT_MUSIC_VIDEO_DURATION);
-      setBreakpointsInput("");
-      setBreakDurationsInput("");
-      setFillSlotWithCommercials(false);
-      setAllowCommercialSlicing(false);
-      setCommercialStrategy("sequential");
-      setMessage("Applied music-video bulk preset with song-length slots.");
-      return;
-    }
-
-    setType("commercial");
-    setDefaultDuration("2:00");
-    setSlotLengthInput("");
-    setBreakpointsInput("");
-    setBreakDurationsInput("");
-    setFillSlotWithCommercials(false);
-    setAllowCommercialSlicing(true);
-    setCommercialStrategy("best-fit");
-    setMessage("Applied 2-minute commercial bulk preset.");
-  };
-
-  const handleTypeChange = (nextType: MediaType) => {
-    setType(nextType);
-
-    if (isCommercialType(nextType)) {
-      setDefaultDuration(nextType === "bumper" ? "0:15" : "2:00");
       setSlotLengthInput("");
       setBreakpointsInput("");
       setBreakDurationsInput("");
       setFillSlotWithCommercials(false);
-      setAllowCommercialSlicing(true);
-      setMessage(`${getTypeLabel(nextType)} mode selected.`);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("sequential");
+      setMessage("Applied music-video preset with song-length playback.");
+      return;
+    }
+
+    if (preset === "bumper") {
+      setType("bumper");
+      setDefaultDuration(DEFAULT_BUMPER_DURATION);
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setCommercialStrategy("best-fit");
+      setMessage("Applied bumper preset. Bumpers import as global ad inventory.");
+      return;
+    }
+
+    setType("commercial");
+    setDefaultDuration(DEFAULT_COMMERCIAL_DURATION);
+    setSlotLengthInput("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setFillSlotWithCommercials(false);
+    setAllowCommercialSlicing(false);
+    setCommercialStrategy("best-fit");
+    setMessage("Applied commercial preset. Ads import as global ad inventory.");
+  };
+
+  const handleTypeChange = (nextType: MediaType) => {
+    setType(nextType);
+    setDefaultDuration(getDefaultDurationForType(nextType));
+
+    if (isCommercialType(nextType)) {
+      setSlotLengthInput("");
+      setBreakpointsInput("");
+      setBreakDurationsInput("");
+      setFillSlotWithCommercials(false);
+      setAllowCommercialSlicing(false);
+      setMessage(`${getTypeLabel(nextType)} mode selected. It will import into global ad inventory.`);
       return;
     }
 
     if (isMusicType(nextType)) {
-      setDefaultDuration(DEFAULT_MUSIC_VIDEO_DURATION);
-      setSlotLengthInput(DEFAULT_MUSIC_VIDEO_DURATION);
+      setSlotLengthInput("");
       setBreakpointsInput("");
       setBreakDurationsInput("");
       setFillSlotWithCommercials(false);
       setAllowCommercialSlicing(false);
       setCommercialStrategy("sequential");
-      setMessage(`${getTypeLabel(nextType)} mode selected with song-length slots.`);
+      setMessage(`${getTypeLabel(nextType)} mode selected with clean song-length playback.`);
       return;
     }
 
+    setSlotLengthInput("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setFillSlotWithCommercials(false);
     setAllowCommercialSlicing(false);
-
-    if (parsedDuration > 0 && !slotLengthInput.trim()) {
-      const nextDefaultSlot = getDefaultSlotLengthForDuration(
-        parsedDuration,
-        nextType,
-      );
-
-      if (nextDefaultSlot) {
-        setSlotLengthInput(formatDurationClock(nextDefaultSlot));
-      }
-    }
-
-    setMessage(`${getTypeLabel(nextType)} mode selected.`);
+    setCommercialStrategy("best-fit");
+    setMessage(`${getTypeLabel(nextType)} mode selected. Clean import defaults are active.`);
   };
 
   const importAll = () => {
@@ -507,13 +545,13 @@ export default function BulkImporterPanel() {
       return;
     }
 
-    if (!selectedChannelExists) {
+    if (!hasValidDestination) {
       setMessage("Select a valid enabled channel first.");
       return;
     }
 
     if (parsedDuration <= 0) {
-      setMessage("Set a default duration first. Example: 22:00.");
+      setMessage("Set a valid default duration first. Example: 22:00.");
       return;
     }
 
@@ -522,12 +560,8 @@ export default function BulkImporterPanel() {
       return;
     }
 
-    if (
-      isBroadcastType(type) &&
-      fillSlotWithCommercials &&
-      parsedSlotLength <= parsedDuration
-    ) {
-      setMessage("Slot length must be longer than runtime. Example: 30:00.");
+    if (!slotSettingsValid) {
+      setMessage("Slot length must be longer than runtime when slot filler is enabled.");
       return;
     }
 
@@ -557,6 +591,7 @@ export default function BulkImporterPanel() {
 
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime);
     const cleanCommercialCategory = sanitizeCommercialCategory(commercialCategory);
+    const commercialImport = isCommercialType(type);
 
     const imported = importableUrls.map((url) =>
       createMediaItemFromUrl({
@@ -564,35 +599,40 @@ export default function BulkImporterPanel() {
         type,
         duration: parsedDuration,
 
-        breakpoints: isBroadcastType(type) ? parsedBreakpoints : [],
-        breakDurations: isBroadcastType(type) ? parsedBreakDurations : [],
-        slotLengthSeconds: effectiveSlotLength,
-        fillSlotWithCommercials: isBroadcastType(type)
+        breakpoints: isSlotManagedProgramType(type) ? parsedBreakpoints : [],
+        breakDurations: isSlotManagedProgramType(type) ? parsedBreakDurations : [],
+        slotLengthSeconds:
+          isSlotManagedProgramType(type) && effectiveSlotLength > parsedDuration
+            ? effectiveSlotLength
+            : undefined,
+        fillSlotWithCommercials: isSlotManagedProgramType(type)
           ? fillSlotWithCommercials
           : false,
         commercialStrategy,
 
-        allowCommercialSlicing: isCommercialType(type)
-          ? allowCommercialSlicing
-          : false,
-        commercialCategory: isCommercialType(type)
-          ? cleanCommercialCategory
-          : undefined,
+        allowCommercialSlicing: commercialImport ? allowCommercialSlicing : false,
+        commercialCategory: commercialImport ? cleanCommercialCategory : undefined,
 
-        airDays,
-        airStartTime: normalizedAirStartTime,
+        airDays: commercialImport ? [] : airDays,
+        airStartTime: commercialImport ? "" : normalizedAirStartTime,
       }),
     );
 
     imported.forEach((item) => {
       addMedia(item);
-      assignMediaToChannel(channelId, item.id);
+
+      if (!commercialImport) {
+        assignMediaToChannel(channelId, item.id);
+      }
     });
 
     setMessage(
-      `Imported ${imported.length} ${getTypeLabel(type).toLowerCase()} to CH ${channelId}. Runtime: ${formatDuration(
-        parsedDuration,
-      )}. Existing skipped: ${skipExistingUrls ? existingUrls.length : 0}.`,
+      `Imported ${imported.length} ${getTypeLabel(type).toLowerCase()} to ${getImportTargetLabel(
+        type,
+        channelId,
+      )}. Runtime: ${formatDuration(parsedDuration)}. Existing skipped: ${
+        skipExistingUrls ? existingUrls.length : 0
+      }.`,
     );
 
     setUrls("");
@@ -601,9 +641,7 @@ export default function BulkImporterPanel() {
   return (
     <section
       className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
-      style={{
-        color: "var(--text)",
-      }}
+      style={{ color: "var(--text)" }}
     >
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
@@ -615,38 +653,46 @@ export default function BulkImporterPanel() {
           </div>
 
           <h2 className="mt-1 text-base font-black tracking-tight">
-            Bulk R2 URL Import
+            Safe Bulk R2 URL Import
           </h2>
 
           <p
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Add many videos quickly using one public R2 URL per line. Best for
-            loading full seasons, complete channels, music-video blocks,
-            commercial pools, and bumper packs.
+            Paste one public R2/video URL per line. Shows and movies import clean
+            by default. Commercials and bumpers import as global ad inventory,
+            not as normal channel playlist items.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <PresetButton label="30m Cartoon" onClick={() => applyPreset("cartoon")} />
-          <PresetButton label="30m Sitcom" onClick={() => applyPreset("sitcom")} />
-          <PresetButton label="60m Drama" onClick={() => applyPreset("drama")} />
+          <PresetButton label="Clean Show" onClick={() => applyPreset("clean-show")} />
+          <PresetButton label="Cartoon Breaks" onClick={() => applyPreset("cartoon-breaks")} />
+          <PresetButton label="Sitcom Breaks" onClick={() => applyPreset("sitcom-breaks")} />
+          <PresetButton label="Drama Breaks" onClick={() => applyPreset("drama-breaks")} />
           <PresetButton label="Music Video" onClick={() => applyPreset("music-video")} />
-          <PresetButton label="2m Ads" onClick={() => applyPreset("commercial")} />
+          <PresetButton label="Commercial" onClick={() => applyPreset("commercial")} />
+          <PresetButton label="Bumper" onClick={() => applyPreset("bumper")} />
         </div>
       </div>
 
       <div className="grid gap-3">
         <div
-          className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+          className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8"
           style={{
             background: "var(--panel-alt-bg)",
             borderColor: "var(--border)",
           }}
         >
           <SummaryPill label="Lines" value={importSummary.totalLines} />
+          <SummaryPill label="Unique" value={importSummary.uniqueUrls} />
           <SummaryPill label="Valid" value={importSummary.validUrls} tone="good" />
+          <SummaryPill
+            label="Importable"
+            value={importSummary.importableUrls}
+            tone={importSummary.importableUrls > 0 ? "good" : "warn"}
+          />
           <SummaryPill
             label="Invalid"
             value={importSummary.invalidUrls}
@@ -705,10 +751,14 @@ export default function BulkImporterPanel() {
           <select
             value={channelId}
             onChange={(event) => setChannelId(event.target.value)}
-            className="rounded-xl border px-3 py-3 text-base sm:text-sm"
+            disabled={isCommercialType(type)}
+            className="rounded-xl border px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
-              borderColor: selectedChannelExists ? "var(--border)" : "#f87171",
+              borderColor:
+                selectedChannelExists || isCommercialType(type)
+                  ? "var(--border)"
+                  : "#f87171",
               color: "var(--text)",
             }}
           >
@@ -738,8 +788,9 @@ export default function BulkImporterPanel() {
             onChange={(event) =>
               setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
             }
+            disabled={isCommercialType(type)}
             placeholder="Air time/order, 16:00"
-            className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+            className="rounded-xl border px-3 py-3 text-base outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: isValidAirStartTime(airStartTime)
@@ -750,7 +801,7 @@ export default function BulkImporterPanel() {
           />
         </div>
 
-        {isBroadcastType(type) ? (
+        {isSlotManagedProgramType(type) ? (
           <div
             className="rounded-2xl border p-3"
             style={{
@@ -762,8 +813,17 @@ export default function BulkImporterPanel() {
               className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
               style={{ color: "var(--primary)" }}
             >
-              Broadcast Slot Settings
+              Optional Broadcast Break Settings
             </div>
+
+            <p
+              className="mb-3 text-xs leading-5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Leave these blank for clean full-program playback. Only add
+              breakpoints when you intentionally want classic TV-style mid-roll
+              breaks.
+            </p>
 
             <div className="grid gap-3 lg:grid-cols-3">
               <input
@@ -771,7 +831,7 @@ export default function BulkImporterPanel() {
                 onChange={(event) =>
                   setSlotLengthInput(event.target.value.replace(/[^\d:.]/g, ""))
                 }
-                placeholder="Slot length, 30:00"
+                placeholder="Optional slot length, 30:00"
                 className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                 style={{
                   background: "var(--panel-bg)",
@@ -790,7 +850,7 @@ export default function BulkImporterPanel() {
                     event.target.value.replace(/[^\d:.,\s]/g, ""),
                   )
                 }
-                placeholder="Breakpoints: 7:30, 15:00"
+                placeholder="Optional breaks: 7:30, 15:00"
                 className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                 style={{
                   background: "var(--panel-bg)",
@@ -806,7 +866,7 @@ export default function BulkImporterPanel() {
                     event.target.value.replace(/[^\d:.,\s]/g, ""),
                   )
                 }
-                placeholder="Ad blocks: 2:00, 2:00"
+                placeholder="Optional ad blocks: 2:00, 2:00"
                 className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                 style={{
                   background: "var(--panel-bg)",
@@ -867,8 +927,17 @@ export default function BulkImporterPanel() {
               className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
               style={{ color: "var(--primary)" }}
             >
-              Commercial Pool Settings
+              Global Ad Inventory Settings
             </div>
+
+            <p
+              className="mb-3 text-xs leading-5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Commercials and bumpers are saved to the media library only. They
+              are not assigned into channel playlists, which keeps live channels
+              clean and lets the scheduler insert ads properly.
+            </p>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label
@@ -925,48 +994,50 @@ export default function BulkImporterPanel() {
                 style={{ color: "var(--text-muted)" }}
               >
                 Prevents accidental duplicate imports when re-pasting a season,
-                music-video pack, or commercial folder.
+                music-video pack, commercial reel, or bumper folder.
               </span>
             </span>
           </label>
         </div>
 
-        <div>
-          <div
-            className="mb-2 flex items-center justify-between gap-2 text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <span>Air Days</span>
-            <button
-              type="button"
-              onClick={selectEveryDay}
-              className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+        {!isCommercialType(type) ? (
+          <div>
+            <div
+              className="mb-2 flex items-center justify-between gap-2 text-xs"
+              style={{ color: "var(--text-muted)" }}
             >
-              Every Day
-            </button>
-          </div>
+              <span>Air Days</span>
+              <button
+                type="button"
+                onClick={selectEveryDay}
+                className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+              >
+                Every Day
+              </button>
+            </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {WEEKDAYS.map((day) => {
-              const active = airDays.includes(day.id);
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAYS.map((day) => {
+                const active = airDays.includes(day.id);
 
-              return (
-                <button
-                  key={day.id}
-                  type="button"
-                  onClick={() => toggleAirDay(day.id)}
-                  className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
-                  style={{
-                    background: active ? "var(--primary)" : "var(--button-bg)",
-                    color: "var(--text)",
-                  }}
-                >
-                  {day.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => toggleAirDay(day.id)}
+                    className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+                    style={{
+                      background: active ? "var(--primary)" : "var(--button-bg)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {day.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div
           className="rounded-2xl border px-3 py-3 text-xs leading-5"
@@ -978,8 +1049,9 @@ export default function BulkImporterPanel() {
         >
           <span style={{ color: "var(--text)" }}>Import Summary:</span>{" "}
           {validUrls.length} valid / {lines.length} unique URLs • Importable:{" "}
-          {importableUrls.length} • Existing: {existingUrls.length} • Invalid:{" "}
-          {invalidUrls.length} • Questionable: {questionableUrls.length} •
+          {importableUrls.length} • Destination:{" "}
+          {getImportTargetLabel(type, channelId)} • Existing: {existingUrls.length} •
+          Invalid: {invalidUrls.length} • Questionable: {questionableUrls.length} •
           Duplicates removed: {duplicateLineCount} • Duration:{" "}
           {parsedDuration > 0 ? formatDuration(parsedDuration) : "unset"} •
           Slot:{" "}
