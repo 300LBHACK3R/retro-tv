@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useStore } from "@/lib/store";
 import type { Channel } from "@/lib/types";
 
@@ -18,6 +18,7 @@ type ChannelOverlayModel = {
   accent: string;
   initials: string;
   description: string;
+  logoUrl: string;
   revealKey: string;
 };
 
@@ -25,6 +26,7 @@ const DEFAULT_ACCENT = "#22d3ee";
 const DEFAULT_AUTO_HIDE_MS = 3200;
 const MIN_AUTO_HIDE_MS = 900;
 const MAX_AUTO_HIDE_MS = 12_000;
+const MAX_LOGO_URL_LENGTH = 500;
 
 function getChannelLabel(channel: Channel): string {
   return `CH ${channel.number ?? channel.id}`;
@@ -65,6 +67,30 @@ function getSafeAccentColor(channel: Channel): string {
   return DEFAULT_ACCENT;
 }
 
+function normalizeLogoUrl(value: string | undefined): string {
+  const clean = (value ?? "").trim().slice(0, MAX_LOGO_URL_LENGTH);
+
+  if (!clean) {
+    return "";
+  }
+
+  if (clean.startsWith("/") && !clean.startsWith("//")) {
+    return clean;
+  }
+
+  try {
+    const url = new URL(clean);
+
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return url.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
 function createSubtitleParts(channel: Channel): string[] {
   return [getOverlayCallsign(channel), getChannelLabel(channel), "Live"];
 }
@@ -100,16 +126,18 @@ function createOverlayModel(channel: Channel): ChannelOverlayModel {
   const channelLabel = getChannelLabel(channel);
   const accent = getSafeAccentColor(channel);
   const description = getOverlayDescription(channel);
+  const logoUrl = normalizeLogoUrl(channel.branding?.logoUrl);
 
   return {
     title,
     channelName,
     callsign,
     channelLabel,
-    subtitleParts: [callsign, channelLabel, "Live"],
+    subtitleParts: createSubtitleParts(channel),
     accent,
-    initials: getInitials(title),
+    initials: getInitials(callsign || title),
     description,
+    logoUrl,
     revealKey: [
       channel.id,
       channel.number ?? "",
@@ -119,8 +147,77 @@ function createOverlayModel(channel: Channel): ChannelOverlayModel {
       channelLabel,
       accent,
       description,
+      logoUrl,
     ].join("|"),
   };
+}
+
+function getOverlayShellStyle(accent: string): CSSProperties {
+  return {
+    background:
+      "radial-gradient(circle at top left, rgba(255,255,255,0.16), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.90), rgba(0,0,0,0.60))",
+    borderColor: accent,
+    boxShadow: `0 0 24px ${accent}3d, 0 18px 55px rgba(0,0,0,0.46)`,
+  };
+}
+
+function getLogoShellStyle(accent: string): CSSProperties {
+  return {
+    background: `radial-gradient(circle at 30% 20%, rgba(255,255,255,0.32), transparent 34%), ${accent}`,
+    boxShadow: `0 0 18px ${accent}80`,
+  };
+}
+
+function ChannelLogo({
+  overlay,
+  compact,
+}: {
+  overlay: ChannelOverlayModel;
+  compact: boolean;
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [overlay.logoUrl]);
+
+  const sizeClass = compact ? "h-8 w-8 text-[10px]" : "h-10 w-10 text-[11px]";
+
+  if (overlay.logoUrl && !logoFailed) {
+    return (
+      <div
+        className={[
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black/45 shadow-2xl",
+          sizeClass,
+        ].join(" ")}
+        style={{
+          border: `1px solid ${overlay.accent}88`,
+          boxShadow: `0 0 18px ${overlay.accent}80`,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={overlay.logoUrl}
+          alt=""
+          className="h-full w-full object-contain p-1"
+          draggable={false}
+          onError={() => setLogoFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={[
+        "flex shrink-0 items-center justify-center rounded-xl font-black uppercase text-white shadow-2xl",
+        sizeClass,
+      ].join(" ")}
+      style={getLogoShellStyle(overlay.accent)}
+    >
+      {overlay.initials}
+    </div>
+  );
 }
 
 export default function ChannelOverlay({
@@ -193,12 +290,7 @@ export default function ChannelOverlay({
           "sm:max-w-[min(34rem,calc(100%-2rem))]",
           compact ? "px-2.5 py-2" : "px-3 py-3 sm:px-3.5",
         ].join(" ")}
-        style={{
-          background:
-            "radial-gradient(circle at top left, rgba(255,255,255,0.16), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.88), rgba(0,0,0,0.58))",
-          borderColor: overlay.accent,
-          boxShadow: `0 0 24px ${overlay.accent}3d, 0 18px 55px rgba(0,0,0,0.46)`,
-        }}
+        style={getOverlayShellStyle(overlay.accent)}
       >
         <div
           className="absolute inset-x-0 top-0 h-px"
@@ -208,18 +300,7 @@ export default function ChannelOverlay({
         />
 
         <div className="flex items-center gap-2.5">
-          <div
-            className={[
-              "flex shrink-0 items-center justify-center rounded-xl font-black uppercase text-white shadow-2xl",
-              compact ? "h-8 w-8 text-[10px]" : "h-10 w-10 text-[11px]",
-            ].join(" ")}
-            style={{
-              background: `radial-gradient(circle at 30% 20%, rgba(255,255,255,0.32), transparent 34%), ${overlay.accent}`,
-              boxShadow: `0 0 18px ${overlay.accent}80`,
-            }}
-          >
-            {overlay.initials}
-          </div>
+          <ChannelLogo overlay={overlay} compact={compact} />
 
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
