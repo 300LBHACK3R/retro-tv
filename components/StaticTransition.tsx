@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 
 interface StaticTransitionProps {
@@ -8,32 +8,54 @@ interface StaticTransitionProps {
   durationMs?: number;
 }
 
+const MIN_TRANSITION_MS = 80;
+const DEFAULT_TRANSITION_MS = 180;
+
+function getSafeDuration(durationMs: number): number {
+  const duration = Math.floor(Number(durationMs));
+
+  if (!Number.isFinite(duration)) {
+    return DEFAULT_TRANSITION_MS;
+  }
+
+  return Math.max(MIN_TRANSITION_MS, duration);
+}
+
 export default function StaticTransition({
   trigger,
-  durationMs = 180,
+  durationMs = DEFAULT_TRANSITION_MS,
 }: StaticTransitionProps) {
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
 
   const [visible, setVisible] = useState(false);
+  const [pulseKey, setPulseKey] = useState(0);
   const timerRef = useRef<number | null>(null);
 
+  const safeDurationMs = useMemo(
+    () => getSafeDuration(durationMs),
+    [durationMs],
+  );
+
   useEffect(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     if (!trigger || preferReducedMotion) {
+      setVisible(false);
       return;
     }
 
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-    }
-
     setVisible(true);
+    setPulseKey((current) => current + 1);
 
     timerRef.current = window.setTimeout(() => {
       setVisible(false);
       timerRef.current = null;
-    }, Math.max(80, durationMs));
+    }, safeDurationMs);
 
     return () => {
       if (timerRef.current) {
@@ -41,7 +63,7 @@ export default function StaticTransition({
         timerRef.current = null;
       }
     };
-  }, [trigger, durationMs, preferReducedMotion]);
+  }, [preferReducedMotion, safeDurationMs, trigger]);
 
   if (!visible) {
     return null;
@@ -49,7 +71,8 @@ export default function StaticTransition({
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-inherit"
+      key={pulseKey}
+      className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-[inherit]"
       aria-hidden="true"
     >
       <div
@@ -57,7 +80,7 @@ export default function StaticTransition({
         style={{
           background:
             "linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)",
-          animation: "ttv-signal-sweep 180ms ease-out forwards",
+          animation: `ttv-signal-sweep ${safeDurationMs}ms ease-out forwards`,
           mixBlendMode: "screen",
         }}
       />
