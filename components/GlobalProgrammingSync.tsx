@@ -26,8 +26,16 @@ type SaveProgrammingResponse = {
   ok?: boolean;
   data?: {
     updatedAt?: string;
+    programming?: ProgrammingSnapshot;
   };
+  programming?: ProgrammingSnapshot;
   error?: string;
+};
+
+type StatusTone = {
+  borderColor: string;
+  color: string;
+  dotColor: string;
 };
 
 const AUTO_SAVE_DEBOUNCE_MS = 900;
@@ -60,7 +68,7 @@ async function fetchWithTimeout(
   try {
     return await fetch(input, {
       ...init,
-      signal: init.signal ?? controller.signal,
+      signal: controller.signal,
     });
   } finally {
     window.clearTimeout(timeout);
@@ -85,11 +93,20 @@ function createSnapshotSignature(snapshot: ProgrammingSnapshot): string {
   });
 }
 
-function getStatusTone(status: SyncStatus): {
-  borderColor: string;
-  color: string;
-  dotColor: string;
-} {
+function getSavedAtFromResponse(
+  response: SaveProgrammingResponse | null,
+  snapshot: ProgrammingSnapshot,
+): string {
+  return (
+    response?.data?.updatedAt ??
+    response?.data?.programming?.updatedAt ??
+    response?.programming?.updatedAt ??
+    snapshot.updatedAt ??
+    new Date().toISOString()
+  );
+}
+
+function getStatusTone(status: SyncStatus): StatusTone {
   if (status === "error") {
     return {
       borderColor: "rgba(248,113,113,0.5)",
@@ -157,17 +174,17 @@ export default function GlobalProgrammingSync({
 
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [message, setMessage] = useState("Starting sync");
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
-  const hasHydratedRef = useRef(false);
-  const skipNextSaveRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
-  const lastSavedAtRef = useRef<string | null>(null);
+  const mountedRef = useRef(false);
+
   const lastSavedSignatureRef = useRef<string | null>(null);
   const lastQueuedSignatureRef = useRef<string | null>(null);
-  const mountedRef = useRef(true);
 
   const clearSaveTimer = useCallback(() => {
     if (saveTimerRef.current) {
@@ -183,6 +200,15 @@ export default function GlobalProgrammingSync({
     }
   }, []);
 
+  const markLoaded = useCallback((nextMessage = "Global sync active") => {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    setStatus("loaded");
+    setMessage(nextMessage);
+  }, []);
+
   const saveProgramming = useCallback(
     async (reason: "auto" | "manual" = "auto") => {
       if (!isAdminAuthorized) {
@@ -190,9 +216,13 @@ export default function GlobalProgrammingSync({
       }
 
       if (!window.navigator.onLine) {
-        setStatus("offline");
-        setMessage("Offline / save paused");
         pendingSaveRef.current = true;
+
+        if (mountedRef.current) {
+          setStatus("offline");
+          setMessage("Offline / save paused");
+        }
+
         return;
       }
 
@@ -200,8 +230,7 @@ export default function GlobalProgrammingSync({
       const signature = createSnapshotSignature(snapshot);
 
       if (reason === "auto" && signature === lastSavedSignatureRef.current) {
-        setStatus("loaded");
-        setMessage("Global sync active");
+        markLoaded();
         return;
       }
 
@@ -216,12 +245,15 @@ export default function GlobalProgrammingSync({
         pendingSaveRef.current = false;
         lastQueuedSignatureRef.current = signature;
 
+        clearSaveTimer();
         clearResetTimer();
 
-        setStatus("saving");
-        setMessage(
-          reason === "manual" ? "Saving now" : "Saving global programming",
-        );
+        if (mountedRef.current) {
+          setStatus("saving");
+          setMessage(
+            reason === "manual" ? "Saving now" : "Saving global programming",
+          );
+        }
 
         const response = await fetchWithTimeout("/api/admin/programming", {
           method: "PUT",
@@ -243,45 +275,56 @@ export default function GlobalProgrammingSync({
           return;
         }
 
-        const savedAt = data.data?.updatedAt ?? new Date().toISOString();
+        const savedAt = getSavedAtFromResponse(data, snapshot);
 
-        lastSavedAtRef.current = savedAt;
         lastSavedSignatureRef.current = signature;
+        lastQueuedSignatureRef.current = signature;
 
+        setLastSavedAt(savedAt);
         setStatus("saved");
         setMessage(createStatusMessage("Global saved", snapshot));
 
         resetTimerRef.current = window.setTimeout(() => {
-          if (mountedRef.current) {
-            setStatus("loaded");
-            setMessage("Global sync active");
-          }
+          markLoaded();
         }, SAVED_MESSAGE_RESET_MS);
       } catch (error) {
         console.error("Failed to save global programming:", error);
 
+        pendingSaveRef.current = true;
+
         if (mountedRef.current) {
-          setStatus("error");
-          setMessage(getErrorMessage(error, "Global save failed"));
+          setStatus(window.navigator.onLine ? "error" : "offline");
+          setMessage(
+            window.navigator.onLine
+              ? getErrorMessage(error, "Global save failed")
+              : "Offline / save paused",
+          );
         }
       } finally {
         isSavingRef.current = false;
 
-        if (pendingSaveRef.current && mountedRef.current) {
+        if (pendingSaveRef.current && mountedRef.current && window.navigator.onLine) {
           pendingSaveRef.current = false;
           void saveProgramming("auto");
         }
       }
     },
-    [clearResetTimer, exportProgrammingSnapshot, isAdminAuthorized],
+    [
+      clearResetTimer,
+      clearSaveTimer,
+      exportProgrammingSnapshot,
+      isAdminAuthorized,
+      markLoaded,
+    ],
   );
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const abortController = new AbortController();
+    let cancelled = false;
 
     const loadProgramming = async () => {
+      setIsHydrated(false);
       setStatus("loading");
       setMessage("Loading global programming");
 
@@ -289,12 +332,11 @@ export default function GlobalProgrammingSync({
         const response = await fetchWithTimeout("/api/programming", {
           cache: "no-store",
           credentials: "same-origin",
-          signal: abortController.signal,
         });
 
         const data = await readJsonSafe<ProgrammingApiResponse>(response);
 
-        if (abortController.signal.aborted) {
+        if (cancelled || !mountedRef.current) {
           return;
         }
 
@@ -303,38 +345,45 @@ export default function GlobalProgrammingSync({
         }
 
         if (data.programming) {
-          skipNextSaveRef.current = true;
+          const signature = createSnapshotSignature(data.programming);
 
           replaceProgramming(data.programming);
 
-          const signature = createSnapshotSignature(data.programming);
-
-          hasHydratedRef.current = true;
-          lastSavedAtRef.current = data.programming.updatedAt;
           lastSavedSignatureRef.current = signature;
           lastQueuedSignatureRef.current = signature;
 
+          setLastSavedAt(data.programming.updatedAt ?? null);
+          setIsHydrated(true);
           setStatus("loaded");
           setMessage(createStatusMessage("Global loaded", data.programming));
           return;
         }
 
         const localSnapshot = exportProgrammingSnapshot();
+        const localSignature = createSnapshotSignature(localSnapshot);
 
-        hasHydratedRef.current = true;
-        lastSavedSignatureRef.current = createSnapshotSignature(localSnapshot);
-        lastQueuedSignatureRef.current = lastSavedSignatureRef.current;
+        lastSavedSignatureRef.current = localSignature;
+        lastQueuedSignatureRef.current = localSignature;
 
+        setLastSavedAt(localSnapshot.updatedAt ?? null);
+        setIsHydrated(true);
         setStatus("fallback");
         setMessage("Using local/default programming");
       } catch (error) {
-        if (abortController.signal.aborted) {
+        if (cancelled || !mountedRef.current) {
           return;
         }
 
         console.error("Failed to load global programming:", error);
 
-        hasHydratedRef.current = true;
+        const localSnapshot = exportProgrammingSnapshot();
+        const localSignature = createSnapshotSignature(localSnapshot);
+
+        lastSavedSignatureRef.current = localSignature;
+        lastQueuedSignatureRef.current = localSignature;
+
+        setLastSavedAt(localSnapshot.updatedAt ?? null);
+        setIsHydrated(true);
         setStatus(window.navigator.onLine ? "error" : "offline");
         setMessage(
           window.navigator.onLine
@@ -347,43 +396,49 @@ export default function GlobalProgrammingSync({
     void loadProgramming();
 
     return () => {
-      abortController.abort();
+      cancelled = true;
       mountedRef.current = false;
     };
   }, [exportProgrammingSnapshot, replaceProgramming]);
 
   useEffect(() => {
-    if (!isAdminAuthorized || !hasHydratedRef.current) {
+    if (!isAdminAuthorized || !isHydrated) {
       return;
     }
 
     const unsubscribe = useStore.subscribe(() => {
-      if (skipNextSaveRef.current) {
-        skipNextSaveRef.current = false;
-        return;
+      try {
+        const snapshot = exportProgrammingSnapshot();
+        const signature = createSnapshotSignature(snapshot);
+
+        if (
+          signature === lastSavedSignatureRef.current ||
+          signature === lastQueuedSignatureRef.current
+        ) {
+          return;
+        }
+
+        lastQueuedSignatureRef.current = signature;
+
+        clearSaveTimer();
+        clearResetTimer();
+
+        if (mountedRef.current) {
+          setStatus("dirty");
+          setMessage("Unsaved programming changes");
+        }
+
+        saveTimerRef.current = window.setTimeout(() => {
+          void saveProgramming("auto");
+        }, AUTO_SAVE_DEBOUNCE_MS);
+      } catch (error) {
+        console.error("Failed to queue global programming save:", error);
+
+        if (mountedRef.current) {
+          setStatus("error");
+          setMessage(getErrorMessage(error, "Could not queue global save"));
+        }
       }
-
-      const snapshot = exportProgrammingSnapshot();
-      const signature = createSnapshotSignature(snapshot);
-
-      if (
-        signature === lastSavedSignatureRef.current ||
-        signature === lastQueuedSignatureRef.current
-      ) {
-        return;
-      }
-
-      lastQueuedSignatureRef.current = signature;
-
-      clearSaveTimer();
-      clearResetTimer();
-
-      setStatus("dirty");
-      setMessage("Unsaved programming changes");
-
-      saveTimerRef.current = window.setTimeout(() => {
-        void saveProgramming("auto");
-      }, AUTO_SAVE_DEBOUNCE_MS);
     });
 
     return () => {
@@ -396,27 +451,34 @@ export default function GlobalProgrammingSync({
     clearSaveTimer,
     exportProgrammingSnapshot,
     isAdminAuthorized,
+    isHydrated,
     saveProgramming,
   ]);
 
   useEffect(() => {
     const handleOnline = () => {
+      if (!mountedRef.current) {
+        return;
+      }
+
       if (pendingSaveRef.current && isAdminAuthorized) {
+        pendingSaveRef.current = false;
         void saveProgramming("auto");
         return;
       }
 
-      if (mountedRef.current && status === "offline") {
-        setStatus("loaded");
-        setMessage("Global sync active");
+      if (status === "offline") {
+        markLoaded();
       }
     };
 
     const handleOffline = () => {
-      if (mountedRef.current) {
-        setStatus("offline");
-        setMessage("Offline / sync paused");
+      if (!mountedRef.current) {
+        return;
       }
+
+      setStatus("offline");
+      setMessage("Offline / sync paused");
     };
 
     window.addEventListener("online", handleOnline);
@@ -426,7 +488,7 @@ export default function GlobalProgrammingSync({
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [isAdminAuthorized, saveProgramming, status]);
+  }, [isAdminAuthorized, markLoaded, saveProgramming, status]);
 
   useEffect(() => {
     return () => {
@@ -437,7 +499,7 @@ export default function GlobalProgrammingSync({
 
   const isSaving = status === "saving";
   const tone = getStatusTone(status);
-  const lastSavedLabel = formatLastSaved(lastSavedAtRef.current);
+  const lastSavedLabel = formatLastSaved(lastSavedAt);
 
   return (
     <div
@@ -447,9 +509,7 @@ export default function GlobalProgrammingSync({
         borderColor: tone.borderColor,
         color: tone.color,
       }}
-      title={`${message}${
-        lastSavedAtRef.current ? ` / Last saved ${lastSavedAtRef.current}` : ""
-      }`}
+      title={`${message}${lastSavedAt ? ` / Last saved ${lastSavedAt}` : ""}`}
       aria-live="polite"
     >
       <span
@@ -474,7 +534,7 @@ export default function GlobalProgrammingSync({
             clearSaveTimer();
             void saveProgramming("manual");
           }}
-          disabled={isSaving}
+          disabled={isSaving || !isHydrated}
           className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? "Saving" : "Save"}
