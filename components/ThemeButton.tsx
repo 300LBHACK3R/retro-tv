@@ -2,16 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  canUseTheme,
-  getThemeAccessLabel,
   getThemeById,
   getThemePriceLabel,
   THEMES,
+  type ThemeDefinition,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
-import type { ThemeDefinition } from "@/lib/themes";
 
-type ThemeAccessList = Parameters<typeof canUseTheme>[1];
 type ThemeMiniFilter = "all" | "free" | "premium" | "unlocked";
 
 const THEME_FILTERS: { id: ThemeMiniFilter; label: string }[] = [
@@ -20,6 +17,12 @@ const THEME_FILTERS: { id: ThemeMiniFilter; label: string }[] = [
   { id: "premium", label: "Premium" },
   { id: "unlocked", label: "Unlocked" },
 ];
+
+/**
+ * Premium themes intentionally stay unlocked until Tate's TV has proper
+ * user accounts, checkout, payment verification, and entitlement syncing.
+ */
+const PREMIUM_THEMES_TEMPORARILY_UNLOCKED = true;
 
 function getPreviewGradient(theme: ThemeDefinition): string {
   return (
@@ -37,7 +40,10 @@ function sortThemes(a: ThemeDefinition, b: ThemeDefinition): number {
     return a.category.localeCompare(b.category);
   }
 
-  return a.name.localeCompare(b.name);
+  return a.name.localeCompare(b.name, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
 }
 
 function formatCategory(value: string): string {
@@ -68,19 +74,43 @@ function themeMatchesQuery(theme: ThemeDefinition, query: string): boolean {
 function themeMatchesFilter({
   theme,
   filter,
-  ownedPremiumThemes,
-  isAdminMode,
 }: {
   theme: ThemeDefinition;
   filter: ThemeMiniFilter;
-  ownedPremiumThemes: ThemeAccessList;
-  isAdminMode: boolean;
 }): boolean {
   if (filter === "all") return true;
   if (filter === "free") return !theme.isPremium;
   if (filter === "premium") return theme.isPremium;
 
-  return canUseTheme(theme.id, ownedPremiumThemes, isAdminMode);
+  return PREMIUM_THEMES_TEMPORARILY_UNLOCKED;
+}
+
+function getThemeAccessBadge(theme: ThemeDefinition): {
+  label: string;
+  background: string;
+  color: string;
+} {
+  if (!theme.isPremium) {
+    return {
+      label: "Free",
+      background: "rgba(34, 197, 94, 0.16)",
+      color: "#86efac",
+    };
+  }
+
+  if (PREMIUM_THEMES_TEMPORARILY_UNLOCKED) {
+    return {
+      label: "Unlocked",
+      background: "rgba(245, 158, 11, 0.18)",
+      color: "#fcd34d",
+    };
+  }
+
+  return {
+    label: "Premium",
+    background: "rgba(245, 158, 11, 0.18)",
+    color: "#fcd34d",
+  };
 }
 
 export default function ThemeButton() {
@@ -89,19 +119,12 @@ export default function ThemeButton() {
   const [filter, setFilter] = useState<ThemeMiniFilter>("all");
 
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
-  const appMode = useStore((state) => state.appMode);
   const themeId = useStore((state) => state.themeId);
-  const ownedPremiumThemesRaw = useStore((state) => state.ownedPremiumThemes);
   const setTheme = useStore((state) => state.setTheme);
 
-  const ownedPremiumThemes = useMemo(
-    () => ownedPremiumThemesRaw as ThemeAccessList,
-    [ownedPremiumThemesRaw],
-  );
-
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
-  const isAdminMode = appMode === "admin";
 
   const sortedThemes = useMemo(() => {
     return [...THEMES]
@@ -110,12 +133,10 @@ export default function ThemeButton() {
         themeMatchesFilter({
           theme,
           filter,
-          ownedPremiumThemes,
-          isAdminMode,
         }),
       )
       .filter((theme) => themeMatchesQuery(theme, query));
-  }, [filter, isAdminMode, ownedPremiumThemes, query]);
+  }, [filter, query]);
 
   useEffect(() => {
     if (!open) {
@@ -127,6 +148,10 @@ export default function ThemeButton() {
 
     document.body.style.overflow = "hidden";
     document.body.style.overscrollBehavior = "none";
+
+    const focusTimer = window.setTimeout(() => {
+      searchRef.current?.focus();
+    }, 50);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -151,6 +176,7 @@ export default function ThemeButton() {
     window.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
+      window.clearTimeout(focusTimer);
       document.body.style.overflow = previousOverflow;
       document.body.style.overscrollBehavior = previousOverscrollBehavior;
       window.removeEventListener("keydown", handleKeyDown);
@@ -159,12 +185,6 @@ export default function ThemeButton() {
   }, [open]);
 
   const applyTheme = (theme: ThemeDefinition) => {
-    const unlocked = canUseTheme(theme.id, ownedPremiumThemes, isAdminMode);
-
-    if (!unlocked) {
-      return;
-    }
-
     setTheme(theme.id);
     setOpen(false);
   };
@@ -214,7 +234,7 @@ export default function ThemeButton() {
           <div
             className="
               theme-panel fixed inset-x-3 top-16 z-[100] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border p-3 shadow-2xl
-              md:absolute md:right-0 md:top-14 md:inset-x-auto md:max-h-[75vh] md:w-[28rem]
+              md:absolute md:inset-x-auto md:right-0 md:top-14 md:max-h-[75vh] md:w-[28rem]
             "
             style={{
               background:
@@ -267,6 +287,7 @@ export default function ThemeButton() {
 
               <div className="mt-3">
                 <input
+                  ref={searchRef}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search themes..."
@@ -280,7 +301,7 @@ export default function ThemeButton() {
                 />
               </div>
 
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 ttv-no-scrollbar">
+              <div className="ttv-no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
                 {THEME_FILTERS.map((item) => {
                   const active = item.id === filter;
 
@@ -301,6 +322,20 @@ export default function ThemeButton() {
                   );
                 })}
               </div>
+
+              {PREMIUM_THEMES_TEMPORARILY_UNLOCKED ? (
+                <div
+                  className="mt-3 rounded-xl border px-3 py-2 text-[11px] leading-5"
+                  style={{
+                    background: "rgba(34,197,94,0.08)",
+                    borderColor: "rgba(34,197,94,0.24)",
+                    color: "#bbf7d0",
+                  }}
+                >
+                  Premium themes are currently unlocked while account and payment
+                  infrastructure is not active.
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -317,18 +352,7 @@ export default function ThemeButton() {
               ) : (
                 sortedThemes.map((theme) => {
                   const isActive = themeId === theme.id;
-                  const unlocked = canUseTheme(
-                    theme.id,
-                    ownedPremiumThemes,
-                    isAdminMode,
-                  );
-
-                  const accessLabel = getThemeAccessLabel(
-                    theme,
-                    ownedPremiumThemes,
-                    isAdminMode,
-                  );
-
+                  const accessBadge = getThemeAccessBadge(theme);
                   const priceLabel = getThemePriceLabel(theme);
 
                   return (
@@ -336,11 +360,10 @@ export default function ThemeButton() {
                       key={theme.id}
                       className={`theme-card overflow-hidden rounded-xl border transition hover:-translate-y-0.5 ${
                         isActive ? "is-active" : ""
-                      } ${!unlocked ? "is-locked" : ""}`}
+                      }`}
                       data-theme-card="true"
                       data-theme-id={theme.id}
-                      data-theme-locked={!unlocked ? "true" : undefined}
-                      aria-pressed={isActive}
+                      data-theme-premium={theme.isPremium ? "true" : undefined}
                       style={{
                         background:
                           "linear-gradient(135deg, rgba(255,255,255,0.04), transparent 46%), rgba(255,255,255,0.035)",
@@ -352,8 +375,9 @@ export default function ThemeButton() {
                       <button
                         type="button"
                         onClick={() => applyTheme(theme)}
-                        disabled={!unlocked || isActive}
-                        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-65"
+                        disabled={isActive}
+                        aria-pressed={isActive}
+                        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-80"
                       >
                         <div
                           className="theme-preview h-4"
@@ -381,13 +405,11 @@ export default function ThemeButton() {
                             <div
                               className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em]"
                               style={{
-                                background: theme.isPremium
-                                  ? "rgba(245, 158, 11, 0.18)"
-                                  : "rgba(34, 197, 94, 0.16)",
-                                color: theme.isPremium ? "#fcd34d" : "#86efac",
+                                background: accessBadge.background,
+                                color: accessBadge.color,
                               }}
                             >
-                              {accessLabel}
+                              {accessBadge.label}
                             </div>
                           </div>
 
@@ -417,13 +439,11 @@ export default function ThemeButton() {
                               style={{
                                 background: isActive
                                   ? "var(--button-bg)"
-                                  : unlocked
-                                    ? "linear-gradient(135deg, var(--primary), rgba(34,211,238,0.72))"
-                                    : "var(--button-bg)",
+                                  : "linear-gradient(135deg, var(--primary), rgba(34,211,238,0.72))",
                                 color: "var(--text)",
                               }}
                             >
-                              {isActive ? "Active" : unlocked ? "Apply" : "Locked"}
+                              {isActive ? "Active" : "Apply"}
                             </span>
                           </div>
                         </div>
