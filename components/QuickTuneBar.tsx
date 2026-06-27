@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import type { Channel } from "@/lib/types";
 
 const QUICK_TUNE_CLEAR_MS = 2200;
+const QUICK_TUNE_BUFFER_MS = 1800;
 const MAX_TUNE_DIGITS = 3;
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -38,8 +39,17 @@ function sortChannels(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return a.id.localeCompare(b.id);
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
+}
+
+function getChannelNumberValue(channel: Channel): number | null {
+  const value = Number(channel.number ?? channel.id);
+
+  return Number.isFinite(value) ? value : null;
 }
 
 function findChannelByTuneValue(
@@ -55,14 +65,18 @@ function findChannelByTuneValue(
   const asNumber = Number(normalized);
 
   return channels.find((channel) => {
-    const channelNumber = channel.number ?? Number(channel.id);
+    const channelNumber = getChannelNumberValue(channel);
+    const channelNumberText =
+      channelNumber === null ? String(channel.number ?? channel.id) : String(channelNumber);
 
     return (
-      channel.id === normalized ||
-      String(channelNumber) === normalized ||
-      String(channelNumber).padStart(2, "0") === normalized ||
-      String(channelNumber).padStart(3, "0") === normalized ||
-      (Number.isFinite(asNumber) && Number(channelNumber) === asNumber)
+      String(channel.id) === normalized ||
+      channelNumberText === normalized ||
+      channelNumberText.padStart(2, "0") === normalized ||
+      channelNumberText.padStart(3, "0") === normalized ||
+      (Number.isFinite(asNumber) &&
+        channelNumber !== null &&
+        channelNumber === asNumber)
     );
   });
 }
@@ -93,16 +107,29 @@ function getAvailableChannelSummary(channels: Channel[]): string {
   return `Available: ${getChannelLabel(first)}–${getChannelLabel(last)} • ${channels.length} channels`;
 }
 
+function getCurrentChannelInputValue(
+  channels: Channel[],
+  currentChannelId: string,
+): string {
+  const channel = channels.find((item) => item.id === currentChannelId);
+
+  return String(channel?.number ?? currentChannelId);
+}
+
 export default function QuickTuneBar() {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
 
-  const [value, setValue] = useState(currentChannelId);
+  const [value, setValue] = useState(() =>
+    getCurrentChannelInputValue(channels, currentChannelId),
+  );
   const [message, setMessage] = useState("");
   const [flashValue, setFlashValue] = useState("");
 
-  const clearTimerRef = useRef<number | null>(null);
+  const clearFlashTimerRef = useRef<number | null>(null);
+  const bufferTimerRef = useRef<number | null>(null);
+  const keyboardBufferRef = useRef("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
@@ -117,16 +144,45 @@ export default function QuickTuneBar() {
     [enabledChannels, value],
   );
 
-  const clearFlashLater = useCallback(() => {
-    if (clearTimerRef.current) {
-      window.clearTimeout(clearTimerRef.current);
+  const clearFlashTimer = useCallback(() => {
+    if (clearFlashTimerRef.current) {
+      window.clearTimeout(clearFlashTimerRef.current);
+      clearFlashTimerRef.current = null;
     }
-
-    clearTimerRef.current = window.setTimeout(() => {
-      setFlashValue("");
-      clearTimerRef.current = null;
-    }, QUICK_TUNE_CLEAR_MS);
   }, []);
+
+  const clearBufferTimer = useCallback(() => {
+    if (bufferTimerRef.current) {
+      window.clearTimeout(bufferTimerRef.current);
+      bufferTimerRef.current = null;
+    }
+  }, []);
+
+  const clearFlashLater = useCallback(() => {
+    clearFlashTimer();
+
+    clearFlashTimerRef.current = window.setTimeout(() => {
+      setFlashValue("");
+      clearFlashTimerRef.current = null;
+    }, QUICK_TUNE_CLEAR_MS);
+  }, [clearFlashTimer]);
+
+  const resetKeyboardBufferLater = useCallback(() => {
+    clearBufferTimer();
+
+    bufferTimerRef.current = window.setTimeout(() => {
+      keyboardBufferRef.current = "";
+      bufferTimerRef.current = null;
+    }, QUICK_TUNE_BUFFER_MS);
+  }, [clearBufferTimer]);
+
+  const clearTuneEntry = useCallback(() => {
+    keyboardBufferRef.current = "";
+    clearBufferTimer();
+    setValue(getCurrentChannelInputValue(channels, currentChannelId));
+    setFlashValue("");
+    setMessage("");
+  }, [channels, clearBufferTimer, currentChannelId]);
 
   const handleTune = useCallback(
     (inputValue = value) => {
@@ -146,32 +202,44 @@ export default function QuickTuneBar() {
         return;
       }
 
+      const nextValue = String(matchingChannel.number ?? matchingChannel.id);
+
+      keyboardBufferRef.current = "";
+      clearBufferTimer();
+
       setChannel(matchingChannel.id);
-      setValue(String(matchingChannel.number ?? matchingChannel.id));
+      setValue(nextValue);
       setMessage(
         `Tuned to ${getChannelLabel(matchingChannel)} • ${getChannelName(
           matchingChannel,
         )}.`,
       );
-      setFlashValue(String(matchingChannel.number ?? matchingChannel.id));
+      setFlashValue(nextValue);
       clearFlashLater();
     },
-    [clearFlashLater, enabledChannels, setChannel, value],
+    [
+      clearBufferTimer,
+      clearFlashLater,
+      enabledChannels,
+      setChannel,
+      value,
+    ],
   );
 
   useEffect(() => {
-    const channel = channels.find((item) => item.id === currentChannelId);
+    if (keyboardBufferRef.current) {
+      return;
+    }
 
-    setValue(String(channel?.number ?? currentChannelId));
+    setValue(getCurrentChannelInputValue(channels, currentChannelId));
   }, [channels, currentChannelId]);
 
   useEffect(() => {
     return () => {
-      if (clearTimerRef.current) {
-        window.clearTimeout(clearTimerRef.current);
-      }
+      clearFlashTimer();
+      clearBufferTimer();
     };
-  }, []);
+  }, [clearBufferTimer, clearFlashTimer]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -182,14 +250,17 @@ export default function QuickTuneBar() {
       if (/^\d$/.test(event.key)) {
         event.preventDefault();
 
-        setValue((current) => {
-          const nextValue = normalizeTuneValue(`${current}${event.key}`);
+        const nextValue = normalizeTuneValue(
+          `${keyboardBufferRef.current}${event.key}`,
+        );
 
-          setFlashValue(nextValue);
-          clearFlashLater();
+        keyboardBufferRef.current = nextValue;
 
-          return nextValue;
-        });
+        setValue(nextValue);
+        setMessage("");
+        setFlashValue(nextValue);
+        clearFlashLater();
+        resetKeyboardBufferLater();
 
         return;
       }
@@ -197,19 +268,32 @@ export default function QuickTuneBar() {
       if (event.key === "Backspace") {
         event.preventDefault();
 
-        setValue((current) => {
-          const nextValue = normalizeTuneValue(current.slice(0, -1));
-          setFlashValue(nextValue);
-          clearFlashLater();
-          return nextValue;
-        });
+        const nextValue = normalizeTuneValue(
+          keyboardBufferRef.current
+            ? keyboardBufferRef.current.slice(0, -1)
+            : value.slice(0, -1),
+        );
+
+        keyboardBufferRef.current = nextValue;
+
+        setValue(nextValue);
+        setMessage("");
+        setFlashValue(nextValue);
+        clearFlashLater();
+        resetKeyboardBufferLater();
 
         return;
       }
 
       if (event.key === "Enter") {
         event.preventDefault();
-        handleTune();
+        handleTune(keyboardBufferRef.current || value);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        clearTuneEntry();
       }
     };
 
@@ -218,7 +302,13 @@ export default function QuickTuneBar() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [clearFlashLater, handleTune]);
+  }, [
+    clearFlashLater,
+    clearTuneEntry,
+    handleTune,
+    resetKeyboardBufferLater,
+    value,
+  ]);
 
   const availableSummary = getAvailableChannelSummary(enabledChannels);
 
@@ -290,12 +380,22 @@ export default function QuickTuneBar() {
               ref={inputRef}
               value={value}
               onChange={(event) => {
-                setValue(normalizeTuneValue(event.target.value));
+                const nextValue = normalizeTuneValue(event.target.value);
+
+                keyboardBufferRef.current = "";
+                clearBufferTimer();
+                setValue(nextValue);
                 setMessage("");
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
-                  handleTune();
+                  event.preventDefault();
+                  handleTune(value);
+                }
+
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  clearTuneEntry();
                 }
               }}
               inputMode="numeric"
@@ -312,7 +412,7 @@ export default function QuickTuneBar() {
 
           <button
             type="button"
-            onClick={() => handleTune()}
+            onClick={() => handleTune(value)}
             disabled={enabledChannels.length === 0}
             className="rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
@@ -339,6 +439,17 @@ export default function QuickTuneBar() {
           <span style={{ color: "var(--text)" }}>
             {getChannelLabel(matchingPreview)} • {getChannelName(matchingPreview)}
           </span>
+        </div>
+      ) : value ? (
+        <div
+          className="relative mt-3 rounded-xl border px-3 py-2 text-xs"
+          style={{
+            background: "rgba(248,113,113,0.08)",
+            borderColor: "rgba(248,113,113,0.32)",
+            color: "#fecaca",
+          }}
+        >
+          No enabled channel matches CH {value}.
         </div>
       ) : null}
 
