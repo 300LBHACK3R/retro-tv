@@ -54,8 +54,11 @@ type WebKitDocument = Document & {
 
 const LIVE_TICK_MS = 1000;
 const HARD_SYNC_DRIFT_SECONDS = 18;
+const HARD_SYNC_COOLDOWN_MS = 4000;
 const SOURCE_END_PADDING_SECONDS = 0.4;
 const FULLSCREEN_BUSY_UNLOCK_MS = 900;
+const CAST_MESSAGE_CLEAR_MS = 3500;
+const SOURCE_TRANSITION_RELEASE_MS = 150;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -100,6 +103,12 @@ function getSourceEnd(item: BroadcastItem): number | null {
   }
 
   return Math.max(0, Math.floor(item.sourceEnd));
+}
+
+function getSafeItemDuration(item: BroadcastItem): number {
+  const duration = Math.floor(Number(item.duration));
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
 
 function isBreakItem(item: BroadcastItem): boolean {
@@ -272,7 +281,10 @@ function sortChannelsByNumber(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return String(a.id).localeCompare(String(b.id));
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -282,6 +294,17 @@ function getChannelLabel(channel: Channel | undefined): string {
   }
 
   return `CH ${channel.number ?? channel.id}`;
+}
+
+function configureVideoForAppPlayback(video: HTMLVideoElement): void {
+  const castVideo = video as WebKitVideoElement;
+
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.setAttribute("x5-playsinline", "true");
+  video.setAttribute("x-webkit-airplay", "allow");
+
+  castVideo.disableRemotePlayback = false;
 }
 
 async function requestPlaybackTarget(video: HTMLVideoElement): Promise<string> {
@@ -311,7 +334,10 @@ export default function Player({ schedule }: PlayerProps) {
   const lastHardSyncRef = useRef(0);
   const handledFullscreenRequestRef = useRef(0);
   const fullscreenBusyRef = useRef(false);
+  const sourceTransitionRef = useRef(false);
   const wakeLockRef = useRef<ScreenWakeLockSentinelLike | null>(null);
+  const castMessageTimerRef = useRef<number | null>(null);
+  const fullscreenBusyTimerRef = useRef<number | null>(null);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -346,6 +372,37 @@ export default function Player({ schedule }: PlayerProps) {
   const fullscreenActive =
     fallbackFullscreen || isElementFullscreen || isNativeVideoFullscreen;
 
+  const clearCastMessageTimer = useCallback(() => {
+    if (castMessageTimerRef.current) {
+      window.clearTimeout(castMessageTimerRef.current);
+      castMessageTimerRef.current = null;
+    }
+  }, []);
+
+  const setTimedCastMessage = useCallback(
+    (nextMessage: string) => {
+      clearCastMessageTimer();
+      setCastMessage(nextMessage);
+
+      castMessageTimerRef.current = window.setTimeout(() => {
+        setCastMessage("");
+        castMessageTimerRef.current = null;
+      }, CAST_MESSAGE_CLEAR_MS);
+    },
+    [clearCastMessageTimer],
+  );
+
+  const releaseFullscreenBusyLock = useCallback(() => {
+    if (fullscreenBusyTimerRef.current) {
+      window.clearTimeout(fullscreenBusyTimerRef.current);
+    }
+
+    fullscreenBusyTimerRef.current = window.setTimeout(() => {
+      fullscreenBusyRef.current = false;
+      fullscreenBusyTimerRef.current = null;
+    }, FULLSCREEN_BUSY_UNLOCK_MS);
+  }, []);
+
   const applyAudio = useCallback(() => {
     const video = videoRef.current;
 
@@ -358,6 +415,10 @@ export default function Player({ schedule }: PlayerProps) {
   }, [muted, volume]);
 
   const requestWakeLock = useCallback(async () => {
+    if (typeof navigator === "undefined") {
+      return;
+    }
+
     const navigatorWithWakeLock = navigator as NavigatorWithWakeLock;
 
     if (!navigatorWithWakeLock.wakeLock?.request) {
@@ -397,29 +458,38 @@ export default function Player({ schedule }: PlayerProps) {
     }
   }, []);
 
-  const hardSyncPosition = useCallback(() => {
-    const video = videoRef.current;
-    const item = live.item;
+  const hardSyncPosition = useCallback(
+    (options: { force?: boolean } = {}) => {
+      const video = videoRef.current;
+      const item = live.item;
 
-    if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-      return;
-    }
+      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+        return;
+      }
 
-    const target = getSafeTargetTime(video, item, live.sourceElapsed);
-    const drift = Math.abs(video.currentTime - target);
-    const now = Date.now();
+      const target = getSafeTargetTime(video, item, live.sourceElapsed);
+      const drift = Math.abs(video.currentTime - target);
+      const now = Date.now();
 
-    if (drift < HARD_SYNC_DRIFT_SECONDS && now - lastHardSyncRef.current < 8000) {
-      return;
-    }
+      if (!options.force) {
+        if (drift < HARD_SYNC_DRIFT_SECONDS) {
+          return;
+        }
 
-    try {
-      video.currentTime = target;
-      lastHardSyncRef.current = now;
-    } catch {
-      // Seeking can be rejected briefly while metadata settles.
-    }
-  }, [live.item, live.sourceElapsed]);
+        if (now - lastHardSyncRef.current < HARD_SYNC_COOLDOWN_MS) {
+          return;
+        }
+      }
+
+      try {
+        video.currentTime = target;
+        lastHardSyncRef.current = now;
+      } catch {
+        // Seeking can be rejected briefly while metadata settles.
+      }
+    },
+    [live.item, live.sourceElapsed],
+  );
 
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
@@ -429,8 +499,11 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     try {
+      configureVideoForAppPlayback(video);
       applyAudio();
+
       await video.play();
+
       setStatus("playing");
       setMessage("");
     } catch {
@@ -449,11 +522,16 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
+    sourceTransitionRef.current = true;
+
     setStatus("loading");
     setMessage("");
     setCastMessage("");
 
     try {
+      configureVideoForAppPlayback(video);
+      applyAudio();
+
       video.pause();
       video.preload = "auto";
       video.src = item.file;
@@ -461,12 +539,16 @@ export default function Player({ schedule }: PlayerProps) {
     } catch {
       setStatus("error");
       setMessage("Could not load this media source.");
+    } finally {
+      window.setTimeout(() => {
+        sourceTransitionRef.current = false;
+      }, SOURCE_TRANSITION_RELEASE_MS);
     }
-  }, [live.item]);
+  }, [applyAudio, live.item]);
 
   const resume = useCallback(() => {
     setNowMs(Date.now());
-    hardSyncPosition();
+    hardSyncPosition({ force: true });
     void tryPlay();
   }, [hardSyncPosition, tryPlay]);
 
@@ -476,10 +558,11 @@ export default function Player({ schedule }: PlayerProps) {
         return;
       }
 
-      const currentIndex = Math.max(
-        0,
-        orderedChannels.findIndex((channel) => channel.id === currentChannelId),
+      const foundIndex = orderedChannels.findIndex(
+        (channel) => channel.id === currentChannelId,
       );
+
+      const currentIndex = foundIndex >= 0 ? foundIndex : 0;
 
       const nextIndex =
         direction === "next"
@@ -503,6 +586,7 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     await exitElementFullscreen();
+
     setFallbackFullscreen(false);
     setIsElementFullscreen(false);
     setIsNativeVideoFullscreen(false);
@@ -515,12 +599,6 @@ export default function Player({ schedule }: PlayerProps) {
 
     fullscreenBusyRef.current = true;
 
-    const releaseBusyLock = () => {
-      window.setTimeout(() => {
-        fullscreenBusyRef.current = false;
-      }, FULLSCREEN_BUSY_UNLOCK_MS);
-    };
-
     const shell = shellRef.current;
     const video = videoRef.current;
 
@@ -530,14 +608,14 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     try {
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       await tryPlay();
 
       if (fallbackFullscreen) {
         setFallbackFullscreen(false);
         setIsElementFullscreen(false);
         setIsNativeVideoFullscreen(false);
-        releaseBusyLock();
+        releaseFullscreenBusyLock();
         return;
       }
 
@@ -546,7 +624,7 @@ export default function Player({ schedule }: PlayerProps) {
       if (nativeVideoExited) {
         setFallbackFullscreen(false);
         setIsNativeVideoFullscreen(false);
-        releaseBusyLock();
+        releaseFullscreenBusyLock();
         return;
       }
 
@@ -556,7 +634,7 @@ export default function Player({ schedule }: PlayerProps) {
         if (didExit) {
           setFallbackFullscreen(false);
           setIsElementFullscreen(false);
-          releaseBusyLock();
+          releaseFullscreenBusyLock();
           return;
         }
       }
@@ -567,12 +645,12 @@ export default function Player({ schedule }: PlayerProps) {
         if (didEnterNativeVideoFullscreen) {
           setFallbackFullscreen(false);
           setIsNativeVideoFullscreen(true);
-          releaseBusyLock();
+          releaseFullscreenBusyLock();
           return;
         }
 
         setFallbackFullscreen(true);
-        releaseBusyLock();
+        releaseFullscreenBusyLock();
         return;
       }
 
@@ -581,17 +659,22 @@ export default function Player({ schedule }: PlayerProps) {
       if (didEnterElementFullscreen) {
         setFallbackFullscreen(false);
         setIsElementFullscreen(true);
-        releaseBusyLock();
+        releaseFullscreenBusyLock();
         return;
       }
 
       setFallbackFullscreen(true);
-      releaseBusyLock();
+      releaseFullscreenBusyLock();
     } catch {
       setFallbackFullscreen((value) => !value);
-      releaseBusyLock();
+      releaseFullscreenBusyLock();
     }
-  }, [fallbackFullscreen, hardSyncPosition, tryPlay]);
+  }, [
+    fallbackFullscreen,
+    hardSyncPosition,
+    releaseFullscreenBusyLock,
+    tryPlay,
+  ]);
 
   const openGuideFromFullscreen = useCallback(() => {
     void exitFullscreenView().finally(() => {
@@ -607,12 +690,8 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     const result = await requestPlaybackTarget(video);
-    setCastMessage(result);
-
-    window.setTimeout(() => {
-      setCastMessage("");
-    }, 3500);
-  }, []);
+    setTimedCastMessage(result);
+  }, [setTimedCastMessage]);
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -629,23 +708,11 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     const video = videoRef.current;
 
-    if (video) {
-      const castVideo = video as WebKitVideoElement;
-      castVideo.setAttribute("x-webkit-airplay", "allow");
-      castVideo.disableRemotePlayback = false;
-    }
-
     if (!video) {
       return;
     }
 
-    const castVideo = video as WebKitVideoElement;
-
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("webkit-playsinline", "true");
-    video.setAttribute("x5-playsinline", "true");
-    video.setAttribute("x-webkit-airplay", "allow");
-    castVideo.disableRemotePlayback = false;
+    configureVideoForAppPlayback(video);
   }, []);
 
   useEffect(() => {
@@ -671,18 +738,14 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     const video = videoRef.current;
 
-    if (video) {
-      const castVideo = video as WebKitVideoElement;
-      castVideo.setAttribute("x-webkit-airplay", "allow");
-      castVideo.disableRemotePlayback = false;
-    }
-
     if (!video) {
       return;
     }
 
+    configureVideoForAppPlayback(video);
+
     const handleLoadedMetadata = () => {
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       void tryPlay();
     };
 
@@ -703,6 +766,10 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handlePause = () => {
+      if (sourceTransitionRef.current) {
+        return;
+      }
+
       if (document.visibilityState === "visible") {
         setStatus("paused");
       }
@@ -715,7 +782,7 @@ export default function Player({ schedule }: PlayerProps) {
 
     const handleEnded = () => {
       setNowMs(Date.now());
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       void tryPlay();
     };
 
@@ -739,13 +806,13 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
-    const video = videoRef.current;
-
-    if (video) {
-      const castVideo = video as WebKitVideoElement;
-      castVideo.setAttribute("x-webkit-airplay", "allow");
-      castVideo.disableRemotePlayback = false;
+    if (status === "playing") {
+      hardSyncPosition();
     }
+  }, [hardSyncPosition, nowMs, status]);
+
+  useEffect(() => {
+    const video = videoRef.current;
 
     if (!video || !live.item) {
       return;
@@ -759,7 +826,7 @@ export default function Player({ schedule }: PlayerProps) {
 
     if (video.currentTime >= sourceEnd - SOURCE_END_PADDING_SECONDS) {
       setNowMs(Date.now());
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
     }
   }, [hardSyncPosition, live.item, nowMs]);
 
@@ -767,7 +834,7 @@ export default function Player({ schedule }: PlayerProps) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setNowMs(Date.now());
-        hardSyncPosition();
+        hardSyncPosition({ force: true });
         void tryPlay();
 
         if (fullscreenActive && status === "playing") {
@@ -826,7 +893,7 @@ export default function Player({ schedule }: PlayerProps) {
       }
 
       setNowMs(Date.now());
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       void tryPlay();
     };
 
@@ -845,21 +912,17 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     const video = videoRef.current;
 
-    if (video) {
-      const castVideo = video as WebKitVideoElement;
-      castVideo.setAttribute("x-webkit-airplay", "allow");
-      castVideo.disableRemotePlayback = false;
-    }
-
     if (!video) {
       return;
     }
+
+    configureVideoForAppPlayback(video);
 
     const handleNativeVideoFullscreenStart = () => {
       setIsNativeVideoFullscreen(true);
       setFallbackFullscreen(false);
       setNowMs(Date.now());
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       void tryPlay();
     };
 
@@ -867,7 +930,7 @@ export default function Player({ schedule }: PlayerProps) {
       setIsNativeVideoFullscreen(false);
       setFallbackFullscreen(false);
       setNowMs(Date.now());
-      hardSyncPosition();
+      hardSyncPosition({ force: true });
       void tryPlay();
     };
 
@@ -903,6 +966,12 @@ export default function Player({ schedule }: PlayerProps) {
 
   useEffect(() => {
     return () => {
+      clearCastMessageTimer();
+
+      if (fullscreenBusyTimerRef.current) {
+        window.clearTimeout(fullscreenBusyTimerRef.current);
+      }
+
       void releaseWakeLock();
 
       const video = videoRef.current;
@@ -915,7 +984,7 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeAttribute("src");
       video.load();
     };
-  }, [releaseWakeLock]);
+  }, [clearCastMessageTimer, releaseWakeLock]);
 
   if (!live.item) {
     return (
@@ -934,6 +1003,7 @@ export default function Player({ schedule }: PlayerProps) {
   }
 
   const title = getDisplayTitle(live.item);
+  const itemDuration = getSafeItemDuration(live.item);
 
   return (
     <div
@@ -969,7 +1039,7 @@ export default function Player({ schedule }: PlayerProps) {
         </div>
 
         <div className="mt-1 text-xs text-white/70">
-          {formatTime(live.elapsed)} / {formatTime(live.item.duration)}
+          {formatTime(live.elapsed)} / {formatTime(itemDuration)}
           {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
         </div>
       </div>
