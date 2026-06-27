@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useStore } from "@/lib/store";
 import type { AppMode } from "@/lib/types";
 
@@ -14,6 +20,8 @@ type ModeOption = {
   badge: string;
   description: string;
 };
+
+type BadgeTone = "authorized" | "locked";
 
 const MODE_OPTIONS: ModeOption[] = [
   {
@@ -35,13 +43,15 @@ function getModeLabel(mode: AppMode): string {
 }
 
 function getAuthorizationCopy(isAdminAuthorized: boolean): string {
-  return isAdminAuthorized
-    ? "Admin mode is unlocked for this session. Viewer mode remains the public-facing default."
-    : "Admin tools are locked. Authenticate first before switching into station management.";
+  if (isAdminAuthorized) {
+    return "Admin mode is unlocked for this session. Viewer mode remains the public-facing default.";
+  }
+
+  return "Admin tools are locked. Authenticate first before switching into station management.";
 }
 
-function getStatusBadgeStyles(isAdminAuthorized: boolean) {
-  if (isAdminAuthorized) {
+function getBadgeStyles(tone: BadgeTone): CSSProperties {
+  if (tone === "authorized") {
     return {
       borderColor: "rgba(34, 197, 94, 0.42)",
       background: "rgba(34, 197, 94, 0.12)",
@@ -53,6 +63,35 @@ function getStatusBadgeStyles(isAdminAuthorized: boolean) {
     borderColor: "var(--border)",
     background: "var(--panel-alt-bg)",
     color: "var(--text-muted)",
+  };
+}
+
+function getModeCardStyles({
+  isActive,
+}: {
+  isActive: boolean;
+}): CSSProperties {
+  return {
+    background: isActive
+      ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))"
+      : "var(--panel-alt-bg)",
+    borderColor: isActive ? "var(--primary)" : "var(--border)",
+    color: "var(--text)",
+    boxShadow: isActive
+      ? "0 0 28px color-mix(in srgb, var(--primary) 22%, transparent)"
+      : "none",
+  };
+}
+
+function getModePillStyles({
+  isActive,
+}: {
+  isActive: boolean;
+}): CSSProperties {
+  return {
+    borderColor: isActive ? "rgba(255,255,255,0.28)" : "var(--border)",
+    background: isActive ? "rgba(255,255,255,0.10)" : "transparent",
+    color: isActive ? "var(--text)" : "var(--text-muted)",
   };
 }
 
@@ -77,20 +116,13 @@ function ModeCard({
       className={[
         "ttv-touch-target group relative overflow-hidden rounded-2xl border p-3 text-left transition",
         "hover:scale-[1.01] hover:opacity-95",
-        "disabled:cursor-not-allowed disabled:opacity-55",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+        "disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:scale-100",
       ].join(" ")}
-      style={{
-        background: isActive
-          ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))"
-          : "var(--panel-alt-bg)",
-        borderColor: isActive ? "var(--primary)" : "var(--border)",
-        color: "var(--text)",
-        boxShadow: isActive
-          ? "0 0 28px color-mix(in srgb, var(--primary) 22%, transparent)"
-          : "none",
-      }}
+      style={getModeCardStyles({ isActive })}
       aria-pressed={isActive}
-      aria-disabled={isLocked}
+      aria-label={`${option.label} mode${isLocked ? " locked" : ""}`}
+      title={isLocked ? "Authenticate first to unlock admin mode." : option.description}
     >
       <div
         className="pointer-events-none absolute -right-10 -top-12 h-24 w-24 rounded-full opacity-0 blur-2xl transition group-hover:opacity-20"
@@ -114,13 +146,7 @@ function ModeCard({
 
         <div
           className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
-          style={{
-            borderColor: isActive
-              ? "rgba(255,255,255,0.28)"
-              : "var(--border)",
-            background: isActive ? "rgba(255,255,255,0.10)" : "transparent",
-            color: isActive ? "var(--text)" : "var(--text-muted)",
-          }}
+          style={getModePillStyles({ isActive })}
         >
           {stateLabel}
         </div>
@@ -136,12 +162,19 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
   const [mounted, setMounted] = useState(false);
 
   const safeAppMode: AppMode =
-    mounted && isAdminAuthorized ? appMode : "viewer";
+    mounted && isAdminAuthorized && appMode === "admin" ? "admin" : "viewer";
 
   const activeModeLabel = useMemo(
     () => getModeLabel(safeAppMode),
     [safeAppMode],
   );
+
+  const authorizationCopy = useMemo(
+    () => getAuthorizationCopy(isAdminAuthorized),
+    [isAdminAuthorized],
+  );
+
+  const badgeTone: BadgeTone = isAdminAuthorized ? "authorized" : "locked";
 
   useEffect(() => {
     setMounted(true);
@@ -152,18 +185,25 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
       return;
     }
 
-    if (appMode === "admin" && !isAdminAuthorized) {
+    if (!isAdminAuthorized && appMode === "admin") {
       setAppMode("viewer");
     }
   }, [appMode, isAdminAuthorized, mounted, setAppMode]);
 
-  const handleModeChange = (mode: AppMode) => {
-    if (mode === "admin" && !isAdminAuthorized) {
-      return;
-    }
+  const handleModeChange = useCallback(
+    (mode: AppMode) => {
+      if (mode === safeAppMode) {
+        return;
+      }
 
-    setAppMode(mode);
-  };
+      if (mode === "admin" && !isAdminAuthorized) {
+        return;
+      }
+
+      setAppMode(mode);
+    },
+    [isAdminAuthorized, safeAppMode, setAppMode],
+  );
 
   if (!mounted) {
     return null;
@@ -207,13 +247,13 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
             className="mt-1 max-w-2xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            {getAuthorizationCopy(isAdminAuthorized)}
+            {authorizationCopy}
           </div>
         </div>
 
         <div
           className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
-          style={getStatusBadgeStyles(isAdminAuthorized)}
+          style={getBadgeStyles(badgeTone)}
         >
           {isAdminAuthorized ? "Authorized" : "Locked"}
         </div>
@@ -245,8 +285,8 @@ export default function AppModeToggle({ isAdminAuthorized }: AppModeToggleProps)
             color: "var(--text-muted)",
           }}
         >
-          Admin access stays behind your hidden/settings authentication flow.
-          Public viewers remain locked to the polished watching experience.
+          Admin access stays behind the protected authentication flow. Public
+          viewers remain locked to the polished watching experience.
         </div>
       ) : null}
     </section>
