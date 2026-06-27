@@ -1,14 +1,19 @@
 ﻿"use client";
 
 import { useEffect } from "react";
+import { programmingStoreName } from "@/lib/store";
+
+type JsonPrimitive = string | number | boolean | null;
 
 type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
+  | JsonPrimitive
   | JsonValue[]
-  | { [key: string]: JsonValue };
+  | {
+      [key: string]: JsonValue;
+    };
+
+const CLEANER_VERSION = "2026-06-27-v2";
+const CLEANER_FLAG_KEY = "ttv:text-encoding-cleaner-version";
 
 const REPLACEMENTS: Array<[string, string]> = [
   ["â€¢", " / "],
@@ -26,10 +31,10 @@ const REPLACEMENTS: Array<[string, string]> = [
   ["’", "'"],
   ["‘", "'"],
 
-  ["â€œ", "\""],
-  ["â€�", "\""],
-  ["“", "\""],
-  ["”", "\""],
+  ["â€œ", '"'],
+  ["â€�", '"'],
+  ["“", '"'],
+  ["”", '"'],
 
   ["â€¦", "..."],
   ["…", "..."],
@@ -100,20 +105,34 @@ function cleanStorageValue(value: string): string {
   return cleanText(value);
 }
 
+function shouldCleanStorageKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+
+  return (
+    key === programmingStoreName ||
+    key === CLEANER_FLAG_KEY ||
+    normalized.startsWith("ttv") ||
+    normalized.startsWith("tates-tv") ||
+    normalized.startsWith("tatestv") ||
+    normalized.includes("programming")
+  );
+}
+
+function getLocalStorageKeys(): string[] {
+  return Array.from({ length: window.localStorage.length })
+    .map((_, index) => window.localStorage.key(index))
+    .filter((key): key is string => Boolean(key));
+}
+
 function cleanLocalStorage(): number {
   let changedCount = 0;
+  const keys = getLocalStorageKeys().filter(shouldCleanStorageKey);
 
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-
-    if (!key) {
-      continue;
-    }
-
+  keys.forEach((key) => {
     const value = window.localStorage.getItem(key);
 
     if (!value) {
-      continue;
+      return;
     }
 
     const cleaned = cleanStorageValue(value);
@@ -122,14 +141,24 @@ function cleanLocalStorage(): number {
       window.localStorage.setItem(key, cleaned);
       changedCount += 1;
     }
-  }
+  });
+
+  window.localStorage.setItem(CLEANER_FLAG_KEY, CLEANER_VERSION);
 
   return changedCount;
+}
+
+function hasCleanerAlreadyRun(): boolean {
+  return window.localStorage.getItem(CLEANER_FLAG_KEY) === CLEANER_VERSION;
 }
 
 export default function TextEncodingCleaner() {
   useEffect(() => {
     try {
+      if (hasCleanerAlreadyRun()) {
+        return;
+      }
+
       cleanLocalStorage();
     } catch {
       /**
