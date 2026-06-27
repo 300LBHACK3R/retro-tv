@@ -403,10 +403,7 @@ function normalizeBreakpoints(item: MediaItem, channel?: Channel): number[] {
   const duration = getSafeDuration(item);
   const saved = Array.isArray(item.breakpoints) ? item.breakpoints : [];
 
-  const source =
-    saved.length > 0 || !isStandardThirtyMinuteShow(item, channel)
-      ? saved
-      : DEFAULT_30_MIN_BREAKPOINTS;
+  const source = saved;
 
   return Array.from(
     new Set(
@@ -459,9 +456,7 @@ function getSlotSettings(
     slotLengthSeconds,
     breakpoints,
     breakDurations: normalizeBreakDurations(item, breakpoints.length, channel),
-    fillSlotWithCommercials:
-      isSlotManagedLongForm(item) &&
-      (Boolean(item.fillSlotWithCommercials) || standardThirty),
+    fillSlotWithCommercials: isSlotManagedLongForm(item) && Boolean(item.fillSlotWithCommercials),
     commercialStrategy: getCommercialStrategy(item, channel),
   };
 }
@@ -1037,58 +1032,28 @@ function buildSlotFillerSchedule(
     return [];
   }
 
-  const schedule: BroadcastItem[] = [];
-  const breakpoints = settings.breakpoints;
-  const points = [0, ...breakpoints, getSafeDuration(item)];
-
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index] ?? 0;
-    const end = points[index + 1] ?? getSafeDuration(item);
-    const segmentDuration = end - start;
-
-    if (segmentDuration <= 0) {
-      continue;
-    }
-
-    const label = points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`;
-    const isLastSegment = index === points.length - 2;
-
-    schedule.push(createVirtualSegment(item, start, segmentDuration, label));
-
-    if (!isLastSegment) {
-      const requestedBreakDuration =
-        settings.breakDurations[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS;
-
-      schedule.push(
-        ...fillCommercialDuration(
-          shortFormItems,
-          requestedBreakDuration,
-          cursor,
-          settings.commercialStrategy,
-          createCommercialContext(channel, now, "mid-roll"),
-        ),
-      );
-    }
-  }
-
   const remainingSlotSeconds = Math.max(
     0,
-    settings.slotLengthSeconds - getScheduleDurationForItems(schedule),
+    settings.slotLengthSeconds - getSafeDuration(item),
   );
 
-  if (remainingSlotSeconds > 0) {
-    schedule.push(
-      ...fillCommercialDuration(
-        shortFormItems,
-        remainingSlotSeconds,
-        cursor,
-        settings.commercialStrategy,
-        createCommercialContext(channel, now, "filler"),
-      ),
-    );
+  if (remainingSlotSeconds <= 0) {
+    return [];
   }
 
-  return schedule;
+  const fillerItems = fillCommercialDuration(
+    shortFormItems,
+    remainingSlotSeconds,
+    cursor,
+    settings.commercialStrategy,
+    createCommercialContext(channel, now, "filler"),
+  );
+
+  if (fillerItems.length === 0) {
+    return [];
+  }
+
+  return [item, ...fillerItems];
 }
 
 function buildManualBreakpointSchedule(
