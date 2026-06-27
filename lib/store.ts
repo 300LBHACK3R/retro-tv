@@ -53,8 +53,9 @@ interface AppState {
       scheduleMode: ScheduleMode;
       commercialBreakMode: CommercialBreakMode;
       randomSeed: string;
-      defaultSlotLengthSeconds: number;
+      defaultSlotLengthSeconds: number | undefined;
       commercialStrategy: CommercialStrategy;
+      adPolicy: Partial<ChannelAdPolicy>;
     }>,
   ) => void;
 
@@ -88,7 +89,7 @@ interface AppState {
 }
 
 export const programmingStoreName = "retro-tv-programming-v1";
-export const programmingStoreVersion = 5;
+export const programmingStoreVersion = 6;
 
 const DEFAULT_CHANNEL_COUNT = 23;
 
@@ -118,7 +119,6 @@ const VALID_COMMERCIAL_STRATEGIES: CommercialStrategy[] = [
   "random",
 ];
 
-
 const VALID_MEDIA_TYPES: MediaType[] = [
   "show",
   "movie",
@@ -133,41 +133,76 @@ const DEFAULT_AD_PLACEMENTS: AdPlacement[] = [
   "filler",
 ];
 
-const DEFAULT_AD_POLICY: ChannelAdPolicy = {
-  enabled: true,
-  placements: DEFAULT_AD_PLACEMENTS,
-  strategy: "best-fit",
-  maxAdsPerBreak: 1,
-  targetBreakSeconds: 120,
-  minSecondsBetweenSameAd: 900,
-  allowedCategories: [],
-  allowGlobalAds: true,
-  allowChannelTargetedAds: true,
-  allowHouseAds: true,
-};
+const VALID_AD_PLACEMENTS: AdPlacement[] = [
+  "pre-roll",
+  "mid-roll",
+  "post-roll",
+  "between-programs",
+  "top-of-hour",
+  "filler",
+];
+
 const LEGACY_DEFAULT_BRANDING_MARKERS: Record<
   number,
   Partial<ChannelBranding>[]
 > = {
-  4: [
+  5: [
     {
-      displayName: "Christian TV",
-      callsign: "FAITH",
-      logoText: "CHRISTIAN TV",
+      displayName: "MainStreet",
+      callsign: "MAIN",
+      logoText: "MAINSTREET",
+    },
+  ],
+  6: [
+    {
+      displayName: "The Loft",
+      callsign: "LOFT",
+      logoText: "THE LOFT",
     },
   ],
   7: [
+    {
+      displayName: "FailZone",
+      callsign: "FAIL",
+      logoText: "FAILZONE",
+    },
     {
       displayName: "The Pulse",
       callsign: "PULSE",
       logoText: "THE PULSE",
     },
   ],
+  8: [
+    {
+      displayName: "TTV Anime",
+      callsign: "ANIME",
+      logoText: "TTV ANIME",
+    },
+  ],
+  9: [
+    {
+      displayName: "TTV Retro 2",
+      callsign: "TTVR2",
+      logoText: "TTV RETRO 2",
+    },
+  ],
   10: [
+    {
+      displayName: "Realms",
+      callsign: "REALMS",
+      logoText: "REALMS",
+    },
     {
       displayName: "TTV Epic",
       callsign: "EPIC",
       logoText: "TTV EPIC",
+    },
+  ],
+  13: [
+    {
+      displayName: "Christian Kids TV",
+      callsign: "CKIDS",
+      logoText: "CHRISTIAN KIDS",
     },
   ],
   14: [
@@ -179,12 +214,22 @@ const LEGACY_DEFAULT_BRANDING_MARKERS: Record<
   ],
   18: [
     {
+      displayName: "Sunset",
+      callsign: "SUNSET",
+      logoText: "SUNSET",
+    },
+    {
       displayName: "Local Music",
       callsign: "LOCAL",
       logoText: "LOCAL MUSIC",
     },
   ],
   19: [
+    {
+      displayName: "Discover",
+      callsign: "DISC",
+      logoText: "DISCOVER",
+    },
     {
       displayName: "Creator Channel",
       callsign: "CREATE",
@@ -208,6 +253,21 @@ const defaultViewerSettings: ViewerSettings = {
   preferReducedMotion: false,
 };
 
+function createDefaultAdPolicy(): ChannelAdPolicy {
+  return {
+    enabled: true,
+    placements: [...DEFAULT_AD_PLACEMENTS],
+    strategy: "best-fit",
+    maxAdsPerBreak: 1,
+    targetBreakSeconds: 120,
+    minSecondsBetweenSameAd: 900,
+    allowedCategories: [],
+    allowGlobalAds: true,
+    allowChannelTargetedAds: true,
+    allowHouseAds: true,
+  };
+}
+
 export const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
@@ -218,10 +278,9 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e01.mp4",
     provider: "cloudflare-r2",
-    breakpoints: [450, 900],
-    breakDurations: [120, 120],
-    slotLengthSeconds: 1800,
-    fillSlotWithCommercials: true,
+    breakpoints: [],
+    breakDurations: [],
+    fillSlotWithCommercials: false,
     commercialStrategy: "best-fit",
     airDays: [],
   },
@@ -234,10 +293,9 @@ export const defaultMedia: MediaItem[] = [
     mimeType: "video/mp4",
     originalName: "martin-mystery-s01e02.mp4",
     provider: "cloudflare-r2",
-    breakpoints: [450, 900],
-    breakDurations: [120, 120],
-    slotLengthSeconds: 1800,
-    fillSlotWithCommercials: true,
+    breakpoints: [],
+    breakDurations: [],
+    fillSlotWithCommercials: false,
     commercialStrategy: "best-fit",
     airDays: [],
   },
@@ -247,17 +305,17 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
   switch (channelNumber) {
     case 1:
       return {
-        displayName: "TTV Retro",
+        displayName: "TTVR",
         callsign: "TTVR",
-        description: "Main retro network feed.",
+        description: "Tate's TV Retro main feed.",
         accentColor: "#ef4444",
-        logoText: "TTV RETRO",
+        logoText: "TTVR",
       };
 
     case 2:
       return {
         displayName: "TTV Movies",
-        callsign: "MOVIES",
+        callsign: "TTVM",
         description: "Movie rotation and feature blocks.",
         accentColor: "#f97316",
         logoText: "TTV MOVIES",
@@ -276,42 +334,32 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
       return {
         displayName: "ToonCore",
         callsign: "TOON",
-        description:
-          "Cartoons, animated classics, and high-energy animated blocks.",
+        description: "Cartoons, animated classics, and animated action blocks.",
         accentColor: "#f97316",
         logoText: "TOONCORE",
       };
 
     case 5:
       return {
-        displayName: "MainStreet",
-        callsign: "MAIN",
+        displayName: "Sunset Teen",
+        callsign: "SUNSET",
         description:
-          "Canadian comfort TV, small-town comedy, and familiar everyday stories.",
-        accentColor: "#0ea5e9",
-        logoText: "MAINSTREET",
+          "Teen adventures, school life, friendships, and 2000s comfort series.",
+        accentColor: "#fb923c",
+        logoText: "SUNSET TEEN",
       };
 
     case 6:
       return {
-        displayName: "The Loft",
-        callsign: "LOFT",
-        description: "Sitcoms, friends, hangout shows, and comfort TV.",
-        accentColor: "#ec4899",
-        logoText: "THE LOFT",
+        displayName: "Christian Kids TV",
+        callsign: "CKIDS",
+        description:
+          "Christian kids shows, faith-based family content, and safe daytime programming.",
+        accentColor: "#84cc16",
+        logoText: "CHRISTIAN KIDS",
       };
 
     case 7:
-      return {
-        displayName: "FailZone",
-        callsign: "FAIL",
-        description:
-          "Viral laughs, classic internet clips, fail videos, weird web nostalgia, and chaotic comedy.",
-        accentColor: "#facc15",
-        logoText: "FAILZONE",
-      };
-
-    case 8:
       return {
         displayName: "TTV Anime",
         callsign: "ANIME",
@@ -320,7 +368,7 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
         logoText: "TTV ANIME",
       };
 
-    case 9:
+    case 8:
       return {
         displayName: "TTV Retro 2",
         callsign: "TTVR2",
@@ -329,14 +377,23 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
         logoText: "TTV RETRO 2",
       };
 
+    case 9:
+      return {
+        displayName: "Discover",
+        callsign: "DISC",
+        description:
+          "History, science, nature, documentaries, mysteries, and real-world stories.",
+        accentColor: "#06b6d4",
+        logoText: "DISCOVER",
+      };
+
     case 10:
       return {
-        displayName: "Realms",
-        callsign: "REALMS",
-        description:
-          "Fantasy worlds, epic adventures, heroic quests, and long-form specials.",
+        displayName: "TTV Movies 2",
+        callsign: "TTVM2",
+        description: "Second movie channel for extra features and specials.",
         accentColor: "#d4af37",
-        logoText: "REALMS",
+        logoText: "TTV MOVIES 2",
       };
 
     case 11:
@@ -350,26 +407,26 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 
     case 12:
       return {
-        displayName: "NOW Movies",
+        displayName: "NOW Movie",
         callsign: "NOWMOV",
         description: "Modern movies and current feature blocks.",
         accentColor: "#2563eb",
-        logoText: "NOW MOVIES",
+        logoText: "NOW MOVIE",
       };
 
     case 13:
       return {
-        displayName: "Christian Kids TV",
-        callsign: "CKIDS",
+        displayName: "FailZone",
+        callsign: "FAIL",
         description:
-          "Christian kids shows, faith-based family content, and safe daytime programming.",
-        accentColor: "#84cc16",
-        logoText: "CHRISTIAN KIDS",
+          "Viral laughs, classic internet clips, fail videos, weird web nostalgia, and chaotic comedy.",
+        accentColor: "#facc15",
+        logoText: "FAILZONE",
       };
 
     case 14:
       return {
-        displayName: "True Standard",
+        displayName: "The True Standard",
         callsign: "TRUE",
         description:
           "Christian teaching, encouragement, faith programming, and truth-centered media.",
@@ -399,32 +456,32 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
 
     case 17:
       return {
-        displayName: "Indie",
+        displayName: "The Indie Spotlight",
         callsign: "INDIE",
         description:
           "Independent films, creators, trailers, submissions, and local features.",
         accentColor: "#fb7185",
-        logoText: "INDIE",
+        logoText: "INDIE SPOTLIGHT",
       };
 
     case 18:
       return {
-        displayName: "Sunset",
-        callsign: "SUNSET",
+        displayName: "Build TV",
+        callsign: "BUILD",
         description:
-          "Teen adventures, unforgettable friendships, school life, first crushes, and iconic family and teen series from the 2000s.",
-        accentColor: "#fb923c",
-        logoText: "SUNSET",
+          "Construction, machines, projects, heavy equipment, tools, and build-focused programming.",
+        accentColor: "#f59e0b",
+        logoText: "BUILD TV",
       };
 
     case 19:
       return {
-        displayName: "Discover",
-        callsign: "DISC",
+        displayName: "MainStreet",
+        callsign: "MAIN",
         description:
-          "History, science, nature, documentaries, mysteries, and real-world stories for curious viewers.",
-        accentColor: "#06b6d4",
-        logoText: "DISCOVER",
+          "Canadian comfort TV, small-town comedy, and familiar everyday stories.",
+        accentColor: "#0ea5e9",
+        logoText: "MAINSTREET",
       };
 
     case 20:
@@ -493,9 +550,9 @@ function createDefaultChannel(channelNumber: number): Channel {
     scheduleMode: "ordered",
     commercialBreakMode: "none",
     randomSeed: `channel-${channelNumber}`,
-    defaultSlotLengthSeconds: 1800,
     commercialStrategy: "best-fit",
     branding,
+    adPolicy: createDefaultAdPolicy(),
   };
 }
 
@@ -516,8 +573,23 @@ function clamp(value: number, min: number, max: number): number {
 
 function normalizeText(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
+
+  const trimmed = value
+    .replace(/â€¢/g, " / ")
+    .replace(/â€˘/g, " / ")
+    .replace(/Â/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = normalizeText(value, "");
+
+  return trimmed || undefined;
 }
 
 function normalizeComparableText(value: unknown): string {
@@ -528,6 +600,17 @@ function normalizeComparableText(value: unknown): string {
 
 function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return dedupeStrings(
+    value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
 }
 
 function createFallbackId(): string {
@@ -552,20 +635,35 @@ function isCommercialStrategy(value: unknown): value is CommercialStrategy {
   );
 }
 
-
 function isMediaType(value: unknown): value is MediaType {
-  return typeof value === "string" && VALID_MEDIA_TYPES.includes(value as MediaType);
+  return (
+    typeof value === "string" && VALID_MEDIA_TYPES.includes(value as MediaType)
+  );
 }
 
 function normalizeMediaType(value: unknown): MediaType {
   return isMediaType(value) ? value : "show";
 }
 
+function isProgramMediaType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
+}
+
 function isCommercialMediaType(type: MediaType): boolean {
   return type === "commercial" || type === "bumper";
 }
-function normalizePositiveInteger(value: unknown, fallback = 0): number {
+
+function normalizePositiveInteger(
+  value: unknown,
+  fallback = 0,
+): number {
   const numeric = Math.floor(Number(value));
+
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
@@ -581,23 +679,27 @@ function normalizeBreakpoints(value: unknown, duration: number): number[] {
         .filter(
           (point) =>
             Number.isFinite(point) &&
-            point > 0 &&
-            point < safeDuration,
+            point >= 60 &&
+            point <= Math.max(0, safeDuration - 60),
         ),
     ),
   ).sort((a, b) => a - b);
 }
 
-function normalizeDurationList(value: unknown): number[] {
+function normalizeDurationList(value: unknown, expectedLength?: number): number[] {
   if (!Array.isArray(value)) return [];
 
-  return Array.from(
-    new Set(
-      value
-        .map((point) => Math.floor(Number(point)))
-        .filter((point) => Number.isFinite(point) && point > 0),
-    ),
-  );
+  const values = value
+    .map((point) => Math.floor(Number(point)))
+    .filter((point) => Number.isFinite(point) && point > 0);
+
+  const deduped = Array.from(new Set(values));
+
+  if (typeof expectedLength === "number") {
+    return deduped.slice(0, Math.max(0, expectedLength));
+  }
+
+  return deduped;
 }
 
 function normalizeAirDays(value: unknown): Weekday[] {
@@ -606,10 +708,40 @@ function normalizeAirDays(value: unknown): Weekday[] {
   return Array.from(new Set(value.filter(isWeekday)));
 }
 
+function normalizeClockTime(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const clean = value.trim();
+
+  if (!clean) return undefined;
+
+  const match = clean.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!match) return undefined;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return undefined;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 function inferMediaProvider(file: string | undefined): MediaItem["provider"] {
   if (!file) return "unknown";
 
-  if (file.includes(".r2.dev") || file.toLowerCase().includes("cloudflare")) {
+  const clean = file.toLowerCase();
+
+  if (clean.includes(".r2.dev") || clean.includes("cloudflare")) {
     return "cloudflare-r2";
   }
 
@@ -641,17 +773,38 @@ function normalizeCommercialCategory(value: unknown): string | undefined {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9-_\s]/g, "")
-    .replace(/\s+/g, "-");
+    .replace(/\s+/g, "-")
+    .slice(0, 32);
 
   return clean || undefined;
 }
 
+function normalizeBrandingUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const clean = value.trim().slice(0, 1000);
+
+  if (!clean) return undefined;
+
+  if (
+    clean.startsWith("/") ||
+    clean.startsWith("data:image/") ||
+    /^https?:\/\//i.test(clean)
+  ) {
+    return clean;
+  }
+
+  return undefined;
+}
 
 function isAdMedia(item: MediaItem | undefined): boolean {
   return item?.type === "commercial" || item?.type === "bumper";
 }
 
-function normalizeAdCategoryList(value: unknown, fallback?: string): AdCategory[] {
+function normalizeAdCategoryList(
+  value: unknown,
+  fallback?: string,
+): AdCategory[] {
   const source = Array.isArray(value) ? value : [];
 
   const normalized = source
@@ -659,10 +812,10 @@ function normalizeAdCategoryList(value: unknown, fallback?: string): AdCategory[
     .filter((item): item is string => Boolean(item));
 
   if (normalized.length > 0) {
-    return dedupeStrings(normalized);
+    return dedupeStrings(normalized) as AdCategory[];
   }
 
-  return fallback ? [fallback] : [];
+  return fallback ? ([fallback] as AdCategory[]) : [];
 }
 
 function normalizeAdChannelTargets(value: unknown): AdChannelTarget[] {
@@ -672,30 +825,21 @@ function normalizeAdChannelTargets(value: unknown): AdChannelTarget[] {
     value
       .map((item) => normalizeText(item, ""))
       .filter(Boolean),
-  );
+  ) as AdChannelTarget[];
 }
 
 function normalizeAdPlacements(value: unknown): AdPlacement[] {
-  const validPlacements: AdPlacement[] = [
-    "pre-roll",
-    "mid-roll",
-    "post-roll",
-    "between-programs",
-    "top-of-hour",
-    "filler",
-  ];
-
   if (!Array.isArray(value)) {
-    return DEFAULT_AD_PLACEMENTS;
+    return [...DEFAULT_AD_PLACEMENTS];
   }
 
   const placements = value.filter((item): item is AdPlacement =>
-    validPlacements.includes(item as AdPlacement),
+    VALID_AD_PLACEMENTS.includes(item as AdPlacement),
   );
 
   return placements.length > 0
     ? Array.from(new Set(placements))
-    : DEFAULT_AD_PLACEMENTS;
+    : [...DEFAULT_AD_PLACEMENTS];
 }
 
 function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
@@ -706,7 +850,7 @@ function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
   const policy = value as ChannelAdPolicy;
 
   return {
-    ...DEFAULT_AD_POLICY,
+    ...createDefaultAdPolicy(),
     ...policy,
     placements: normalizeAdPlacements(policy.placements),
     strategy: isCommercialStrategy(policy.strategy) ? policy.strategy : "best-fit",
@@ -732,7 +876,100 @@ function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
 function ensureChannelAdPolicy(channel: Channel): Channel {
   return {
     ...channel,
-    adPolicy: normalizeAdPolicy(channel.adPolicy) ?? DEFAULT_AD_POLICY,
+    adPolicy: normalizeAdPolicy(channel.adPolicy) ?? createDefaultAdPolicy(),
+  };
+}
+
+function normalizeMediaItem(item: MediaItem): MediaItem {
+  const now = new Date().toISOString();
+  const type = normalizeMediaType(item.type);
+  const duration = Math.max(1, Math.floor(Number(item.duration) || 1));
+  const file = normalizeText(item.file, "");
+  const slotLengthSeconds = isProgramMediaType(type)
+    ? normalizePositiveInteger(item.slotLengthSeconds)
+    : 0;
+  const safeSlotLengthSeconds =
+    slotLengthSeconds > duration ? slotLengthSeconds : undefined;
+  const breakpoints = isProgramMediaType(type)
+    ? normalizeBreakpoints(item.breakpoints, duration)
+    : [];
+  const breakDurations = isProgramMediaType(type)
+    ? normalizeDurationList(item.breakDurations, breakpoints.length)
+    : [];
+  const commercialCategory = normalizeCommercialCategory(item.commercialCategory);
+
+  return {
+    ...item,
+    id: normalizeText(item.id, createFallbackId()),
+    title: normalizeText(item.title, "Untitled Media"),
+    type,
+    duration,
+    file,
+    mimeType: item.mimeType ?? inferMimeType(file),
+    originalName: normalizeOptionalText(item.originalName) ?? item.originalName,
+    provider: item.provider ?? inferMediaProvider(file),
+
+    breakpoints,
+    breakDurations,
+    slotLengthSeconds: safeSlotLengthSeconds,
+    fillSlotWithCommercials:
+      isProgramMediaType(type) && safeSlotLengthSeconds
+        ? Boolean(item.fillSlotWithCommercials)
+        : false,
+    commercialStrategy: isCommercialStrategy(item.commercialStrategy)
+      ? item.commercialStrategy
+      : "best-fit",
+
+    airDays: isProgramMediaType(type) ? normalizeAirDays(item.airDays) : [],
+    airStartTime: isProgramMediaType(type)
+      ? normalizeClockTime(item.airStartTime)
+      : undefined,
+
+    allowCommercialSlicing: isCommercialMediaType(type)
+      ? item.allowCommercialSlicing === true
+      : false,
+    commercialCategory: isCommercialMediaType(type)
+      ? commercialCategory
+      : undefined,
+
+    adChannelIds: isCommercialMediaType(type)
+      ? normalizeAdChannelTargets(item.adChannelIds)
+      : [],
+    adPlacements: isCommercialMediaType(type)
+      ? normalizeAdPlacements(item.adPlacements)
+      : [],
+    adCategories: isCommercialMediaType(type)
+      ? normalizeAdCategoryList(
+          item.adCategories,
+          commercialCategory ?? "general",
+        )
+      : [],
+    adPriority: Math.max(0, Math.floor(Number(item.adPriority) || 0)),
+    adMaxPlaysPerHour:
+      item.adMaxPlaysPerHour === undefined
+        ? undefined
+        : normalizePositiveInteger(item.adMaxPlaysPerHour),
+    adMinSecondsBetweenPlays:
+      item.adMinSecondsBetweenPlays === undefined
+        ? undefined
+        : normalizePositiveInteger(item.adMinSecondsBetweenPlays),
+    adDays: isCommercialMediaType(type) ? normalizeAirDays(item.adDays) : [],
+    adStartTime: isCommercialMediaType(type)
+      ? normalizeClockTime(item.adStartTime)
+      : undefined,
+    adEndTime: isCommercialMediaType(type)
+      ? normalizeClockTime(item.adEndTime)
+      : undefined,
+    isHouseAd: isCommercialMediaType(type) ? Boolean(item.isHouseAd) : false,
+    advertiserName: isCommercialMediaType(type)
+      ? normalizeText(item.advertiserName, "")
+      : "",
+    campaignName: isCommercialMediaType(type)
+      ? normalizeText(item.campaignName, "")
+      : "",
+
+    createdAt: item.createdAt ?? now,
+    updatedAt: now,
   };
 }
 
@@ -749,6 +986,19 @@ function addAdTargetToMediaItem(item: MediaItem, channelId: string): MediaItem {
     adCategories: normalizeAdCategoryList(
       item.adCategories,
       commercialCategory ?? "general",
+    ),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function removeAdTargetFromMediaItem(
+  item: MediaItem,
+  channelId: string,
+): MediaItem {
+  return normalizeMediaItem({
+    ...item,
+    adChannelIds: normalizeAdChannelTargets(item.adChannelIds).filter(
+      (target) => String(target) !== String(channelId),
     ),
     updatedAt: new Date().toISOString(),
   });
@@ -779,10 +1029,10 @@ function extractAdsFromChannelLineups(
       ]);
     }
 
-    return {
+    return ensureChannelAdPolicy({
       ...channel,
       mediaIds: dedupeStrings(keptMediaIds),
-    };
+    });
   });
 
   const cleanedMedia = media.map((item) => {
@@ -811,67 +1061,6 @@ function extractAdsFromChannelLineups(
     media: cleanedMedia,
   };
 }
-function normalizeMediaItem(item: MediaItem): MediaItem {
-  const now = new Date().toISOString();
-  const duration = Math.max(1, Math.floor(Number(item.duration) || 1));
-  const file = normalizeText(item.file, "");
-  const slotLengthSeconds = normalizePositiveInteger(item.slotLengthSeconds);
-  const type = normalizeMediaType(item.type);
-
-  return {
-    ...item,
-    id: normalizeText(item.id, createFallbackId()),
-    title: normalizeText(item.title, "Untitled Media"),
-    type,
-    duration,
-    file,
-    mimeType: item.mimeType ?? inferMimeType(file),
-    provider: item.provider ?? inferMediaProvider(file),
-    breakpoints: normalizeBreakpoints(item.breakpoints, duration),
-    breakDurations: normalizeDurationList(item.breakDurations),
-    slotLengthSeconds:
-      slotLengthSeconds > duration ? slotLengthSeconds : undefined,
-    fillSlotWithCommercials:
-      type === "show" || type === "movie"
-        ? Boolean(item.fillSlotWithCommercials)
-        : false,
-    commercialStrategy: isCommercialStrategy(item.commercialStrategy)
-      ? item.commercialStrategy
-      : "best-fit",
-    airDays: normalizeAirDays(item.airDays),
-    airStartTime: normalizeText(item.airStartTime, ""),
-    allowCommercialSlicing:
-      item.allowCommercialSlicing ?? item.type === "commercial",
-    commercialCategory: normalizeCommercialCategory(item.commercialCategory),
-    adChannelIds: normalizeAdChannelTargets(item.adChannelIds),
-    adPlacements: isCommercialMediaType(type)
-      ? normalizeAdPlacements(item.adPlacements)
-      : item.adPlacements,
-    adCategories: isCommercialMediaType(type)
-      ? normalizeAdCategoryList(
-          item.adCategories,
-          normalizeCommercialCategory(item.commercialCategory) ?? "general",
-        )
-      : item.adCategories,
-    adPriority: Math.max(0, Math.floor(Number(item.adPriority) || 0)),
-    adMaxPlaysPerHour:
-      item.adMaxPlaysPerHour === undefined
-        ? undefined
-        : normalizePositiveInteger(item.adMaxPlaysPerHour),
-    adMinSecondsBetweenPlays:
-      item.adMinSecondsBetweenPlays === undefined
-        ? undefined
-        : normalizePositiveInteger(item.adMinSecondsBetweenPlays),
-    adDays: normalizeAirDays(item.adDays),
-    adStartTime: normalizeText(item.adStartTime, ""),
-    adEndTime: normalizeText(item.adEndTime, ""),
-    isHouseAd: Boolean(item.isHouseAd),
-    advertiserName: normalizeText(item.advertiserName, ""),
-    campaignName: normalizeText(item.campaignName, ""),
-    createdAt: item.createdAt ?? now,
-    updatedAt: now,
-  };
-}
 
 function isValidScheduleMode(value: unknown): value is ScheduleMode {
   return value === "ordered" || value === "daily-random";
@@ -897,7 +1086,10 @@ function matchesBrandingMarker(
   return Object.entries(marker).every(([key, markerValue]) => {
     const brandingValue = branding[key as keyof ChannelBranding];
 
-    return normalizeComparableText(brandingValue) === normalizeComparableText(markerValue);
+    return (
+      normalizeComparableText(brandingValue) ===
+      normalizeComparableText(markerValue)
+    );
   });
 }
 
@@ -961,7 +1153,9 @@ function mergeChannelBranding(
     description: channel.branding?.description ?? fallbackBranding.description,
     accentColor: channel.branding?.accentColor ?? fallbackBranding.accentColor,
     logoText: channel.branding?.logoText ?? fallbackBranding.logoText,
-    logoUrl: channel.branding?.logoUrl ?? fallbackBranding.logoUrl,
+    logoUrl:
+      normalizeBrandingUrl(channel.branding?.logoUrl) ??
+      fallbackBranding.logoUrl,
   };
 }
 
@@ -970,12 +1164,10 @@ function normalizeChannel(channel: Channel): Channel {
   const resolvedChannelNumber = Number.isFinite(channelNumber)
     ? channelNumber
     : undefined;
-
   const fallbackBranding = createDefaultChannelBranding(
     resolvedChannelNumber ?? 1,
   );
-
-  const defaultSlotLengthSeconds = normalizePositiveInteger(
+  const explicitDefaultSlotLength = normalizePositiveInteger(
     channel.defaultSlotLengthSeconds,
   );
 
@@ -986,7 +1178,7 @@ function normalizeChannel(channel: Channel): Channel {
 
   const branding = mergeChannelBranding(channel, fallbackBranding);
 
-  return {
+  return ensureChannelAdPolicy({
     ...channel,
     id: normalizeText(channel.id, String(resolvedChannelNumber || 1)),
     name: normalizeText(channel.name, fallbackChannelName),
@@ -1004,12 +1196,13 @@ function normalizeChannel(channel: Channel): Channel {
       `channel-${resolvedChannelNumber ?? channel.id}`,
     ),
     defaultSlotLengthSeconds:
-      defaultSlotLengthSeconds > 0 ? defaultSlotLengthSeconds : 1800,
+      explicitDefaultSlotLength > 0 ? explicitDefaultSlotLength : undefined,
     commercialStrategy: isCommercialStrategy(channel.commercialStrategy)
       ? channel.commercialStrategy
       : "best-fit",
     branding,
-  };
+    adPolicy: normalizeAdPolicy(channel.adPolicy) ?? createDefaultAdPolicy(),
+  });
 }
 
 function mergeById<T extends { id: string }>(defaults: T[], saved?: T[]): T[] {
@@ -1047,7 +1240,10 @@ function getValidThemeId(value: unknown): ThemeId {
 
 function getValidOwnedThemes(value: unknown): ThemeId[] {
   if (!Array.isArray(value)) return [];
-  return dedupeStrings(value).filter(isThemeId);
+
+  return dedupeStrings(
+    value.filter((item): item is string => typeof item === "string"),
+  ).filter(isThemeId);
 }
 
 function getValidAppMode(value: unknown): AppMode {
@@ -1158,7 +1354,22 @@ function normalizeChannelsWithDefaults(
 ): Channel[] {
   const mergedChannels = mergeById(defaultChannels, channels).map(normalizeChannel);
 
-  return migrateLegacyPulseMusicToChannel20(mergedChannels, media);
+  return migrateLegacyPulseMusicToChannel20(mergedChannels, media).map(
+    ensureChannelAdPolicy,
+  );
+}
+
+function normalizeProgrammingCollections(
+  media: MediaItem[],
+  channels: Channel[],
+): { media: MediaItem[]; channels: Channel[] } {
+  const normalizedMedia = media.map(normalizeMediaItem);
+  const normalizedChannels = normalizeChannelsWithDefaults(
+    channels,
+    normalizedMedia,
+  );
+
+  return extractAdsFromChannelLineups(normalizedChannels, normalizedMedia);
 }
 
 export const useStore = create<AppState>()(
@@ -1204,8 +1415,8 @@ export const useStore = create<AppState>()(
         }),
 
       updateMedia: (mediaId, patch) =>
-        set((state) => ({
-          media: state.media.map((item) =>
+        set((state) => {
+          const nextMedia = state.media.map((item) =>
             item.id === mediaId
               ? normalizeMediaItem({
                   ...item,
@@ -1214,8 +1425,10 @@ export const useStore = create<AppState>()(
                   updatedAt: new Date().toISOString(),
                 })
               : item,
-          ),
-        })),
+          );
+
+          return extractAdsFromChannelLineups(state.channels, nextMedia);
+        }),
 
       removeMedia: (mediaId) =>
         set((state) => ({
@@ -1329,8 +1542,11 @@ export const useStore = create<AppState>()(
                 accentColor:
                   fallbackBranding.accentColor ?? DEFAULT_ACCENT_COLOR,
                 logoText: fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
-                logoUrl: fallbackBranding.logoUrl,
+                logoUrl: normalizeBrandingUrl(fallbackBranding.logoUrl),
                 ...brandingPatch,
+                logoUrl:
+                  normalizeBrandingUrl(brandingPatch.logoUrl) ??
+                  normalizeBrandingUrl(fallbackBranding.logoUrl),
               },
             };
           }),
@@ -1338,35 +1554,45 @@ export const useStore = create<AppState>()(
 
       updateChannelSettings: (channelId, patch) =>
         set((state) => ({
-          channels: state.channels.map((channel) =>
-            channel.id === channelId
-              ? normalizeChannel({
-                  ...channel,
-                  scheduleMode:
-                    patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
-                      ? patch.scheduleMode
-                      : channel.scheduleMode,
-                  commercialBreakMode:
-                    patch.commercialBreakMode &&
-                    isValidCommercialBreakMode(patch.commercialBreakMode)
-                      ? patch.commercialBreakMode
-                      : channel.commercialBreakMode,
-                  randomSeed:
-                    patch.randomSeed !== undefined
-                      ? normalizeText(patch.randomSeed, `channel-${channel.id}`)
-                      : channel.randomSeed,
-                  defaultSlotLengthSeconds:
-                    patch.defaultSlotLengthSeconds !== undefined
-                      ? patch.defaultSlotLengthSeconds
-                      : channel.defaultSlotLengthSeconds,
-                  commercialStrategy:
-                    patch.commercialStrategy &&
-                    isCommercialStrategy(patch.commercialStrategy)
-                      ? patch.commercialStrategy
-                      : channel.commercialStrategy,
-                })
-              : channel,
-          ),
+          channels: state.channels.map((channel) => {
+            if (channel.id !== channelId) return channel;
+
+            const hasDefaultSlotPatch = Object.prototype.hasOwnProperty.call(
+              patch,
+              "defaultSlotLengthSeconds",
+            );
+
+            return normalizeChannel({
+              ...channel,
+              scheduleMode:
+                patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
+                  ? patch.scheduleMode
+                  : channel.scheduleMode,
+              commercialBreakMode:
+                patch.commercialBreakMode &&
+                isValidCommercialBreakMode(patch.commercialBreakMode)
+                  ? patch.commercialBreakMode
+                  : channel.commercialBreakMode,
+              randomSeed:
+                patch.randomSeed !== undefined
+                  ? normalizeText(patch.randomSeed, `channel-${channel.id}`)
+                  : channel.randomSeed,
+              defaultSlotLengthSeconds: hasDefaultSlotPatch
+                ? patch.defaultSlotLengthSeconds
+                : channel.defaultSlotLengthSeconds,
+              commercialStrategy:
+                patch.commercialStrategy &&
+                isCommercialStrategy(patch.commercialStrategy)
+                  ? patch.commercialStrategy
+                  : channel.commercialStrategy,
+              adPolicy: patch.adPolicy
+                ? normalizeAdPolicy({
+                    ...(channel.adPolicy ?? createDefaultAdPolicy()),
+                    ...patch.adPolicy,
+                  })
+                : channel.adPolicy,
+            });
+          }),
         })),
 
       assignMediaToChannel: (channelId, mediaId) =>
@@ -1386,7 +1612,9 @@ export const useStore = create<AppState>()(
                   : item,
               ),
               channels: state.channels.map((channel) =>
-                channel.id === channelId ? ensureChannelAdPolicy(channel) : channel,
+                channel.id === channelId
+                  ? ensureChannelAdPolicy(channel)
+                  : channel,
               ),
             };
           }
@@ -1396,7 +1624,6 @@ export const useStore = create<AppState>()(
               item.id === mediaId
                 ? normalizeMediaItem({
                     ...item,
-                    type: normalizeMediaType(item.type),
                     updatedAt: new Date().toISOString(),
                   })
                 : item,
@@ -1415,6 +1642,11 @@ export const useStore = create<AppState>()(
 
       removeMediaFromChannel: (channelId, mediaId) =>
         set((state) => ({
+          media: state.media.map((item) =>
+            item.id === mediaId && isAdMedia(item)
+              ? removeAdTargetFromMediaItem(item, channelId)
+              : item,
+          ),
           channels: state.channels.map((channel) =>
             channel.id === channelId
               ? {
@@ -1552,23 +1784,25 @@ export const useStore = create<AppState>()(
           channels: defaultChannels,
           currentChannelId: "1",
           isGuideOpen: false,
+          appMode: "viewer",
+          isSettingsOpen: false,
           deletedMediaIds: [],
+          viewerSettings: defaultViewerSettings,
         }),
 
       replaceProgramming: (snapshot) =>
         set(() => {
-          const nextMedia = snapshot.media.map(normalizeMediaItem);
-          const nextChannels = normalizeChannelsWithDefaults(
+          const normalized = normalizeProgrammingCollections(
+            snapshot.media,
             snapshot.channels,
-            nextMedia,
           );
 
           return {
-            media: nextMedia,
-            channels: nextChannels,
+            media: normalized.media,
+            channels: normalized.channels,
             currentChannelId: getSafeCurrentChannelId(
               snapshot.currentChannelId,
-              nextChannels,
+              normalized.channels,
             ),
             sidebarWidth: clamp(
               snapshot.sidebarWidth,
@@ -1591,15 +1825,18 @@ export const useStore = create<AppState>()(
 
       exportProgrammingSnapshot: () => {
         const state = get();
+        const normalized = extractAdsFromChannelLineups(
+          state.channels,
+          state.media,
+        );
 
         return {
-          media: state.media,
-          channels: state.channels,
+          media: normalized.media,
+          channels: normalized.channels,
           currentChannelId: state.currentChannelId,
           sidebarWidth: state.sidebarWidth,
           guideHeight: state.guideHeight,
           appMode: "viewer",
-          isSettingsOpen: false,
           themeId: state.themeId,
           ownedPremiumThemes: state.ownedPremiumThemes,
           updatedAt: new Date().toISOString(),
@@ -1622,24 +1859,29 @@ export const useStore = create<AppState>()(
           ? saved.channels
           : [];
 
-        const mergedMedia = removeDeletedDefaults(
+        const mergedMediaSource = removeDeletedDefaults(
           mergeById(defaultMedia, savedMedia.map(normalizeMediaItem)),
           deletedMediaIds,
         );
 
-        const mergedChannels = removeMediaIdsFromChannels(
-          normalizeChannelsWithDefaults(savedChannels, mergedMedia),
+        const mergedChannelSource = removeMediaIdsFromChannels(
+          normalizeChannelsWithDefaults(savedChannels, mergedMediaSource),
           deletedMediaIds,
+        );
+
+        const normalized = extractAdsFromChannelLineups(
+          mergedChannelSource,
+          mergedMediaSource,
         );
 
         return {
           ...currentState,
           ...saved,
-          media: mergedMedia,
-          channels: mergedChannels,
+          media: normalized.media,
+          channels: normalized.channels,
           currentChannelId: getSafeCurrentChannelId(
             saved?.currentChannelId,
-            mergedChannels,
+            normalized.channels,
           ),
           isGuideOpen: false,
           sidebarWidth: clamp(
@@ -1652,7 +1894,12 @@ export const useStore = create<AppState>()(
             MIN_GUIDE_HEIGHT,
             MAX_GUIDE_HEIGHT,
           ),
-          appMode: getValidAppMode(saved?.appMode),
+
+          /**
+           * Never restore admin mode from local persisted programming.
+           * Admin mode must come from the protected local auth flow only.
+           */
+          appMode: "viewer",
           isSettingsOpen: false,
           themeId: getValidThemeId(saved?.themeId),
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
@@ -1661,19 +1908,30 @@ export const useStore = create<AppState>()(
         };
       },
 
-      partialize: (state) => ({
-        media: state.media,
-        channels: state.channels,
-        currentChannelId: state.currentChannelId,
-        isGuideOpen: state.isGuideOpen,
-        sidebarWidth: state.sidebarWidth,
-        guideHeight: state.guideHeight,
-        appMode: state.appMode,
-        themeId: state.themeId,
-        ownedPremiumThemes: state.ownedPremiumThemes,
-        deletedMediaIds: state.deletedMediaIds,
-        viewerSettings: state.viewerSettings,
-      }),
+      partialize: (state) => {
+        const normalized = extractAdsFromChannelLineups(
+          state.channels,
+          state.media,
+        );
+
+        return {
+          media: normalized.media,
+          channels: normalized.channels,
+          currentChannelId: state.currentChannelId,
+          isGuideOpen: false,
+          sidebarWidth: state.sidebarWidth,
+          guideHeight: state.guideHeight,
+          appMode: "viewer" as AppMode,
+          themeId: state.themeId,
+          ownedPremiumThemes: state.ownedPremiumThemes,
+          deletedMediaIds: state.deletedMediaIds,
+          viewerSettings: {
+            ...state.viewerSettings,
+            isSettingsOpen: false,
+            isAdminAccessOpen: false,
+          },
+        };
+      },
     },
   ),
 );
