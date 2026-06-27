@@ -62,13 +62,7 @@ const CLASSIC_BREAK_ITEM_COUNT = 2;
 
 const MIN_SEGMENT_SECONDS = 90;
 
-const DEFAULT_30_MIN_SLOT_SECONDS = 30 * 60;
-const DEFAULT_60_MIN_SLOT_SECONDS = 60 * 60;
 const DAILY_FIXED_SCHEDULE_SECONDS = 24 * 60 * 60;
-
-const DEFAULT_30_MIN_BREAKPOINTS = [7 * 60 + 30, 15 * 60];
-const DEFAULT_30_MIN_BREAK_DURATIONS = [2 * 60, 2 * 60];
-
 const DEFAULT_INTERNAL_BREAK_SECONDS = 2 * 60;
 const COMMERCIAL_MATCH_TOLERANCE_SECONDS = 12;
 
@@ -365,49 +359,21 @@ function getSlotLength(item: MediaItem, channel?: Channel): number {
     return channelSlot;
   }
 
-  if (item.type === "show" && duration <= 28 * 60) {
-    return DEFAULT_30_MIN_SLOT_SECONDS;
-  }
-
-  if (item.type === "show" && duration <= 58 * 60) {
-    return DEFAULT_60_MIN_SLOT_SECONDS;
-  }
-
+  /**
+   * Launch-safe rule:
+   * Do not invent 30m/60m slot lengths here. Slot filling must only happen
+   * when item/channel metadata explicitly provides a longer slot length.
+   */
   return 0;
 }
 
-function isStandardThirtyMinuteShow(
-  item: MediaItem,
-  channel?: Channel,
-): boolean {
-  return (
-    item.type === "show" &&
-    item.duration > 0 &&
-    item.duration <= 28 * 60 &&
-    getSlotLength(item, channel) === DEFAULT_30_MIN_SLOT_SECONDS
-  );
-}
-
-function hasSavedBreakpoints(item: MediaItem): boolean {
-  return (
-    Array.isArray(item.breakpoints) &&
-    item.breakpoints.some((value) => {
-      const seconds = Math.floor(Number(value));
-
-      return Number.isFinite(seconds) && seconds > 0;
-    })
-  );
-}
-
-function normalizeBreakpoints(item: MediaItem, channel?: Channel): number[] {
+function normalizeBreakpoints(item: MediaItem): number[] {
   const duration = getSafeDuration(item);
   const saved = Array.isArray(item.breakpoints) ? item.breakpoints : [];
 
-  const source = saved;
-
   return Array.from(
     new Set(
-      source
+      saved
         .map((value) => Math.floor(Number(value)))
         .filter(
           (value) =>
@@ -419,25 +385,21 @@ function normalizeBreakpoints(item: MediaItem, channel?: Channel): number[] {
   ).sort((a, b) => a - b);
 }
 
+function hasSavedBreakpoints(item: MediaItem): boolean {
+  return normalizeBreakpoints(item).length > 0;
+}
+
 function normalizeBreakDurations(
   item: MediaItem,
   breakCount: number,
-  channel?: Channel,
 ): number[] {
   const saved = Array.isArray(item.breakDurations) ? item.breakDurations : [];
-  const standardThirty = isStandardThirtyMinuteShow(item, channel);
 
   return Array.from({ length: breakCount }, (_, index) => {
     const savedValue = Math.floor(Number(saved[index]));
 
     if (Number.isFinite(savedValue) && savedValue > 0) {
       return savedValue;
-    }
-
-    if (standardThirty) {
-      return (
-        DEFAULT_30_MIN_BREAK_DURATIONS[index] ?? DEFAULT_INTERNAL_BREAK_SECONDS
-      );
     }
 
     return DEFAULT_INTERNAL_BREAK_SECONDS;
@@ -448,15 +410,17 @@ function getSlotSettings(
   item: MediaItem,
   channel: Channel | undefined,
 ): SlotSettings {
-  const breakpoints = normalizeBreakpoints(item, channel);
-  const standardThirty = isStandardThirtyMinuteShow(item, channel);
+  const breakpoints = normalizeBreakpoints(item);
   const slotLengthSeconds = getSlotLength(item, channel);
 
   return {
     slotLengthSeconds,
     breakpoints,
-    breakDurations: normalizeBreakDurations(item, breakpoints.length, channel),
-    fillSlotWithCommercials: isSlotManagedLongForm(item) && Boolean(item.fillSlotWithCommercials),
+    breakDurations: normalizeBreakDurations(item, breakpoints.length),
+    fillSlotWithCommercials:
+      isSlotManagedLongForm(item) &&
+      slotLengthSeconds > getSafeDuration(item) &&
+      Boolean(item.fillSlotWithCommercials),
     commercialStrategy: getCommercialStrategy(item, channel),
   };
 }
@@ -622,7 +586,9 @@ function createCommercialPool(
     ? availableAds.filter(isShortForm)
     : [];
 
-  return sortCommercialPool(dedupeMediaById([...directShortForm, ...globalShortForm]));
+  return sortCommercialPool(
+    dedupeMediaById([...directShortForm, ...globalShortForm]),
+  );
 }
 
 function createVirtualSegment(
@@ -686,7 +652,11 @@ function createTimedSlice(
 }
 
 function canSliceCommercial(item: MediaItem): boolean {
-  return item.allowCommercialSlicing !== false;
+  /**
+   * Launch-safe rule:
+   * Commercial slicing is opt-in only. Undefined must behave like false.
+   */
+  return item.allowCommercialSlicing === true;
 }
 
 function canFitCommercialInExactBlock(
@@ -985,7 +955,9 @@ function takeBreakItems(
 }
 
 function getBreakCount(mode: CommercialBreakMode): number {
-  return mode === "classic-tv" ? CLASSIC_BREAK_ITEM_COUNT : DEFAULT_BREAK_ITEM_COUNT;
+  return mode === "classic-tv"
+    ? CLASSIC_BREAK_ITEM_COUNT
+    : DEFAULT_BREAK_ITEM_COUNT;
 }
 
 function shouldAddEndBreak(mode: CommercialBreakMode): boolean {
@@ -1023,19 +995,17 @@ function buildSlotFillerSchedule(
   cursor: CommercialCursor,
 ): BroadcastItem[] {
   const settings = getSlotSettings(item, channel);
+  const duration = getSafeDuration(item);
 
   if (
     !settings.fillSlotWithCommercials ||
-    settings.slotLengthSeconds <= item.duration ||
+    settings.slotLengthSeconds <= duration ||
     shortFormItems.length === 0
   ) {
     return [];
   }
 
-  const remainingSlotSeconds = Math.max(
-    0,
-    settings.slotLengthSeconds - getSafeDuration(item),
-  );
+  const remainingSlotSeconds = Math.max(0, settings.slotLengthSeconds - duration);
 
   if (remainingSlotSeconds <= 0) {
     return [];
@@ -1076,14 +1046,14 @@ function buildManualBreakpointSchedule(
     return slotSchedule;
   }
 
-  const breakpoints = normalizeBreakpoints(item, channel);
+  const breakpoints = normalizeBreakpoints(item);
 
   if (breakpoints.length === 0 || shortFormItems.length === 0) {
     return [item];
   }
 
   const strategy = getCommercialStrategy(item, channel);
-  const breakDurations = normalizeBreakDurations(item, breakpoints.length, channel);
+  const breakDurations = normalizeBreakDurations(item, breakpoints.length);
   const schedule: BroadcastItem[] = [];
   const points = [0, ...breakpoints, getSafeDuration(item)];
 
@@ -1121,7 +1091,7 @@ function buildManualBreakpointSchedule(
     }
   }
 
-  return schedule;
+  return schedule.length > 0 ? schedule : [item];
 }
 
 function buildAutomaticBreakSchedule(
@@ -1132,7 +1102,6 @@ function buildAutomaticBreakSchedule(
   now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
-  const duration = getSafeDuration(item);
   const strategy = getCommercialStrategy(item, channel);
 
   const slotSchedule = buildSlotFillerSchedule(
@@ -1162,83 +1131,17 @@ function buildAutomaticBreakSchedule(
     return [item];
   }
 
-  const breakCount = getBreakCount(mode);
-
-  if (mode === "end-only" || duration < MIN_SEGMENT_SECONDS * 2) {
-    return [
-      item,
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "post-roll"),
-      ),
-    ];
-  }
-
-  if (mode === "midpoint-and-end") {
-    const firstHalf = Math.floor(duration / 2);
-    const secondHalf = duration - firstHalf;
-
-    return [
-      createVirtualSegment(item, 0, firstHalf, "Part 1"),
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "mid-roll"),
-      ),
-      createVirtualSegment(item, firstHalf, secondHalf, "Part 2"),
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "post-roll"),
-      ),
-    ];
-  }
-
-  if (mode === "classic-tv" && duration >= 2400) {
-    const first = Math.floor(duration / 3);
-    const second = Math.floor(duration / 3);
-    const third = duration - first - second;
-
-    return [
-      createVirtualSegment(item, 0, first, "Act 1"),
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "mid-roll"),
-      ),
-      createVirtualSegment(item, first, second, "Act 2"),
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "mid-roll"),
-      ),
-      createVirtualSegment(item, first + second, third, "Act 3"),
-      ...takeBreakItems(
-        shortFormItems,
-        breakCount,
-        cursor,
-        strategy,
-        createCommercialContext(channel, now, "post-roll"),
-      ),
-    ];
-  }
-
+  /**
+   * Launch-safe rule:
+   * Without saved breakpoints, do not split programs into automatic Part/Act
+   * virtual segments. Even midpoint-and-end/classic-tv modes should behave as
+   * program + post-roll ads unless the media item has deliberate breakpoints.
+   */
   return [
     item,
     ...takeBreakItems(
       shortFormItems,
-      breakCount,
+      getBreakCount(mode),
       cursor,
       strategy,
       createCommercialContext(channel, now, "post-roll"),
