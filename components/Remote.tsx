@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
 import type { Channel, PlayerViewMode } from "@/lib/types";
+
+const CHANNEL_ENTRY_AUTO_TUNE_MS = 1150;
+const MAX_TUNE_DIGITS = 3;
 
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
@@ -29,6 +32,14 @@ function getChannelNumberText(channel: Channel | undefined): string {
   return String(channel.number ?? channel.id);
 }
 
+function normalizeChannelEntry(value: string): string {
+  return value.replace(/\D/g, "").slice(0, MAX_TUNE_DIGITS);
+}
+
+function stripLeadingZeros(value: string): string {
+  return value.replace(/^0+/, "") || "0";
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -46,6 +57,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function shouldIgnoreKeyboardShortcut(event: KeyboardEvent): boolean {
   return (
+    event.defaultPrevented ||
     isTypingTarget(event.target) ||
     event.ctrlKey ||
     event.metaKey ||
@@ -64,7 +76,10 @@ function sortChannels(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return String(a.id).localeCompare(String(b.id));
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -77,6 +92,10 @@ function getViewModeLabel(mode: PlayerViewMode): string {
 
 function getFitModeLabel(mode: string): string {
   return mode === "contain" ? "Fit" : "Fill";
+}
+
+function getNextFitModeLabel(mode: string): string {
+  return mode === "contain" ? "Fill" : "Fit";
 }
 
 function getNextChannelIndex(currentIndex: number, channelCount: number): number {
@@ -102,23 +121,44 @@ function getPreviousChannelIndex(
   return (safeIndex - 1 + channelCount) % channelCount;
 }
 
+function channelMatchesEntry(channel: Channel, entry: string): boolean {
+  const cleanEntry = stripLeadingZeros(entry);
+  const paddedTwo = cleanEntry.padStart(2, "0");
+  const paddedThree = cleanEntry.padStart(3, "0");
+
+  const idText = String(channel.id).trim().toLowerCase();
+  const numberText = String(channel.number ?? "").trim();
+  const fallbackNumberText = String(Number(channel.id));
+
+  const candidates = new Set<string>([
+    idText,
+    numberText,
+    stripLeadingZeros(numberText),
+    numberText.padStart(2, "0"),
+    numberText.padStart(3, "0"),
+    fallbackNumberText,
+    `channel-${cleanEntry}`,
+    `ch-${cleanEntry}`,
+    `channel-${paddedTwo}`,
+    `ch-${paddedTwo}`,
+    `channel-${paddedThree}`,
+    `ch-${paddedThree}`,
+  ]);
+
+  return candidates.has(cleanEntry) || candidates.has(entry.toLowerCase());
+}
+
 function findChannelByEntry(
   channels: Channel[],
   entry: string,
 ): Channel | undefined {
-  const cleanEntry = entry.trim().replace(/^0+/, "") || "0";
+  const cleanEntry = normalizeChannelEntry(entry);
 
-  return channels.find((channel) => {
-    const numberText = String(channel.number ?? "").trim();
-    const idText = String(channel.id).trim();
+  if (!cleanEntry) {
+    return undefined;
+  }
 
-    return (
-      numberText === cleanEntry ||
-      idText === cleanEntry ||
-      idText.toLowerCase() === `channel-${cleanEntry}` ||
-      idText.toLowerCase() === `ch-${cleanEntry}`
-    );
-  });
+  return channels.find((channel) => channelMatchesEntry(channel, cleanEntry));
 }
 
 function RemoteButton({
@@ -129,7 +169,7 @@ function RemoteButton({
   danger = false,
   ariaLabel,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
@@ -202,10 +242,18 @@ export default function Remote() {
 
   const tuneChannelEntry = useCallback(
     (entry: string) => {
-      const targetChannel = findChannelByEntry(enabledChannels, entry);
+      const cleanEntry = normalizeChannelEntry(entry);
+
+      if (!cleanEntry) {
+        setStatusMessage("Enter a channel number.");
+        setChannelEntry("");
+        return;
+      }
+
+      const targetChannel = findChannelByEntry(enabledChannels, cleanEntry);
 
       if (!targetChannel) {
-        setStatusMessage(`No channel found for ${entry}.`);
+        setStatusMessage(`No channel found for CH ${cleanEntry}.`);
         setChannelEntry("");
         return;
       }
@@ -217,17 +265,15 @@ export default function Remote() {
     [enabledChannels, setChannel],
   );
 
-  const appendChannelDigit = useCallback(
-    (digit: string) => {
-      setChannelEntry((current) => {
-        const next = `${current}${digit}`.slice(-3);
-        setStatusMessage(`Tune ${next}`);
+  const appendChannelDigit = useCallback((digit: string) => {
+    setChannelEntry((current) => {
+      const next = normalizeChannelEntry(`${current}${digit}`);
 
-        return next;
-      });
-    },
-    [],
-  );
+      setStatusMessage(`Tune CH ${next}`);
+
+      return next;
+    });
+  }, []);
 
   const clearChannelEntry = useCallback(() => {
     setChannelEntry("");
@@ -279,6 +325,33 @@ export default function Remote() {
     setStatusMessage(`${getViewModeLabel(nextMode)} view active.`);
   }, [playerViewMode, setPlayerViewMode]);
 
+  const toggleGuideMode = useCallback(() => {
+    toggleGuide();
+    setStatusMessage(isGuideOpen ? "Guide closed." : "Guide opened.");
+  }, [isGuideOpen, toggleGuide]);
+
+  const toggleMuteMode = useCallback(() => {
+    toggleMuted();
+    setStatusMessage(muted ? "Audio unmuted." : "Audio muted.");
+  }, [muted, toggleMuted]);
+
+  const toggleFitModeWithStatus = useCallback(() => {
+    const nextLabel = getNextFitModeLabel(fitMode);
+
+    toggleFitMode();
+    setStatusMessage(`Video ${nextLabel} mode active.`);
+  }, [fitMode, toggleFitMode]);
+
+  const toggleFullscreenWithStatus = useCallback(() => {
+    requestFullscreenToggle();
+    setStatusMessage("Fullscreen toggled.");
+  }, [requestFullscreenToggle]);
+
+  const openSettings = useCallback(() => {
+    setSettingsOpen(true);
+    setStatusMessage("Settings opened.");
+  }, [setSettingsOpen]);
+
   useEffect(() => {
     if (!channelEntry) {
       return;
@@ -286,7 +359,7 @@ export default function Remote() {
 
     const timer = window.setTimeout(() => {
       tuneChannelEntry(channelEntry);
-    }, 1150);
+    }, CHANNEL_ENTRY_AUTO_TUNE_MS);
 
     return () => {
       window.clearTimeout(timer);
@@ -317,6 +390,20 @@ export default function Remote() {
         return;
       }
 
+      if (event.key === "Backspace" && channelEntry) {
+        event.preventDefault();
+
+        setChannelEntry((current) => {
+          const next = normalizeChannelEntry(current.slice(0, -1));
+
+          setStatusMessage(next ? `Tune CH ${next}` : "Channel entry cleared.");
+
+          return next;
+        });
+
+        return;
+      }
+
       if (event.key === "ArrowUp" || event.key === "PageUp") {
         event.preventDefault();
         goNext();
@@ -331,22 +418,19 @@ export default function Remote() {
 
       if (key === "g") {
         event.preventDefault();
-        toggleGuide();
-        setStatusMessage(isGuideOpen ? "Guide closed." : "Guide opened.");
+        toggleGuideMode();
         return;
       }
 
       if (key === "m") {
         event.preventDefault();
-        toggleMuted();
-        setStatusMessage(muted ? "Audio unmuted." : "Audio muted.");
+        toggleMuteMode();
         return;
       }
 
       if (key === "f") {
         event.preventDefault();
-        requestFullscreenToggle();
-        setStatusMessage("Fullscreen toggled.");
+        toggleFullscreenWithStatus();
         return;
       }
 
@@ -370,8 +454,7 @@ export default function Remote() {
 
       if (key === "s") {
         event.preventDefault();
-        setSettingsOpen(true);
-        setStatusMessage("Settings opened.");
+        openSettings();
       }
     };
 
@@ -386,13 +469,11 @@ export default function Remote() {
     clearChannelEntry,
     goNext,
     goPrev,
-    isGuideOpen,
-    muted,
-    requestFullscreenToggle,
-    setSettingsOpen,
-    toggleGuide,
+    openSettings,
+    toggleFullscreenWithStatus,
+    toggleGuideMode,
     toggleMiniMode,
-    toggleMuted,
+    toggleMuteMode,
     toggleRemoteMinimized,
     toggleTheaterMode,
     tuneChannelEntry,
@@ -471,10 +552,7 @@ export default function Remote() {
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
-            onClick={() => {
-              setSettingsOpen(true);
-              setStatusMessage("Settings opened.");
-            }}
+            onClick={openSettings}
             className="rounded-xl px-3 py-2 text-xs font-black transition hover:scale-[1.03] hover:opacity-95"
             style={{
               background: "var(--button-bg)",
@@ -549,10 +627,7 @@ export default function Remote() {
         </RemoteButton>
 
         <RemoteButton
-          onClick={() => {
-            toggleGuide();
-            setStatusMessage(isGuideOpen ? "Guide closed." : "Guide opened.");
-          }}
+          onClick={toggleGuideMode}
           active={isGuideOpen}
           ariaLabel={isGuideOpen ? "Close guide" : "Open guide"}
         >
@@ -616,13 +691,7 @@ export default function Remote() {
       </div>
 
       <div className="mt-2 grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
-        <RemoteButton
-          onClick={() => {
-            toggleMuted();
-            setStatusMessage(muted ? "Audio unmuted." : "Audio muted.");
-          }}
-          danger={muted}
-        >
+        <RemoteButton onClick={toggleMuteMode} danger={muted}>
           {muted ? "Muted" : "Mute"}
         </RemoteButton>
 
@@ -641,23 +710,11 @@ export default function Remote() {
           className="w-full accent-current"
         />
 
-        <RemoteButton
-          onClick={() => {
-            toggleFitMode();
-            setStatusMessage(`Video ${getFitModeLabel(fitMode)} mode toggled.`);
-          }}
-        >
+        <RemoteButton onClick={toggleFitModeWithStatus}>
           {getFitModeLabel(fitMode)}
         </RemoteButton>
 
-        <RemoteButton
-          onClick={() => {
-            requestFullscreenToggle();
-            setStatusMessage("Fullscreen toggled.");
-          }}
-        >
-          Full
-        </RemoteButton>
+        <RemoteButton onClick={toggleFullscreenWithStatus}>Full</RemoteButton>
       </div>
 
       <div
