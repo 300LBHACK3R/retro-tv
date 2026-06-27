@@ -1,4 +1,4 @@
-﻿import { create } from "zustand";
+import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 import type {
@@ -575,9 +575,9 @@ function normalizeText(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
 
   const trimmed = value
-    .replace(/â€¢/g, " / ")
-    .replace(/â€˘/g, " / ")
-    .replace(/Â/g, "")
+    .replace(/•/g, " / ")
+    .replace(/�?/g, " / ")
+    .replace(/�/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -1542,11 +1542,10 @@ export const useStore = create<AppState>()(
                 accentColor:
                   fallbackBranding.accentColor ?? DEFAULT_ACCENT_COLOR,
                 logoText: fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
-                logoUrl: normalizeBrandingUrl(fallbackBranding.logoUrl),
                 ...brandingPatch,
-                logoUrl:
-                  normalizeBrandingUrl(brandingPatch.logoUrl) ??
-                  normalizeBrandingUrl(fallbackBranding.logoUrl),
+                logoUrl: Object.prototype.hasOwnProperty.call(brandingPatch, "logoUrl")
+                  ? normalizeBrandingUrl(brandingPatch.logoUrl)
+                  : normalizeBrandingUrl(fallbackBranding.logoUrl),
               },
             };
           }),
