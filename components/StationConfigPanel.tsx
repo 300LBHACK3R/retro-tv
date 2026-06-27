@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   programmingStoreName,
   programmingStoreVersion,
@@ -32,15 +32,50 @@ type ConfigStat = {
   label: string;
   value: string | number;
   helper: string;
+  tone?: "default" | "warning" | "danger";
 };
 
-const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+type ImportStatus = "neutral" | "success" | "warning" | "error";
+
+const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const RELOAD_DELAY_MS = 500;
+const PRE_IMPORT_BACKUP_KEY = `${programmingStoreName}:pre-import-backup`;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isAdInventoryItem(item: MediaItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
+function getEmbeddedAdCount(media: MediaItem[], channels: Channel[]): number {
+  const mediaById = new Map(media.map((item) => [item.id, item]));
+  const embeddedAdIds = new Set<string>();
+
+  channels.forEach((channel) => {
+    channel.mediaIds.forEach((mediaId) => {
+      const item = mediaById.get(mediaId);
+
+      if (item && isAdInventoryItem(item)) {
+        embeddedAdIds.add(mediaId);
+      }
+    });
+  });
+
+  return embeddedAdIds.size;
+}
+
+function mergeThemeIds(primary: ThemeId[], fallback: ThemeId[]): ThemeId[] {
+  return Array.from(new Set([...primary, ...fallback]));
+}
 
 function buildExportPayload(snapshot: StoreSnapshot): ExportPayload {
+  const now = new Date().toISOString();
+
   return {
     schemaVersion: 2,
-    exportedAt: new Date().toISOString(),
+    exportedAt: now,
     app: "tates-tv",
     media: snapshot.media,
     channels: snapshot.channels,
@@ -56,22 +91,46 @@ function buildExportPayload(snapshot: StoreSnapshot): ExportPayload {
 
     themeId: snapshot.themeId,
     ownedPremiumThemes: snapshot.ownedPremiumThemes,
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
   };
 }
 
-function parseImportPayload(raw: unknown): ProgrammingSnapshot {
-  const sanitized = sanitizeProgrammingSnapshot(raw);
+function extractSnapshotCandidate(raw: unknown): unknown {
+  if (!isRecord(raw)) {
+    return raw;
+  }
+
+  /**
+   * Allows importing a raw exported station config OR a direct Zustand persist
+   * payload shaped like { state, version }.
+   */
+  if (isRecord(raw.state)) {
+    return raw.state;
+  }
+
+  return raw;
+}
+
+function parseImportPayload(
+  raw: unknown,
+  existingOwnedPremiumThemes: ThemeId[],
+): ProgrammingSnapshot {
+  const candidate = extractSnapshotCandidate(raw);
+  const sanitized = sanitizeProgrammingSnapshot(candidate);
 
   if (!sanitized) {
     throw new Error(
-      "Import failed. This JSON file does not contain valid TatesTv programming data.",
+      "Import failed. This JSON file does not contain valid Tate's TV programming data.",
     );
   }
 
   return {
     ...sanitized,
     appMode: "viewer",
+    ownedPremiumThemes: mergeThemeIds(
+      sanitized.ownedPremiumThemes,
+      existingOwnedPremiumThemes,
+    ),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -173,16 +232,78 @@ async function readJsonFile(file: File): Promise<unknown> {
   }
 }
 
+function createPreImportBackup(): void {
+  const currentPayload = localStorage.getItem(programmingStoreName);
+
+  if (!currentPayload) {
+    return;
+  }
+
+  localStorage.setItem(
+    PRE_IMPORT_BACKUP_KEY,
+    JSON.stringify({
+      createdAt: new Date().toISOString(),
+      storeName: programmingStoreName,
+      payload: JSON.parse(currentPayload) as unknown,
+    }),
+  );
+}
+
+function getStatusStyles(status: ImportStatus) {
+  if (status === "error") {
+    return {
+      borderColor: "rgba(248, 113, 113, 0.45)",
+      color: "#fecaca",
+    };
+  }
+
+  if (status === "success") {
+    return {
+      borderColor: "rgba(34, 197, 94, 0.35)",
+      color: "#bbf7d0",
+    };
+  }
+
+  if (status === "warning") {
+    return {
+      borderColor: "rgba(250, 204, 21, 0.38)",
+      color: "#fde68a",
+    };
+  }
+
+  return {
+    borderColor: "var(--border)",
+    color: "var(--text-muted)",
+  };
+}
+
 function StatCard({ stat }: { stat: ConfigStat }) {
+  const borderColor =
+    stat.tone === "danger"
+      ? "rgba(248, 113, 113, 0.45)"
+      : stat.tone === "warning"
+        ? "rgba(250, 204, 21, 0.38)"
+        : "var(--border)";
+
+  const valueColor =
+    stat.tone === "danger"
+      ? "#fecaca"
+      : stat.tone === "warning"
+        ? "#fde68a"
+        : "var(--text)";
+
   return (
     <div
       className="rounded-2xl border p-3"
       style={{
         background: "var(--panel-bg)",
-        borderColor: "var(--border)",
+        borderColor,
       }}
     >
-      <div className="truncate text-lg font-black tracking-tight">
+      <div
+        className="truncate text-lg font-black tracking-tight"
+        style={{ color: valueColor }}
+      >
         {stat.value}
       </div>
 
@@ -229,7 +350,13 @@ export default function StationConfigPanel({
   const [message, setMessage] = useState(
     "Export and restore channels, media metadata, layout, mode, and theme settings.",
   );
+  const [status, setStatus] = useState<ImportStatus>("neutral");
   const [isImporting, setIsImporting] = useState(false);
+
+  const embeddedAdCount = useMemo(
+    () => getEmbeddedAdCount(media, channels),
+    [channels, media],
+  );
 
   const configStats = useMemo<ConfigStat[]>(
     () => [
@@ -259,15 +386,31 @@ export default function StationConfigPanel({
         helper: "Active visual theme saved with config.",
       },
       {
-        label: "Owned Themes",
+        label: "Unlocked",
         value: formatCompactNumber(ownedPremiumThemes.length),
-        helper: "Premium/unlocked theme IDs in this browser config.",
+        helper: "Theme IDs preserved across backup imports.",
+      },
+      {
+        label: "Embedded Ads",
+        value: formatCompactNumber(embeddedAdCount),
+        helper:
+          embeddedAdCount > 0
+            ? "Commercials/bumpers found inside playlists."
+            : "Commercial inventory is clean.",
+        tone: embeddedAdCount > 0 ? "warning" : "default",
       },
     ],
-    [channels, currentChannelId, media.length, ownedPremiumThemes.length, themeId],
+    [
+      channels,
+      currentChannelId,
+      embeddedAdCount,
+      media.length,
+      ownedPremiumThemes.length,
+      themeId,
+    ],
   );
 
-  const exportConfig = () => {
+  const exportConfig = useCallback(() => {
     const payload = buildExportPayload({
       media,
       channels,
@@ -281,61 +424,81 @@ export default function StationConfigPanel({
 
     downloadJson(createExportFilename(), payload);
 
+    setStatus("success");
     setMessage(
       `Config exported: ${payload.media.length} media items and ${payload.channels.length} channels.`,
     );
-  };
+  }, [
+    appMode,
+    channels,
+    currentChannelId,
+    guideHeight,
+    media,
+    ownedPremiumThemes,
+    sidebarWidth,
+    themeId,
+  ]);
 
-  const importConfig = async (file: File) => {
-    try {
-      setIsImporting(true);
-      setMessage("Importing config...");
+  const importConfig = useCallback(
+    async (file: File) => {
+      try {
+        setIsImporting(true);
+        setStatus("neutral");
+        setMessage("Importing config...");
 
-      const validationError = getFileValidationError(file);
+        const validationError = getFileValidationError(file);
 
-      if (validationError) {
-        throw new Error(validationError);
+        if (validationError) {
+          throw new Error(validationError);
+        }
+
+        const confirmed = window.confirm(
+          "Importing this config will replace the station programming saved in this browser. A local pre-import backup will be created first. Continue?",
+        );
+
+        if (!confirmed) {
+          setStatus("warning");
+          setMessage("Import cancelled.");
+          return;
+        }
+
+        const parsed = await readJsonFile(file);
+        const snapshot = parseImportPayload(parsed, ownedPremiumThemes);
+        const zustandPayload = buildZustandPayload(snapshot);
+
+        createPreImportBackup();
+        localStorage.setItem(programmingStoreName, JSON.stringify(zustandPayload));
+
+        setStatus("success");
+        setMessage(
+          `Config imported: ${snapshot.media.length} media items and ${snapshot.channels.length} channels. Reloading...`,
+        );
+
+        window.setTimeout(() => {
+          window.location.reload();
+        }, RELOAD_DELAY_MS);
+      } catch (error) {
+        console.error(error);
+
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Import failed. Check the JSON file and try again.";
+
+        setStatus("error");
+        setMessage(errorMessage);
+      } finally {
+        setIsImporting(false);
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
+    },
+    [ownedPremiumThemes],
+  );
 
-      const confirmed = window.confirm(
-        "Importing this config will replace the station programming saved in this browser. Continue?",
-      );
-
-      if (!confirmed) {
-        setMessage("Import cancelled.");
-        return;
-      }
-
-      const parsed = await readJsonFile(file);
-      const snapshot = parseImportPayload(parsed);
-      const zustandPayload = buildZustandPayload(snapshot);
-
-      localStorage.setItem(programmingStoreName, JSON.stringify(zustandPayload));
-
-      setMessage(
-        `Config imported: ${snapshot.media.length} media items and ${snapshot.channels.length} channels. Reloading...`,
-      );
-
-      window.setTimeout(() => {
-        window.location.reload();
-      }, RELOAD_DELAY_MS);
-    } catch (error) {
-      console.error(error);
-
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Import failed. Check the JSON file and try again.";
-
-      setMessage(errorMessage);
-    } finally {
-      setIsImporting(false);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
+  const statusStyles = getStatusStyles(status);
 
   return (
     <section
@@ -359,9 +522,9 @@ export default function StationConfigPanel({
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Backup or restore this browser&apos;s TatesTv programming setup,
-            including channels, R2 URLs, themes, layout, breakpoints, slot
-            lengths, and commercial settings.
+            Backup or restore this browser&apos;s Tate&apos;s TV programming
+            setup, including channels, R2 URLs, themes, layout, breakpoints,
+            slot lengths, and commercial settings.
           </p>
         </div>
 
@@ -378,7 +541,7 @@ export default function StationConfigPanel({
       </div>
 
       <div
-        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-6"
+        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-7"
         style={{
           background: "var(--panel-alt-bg)",
           borderColor: "var(--border)",
@@ -424,6 +587,21 @@ export default function StationConfigPanel({
         </div>
       </div>
 
+      {embeddedAdCount > 0 ? (
+        <div
+          className="mt-3 rounded-2xl border px-3 py-2 text-[11px] leading-5"
+          style={{
+            background: "rgba(250, 204, 21, 0.08)",
+            borderColor: "rgba(250, 204, 21, 0.32)",
+            color: "#fde68a",
+          }}
+        >
+          Warning: {embeddedAdCount} commercial/bumper item
+          {embeddedAdCount === 1 ? "" : "s"} are still inside channel playlists.
+          Clean them from the Media Library or Quick Editor before final launch.
+        </div>
+      ) : null}
+
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button
           type="button"
@@ -467,12 +645,8 @@ export default function StationConfigPanel({
         className="mt-3 rounded-2xl border px-3 py-2 text-xs leading-5"
         style={{
           background: "var(--panel-alt-bg)",
-          borderColor: message.toLowerCase().includes("failed")
-            ? "rgba(248, 113, 113, 0.45)"
-            : "var(--border)",
-          color: message.toLowerCase().includes("failed")
-            ? "#fecaca"
-            : "var(--text-muted)",
+          borderColor: statusStyles.borderColor,
+          color: statusStyles.color,
         }}
         aria-live="polite"
       >
@@ -489,7 +663,8 @@ export default function StationConfigPanel({
       >
         This backs up programming metadata and Cloudflare/R2 URLs only. It does
         not export actual MP4 files. Imported configs always restore in viewer
-        mode; admin access must be re-authenticated.
+        mode; admin access must be re-authenticated. A pre-import local backup is
+        saved under <span style={{ color: "var(--text)" }}>{PRE_IMPORT_BACKUP_KEY}</span>.
       </div>
     </section>
   );
