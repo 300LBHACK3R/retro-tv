@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import type { MediaItem } from "@/lib/types";
 
 type PreviewStatus = "idle" | "loading" | "ready" | "paused" | "error";
@@ -13,6 +19,11 @@ interface PreviewPlayerProps {
   endAt?: number;
   compact?: boolean;
 }
+
+type PreviewWindow = {
+  start: number;
+  end: number | null;
+};
 
 const SEEK_TOLERANCE_SECONDS = 1.25;
 const END_LOOP_PADDING_SECONDS = 0.25;
@@ -36,52 +47,70 @@ function formatDuration(seconds: number): string {
   return `${minutes} min`;
 }
 
-function getSafePreviewTime(
-  video: HTMLVideoElement,
-  startAt: number,
-  endAt?: number,
-): number {
-  const targetTime = Math.max(startAt, 0);
-  const safeEndAt =
-    typeof endAt === "number" && Number.isFinite(endAt) && endAt > targetTime
-      ? endAt
-      : null;
+function getSafeNumber(value: number | undefined, fallback = 0): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
 
-  if (safeEndAt) {
+  return value;
+}
+
+function getSafeDuration(value: number | undefined): number {
+  const duration = Math.floor(getSafeNumber(value, 0));
+
+  return duration > 0 ? duration : 0;
+}
+
+function getPreviewWindow({
+  video,
+  item,
+  startAt,
+  endAt,
+}: {
+  video: HTMLVideoElement;
+  item: MediaItem;
+  startAt: number;
+  endAt?: number;
+}): PreviewWindow {
+  const start = Math.max(0, getSafeNumber(startAt, 0));
+  const requestedEnd = getSafeNumber(endAt, 0);
+  const videoDuration =
+    Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+  const itemDuration = getSafeDuration(item.duration);
+
+  let end: number | null = null;
+
+  if (requestedEnd > start) {
+    end = requestedEnd;
+  } else if (videoDuration > start) {
+    end = videoDuration;
+  } else if (itemDuration > start) {
+    end = itemDuration;
+  }
+
+  return {
+    start,
+    end,
+  };
+}
+
+function getSafePreviewTime(window: PreviewWindow): number {
+  if (window.end && window.end > window.start) {
     return Math.min(
-      targetTime,
-      Math.max(safeEndAt - END_LOOP_PADDING_SECONDS, 0),
+      window.start,
+      Math.max(window.end - END_LOOP_PADDING_SECONDS, 0),
     );
   }
 
-  if (!Number.isFinite(video.duration) || video.duration <= 0) {
-    return targetTime;
-  }
-
-  return Math.min(
-    targetTime,
-    Math.max(video.duration - END_LOOP_PADDING_SECONDS, 0),
-  );
+  return Math.max(0, window.start);
 }
 
-function getPreviewEndTime(
-  video: HTMLVideoElement,
-  item: MediaItem,
-  endAt?: number,
-): number | null {
-  if (typeof endAt === "number" && Number.isFinite(endAt) && endAt > 0) {
-    return endAt;
+function shouldLoopPreview(video: HTMLVideoElement, window: PreviewWindow): boolean {
+  if (!window.end) {
+    return false;
   }
 
-  if (Number.isFinite(video.duration) && video.duration > 0) {
-    return video.duration;
-  }
-
-  if (Number.isFinite(item.duration) && item.duration > 0) {
-    return item.duration;
-  }
-
-  return null;
+  return video.currentTime >= window.end - END_LOOP_PADDING_SECONDS;
 }
 
 function getStatusLabel(status: PreviewStatus): string {
@@ -114,6 +143,10 @@ function getErrorMessage(video: HTMLVideoElement): string {
     return "Unsupported video format.";
   }
 
+  if (code === MediaError.MEDIA_ERR_ABORTED) {
+    return "Preview was interrupted.";
+  }
+
   return "Preview failed. Test the media source.";
 }
 
@@ -125,11 +158,24 @@ function getPreviewMeta(item: MediaItem | null): string {
   return `${item.type.toUpperCase()} • ${formatDuration(item.duration)}`;
 }
 
-function clearTimer(timerRef: React.MutableRefObject<number | null>): void {
+function hasPreviewSource(item: MediaItem | null): item is MediaItem {
+  return Boolean(item?.file && item.file.trim().length > 0);
+}
+
+function clearTimer(timerRef: MutableRefObject<number | null>): void {
   if (timerRef.current) {
     window.clearTimeout(timerRef.current);
     timerRef.current = null;
   }
+}
+
+function configurePreviewVideo(video: HTMLVideoElement): void {
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.loop = false;
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
 }
 
 export default function PreviewPlayer({
@@ -146,7 +192,7 @@ export default function PreviewPlayer({
   const loadingTimerRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<PreviewStatus>(
-    item ? "loading" : "idle",
+    hasPreviewSource(item) ? "loading" : "idle",
   );
   const [errorMessage, setErrorMessage] = useState("");
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
@@ -156,7 +202,16 @@ export default function PreviewPlayer({
   useEffect(() => {
     const video = videoRef.current;
 
-    if (!video || !item?.file) {
+    if (!video || !hasPreviewSource(item)) {
+      clearTimer(retryTimerRef);
+      clearTimer(loadingTimerRef);
+
+      if (video) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      }
+
       setStatus("idle");
       setErrorMessage("");
       setShowLoadingOverlay(false);
@@ -167,9 +222,13 @@ export default function PreviewPlayer({
     let cancelled = false;
 
     const clearRetry = () => clearTimer(retryTimerRef);
+
     const clearLoading = () => {
       clearTimer(loadingTimerRef);
-      setShowLoadingOverlay(false);
+
+      if (!cancelled) {
+        setShowLoadingOverlay(false);
+      }
     };
 
     const startLoadingOverlayDelay = () => {
@@ -182,8 +241,17 @@ export default function PreviewPlayer({
       }, LOADING_OVERLAY_DELAY_MS);
     };
 
+    const getCurrentPreviewWindow = () =>
+      getPreviewWindow({
+        video,
+        item,
+        startAt,
+        endAt,
+      });
+
     const safeSeek = () => {
-      const safeTarget = getSafePreviewTime(video, startAt, endAt);
+      const previewWindow = getCurrentPreviewWindow();
+      const safeTarget = getSafePreviewTime(previewWindow);
 
       try {
         if (Math.abs(video.currentTime - safeTarget) > SEEK_TOLERANCE_SECONDS) {
@@ -251,26 +319,30 @@ export default function PreviewPlayer({
       }
     };
 
+    const handlePause = () => {
+      if (!cancelled && status !== "loading") {
+        setStatus("paused");
+      }
+    };
+
     const handleTimeUpdate = () => {
-      if (cancelled || !item) {
+      if (cancelled) {
         return;
       }
 
-      const previewEndTime = getPreviewEndTime(video, item, endAt);
+      const previewWindow = getCurrentPreviewWindow();
 
-      if (!previewEndTime) {
+      if (!shouldLoopPreview(video, previewWindow)) {
         return;
       }
 
-      if (video.currentTime >= previewEndTime - END_LOOP_PADDING_SECONDS) {
-        safeSeek();
+      safeSeek();
 
-        void video.play().catch(() => {
-          if (!cancelled) {
-            setStatus("paused");
-          }
-        });
-      }
+      void video.play().catch(() => {
+        if (!cancelled) {
+          setStatus("paused");
+        }
+      });
     };
 
     const handleError = () => {
@@ -281,20 +353,33 @@ export default function PreviewPlayer({
       }
     };
 
+    const handleEnded = () => {
+      if (cancelled) {
+        return;
+      }
+
+      safeSeek();
+
+      void video.play().catch(() => {
+        if (!cancelled) {
+          setStatus("paused");
+        }
+      });
+    };
+
     clearRetry();
     startLoadingOverlayDelay();
     setStatus("loading");
     setErrorMessage("");
 
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    video.loop = !endAt;
+    configurePreviewVideo(video);
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("playing", handlePlaying);
+    video.addEventListener("pause", handlePause);
     video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("ended", handleEnded);
     video.addEventListener("error", handleError);
 
     if (currentSrcRef.current !== item.file) {
@@ -309,15 +394,17 @@ export default function PreviewPlayer({
     return () => {
       cancelled = true;
       clearRetry();
-      clearLoading();
+      clearTimer(loadingTimerRef);
 
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("pause", handlePause);
       video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("ended", handleEnded);
       video.removeEventListener("error", handleError);
     };
-  }, [endAt, item, startAt]);
+  }, [endAt, item, startAt, status]);
 
   useEffect(() => {
     return () => {
@@ -362,9 +449,7 @@ export default function PreviewPlayer({
     return (
       <section
         className="ttv-glass-panel overflow-hidden rounded-2xl shadow-xl"
-        style={{
-          color: "var(--text)",
-        }}
+        style={{ color: "var(--text)" }}
       >
         <div
           className="border-b px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
@@ -386,12 +471,12 @@ export default function PreviewPlayer({
     );
   }
 
+  const hasSource = hasPreviewSource(item);
+
   return (
     <section
       className="ttv-glass-panel overflow-hidden rounded-2xl shadow-xl"
-      style={{
-        color: "var(--text)",
-      }}
+      style={{ color: "var(--text)" }}
     >
       <div
         className="flex items-center justify-between gap-3 border-b px-3 py-2"
@@ -422,10 +507,10 @@ export default function PreviewPlayer({
           style={{
             borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
-            color: getStatusColor(status),
+            color: getStatusColor(hasSource ? status : "idle"),
           }}
         >
-          {getStatusLabel(status)}
+          {getStatusLabel(hasSource ? status : "idle")}
         </div>
       </div>
 
@@ -434,17 +519,26 @@ export default function PreviewPlayer({
           compact ? "aspect-[16/10]" : "aspect-video"
         } bg-black`}
       >
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          autoPlay
-          preload="metadata"
-          poster={item.poster}
-          className="h-full w-full object-cover"
-        />
+        {hasSource ? (
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            autoPlay
+            preload="metadata"
+            poster={item.poster}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center bg-black/60 px-4 text-center text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
+            This media item has no playable source URL.
+          </div>
+        )}
 
-        {status === "loading" && showLoadingOverlay ? (
+        {hasSource && status === "loading" && showLoadingOverlay ? (
           <div
             className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-black uppercase tracking-[0.16em]"
             style={{ color: "var(--text-muted)" }}
@@ -453,7 +547,7 @@ export default function PreviewPlayer({
           </div>
         ) : null}
 
-        {status === "paused" ? (
+        {hasSource && status === "paused" ? (
           <button
             type="button"
             onClick={handleManualPlay}
@@ -464,7 +558,7 @@ export default function PreviewPlayer({
           </button>
         ) : null}
 
-        {status === "error" ? (
+        {hasSource && status === "error" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70 px-4 text-center text-xs leading-5 text-red-200">
             {errorMessage || "Preview failed. Test the Cloudflare/R2 media URL."}
           </div>
