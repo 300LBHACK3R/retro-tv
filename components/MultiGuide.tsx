@@ -8,8 +8,8 @@ import {
   useState,
   type UIEvent,
 } from "react";
-import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
+import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
@@ -31,6 +31,8 @@ const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 const LIVE_TICK_MS = 15_000;
 
 const MIN_CELL_WIDTH = 52;
+const MIN_BUILD_STEPS = 500;
+
 const SLOT_INDEXES = Array.from({ length: SLOT_COUNT }, (_, index) => index);
 
 type GuideRowInput = {
@@ -99,6 +101,7 @@ function formatDuration(seconds: number): string {
 
 function floorToHalfHour(date: Date): Date {
   const nextDate = new Date(date);
+
   nextDate.setSeconds(0, 0);
   nextDate.setMinutes(nextDate.getMinutes() < 30 ? 0 : 30);
 
@@ -107,6 +110,7 @@ function floorToHalfHour(date: Date): Date {
 
 function startOfLocalDay(date: Date): Date {
   const nextDate = new Date(date);
+
   nextDate.setHours(0, 0, 0, 0);
 
   return nextDate;
@@ -114,6 +118,7 @@ function startOfLocalDay(date: Date): Date {
 
 function startOfNextLocalDay(date: Date): Date {
   const nextDate = startOfLocalDay(date);
+
   nextDate.setDate(nextDate.getDate() + 1);
 
   return nextDate;
@@ -121,6 +126,7 @@ function startOfNextLocalDay(date: Date): Date {
 
 function getNoonForDate(date: Date): Date {
   const nextDate = new Date(date);
+
   nextDate.setHours(12, 0, 0, 0);
 
   return nextDate;
@@ -143,6 +149,12 @@ function getSecondsSinceBroadcastEpoch(dateMs: number): number {
 }
 
 function getItemDuration(item: BroadcastItem): number {
+  const guideDuration = Math.floor(Number(item.guideDuration));
+
+  if (Number.isFinite(guideDuration) && guideDuration > 0) {
+    return guideDuration;
+  }
+
   const duration = Math.floor(Number(item.duration));
 
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
@@ -156,8 +168,34 @@ function isGuideVisibleItem(item: BroadcastItem): boolean {
   return Boolean(item.file) && getItemDuration(item) > 0 && !isHiddenGuideItem(item);
 }
 
+function isProgramMediaItem(item: MediaItem): boolean {
+  return (
+    item.type === "show" ||
+    item.type === "movie" ||
+    item.type === "music" ||
+    item.type === "music-video"
+  );
+}
+
+function isAdInventoryItem(item: MediaItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
+function getProgramMediaItems(media: MediaItem[] | undefined): MediaItem[] {
+  return (media ?? []).filter(isProgramMediaItem);
+}
+
+function getAvailableAdItems(media: MediaItem[] | undefined): MediaItem[] {
+  return (media ?? []).filter(isAdInventoryItem);
+}
+
 function getDisplayTitle(item: BroadcastItem): string {
-  return cleanDisplayText(item.sourceTitle?.trim() || item.title);
+  return cleanDisplayText(item.sourceTitle?.trim() || item.title || "Untitled");
+}
+
+function getDisplayType(item: BroadcastItem): string {
+  if (item.type === "music-video") return "MUSIC VIDEO";
+  return item.type.toUpperCase();
 }
 
 function getStableItemKey(item: BroadcastItem): string {
@@ -165,7 +203,7 @@ function getStableItemKey(item: BroadcastItem): string {
     return cleanDisplayText(item.parentMediaId);
   }
 
-  return cleanDisplayText(item.id || item.title);
+  return cleanDisplayText(item.parentMediaId || item.id || item.title);
 }
 
 function getChannelLabel(channel: Channel): string {
@@ -205,7 +243,10 @@ function sortRows(data: GuideRowInput[]): GuideRowInput[] {
         return aNumber - bNumber;
       }
 
-      return String(a.channel.id).localeCompare(String(b.channel.id));
+      return String(a.channel.id).localeCompare(String(b.channel.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -288,11 +329,11 @@ function canMergeVisibleGuideSegment(
     return false;
   }
 
-  if (!item.isVirtualSegment || !item.parentMediaId) {
-    return false;
+  if (item.isVirtualSegment && item.parentMediaId) {
+    return previous.stableKey === cleanDisplayText(item.parentMediaId);
   }
 
-  return previous.stableKey === cleanDisplayText(item.parentMediaId);
+  return previous.stableKey === getStableItemKey(item);
 }
 
 function pushCell(
@@ -327,6 +368,15 @@ function pushCell(
   });
 }
 
+function getMaxBuildSteps(
+  schedule: BroadcastItem[],
+  totalDuration: number,
+  windowDurationSeconds: number,
+): number {
+  const cycleCount = Math.ceil(windowDurationSeconds / Math.max(1, totalDuration));
+  return Math.max(MIN_BUILD_STEPS, schedule.length * (cycleCount + 2));
+}
+
 function buildDisplayCellsForWindow(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
@@ -349,8 +399,11 @@ function buildDisplayCellsForWindow(
   let offsetInsideItem = startPosition.offsetInsideItem;
   let cursor = 0;
   let lastVisibleItem = startPosition.previousVisibleItem;
+  let guard = 0;
 
-  while (cursor < windowDurationSeconds) {
+  const maxSteps = getMaxBuildSteps(schedule, totalDuration, windowDurationSeconds);
+
+  while (cursor < windowDurationSeconds && guard < maxSteps) {
     const item = schedule[scheduleIndex];
 
     if (!item) {
@@ -384,6 +437,7 @@ function buildDisplayCellsForWindow(
     cursor = segmentEnd;
     scheduleIndex = (scheduleIndex + 1) % schedule.length;
     offsetInsideItem = 0;
+    guard += 1;
   }
 
   return cells;
@@ -392,15 +446,19 @@ function buildDisplayCellsForWindow(
 function getScheduleForSlice(
   row: GuideRowInput,
   sliceStart: Date,
-  now: Date,
+  currentDayReference: Date,
 ): BroadcastItem[] {
-  if (!row.media || isSameLocalDay(sliceStart, now)) {
+  if (!row.media || isSameLocalDay(sliceStart, currentDayReference)) {
     return row.schedule;
   }
 
-  return buildSchedule(row.media, {
+  const programMedia = getProgramMediaItems(row.media);
+  const availableAds = getAvailableAdItems(row.media);
+
+  return buildSchedule(programMedia, {
     channel: row.channel,
     now: getNoonForDate(sliceStart),
+    availableAds,
   });
 }
 
@@ -416,7 +474,7 @@ function appendCells(
       cell.startSec + offsetSeconds,
       cell.endSec + offsetSeconds,
       {
-        mergeWithPrevious: false,
+        mergeWithPrevious: true,
       },
     );
   }
@@ -426,7 +484,7 @@ function buildForwardGuideCells(
   row: GuideRowInput,
   windowStart: Date,
   windowDurationSeconds: number,
-  now: Date,
+  currentDayReference: Date,
 ): GuideCell[] {
   const windowEndMs = windowStart.getTime() + windowDurationSeconds * 1000;
   const result: GuideCell[] = [];
@@ -442,7 +500,7 @@ function buildForwardGuideCells(
       Math.floor((sliceEndMs - sliceStart.getTime()) / 1000),
     );
 
-    const schedule = getScheduleForSlice(row, sliceStart, now);
+    const schedule = getScheduleForSlice(row, sliceStart, currentDayReference);
     const sliceBroadcastSeconds = getSecondsSinceBroadcastEpoch(sliceStart.getTime());
 
     const sliceCells = buildDisplayCellsForWindow(
@@ -524,15 +582,15 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const guideDensity = useStore((state) => state.viewerSettings.guideDensity);
 
   const [mounted, setMounted] = useState(false);
-  const [now, setNow] = useState<Date | null>(null);
+  const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
   const [activeMarkerIndex, setActiveMarkerIndex] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-    setNow(new Date());
+    setNowMs(Date.now());
 
     const interval = window.setInterval(() => {
-      setNow(new Date());
+      setNowMs(Date.now());
     }, LIVE_TICK_MS);
 
     return () => {
@@ -540,36 +598,37 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     };
   }, []);
 
-  const windowStart = useMemo(() => {
-    if (!now) {
-      return null;
-    }
+  const now = useMemo(() => new Date(nowMs), [nowMs]);
 
-    return floorToHalfHour(now);
-  }, [now]);
+  const windowStartMs = useMemo(() => floorToHalfHour(now).getTime(), [now]);
+  const currentDayMs = useMemo(() => startOfLocalDay(now).getTime(), [now]);
+
+  const windowStart = useMemo(() => new Date(windowStartMs), [windowStartMs]);
+  const currentDayReference = useMemo(
+    () => new Date(currentDayMs),
+    [currentDayMs],
+  );
 
   useEffect(() => {
     setActiveMarkerIndex(0);
-  }, [windowStart?.getTime()]);
+  }, [windowStartMs]);
 
   const preparedRows = useMemo<PreparedGuideRow[]>(() => {
-    if (!now || !windowStart) {
-      return [];
-    }
-
     return sortRows(data).map((row) => ({
       ...row,
-      cells: buildForwardGuideCells(row, windowStart, GUIDE_WINDOW_SECONDS, now),
+      cells: buildForwardGuideCells(
+        row,
+        windowStart,
+        GUIDE_WINDOW_SECONDS,
+        currentDayReference,
+      ),
     }));
-  }, [data, now, windowStart]);
+  }, [currentDayReference, data, windowStart]);
 
-  const guideMarkers = useMemo(() => {
-    if (!windowStart) {
-      return [];
-    }
-
-    return buildGuideMarkers(windowStart);
-  }, [windowStart]);
+  const guideMarkers = useMemo(
+    () => buildGuideMarkers(windowStart),
+    [windowStart],
+  );
 
   const scrollToMarker = useCallback(
     (marker: GuideMarker, markerIndex: number): void => {
@@ -612,7 +671,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     [guideMarkers],
   );
 
-  if (!mounted || !now || !windowStart) {
+  if (!mounted) {
     return null;
   }
 
@@ -620,7 +679,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     guideDensity === "compact" ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE;
 
   const secondsSinceWindowStart = clampNumber(
-    Math.floor((now.getTime() - windowStart.getTime()) / 1000),
+    Math.floor((nowMs - windowStartMs) / 1000),
     0,
     GUIDE_WINDOW_SECONDS,
   );
@@ -657,7 +716,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           </div>
 
           <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Now and upcoming only. No rewind, no previous-aired timeline.
+            Now and upcoming only. Commercial breaks are hidden from public listings.
           </div>
         </div>
 
@@ -749,7 +808,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           >
             {SLOT_INDEXES.map((index) => {
               const slotTime = new Date(
-                windowStart.getTime() + index * SLOT_SECONDS * 1000,
+                windowStartMs + index * SLOT_SECONDS * 1000,
               );
 
               const isDayStart =
@@ -919,6 +978,7 @@ function GuideRow({
 
           const title = getDisplayTitle(cell.item);
           const duration = cell.endSec - cell.startSec;
+          const displayType = getDisplayType(cell.item);
 
           return (
             <button
@@ -952,7 +1012,7 @@ function GuideRow({
               <div className="truncate font-black tracking-tight">{title}</div>
 
               <div className="mt-1 truncate text-[10px]" style={{ opacity: 0.76 }}>
-                {cell.item.type.toUpperCase()} / {formatDuration(duration)}
+                {displayType} / {formatDuration(duration)}
               </div>
             </button>
           );
