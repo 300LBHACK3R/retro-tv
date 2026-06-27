@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   AdCategory,
   AdPlacement,
   BroadcastItem,
@@ -418,9 +418,7 @@ function getSlotSettings(
     breakpoints,
     breakDurations: normalizeBreakDurations(item, breakpoints.length),
     fillSlotWithCommercials:
-      isSlotManagedLongForm(item) &&
-      slotLengthSeconds > getSafeDuration(item) &&
-      Boolean(item.fillSlotWithCommercials),
+      isSlotManagedLongForm(item) && Boolean(item.fillSlotWithCommercials),
     commercialStrategy: getCommercialStrategy(item, channel),
   };
 }
@@ -478,13 +476,17 @@ function isAdPlacementAllowed(
 
 function isAdTargetAllowed(item: MediaItem, channel?: Channel): boolean {
   if (!channel) {
-    return true;
+    return false;
+  }
+
+  if (channel.adPolicy?.enabled === false) {
+    return false;
   }
 
   const targets = Array.isArray(item.adChannelIds) ? item.adChannelIds : [];
 
   if (targets.length === 0) {
-    return true;
+    return false;
   }
 
   const channelIds = new Set([
@@ -493,7 +495,7 @@ function isAdTargetAllowed(item: MediaItem, channel?: Channel): boolean {
   ]);
 
   if (targets.includes("all")) {
-    return channel.adPolicy?.allowGlobalAds !== false;
+    return channel.adPolicy?.allowGlobalAds === true;
   }
 
   const targetsThisChannel = targets.some((target) =>
@@ -652,10 +654,6 @@ function createTimedSlice(
 }
 
 function canSliceCommercial(item: MediaItem): boolean {
-  /**
-   * Launch-safe rule:
-   * Commercial slicing is opt-in only. Undefined must behave like false.
-   */
   return item.allowCommercialSlicing === true;
 }
 
@@ -1094,6 +1092,85 @@ function buildManualBreakpointSchedule(
   return schedule.length > 0 ? schedule : [item];
 }
 
+function getSimpleCableBreakpoints(item: MediaItem): number[] {
+  if (!isSlotManagedLongForm(item)) {
+    return [];
+  }
+
+  const duration = getSafeDuration(item);
+
+  if (duration < 20 * 60) {
+    return [];
+  }
+
+  if (duration < 45 * 60) {
+    return [Math.floor(duration * 0.5)];
+  }
+
+  if (duration < 75 * 60) {
+    return [Math.floor(duration * 0.34), Math.floor(duration * 0.67)];
+  }
+
+  const estimatedBreakCount = Math.floor(duration / (42 * 60));
+  const breakCount = Math.min(4, Math.max(2, estimatedBreakCount));
+
+  return Array.from({ length: breakCount }, (_, index) => {
+    return Math.floor(duration * ((index + 1) / (breakCount + 1)));
+  }).filter((point) => {
+    return point >= MIN_SEGMENT_SECONDS && point <= duration - MIN_SEGMENT_SECONDS;
+  });
+}
+
+function buildSimpleCableBreakSchedule(
+  item: MediaItem,
+  shortFormItems: MediaItem[],
+  channel: Channel | undefined,
+  now: Date,
+  cursor: CommercialCursor,
+): BroadcastItem[] {
+  const breakpoints = getSimpleCableBreakpoints(item);
+
+  if (breakpoints.length === 0 || shortFormItems.length === 0) {
+    return [item];
+  }
+
+  const strategy = getCommercialStrategy(item, channel);
+  const points = [0, ...breakpoints, getSafeDuration(item)];
+  const schedule: BroadcastItem[] = [];
+  let insertedAdBreak = false;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index] ?? 0;
+    const end = points[index + 1] ?? getSafeDuration(item);
+    const duration = end - start;
+
+    if (duration <= 0) {
+      continue;
+    }
+
+    const isLastSegment = index === points.length - 2;
+
+    schedule.push(createVirtualSegment(item, start, duration, `Part ${index + 1}`));
+
+    if (!isLastSegment) {
+      const ads = fillCommercialDuration(
+        shortFormItems,
+        DEFAULT_INTERNAL_BREAK_SECONDS,
+        cursor,
+        strategy,
+        createCommercialContext(channel, now, "mid-roll"),
+      );
+
+      if (ads.length > 0) {
+        schedule.push(...ads);
+        insertedAdBreak = true;
+      }
+    }
+  }
+
+  return insertedAdBreak && schedule.length > 0 ? schedule : [item];
+}
+
 function buildAutomaticBreakSchedule(
   item: MediaItem,
   shortFormItems: MediaItem[],
@@ -1102,8 +1179,6 @@ function buildAutomaticBreakSchedule(
   now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
-  const strategy = getCommercialStrategy(item, channel);
-
   const slotSchedule = buildSlotFillerSchedule(
     item,
     shortFormItems,
@@ -1114,6 +1189,10 @@ function buildAutomaticBreakSchedule(
 
   if (slotSchedule.length > 0) {
     return slotSchedule;
+  }
+
+  if (mode === "none" || shortFormItems.length === 0) {
+    return [item];
   }
 
   if (hasSavedBreakpoints(item) && shortFormItems.length > 0) {
@@ -1127,26 +1206,13 @@ function buildAutomaticBreakSchedule(
     );
   }
 
-  if (mode === "none" || shortFormItems.length === 0) {
-    return [item];
-  }
-
-  /**
-   * Launch-safe rule:
-   * Without saved breakpoints, do not split programs into automatic Part/Act
-   * virtual segments. Even midpoint-and-end/classic-tv modes should behave as
-   * program + post-roll ads unless the media item has deliberate breakpoints.
-   */
-  return [
+  return buildSimpleCableBreakSchedule(
     item,
-    ...takeBreakItems(
-      shortFormItems,
-      getBreakCount(mode),
-      cursor,
-      strategy,
-      createCommercialContext(channel, now, "post-roll"),
-    ),
-  ];
+    shortFormItems,
+    channel,
+    now,
+    cursor,
+  );
 }
 
 function createCommercialCursor(): CommercialCursor {

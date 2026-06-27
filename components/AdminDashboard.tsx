@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import BulkImporterPanel from "@/components/BulkImporterPanel";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
@@ -14,7 +13,6 @@ import type { Channel, MediaItem } from "@/lib/types";
 type AdminTab =
   | "quick-edit"
   | "add"
-  | "bulk"
   | "programming"
   | "branding"
   | "library"
@@ -56,12 +54,6 @@ const TABS: AdminTabMeta[] = [
     label: "Add Media",
     shortLabel: "Add",
     description: "Add one media item from a public R2 or video URL.",
-  },
-  {
-    id: "bulk",
-    label: "Bulk Import",
-    shortLabel: "Bulk",
-    description: "Load full seasons, channels, commercials, bumpers, or music packs.",
   },
   {
     id: "programming",
@@ -743,7 +735,7 @@ export default function AdminDashboard() {
               background: "var(--panel-alt-bg)",
               color: "var(--text-muted)",
             }}
-            title={`${getChannelLabel(activeChannel)} • ${getChannelName(
+            title={`${getChannelLabel(activeChannel)} â€¢ ${getChannelName(
               activeChannel,
             )}`}
           >
@@ -796,7 +788,6 @@ export default function AdminDashboard() {
 
       <div className="min-w-0">
         {activeTab === "add" ? <UploadPanel /> : null}
-        {activeTab === "bulk" ? <BulkImporterPanel /> : null}
         {activeTab === "quick-edit" ? <QuickMediaEditorPanel /> : null}
         {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}
         {activeTab === "branding" ? <ChannelBrandingPanel /> : null}
