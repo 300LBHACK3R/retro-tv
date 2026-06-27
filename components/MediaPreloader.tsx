@@ -41,12 +41,23 @@ type IdleCallbackWindow = Window & {
   cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
 };
 
-const MAX_DESKTOP_PRELOADS = 4;
-const MAX_MOBILE_PRELOADS = 2;
+type ResourceHint = {
+  rel: "preconnect" | "dns-prefetch";
+  href: string;
+  crossOrigin?: "anonymous";
+};
+
+const MAX_DESKTOP_URLS = 6;
+const MAX_MOBILE_URLS = 3;
+const MAX_DESKTOP_ORIGINS = 4;
+const MAX_MOBILE_ORIGINS = 2;
+
 const IDLE_TIMEOUT_MS = 2_000;
 const FALLBACK_DELAY_MS = 250;
-const PRELOAD_DATA_ATTRIBUTE = "ttv-preload";
-const PRELOAD_SELECTOR = `link[data-${PRELOAD_DATA_ATTRIBUTE}="true"]`;
+
+const MANAGED_ATTRIBUTE = "data-ttv-preload";
+const MANAGED_KEY_ATTRIBUTE = "data-ttv-preload-key";
+const MANAGED_SELECTOR = `link[${MANAGED_ATTRIBUTE}="true"]`;
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof document !== "undefined";
@@ -109,114 +120,161 @@ function isLikelyMobile(): boolean {
   );
 }
 
-function getPreloadLimit(): number {
-  return isLikelyMobile() ? MAX_MOBILE_PRELOADS : MAX_DESKTOP_PRELOADS;
+function getUrlLimit(): number {
+  return isLikelyMobile() ? MAX_MOBILE_URLS : MAX_DESKTOP_URLS;
 }
 
-function toAbsoluteUrl(url: string): string | null {
+function getOriginLimit(): number {
+  return isLikelyMobile() ? MAX_MOBILE_ORIGINS : MAX_DESKTOP_ORIGINS;
+}
+
+function normalizeAbsoluteUrl(url: string): string | null {
   if (!isBrowser()) {
     return null;
   }
 
+  const clean = url.trim();
+
+  if (!clean || clean.startsWith("data:") || clean.startsWith("blob:")) {
+    return null;
+  }
+
   try {
-    return new URL(url, window.location.href).href;
+    const parsed = new URL(clean, window.location.href);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.href;
   } catch {
     return null;
   }
 }
 
-function getOrigin(url: string): string | null {
+function getOriginHref(url: string): string | null {
   if (!isBrowser()) {
     return null;
   }
 
   try {
-    return new URL(url, window.location.href).origin;
+    const parsed = new URL(url, window.location.href);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return `${parsed.origin}/`;
   } catch {
     return null;
   }
 }
 
-function getExistingManagedLinks(): HTMLLinkElement[] {
+function getManagedLinks(): HTMLLinkElement[] {
   if (!isBrowser()) {
     return [];
   }
 
-  return Array.from(document.querySelectorAll<HTMLLinkElement>(PRELOAD_SELECTOR));
+  return Array.from(document.querySelectorAll<HTMLLinkElement>(MANAGED_SELECTOR));
 }
 
-function cleanupManagedLinks(validHrefs: Set<string>): void {
-  for (const link of getExistingManagedLinks()) {
-    if (!validHrefs.has(link.href)) {
+function createHintKey(hint: ResourceHint): string {
+  return `${hint.rel}:${hint.href}`;
+}
+
+function cleanupManagedLinks(validKeys: Set<string>): void {
+  for (const link of getManagedLinks()) {
+    const key = link.getAttribute(MANAGED_KEY_ATTRIBUTE);
+
+    if (!key || !validKeys.has(key)) {
       link.remove();
     }
   }
 }
 
-function linkAlreadyExists(rel: string, href: string): boolean {
+function managedLinkExists(key: string): boolean {
   if (!isBrowser()) {
     return true;
   }
 
-  return Array.from(document.querySelectorAll<HTMLLinkElement>("link")).some(
-    (link) => link.rel === rel && link.href === href,
+  return getManagedLinks().some(
+    (link) => link.getAttribute(MANAGED_KEY_ATTRIBUTE) === key,
   );
 }
 
-function appendLink(rel: string, href: string, as?: string): void {
-  if (!isBrowser() || linkAlreadyExists(rel, href)) {
+function appendResourceHint(hint: ResourceHint): void {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const key = createHintKey(hint);
+
+  if (managedLinkExists(key)) {
     return;
   }
 
   const link = document.createElement("link");
 
-  link.rel = rel;
-  link.href = href;
-  link.setAttribute(`data-${PRELOAD_DATA_ATTRIBUTE}`, "true");
+  link.rel = hint.rel;
+  link.href = hint.href;
+  link.setAttribute(MANAGED_ATTRIBUTE, "true");
+  link.setAttribute(MANAGED_KEY_ATTRIBUTE, key);
 
-  if (as) {
-    link.as = as;
+  if (hint.crossOrigin) {
+    link.crossOrigin = hint.crossOrigin;
   }
 
   document.head.appendChild(link);
 }
 
-function addPerformanceLinks(urls: string[]): void {
+function createResourceHints(urls: string[]): ResourceHint[] {
   if (!isBrowser()) {
-    return;
+    return [];
   }
 
   const absoluteUrls = urls
-    .map((url) => toAbsoluteUrl(url))
+    .map((url) => normalizeAbsoluteUrl(url))
     .filter((url): url is string => Boolean(url));
 
   const origins = Array.from(
     new Set(
       absoluteUrls
-        .map((url) => getOrigin(url))
+        .map((url) => getOriginHref(url))
         .filter((origin): origin is string => Boolean(origin)),
     ),
-  );
+  ).slice(0, getOriginLimit());
 
-  const validHrefs = new Set<string>();
+  const currentOrigin = `${window.location.origin}/`;
 
-  for (const url of absoluteUrls) {
-    validHrefs.add(url);
+  return origins.flatMap((origin) => {
+    const isCrossOrigin = origin !== currentOrigin;
+
+    return [
+      {
+        rel: "preconnect",
+        href: origin,
+        crossOrigin: isCrossOrigin ? "anonymous" : undefined,
+      },
+      {
+        rel: "dns-prefetch",
+        href: origin,
+      },
+    ] satisfies ResourceHint[];
+  });
+}
+
+function applyResourceHints(urls: string[]): void {
+  if (!isBrowser()) {
+    return;
   }
 
-  for (const origin of origins) {
-    validHrefs.add(`${origin}/`);
-  }
+  const hints = createResourceHints(urls);
+  const validKeys = new Set(hints.map(createHintKey));
 
-  cleanupManagedLinks(validHrefs);
+  cleanupManagedLinks(validKeys);
 
-  for (const origin of origins) {
-    appendLink("preconnect", origin);
-    appendLink("dns-prefetch", origin);
-  }
-
-  for (const url of absoluteUrls) {
-    appendLink("preload", url, "video");
+  for (const hint of hints) {
+    appendResourceHint(hint);
   }
 }
 
@@ -250,37 +308,42 @@ function createPreloadUrlList(
 ): string[] {
   const urls: string[] = [];
   const seen = new Set<string>();
+  const maxUrls = getUrlLimit();
 
   const addUrl = (value: unknown) => {
+    if (urls.length >= maxUrls) {
+      return;
+    }
+
     const url = getUrlFromUnknown(value);
 
     if (!isUsableUrl(url)) {
       return;
     }
 
-    const trimmedUrl = url.trim();
+    const absoluteUrl = normalizeAbsoluteUrl(url);
 
-    if (seen.has(trimmedUrl)) {
+    if (!absoluteUrl || seen.has(absoluteUrl)) {
       return;
     }
 
-    seen.add(trimmedUrl);
-    urls.push(trimmedUrl);
+    seen.add(absoluteUrl);
+    urls.push(absoluteUrl);
   };
 
   for (const item of activeSchedule) {
     addUrl(item);
 
-    if (urls.length >= MAX_DESKTOP_PRELOADS) {
+    if (urls.length >= maxUrls) {
       break;
     }
   }
 
-  if (urls.length < MAX_DESKTOP_PRELOADS) {
+  if (urls.length < maxUrls) {
     for (const mediaItem of getChannelMediaItems(activeChannel)) {
       addUrl(mediaItem);
 
-      if (urls.length >= MAX_DESKTOP_PRELOADS) {
+      if (urls.length >= maxUrls) {
         break;
       }
     }
@@ -303,17 +366,21 @@ export function MediaPreloader({
       return;
     }
 
-    const limitedUrls = preloadUrls.slice(0, getPreloadLimit());
-
-    if (limitedUrls.length === 0) {
+    if (preloadUrls.length === 0) {
       cleanupManagedLinks(new Set());
       return;
     }
 
     return scheduleIdleWork(() => {
-      addPerformanceLinks(limitedUrls);
+      applyResourceHints(preloadUrls);
     });
   }, [preloadUrls]);
+
+  useEffect(() => {
+    return () => {
+      cleanupManagedLinks(new Set());
+    };
+  }, []);
 
   return null;
 }

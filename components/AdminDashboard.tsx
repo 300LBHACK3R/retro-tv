@@ -9,7 +9,7 @@ import QuickMediaEditorPanel from "@/components/QuickMediaEditorPanel";
 import StationConfigPanel from "@/components/StationConfigPanel";
 import UploadPanel from "@/components/UploadPanel";
 import { useStore } from "@/lib/store";
-import type { MediaItem } from "@/lib/types";
+import type { Channel, MediaItem } from "@/lib/types";
 
 type AdminTab =
   | "quick-edit"
@@ -32,6 +32,7 @@ type DashboardStat = {
   label: string;
   value: string | number;
   helper: string;
+  tone?: "default" | "good" | "warn" | "danger";
 };
 
 type LaunchCheck = {
@@ -41,37 +42,38 @@ type LaunchCheck = {
 };
 
 const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
+const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
   {
     id: "quick-edit",
     label: "Quick Edit",
     shortLabel: "Edit",
-    description: "Edit shows, breaks, runtime, days, and channel assignments.",
+    description: "Edit titles, runtimes, types, air days, and safe channel assignments.",
   },
   {
     id: "add",
     label: "Add Media",
     shortLabel: "Add",
-    description: "Add one media item from a public R2/video URL.",
+    description: "Add one media item from a public R2 or video URL.",
   },
   {
     id: "bulk",
     label: "Bulk Import",
     shortLabel: "Bulk",
-    description: "Load full seasons, channels, commercials, or music packs.",
+    description: "Load full seasons, channels, commercials, bumpers, or music packs.",
   },
   {
     id: "programming",
     label: "Playlist",
     shortLabel: "Playlist",
-    description: "Reorder channel playlists and tune schedule behavior.",
+    description: "Reorder channel lineups and tune schedule/ad behavior.",
   },
   {
     id: "branding",
     label: "Branding",
     shortLabel: "Brand",
-    description: "Edit channel identity, callsign, color, and overlay details.",
+    description: "Edit channel identity, callsign, color, logo, and overlay details.",
   },
   {
     id: "library",
@@ -89,7 +91,7 @@ const TABS: AdminTabMeta[] = [
     id: "launch",
     label: "Launch Check",
     shortLabel: "Launch",
-    description: "Review station readiness before going live.",
+    description: "Run the station readiness checklist before release.",
   },
 ];
 
@@ -110,9 +112,28 @@ function getInitialAdminTab(): AdminTab {
   }
 }
 
-function getChannelLabel(
-  channel: { id: string; number?: number; name: string } | undefined,
-): string {
+function getChannelSortValue(channel: Pick<Channel, "id" | "number">): number {
+  const value = Number(channel.number ?? channel.id);
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function sortChannels(channels: Channel[]): Channel[] {
+  return [...channels].sort((a, b) => {
+    const aNumber = getChannelSortValue(a);
+    const bNumber = getChannelSortValue(b);
+
+    if (aNumber !== bNumber) {
+      return aNumber - bNumber;
+    }
+
+    return String(a.id).localeCompare(String(b.id), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+}
+
+function getChannelLabel(channel: Pick<Channel, "id" | "number"> | undefined): string {
   if (!channel) {
     return "No Channel";
   }
@@ -121,14 +142,7 @@ function getChannelLabel(
 }
 
 function getChannelName(
-  channel:
-    | {
-        name: string;
-        branding?: {
-          displayName?: string;
-        };
-      }
-    | undefined,
+  channel: Pick<Channel, "name" | "branding"> | undefined,
 ): string {
   if (!channel) {
     return "No active channel selected";
@@ -137,28 +151,131 @@ function getChannelName(
   return channel.branding?.displayName ?? channel.name;
 }
 
+function isAdItem(item: MediaItem | undefined): boolean {
+  return item?.type === "commercial" || item?.type === "bumper";
+}
+
+function isProgramItem(item: MediaItem | undefined): boolean {
+  return (
+    item?.type === "show" ||
+    item?.type === "movie" ||
+    item?.type === "music" ||
+    item?.type === "music-video"
+  );
+}
+
+function isPlayableMedia(item: MediaItem | undefined): boolean {
+  return Boolean(
+    item &&
+      typeof item.file === "string" &&
+      item.file.trim().length > 0 &&
+      Number.isFinite(Number(item.duration)) &&
+      Number(item.duration) > 0,
+  );
+}
+
 function getMediaTypeCount(media: MediaItem[], types: MediaItem["type"][]): number {
   const typeSet = new Set(types);
-
   return media.filter((item) => typeSet.has(item.type)).length;
 }
 
-function createAssignedMediaSet(channels: { mediaIds: string[] }[]): Set<string> {
+function createMediaById(media: MediaItem[]): Map<string, MediaItem> {
+  return new Map(media.map((item) => [item.id, item]));
+}
+
+function createAssignedMediaSet(channels: Pick<Channel, "mediaIds">[]): Set<string> {
   const assigned = new Set<string>();
 
   channels.forEach((channel) => {
-    channel.mediaIds.forEach((mediaId) => {
-      assigned.add(mediaId);
-    });
+    channel.mediaIds.forEach((mediaId) => assigned.add(mediaId));
   });
 
   return assigned;
+}
+
+function countChannelPrograms(channel: Channel | undefined, mediaById: Map<string, MediaItem>): number {
+  if (!channel) {
+    return 0;
+  }
+
+  return channel.mediaIds.filter((mediaId) => isProgramItem(mediaById.get(mediaId))).length;
+}
+
+function countChannelAds(channel: Channel | undefined, mediaById: Map<string, MediaItem>): number {
+  if (!channel) {
+    return 0;
+  }
+
+  return channel.mediaIds.filter((mediaId) => isAdItem(mediaById.get(mediaId))).length;
+}
+
+function countMissingChannelItems(
+  channel: Channel | undefined,
+  mediaById: Map<string, MediaItem>,
+): number {
+  if (!channel) {
+    return 0;
+  }
+
+  return channel.mediaIds.filter((mediaId) => !mediaById.has(mediaId)).length;
+}
+
+function countChannelsWithPrograms(channels: Channel[], mediaById: Map<string, MediaItem>): number {
+  return channels.filter((channel) => countChannelPrograms(channel, mediaById) > 0).length;
+}
+
+function countChannelsWithEmbeddedAds(channels: Channel[], mediaById: Map<string, MediaItem>): number {
+  return channels.filter((channel) => countChannelAds(channel, mediaById) > 0).length;
+}
+
+function countChannelsWithMissingMedia(channels: Channel[], mediaById: Map<string, MediaItem>): number {
+  return channels.filter((channel) => countMissingChannelItems(channel, mediaById) > 0).length;
+}
+
+function countPlayablePrograms(media: MediaItem[]): number {
+  return media.filter((item) => isProgramItem(item) && isPlayableMedia(item)).length;
+}
+
+function countPlayableAds(media: MediaItem[]): number {
+  return media.filter((item) => isAdItem(item) && isPlayableMedia(item)).length;
 }
 
 function formatCompactNumber(value: number): string {
   return new Intl.NumberFormat("en-CA", {
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function getStatCardStyles(tone: DashboardStat["tone"] = "default") {
+  if (tone === "good") {
+    return {
+      borderColor: "rgba(34, 197, 94, 0.32)",
+      background: "rgba(34, 197, 94, 0.08)",
+      valueColor: "#86efac",
+    };
+  }
+
+  if (tone === "warn") {
+    return {
+      borderColor: "rgba(250, 204, 21, 0.32)",
+      background: "rgba(250, 204, 21, 0.08)",
+      valueColor: "#fde68a",
+    };
+  }
+
+  if (tone === "danger") {
+    return {
+      borderColor: "rgba(248, 113, 113, 0.32)",
+      background: "rgba(248, 113, 113, 0.08)",
+      valueColor: "#fca5a5",
+    };
+  }
+
+  return {
+    borderColor: "var(--border)",
+    background: "var(--panel-alt-bg)",
+    valueColor: "var(--text)",
+  };
 }
 
 function getLaunchCheckStyles(status: LaunchCheck["status"]) {
@@ -227,15 +344,19 @@ function TabButton({
 }
 
 function StatCard({ stat }: { stat: DashboardStat }) {
+  const styles = getStatCardStyles(stat.tone);
+
   return (
     <div
       className="rounded-2xl border p-3"
       style={{
-        background: "var(--panel-alt-bg)",
-        borderColor: "var(--border)",
+        background: styles.background,
+        borderColor: styles.borderColor,
       }}
     >
-      <div className="text-xl font-black tracking-tight">{stat.value}</div>
+      <div className="text-xl font-black tracking-tight" style={{ color: styles.valueColor }}>
+        {stat.value}
+      </div>
 
       <div
         className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
@@ -288,8 +409,8 @@ function LaunchReadinessPanel({
             className="mt-1 max-w-2xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Quick operational view for programming coverage, channel setup,
-            assignments, backups, and the currently selected channel.
+            Release check for the live-TV engine, 23-channel lineup, programming
+            coverage, commercial inventory, playlist hygiene, and backup safety.
           </p>
         </div>
 
@@ -303,7 +424,7 @@ function LaunchReadinessPanel({
         >
           <span style={{ color: "var(--primary)" }}>{passCount} pass</span>
           <span className="mx-2 opacity-50">/</span>
-          <span>{warnCount} watch</span>
+          <span>{warnCount} review</span>
         </div>
       </div>
 
@@ -364,23 +485,29 @@ export default function AdminDashboard() {
     try {
       window.localStorage.setItem(ADMIN_TAB_STORAGE_KEY, activeTab);
     } catch {
-      // Best-effort UI preference only.
+      // Local UI preference only.
     }
   }, [activeTab]);
 
+  const sortedChannels = useMemo(() => sortChannels(channels), [channels]);
+
+  const enabledChannels = useMemo(
+    () => sortedChannels.filter((channel) => channel.isEnabled !== false),
+    [sortedChannels],
+  );
+
+  const mediaById = useMemo(() => createMediaById(media), [media]);
+
   const activeChannel = useMemo(
-    () => channels.find((channel) => channel.id === currentChannelId),
-    [channels, currentChannelId],
+    () =>
+      channels.find((channel) => channel.id === currentChannelId) ??
+      enabledChannels[0],
+    [channels, currentChannelId, enabledChannels],
   );
 
   const activeTabMeta = useMemo<AdminTabMeta>(() => {
     return TABS.find((tab) => tab.id === activeTab) ?? TABS[0]!;
   }, [activeTab]);
-
-  const enabledChannelCount = useMemo(
-    () => channels.filter((channel) => channel.isEnabled !== false).length,
-    [channels],
-  );
 
   const assignedMediaSet = useMemo(
     () => createAssignedMediaSet(channels),
@@ -397,111 +524,170 @@ export default function AdminDashboard() {
     [assignedCount, media.length],
   );
 
-  const activeChannelMediaCount = activeChannel?.mediaIds.length ?? 0;
+  const enabledChannelCount = enabledChannels.length;
+  const programInventoryCount = getMediaTypeCount(media, [
+    "show",
+    "movie",
+    "music",
+    "music-video",
+  ]);
+  const playableProgramCount = countPlayablePrograms(media);
+  const adInventoryCount = getMediaTypeCount(media, ["commercial", "bumper"]);
+  const playableAdCount = countPlayableAds(media);
+  const musicCount = getMediaTypeCount(media, ["music", "music-video"]);
+
+  const activeChannelProgramCount = countChannelPrograms(activeChannel, mediaById);
+  const activeChannelEmbeddedAdCount = countChannelAds(activeChannel, mediaById);
+  const activeChannelMissingCount = countMissingChannelItems(activeChannel, mediaById);
+
+  const channelsWithPrograms = countChannelsWithPrograms(enabledChannels, mediaById);
+  const channelsWithEmbeddedAds = countChannelsWithEmbeddedAds(enabledChannels, mediaById);
+  const channelsWithMissingMedia = countChannelsWithMissingMedia(enabledChannels, mediaById);
 
   const dashboardStats = useMemo<DashboardStat[]>(() => {
-    const adInventoryCount = getMediaTypeCount(media, ["commercial", "bumper"]);
-    const programCount = getMediaTypeCount(media, [
-      "show",
-      "movie",
-      "music",
-      "music-video",
-    ]);
-    const musicCount = getMediaTypeCount(media, ["music", "music-video"]);
-
     return [
       {
         label: "Media Items",
         value: formatCompactNumber(media.length),
         helper: "Total saved videos, shows, movies, music, ads, and bumpers.",
+        tone: media.length > 0 ? "good" : "warn",
       },
       {
         label: "Programs",
-        value: formatCompactNumber(programCount),
-        helper: "Shows, movies, music, and music videos available to channels.",
+        value: formatCompactNumber(programInventoryCount),
+        helper: `${formatCompactNumber(playableProgramCount)} playable long-form items.`,
+        tone: playableProgramCount > 0 ? "good" : "warn",
       },
       {
         label: "Music",
         value: formatCompactNumber(musicCount),
-        helper: "Music and music-video inventory for music channels.",
+        helper: "Music and music-video inventory for The Pulse, Amplify, and worship channels.",
+        tone: musicCount > 0 ? "good" : "default",
       },
       {
         label: "Ads / Bumpers",
         value: formatCompactNumber(adInventoryCount),
-        helper: "Short-form inventory used for breaks and filler.",
+        helper: `${formatCompactNumber(playableAdCount)} playable short-form ad item(s).`,
+        tone: playableAdCount > 0 ? "good" : "warn",
       },
       {
         label: "Enabled Channels",
-        value: formatCompactNumber(enabledChannelCount),
+        value: `${formatCompactNumber(enabledChannelCount)}/${REQUIRED_LAUNCH_CHANNEL_COUNT}`,
         helper: "Public channels available to viewers.",
+        tone:
+          enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT
+            ? "good"
+            : enabledChannelCount > 0
+              ? "warn"
+              : "danger",
       },
       {
-        label: "Unassigned",
-        value: formatCompactNumber(unassignedCount),
-        helper: "Media saved but not yet attached to a channel.",
+        label: "Embedded Ads",
+        value: formatCompactNumber(channelsWithEmbeddedAds),
+        helper: "Channels with commercials directly in mediaIds. Should be zero.",
+        tone: channelsWithEmbeddedAds === 0 ? "good" : "danger",
       },
     ];
-  }, [enabledChannelCount, media, unassignedCount]);
+  }, [
+    adInventoryCount,
+    channelsWithEmbeddedAds,
+    enabledChannelCount,
+    media.length,
+    musicCount,
+    playableAdCount,
+    playableProgramCount,
+    programInventoryCount,
+  ]);
 
   const launchChecks = useMemo<LaunchCheck[]>(() => {
     return [
       {
-        label: "Channel Lineup",
-        status: enabledChannelCount >= 12 ? "pass" : "warn",
+        label: "23-Channel Lineup",
+        status:
+          enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT ? "pass" : "warn",
         helper:
-          enabledChannelCount >= 12
-            ? "Twelve or more public channels are enabled."
-            : "Enable all launch channels before going public.",
+          enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT
+            ? "All 23 launch channels are enabled."
+            : `Only ${formatCompactNumber(
+                enabledChannelCount,
+              )}/${REQUIRED_LAUNCH_CHANNEL_COUNT} channels are enabled.`,
       },
       {
-        label: "Programming Inventory",
-        status: media.length >= 20 ? "pass" : "warn",
+        label: "Every Channel Has Programs",
+        status:
+          enabledChannelCount > 0 && channelsWithPrograms === enabledChannelCount
+            ? "pass"
+            : "warn",
         helper:
-          media.length >= 20
-            ? "The media library has enough content for a launch pass."
-            : "Add more shows, movies, music, ads, or bumpers.",
+          enabledChannelCount > 0 && channelsWithPrograms === enabledChannelCount
+            ? "Every enabled channel has at least one normal program item."
+            : `${formatCompactNumber(
+                channelsWithPrograms,
+              )}/${formatCompactNumber(enabledChannelCount)} enabled channels have programs.`,
       },
       {
-        label: "Channel Assignments",
-        status: assignedCount > 0 && unassignedCount < media.length ? "pass" : "warn",
+        label: "Commercial Inventory",
+        status: playableAdCount > 0 ? "pass" : "warn",
         helper:
-          assignedCount > 0
-            ? `${formatCompactNumber(assignedCount)} media items are assigned to channels.`
-            : "Assign media to channels so the live schedule can run.",
+          playableAdCount > 0
+            ? `${formatCompactNumber(playableAdCount)} playable ad/bumpers available for breaks.`
+            : "Add at least one playable commercial or bumper.",
       },
       {
-        label: "Active Channel",
-        status: activeChannel && activeChannelMediaCount > 0 ? "pass" : "warn",
+        label: "Commercials Not In Playlists",
+        status: channelsWithEmbeddedAds === 0 ? "pass" : "warn",
         helper:
-          activeChannel && activeChannelMediaCount > 0
+          channelsWithEmbeddedAds === 0
+            ? "Commercials are clean inventory, not normal channel episodes."
+            : `${formatCompactNumber(
+                channelsWithEmbeddedAds,
+              )} channel(s) still have ads directly in mediaIds.`,
+      },
+      {
+        label: "No Missing Playlist Items",
+        status: channelsWithMissingMedia === 0 ? "pass" : "warn",
+        helper:
+          channelsWithMissingMedia === 0
+            ? "All channel mediaIds resolve to saved media records."
+            : `${formatCompactNumber(
+                channelsWithMissingMedia,
+              )} channel(s) reference missing media.`,
+      },
+      {
+        label: "Active Channel Playback",
+        status:
+          Boolean(activeChannel) &&
+          activeChannelProgramCount > 0 &&
+          activeChannelMissingCount === 0
+            ? "pass"
+            : "warn",
+        helper:
+          Boolean(activeChannel) && activeChannelProgramCount > 0
             ? `${getChannelLabel(activeChannel)} has ${formatCompactNumber(
-                activeChannelMediaCount,
-              )} assigned item(s).`
-            : "Select a channel with assigned media before testing playback.",
+                activeChannelProgramCount,
+              )} program item(s) and ${formatCompactNumber(
+                activeChannelEmbeddedAdCount,
+              )} embedded ad item(s).`
+            : "Select a channel with at least one playable program.",
       },
       {
         label: "Station Backup",
         status: media.length > 0 && channels.length > 0 ? "pass" : "warn",
-        helper:
-          "Export Station Config after each major upload or branding session.",
-      },
-      {
-        label: "Commercial Inventory",
-        status: getMediaTypeCount(media, ["commercial", "bumper"]) > 0 ? "pass" : "warn",
-        helper:
-          getMediaTypeCount(media, ["commercial", "bumper"]) > 0
-            ? "Commercial or bumper inventory is available."
-            : "Add ad/bumpers for more realistic channel breaks.",
+        helper: "Export Station Config after every major upload, cleanup, or branding pass.",
       },
     ];
   }, [
     activeChannel,
-    activeChannelMediaCount,
-    assignedCount,
+    activeChannelEmbeddedAdCount,
+    activeChannelMissingCount,
+    activeChannelProgramCount,
     channels.length,
+    channelsWithEmbeddedAds,
+    channelsWithMissingMedia,
+    channelsWithPrograms,
     enabledChannelCount,
-    media,
-    unassignedCount,
+    media.length,
+    playableAdCount,
   ]);
 
   return (
@@ -544,9 +730,9 @@ export default function AdminDashboard() {
               className="mt-1 max-w-3xl text-xs leading-5"
               style={{ color: "var(--text-muted)" }}
             >
-              Manage uploads, bulk imports, playlists, commercial blocks,
-              music channels, channel branding, media assignments, and station
-              backups from one protected control surface.
+              Manage uploads, bulk imports, playlists, commercial inventory,
+              music channels, channel branding, media assignments, backups, and
+              launch readiness from one protected control surface.
             </p>
           </div>
 
@@ -615,6 +801,7 @@ export default function AdminDashboard() {
         {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}
         {activeTab === "branding" ? <ChannelBrandingPanel /> : null}
         {activeTab === "library" ? <MediaLibraryPanel /> : null}
+
         {activeTab === "launch" ? (
           <LaunchReadinessPanel
             checks={launchChecks}
