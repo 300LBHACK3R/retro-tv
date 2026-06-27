@@ -7,18 +7,22 @@ import type { MediaItem, MediaType } from "@/lib/types";
 
 type LibraryFilter = "all" | "show" | "movie" | "music" | "music-video";
 
+type LibraryMediaType = Exclude<MediaType, "commercial" | "bumper">;
+
 type ParsedLibraryItem = {
   media: MediaItem;
+  groupKey: string;
   seriesTitle: string;
   displayTitle: string;
   season: number;
   episode: number;
-  type: MediaType;
+  type: LibraryMediaType;
 };
 
 type LibraryShow = {
+  key: string;
   title: string;
-  type: MediaType;
+  type: LibraryMediaType;
   seasons: Map<number, ParsedLibraryItem[]>;
   itemCount: number;
   totalDuration: number;
@@ -64,13 +68,27 @@ function inferTitleFromFile(file: string): string {
   }
 }
 
-function isLibraryMedia(item: MediaItem): boolean {
+function getSafeDuration(value: number | undefined): number {
+  const duration = Math.floor(Number(value));
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 0;
+}
+
+function hasPlayableSource(item: MediaItem): boolean {
+  return item.file.trim().length > 0 && getSafeDuration(item.duration) > 0;
+}
+
+function isLibraryMediaType(type: MediaType): type is LibraryMediaType {
   return (
-    item.type === "show" ||
-    item.type === "movie" ||
-    item.type === "music" ||
-    item.type === "music-video"
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
   );
+}
+
+function isLibraryMedia(item: MediaItem): boolean {
+  return isLibraryMediaType(item.type) && hasPlayableSource(item);
 }
 
 function getTypeLabel(type: MediaType): string {
@@ -95,6 +113,37 @@ function getFallbackGroupTitle(media: MediaItem, fallbackTitle: string): string 
   return fallbackTitle || "Untitled";
 }
 
+function createGroupKey(type: LibraryMediaType, title: string): string {
+  return `${type}:${title.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+function createParsedItem({
+  media,
+  seriesTitle,
+  displayTitle,
+  season,
+  episode,
+}: {
+  media: MediaItem;
+  seriesTitle: string;
+  displayTitle: string;
+  season: number;
+  episode: number;
+}): ParsedLibraryItem {
+  const safeSeriesTitle = cleanDisplay(seriesTitle) || "Untitled";
+  const safeType = media.type as LibraryMediaType;
+
+  return {
+    media,
+    groupKey: createGroupKey(safeType, safeSeriesTitle),
+    seriesTitle: safeSeriesTitle,
+    displayTitle: cleanDisplay(displayTitle) || safeSeriesTitle,
+    season: Number.isFinite(season) && season > 0 ? season : 1,
+    episode: Number.isFinite(episode) && episode > 0 ? episode : 0,
+    type: safeType,
+  };
+}
+
 function parseEpisode(media: MediaItem): ParsedLibraryItem {
   const rawTitle = cleanDisplay(media.title || inferTitleFromFile(media.file));
   const fallbackTitle = rawTitle || "Untitled";
@@ -115,55 +164,56 @@ function parseEpisode(media: MediaItem): ParsedLibraryItem {
     }
 
     if (match.length === 4) {
-      const seriesTitle = cleanDisplay(match[1] ?? "Untitled");
+      const seriesTitle =
+        cleanDisplay(match[1] ?? "") || getFallbackGroupTitle(media, fallbackTitle);
       const episode = Number(match[2] ?? 0);
       const suffix = cleanDisplay(match[3] ?? "");
+      const displayTitle =
+        suffix.length > 0
+          ? `S01E${String(episode).padStart(2, "0")} ${suffix}`
+          : `S01E${String(episode).padStart(2, "0")}`;
 
-      return {
+      return createParsedItem({
         media,
-        seriesTitle: seriesTitle || getFallbackGroupTitle(media, fallbackTitle),
-        displayTitle:
-          suffix.length > 0
-            ? `S01E${String(episode).padStart(2, "0")} ${suffix}`
-            : `S01E${String(episode).padStart(2, "0")}`,
+        seriesTitle,
+        displayTitle,
         season: 1,
-        episode: Number.isFinite(episode) && episode > 0 ? episode : 0,
-        type: media.type,
-      };
+        episode,
+      });
     }
 
-    const seriesTitle = cleanDisplay(match[1] ?? "Untitled");
+    const seriesTitle =
+      cleanDisplay(match[1] ?? "") || getFallbackGroupTitle(media, fallbackTitle);
     const season = Number(match[2] ?? 1);
     const episode = Number(match[3] ?? 0);
     const suffix = cleanDisplay(match[4] ?? "");
+    const displayTitle =
+      suffix.length > 0
+        ? `S${String(season).padStart(2, "0")}E${String(episode).padStart(
+            2,
+            "0",
+          )} ${suffix}`
+        : `S${String(season).padStart(2, "0")}E${String(episode).padStart(
+            2,
+            "0",
+          )}`;
 
-    return {
+    return createParsedItem({
       media,
-      seriesTitle: seriesTitle || getFallbackGroupTitle(media, fallbackTitle),
-      displayTitle:
-        suffix.length > 0
-          ? `S${String(season).padStart(2, "0")}E${String(episode).padStart(
-              2,
-              "0",
-            )} ${suffix}`
-          : `S${String(season).padStart(2, "0")}E${String(episode).padStart(
-              2,
-              "0",
-            )}`,
-      season: Number.isFinite(season) && season > 0 ? season : 1,
-      episode: Number.isFinite(episode) && episode > 0 ? episode : 0,
-      type: media.type,
-    };
+      seriesTitle,
+      displayTitle,
+      season,
+      episode,
+    });
   }
 
-  return {
+  return createParsedItem({
     media,
     seriesTitle: getFallbackGroupTitle(media, fallbackTitle),
     displayTitle: fallbackTitle,
     season: 1,
     episode: media.type === "show" ? 0 : Number.MAX_SAFE_INTEGER,
-    type: media.type,
-  };
+  });
 }
 
 function buildLibrary(media: MediaItem[]): LibraryShow[] {
@@ -173,11 +223,10 @@ function buildLibrary(media: MediaItem[]): LibraryShow[] {
     .filter(isLibraryMedia)
     .map(parseEpisode)
     .forEach((item) => {
-      const key = `${item.type}:${item.seriesTitle.toLowerCase()}`;
-
       const existing =
-        shows.get(key) ??
+        shows.get(item.groupKey) ??
         ({
+          key: item.groupKey,
           title: item.seriesTitle,
           type: item.type,
           seasons: new Map<number, ParsedLibraryItem[]>(),
@@ -187,11 +236,12 @@ function buildLibrary(media: MediaItem[]): LibraryShow[] {
 
       const seasonItems = existing.seasons.get(item.season) ?? [];
       seasonItems.push(item);
+
       existing.seasons.set(item.season, seasonItems);
       existing.itemCount += 1;
-      existing.totalDuration += item.media.duration || 0;
+      existing.totalDuration += getSafeDuration(item.media.duration);
 
-      shows.set(key, existing);
+      shows.set(item.groupKey, existing);
     });
 
   return Array.from(shows.values())
@@ -200,9 +250,18 @@ function buildLibrary(media: MediaItem[]): LibraryShow[] {
         show.seasons.set(
           season,
           items.sort((a, b) => {
-            if (a.type !== b.type) return getTypeLabel(a.type).localeCompare(getTypeLabel(b.type));
-            if (a.episode !== b.episode) return a.episode - b.episode;
-            return a.displayTitle.localeCompare(b.displayTitle);
+            if (a.type !== b.type) {
+              return getTypeLabel(a.type).localeCompare(getTypeLabel(b.type));
+            }
+
+            if (a.episode !== b.episode) {
+              return a.episode - b.episode;
+            }
+
+            return a.displayTitle.localeCompare(b.displayTitle, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
           }),
         );
       });
@@ -214,7 +273,10 @@ function buildLibrary(media: MediaItem[]): LibraryShow[] {
         return getTypeLabel(a.type).localeCompare(getTypeLabel(b.type));
       }
 
-      return a.title.localeCompare(b.title);
+      return a.title.localeCompare(b.title, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -248,11 +310,27 @@ function itemMatchesQuery(show: LibraryShow, query: string): boolean {
     .includes(cleanQuery);
 }
 
+function getSeasonLabel(show: LibraryShow, season: number): string {
+  if (show.type === "show") {
+    return `Season ${season}`;
+  }
+
+  return "Library";
+}
+
+function getEpisodeMeta(show: LibraryShow, episode: ParsedLibraryItem): string {
+  if (show.type === "show") {
+    return `S${episode.season} E${episode.episode || "-"}`;
+  }
+
+  return getTypeLabel(episode.type);
+}
+
 export default function ShowLibrary() {
   const media = useStore((state) => state.media);
 
   const [open, setOpen] = useState(false);
-  const [selectedShowTitle, setSelectedShowTitle] = useState<string>("");
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string>("");
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<ParsedLibraryItem | null>(
     null,
@@ -270,11 +348,11 @@ export default function ShowLibrary() {
 
   const selectedShow = useMemo(() => {
     return (
-      filteredLibrary.find((show) => show.title === selectedShowTitle) ??
+      filteredLibrary.find((show) => show.key === selectedGroupKey) ??
       filteredLibrary[0] ??
       null
     );
-  }, [filteredLibrary, selectedShowTitle]);
+  }, [filteredLibrary, selectedGroupKey]);
 
   const seasonNumbers = useMemo(() => {
     if (!selectedShow) return [];
@@ -330,7 +408,7 @@ export default function ShowLibrary() {
 
   useEffect(() => {
     if (!selectedShow && filteredLibrary[0]) {
-      setSelectedShowTitle(filteredLibrary[0].title);
+      setSelectedGroupKey(filteredLibrary[0].key);
     }
   }, [filteredLibrary, selectedShow]);
 
@@ -340,7 +418,9 @@ export default function ShowLibrary() {
       return;
     }
 
-    const firstSeason = Array.from(selectedShow.seasons.keys()).sort((a, b) => a - b)[0];
+    const firstSeason = Array.from(selectedShow.seasons.keys()).sort(
+      (a, b) => a - b,
+    )[0];
 
     if (firstSeason && !selectedShow.seasons.has(selectedSeason)) {
       setSelectedSeason(firstSeason);
@@ -348,10 +428,10 @@ export default function ShowLibrary() {
     }
   }, [selectedSeason, selectedShow]);
 
-  const handleShowSelect = (title: string) => {
-    const show = library.find((item) => item.title === title);
+  const handleShowSelect = (key: string) => {
+    const show = library.find((item) => item.key === key);
 
-    setSelectedShowTitle(title);
+    setSelectedGroupKey(key);
 
     const firstSeason = show
       ? Array.from(show.seasons.keys()).sort((a, b) => a - b)[0] ?? 1
@@ -413,7 +493,8 @@ export default function ShowLibrary() {
                   style={{ color: "var(--text-muted)" }}
                 >
                   Live channels keep the cable-TV feel. Library mode is for
-                  browsing saved media without changing the live schedule.
+                  browsing saved shows, movies, and music without changing the
+                  live schedule.
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -483,7 +564,7 @@ export default function ShowLibrary() {
                   }}
                 />
 
-                <div className="mb-3 flex gap-2 overflow-x-auto pb-1 ttv-no-scrollbar">
+                <div className="ttv-no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
                   {LIBRARY_FILTERS.map((item) => {
                     const active = item.id === filter;
 
@@ -493,7 +574,7 @@ export default function ShowLibrary() {
                         type="button"
                         onClick={() => {
                           setFilter(item.id);
-                          setSelectedShowTitle("");
+                          setSelectedGroupKey("");
                           setSelectedEpisode(null);
                         }}
                         className="shrink-0 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
@@ -512,13 +593,13 @@ export default function ShowLibrary() {
                 <div className="max-h-[55dvh] space-y-2 overflow-y-auto pr-1">
                   {filteredLibrary.length > 0 ? (
                     filteredLibrary.map((show) => {
-                      const active = selectedShow?.title === show.title;
+                      const active = selectedShow?.key === show.key;
 
                       return (
                         <button
-                          key={`${show.type}-${show.title}`}
+                          key={show.key}
                           type="button"
-                          onClick={() => handleShowSelect(show.title)}
+                          onClick={() => handleShowSelect(show.key)}
                           className="w-full rounded-xl border p-3 text-left transition hover:opacity-90"
                           style={{
                             background: active
@@ -602,9 +683,7 @@ export default function ShowLibrary() {
                                   color: "var(--text)",
                                 }}
                               >
-                                {selectedShow.type === "show"
-                                  ? `Season ${season}`
-                                  : "Library"}
+                                {getSeasonLabel(selectedShow, season)}
                               </button>
                             );
                           })}
@@ -642,10 +721,8 @@ export default function ShowLibrary() {
                                   color: active ? "inherit" : "var(--text-muted)",
                                 }}
                               >
-                                {selectedShow.type === "show"
-                                  ? `S${episode.season} E${episode.episode || "-"}`
-                                  : getTypeLabel(episode.type)}{" "}
-                                / {formatDuration(episode.media.duration)}
+                                {getEpisodeMeta(selectedShow, episode)} /{" "}
+                                {formatDuration(episode.media.duration)}
                               </div>
                             </button>
                           );
@@ -660,7 +737,8 @@ export default function ShowLibrary() {
                         color: "var(--text-muted)",
                       }}
                     >
-                      Upload media first, then it will appear here.
+                      Upload playable shows, movies, or music first, then they
+                      will appear here.
                     </div>
                   )}
                 </div>
