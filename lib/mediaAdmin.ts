@@ -43,6 +43,8 @@ type CreateMediaItemFromUrlInput = {
   airStartTime?: string;
 };
 
+const WEEKDAY_IDS = new Set<Weekday>(WEEKDAYS.map((day) => day.id));
+
 function getNowIso(): string {
   return new Date().toISOString();
 }
@@ -62,6 +64,49 @@ function createId(title?: string): string {
   return `${cleanTitle || "media"}-${Date.now().toString(36)}${Math.random()
     .toString(36)
     .slice(2, 6)}`;
+}
+
+function normalizePositiveSecond(value: unknown): number {
+  const numberValue = Math.floor(Number(value));
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    return 0;
+  }
+
+  return numberValue;
+}
+
+function normalizeSecondList(values: readonly number[] | undefined): number[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
+    .map(normalizePositiveSecond)
+    .filter((seconds) => seconds > 0);
+}
+
+function sanitizeAirDays(values: readonly Weekday[] | undefined): Weekday[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(values.filter((value): value is Weekday => WEEKDAY_IDS.has(value))),
+  );
+}
+
+function isProgramType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
+}
+
+function isCommercialType(type: MediaType): boolean {
+  return type === "commercial" || type === "bumper";
 }
 
 export function normalizeUrl(value: string): string {
@@ -212,11 +257,19 @@ function parseClockDuration(value: string): number {
   if (parts.length === 3) {
     const [hours = 0, minutes = 0, seconds = 0] = parts;
 
+    if (minutes > 59 || seconds > 59) {
+      return 0;
+    }
+
     return Math.round(hours * 3600 + minutes * 60 + seconds);
   }
 
   if (parts.length === 2) {
     const [minutes = 0, seconds = 0] = parts;
+
+    if (seconds > 59) {
+      return 0;
+    }
 
     return Math.round(minutes * 60 + seconds);
   }
@@ -322,6 +375,13 @@ export function sanitizeCommercialCategory(value: string): string | undefined {
   return clean || undefined;
 }
 
+/**
+ * Kept for compatibility with older UI code.
+ *
+ * This should not be applied automatically during media creation.
+ * Slot length should only be set when an admin explicitly chooses a preset or
+ * enters a slot length.
+ */
 export function getDefaultSlotLengthForDuration(
   duration: number,
   type: MediaType,
@@ -330,15 +390,17 @@ export function getDefaultSlotLengthForDuration(
     return undefined;
   }
 
-  if (duration <= 0) {
+  const safeDuration = normalizePositiveSecond(duration);
+
+  if (safeDuration <= 0) {
     return undefined;
   }
 
-  if (duration <= 30 * 60) {
+  if (safeDuration <= 30 * 60) {
     return 30 * 60;
   }
 
-  if (duration <= 60 * 60) {
+  if (safeDuration <= 60 * 60) {
     return 60 * 60;
   }
 
@@ -392,6 +454,57 @@ function getOriginalNameFromUrl(url: string, fallbackTitle: string): string {
   }
 }
 
+function getSafeSlotLengthSeconds(
+  slotLengthSeconds: number | undefined,
+  duration: number,
+): number | undefined {
+  const slotLength = normalizePositiveSecond(slotLengthSeconds);
+
+  if (slotLength <= 0) {
+    return undefined;
+  }
+
+  /**
+   * Slot length must be deliberate and must be longer than the playable item.
+   * Equal/shorter slot lengths do nothing useful and can confuse guide math.
+   */
+  if (slotLength <= duration) {
+    return undefined;
+  }
+
+  return slotLength;
+}
+
+function getCleanBreakpoints(
+  breakpoints: number[] | undefined,
+  duration: number,
+): number[] {
+  const cleanBreakpoints = normalizeSecondList(breakpoints);
+
+  return Array.from(
+    new Set(
+      cleanBreakpoints.filter(
+        (seconds) => seconds >= 60 && seconds <= Math.max(0, duration - 60),
+      ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+function getCleanBreakDurations(
+  breakDurations: number[] | undefined,
+  breakpointCount: number,
+): number[] {
+  const cleanDurations = normalizeSecondList(breakDurations);
+
+  if (breakpointCount <= 0) {
+    return [];
+  }
+
+  return Array.from({ length: breakpointCount })
+    .map((_, index) => cleanDurations[index] ?? 0)
+    .filter((seconds) => seconds > 0);
+}
+
 export function createMediaItemFromUrl({
   url,
   title,
@@ -402,7 +515,7 @@ export function createMediaItemFromUrl({
   slotLengthSeconds,
   fillSlotWithCommercials = false,
   commercialStrategy = "best-fit",
-  allowCommercialSlicing,
+  allowCommercialSlicing = false,
   commercialCategory,
   airDays = [],
   airStartTime,
@@ -410,13 +523,18 @@ export function createMediaItemFromUrl({
   const cleanUrl = normalizeUrl(url);
   const safeDuration = Math.max(1, Math.floor(Number(duration) || 0));
   const cleanTitle = title?.trim() || inferNameFromUrl(cleanUrl) || "Untitled Media";
-  const defaultSlotLength = getDefaultSlotLengthForDuration(safeDuration, type);
-
-  const safeSlotLengthSeconds =
-    slotLengthSeconds && slotLengthSeconds > safeDuration
-      ? Math.floor(slotLengthSeconds)
-      : defaultSlotLength;
-
+  const cleanBreakpoints = isProgramType(type)
+    ? getCleanBreakpoints(breakpoints, safeDuration)
+    : [];
+  const cleanBreakDurations = isProgramType(type)
+    ? getCleanBreakDurations(breakDurations, cleanBreakpoints.length)
+    : [];
+  const cleanSlotLengthSeconds = isProgramType(type)
+    ? getSafeSlotLengthSeconds(slotLengthSeconds, safeDuration)
+    : undefined;
+  const normalizedAirStartTime = isProgramType(type) && airStartTime
+    ? normalizeAirStartTime(airStartTime)
+    : undefined;
   const now = getNowIso();
 
   return {
@@ -431,20 +549,24 @@ export function createMediaItemFromUrl({
     createdAt: now,
     updatedAt: now,
 
-    breakpoints,
-    breakDurations,
-    slotLengthSeconds: safeSlotLengthSeconds,
+    breakpoints: cleanBreakpoints,
+    breakDurations: cleanBreakDurations,
+    slotLengthSeconds: cleanSlotLengthSeconds,
     fillSlotWithCommercials:
-      type === "show" || type === "movie" ? fillSlotWithCommercials : false,
+      isProgramType(type) && cleanSlotLengthSeconds
+        ? Boolean(fillSlotWithCommercials)
+        : false,
     commercialStrategy,
 
-    allowCommercialSlicing:
-      allowCommercialSlicing ?? (type === "commercial" || type === "bumper"),
-    commercialCategory: commercialCategory
-      ? sanitizeCommercialCategory(commercialCategory)
-      : undefined,
+    allowCommercialSlicing: isCommercialType(type)
+      ? Boolean(allowCommercialSlicing)
+      : false,
+    commercialCategory:
+      isCommercialType(type) && commercialCategory
+        ? sanitizeCommercialCategory(commercialCategory)
+        : undefined,
 
-    airDays,
-    airStartTime: airStartTime ? normalizeAirStartTime(airStartTime) : undefined,
+    airDays: isProgramType(type) ? sanitizeAirDays(airDays) : [],
+    airStartTime: normalizedAirStartTime,
   };
 }

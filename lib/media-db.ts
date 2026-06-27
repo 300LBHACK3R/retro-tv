@@ -38,7 +38,7 @@ function assertBrowserIndexedDb(): void {
 }
 
 function formatBytes(bytes: number): string {
-  const safeBytes = Math.max(0, Math.floor(bytes));
+  const safeBytes = Math.max(0, Math.floor(Number(bytes) || 0));
 
   if (safeBytes < 1024) return `${safeBytes} B`;
 
@@ -55,26 +55,40 @@ function formatBytes(bytes: number): string {
 function createMediaMeta(storageKey: string, file: Blob): StoredMediaMeta {
   return {
     storageKey,
-    size: file.size,
+    size: Math.max(0, Math.floor(file.size)),
     type: file.type || "application/octet-stream",
     updatedAt: new Date().toISOString(),
   };
 }
 
-function createDbError(message: string, error?: unknown): Error {
-  if (error instanceof Error && error.message) {
-    return new Error(`${message} ${error.message}`);
+function getErrorMessage(error: unknown): string {
+  if (error instanceof DOMException && error.message) {
+    return error.message;
   }
 
-  if (error instanceof DOMException && error.message) {
-    return new Error(`${message} ${error.message}`);
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error.trim();
+  }
+
+  return "";
+}
+
+function createDbError(message: string, error?: unknown): Error {
+  const details = getErrorMessage(error);
+
+  if (details) {
+    return new Error(`${message} ${details}`);
   }
 
   return new Error(message);
 }
 
 function assertValidStorageKey(storageKey: MediaDbKey): string {
-  const cleanKey = storageKey.trim();
+  const cleanKey = String(storageKey ?? "").trim();
 
   if (!cleanKey) {
     throw new Error("A valid storage key is required.");
@@ -91,6 +105,24 @@ function assertValidBlob(file: Blob): void {
   if (file.size <= 0) {
     throw new Error("Cannot save an empty media file.");
   }
+}
+
+function isQuotaExceededError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return (
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+    );
+  }
+
+  const message = getErrorMessage(error).toLowerCase();
+
+  return (
+    message.includes("quotaexceedederror") ||
+    message.includes("quota exceeded") ||
+    message.includes("quota_reached") ||
+    message.includes("storage quota")
+  );
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -130,7 +162,7 @@ function openDb(): Promise<IDBDatabase> {
     request.onblocked = () => {
       reject(
         new Error(
-          "Media database upgrade was blocked. Close other TatesTv tabs and try again.",
+          "Media database upgrade was blocked. Close other Tate's TV tabs and try again.",
         ),
       );
     };
@@ -162,11 +194,11 @@ async function withStore<T>(
       const store = tx.objectStore(storeName);
 
       let requestResult: T | undefined;
-      let rejected = false;
+      let settled = false;
 
       const rejectOnce = (error: Error) => {
-        if (rejected) return;
-        rejected = true;
+        if (settled) return;
+        settled = true;
         reject(error);
       };
 
@@ -194,7 +226,8 @@ async function withStore<T>(
       }
 
       tx.oncomplete = () => {
-        if (!rejected) {
+        if (!settled) {
+          settled = true;
           resolve(requestResult);
         }
       };
@@ -235,11 +268,11 @@ async function withTransaction(
         {},
       );
 
-      let rejected = false;
+      let settled = false;
 
       const rejectOnce = (error: Error) => {
-        if (rejected) return;
-        rejected = true;
+        if (settled) return;
+        settled = true;
         reject(error);
       };
 
@@ -255,7 +288,8 @@ async function withTransaction(
       }
 
       tx.oncomplete = () => {
-        if (!rejected) {
+        if (!settled) {
+          settled = true;
           resolve();
         }
       };
@@ -277,7 +311,10 @@ async function withTransaction(
   }
 }
 
-function getQuotaRisk(percentUsed: number, quota: number): MediaStorageSummary["quotaRisk"] {
+function getQuotaRisk(
+  percentUsed: number,
+  quota: number,
+): MediaStorageSummary["quotaRisk"] {
   if (quota <= 0) {
     return "unknown";
   }
@@ -293,12 +330,17 @@ function getQuotaRisk(percentUsed: number, quota: number): MediaStorageSummary["
   return "safe";
 }
 
-function isQuotaExceededError(error: unknown): boolean {
-  return (
-    error instanceof DOMException &&
-    (error.name === "QuotaExceededError" ||
-      error.name === "NS_ERROR_DOM_QUOTA_REACHED")
-  );
+function getStoreOrThrow(
+  stores: Record<string, IDBObjectStore>,
+  storeName: string,
+): IDBObjectStore {
+  const store = stores[storeName];
+
+  if (!store) {
+    throw new Error(`Media database store is unavailable: ${storeName}.`);
+  }
+
+  return store;
 }
 
 export async function saveMediaBlob(
@@ -313,12 +355,8 @@ export async function saveMediaBlob(
       [FILE_STORE_NAME, META_STORE_NAME],
       "readwrite",
       (stores) => {
-        const fileStore = stores[FILE_STORE_NAME];
-        const metaStore = stores[META_STORE_NAME];
-
-        if (!fileStore || !metaStore) {
-          throw new Error("Media database stores are unavailable.");
-        }
+        const fileStore = getStoreOrThrow(stores, FILE_STORE_NAME);
+        const metaStore = getStoreOrThrow(stores, META_STORE_NAME);
 
         fileStore.put(file, cleanKey);
         metaStore.put(createMediaMeta(cleanKey, file));
@@ -338,7 +376,7 @@ export async function saveMediaBlob(
 export async function loadMediaBlob(
   storageKey: MediaDbKey,
 ): Promise<Blob | null> {
-  const cleanKey = storageKey.trim();
+  const cleanKey = String(storageKey ?? "").trim();
 
   if (!cleanKey) {
     return null;
@@ -354,7 +392,7 @@ export async function loadMediaBlob(
 }
 
 export async function hasMediaBlob(storageKey: MediaDbKey): Promise<boolean> {
-  const cleanKey = storageKey.trim();
+  const cleanKey = String(storageKey ?? "").trim();
 
   if (!cleanKey) {
     return false;
@@ -372,7 +410,7 @@ export async function hasMediaBlob(storageKey: MediaDbKey): Promise<boolean> {
 export async function getMediaBlobMeta(
   storageKey: MediaDbKey,
 ): Promise<StoredMediaMeta | null> {
-  const cleanKey = storageKey.trim();
+  const cleanKey = String(storageKey ?? "").trim();
 
   if (!cleanKey) {
     return null;
@@ -398,7 +436,7 @@ export async function listMediaBlobMeta(): Promise<StoredMediaMeta[]> {
 }
 
 export async function deleteMediaBlob(storageKey: MediaDbKey): Promise<void> {
-  const cleanKey = storageKey.trim();
+  const cleanKey = String(storageKey ?? "").trim();
 
   if (!cleanKey) {
     return;
@@ -408,12 +446,8 @@ export async function deleteMediaBlob(storageKey: MediaDbKey): Promise<void> {
     [FILE_STORE_NAME, META_STORE_NAME],
     "readwrite",
     (stores) => {
-      const fileStore = stores[FILE_STORE_NAME];
-      const metaStore = stores[META_STORE_NAME];
-
-      if (!fileStore || !metaStore) {
-        throw new Error("Media database stores are unavailable.");
-      }
+      const fileStore = getStoreOrThrow(stores, FILE_STORE_NAME);
+      const metaStore = getStoreOrThrow(stores, META_STORE_NAME);
 
       fileStore.delete(cleanKey);
       metaStore.delete(cleanKey);
@@ -423,7 +457,7 @@ export async function deleteMediaBlob(storageKey: MediaDbKey): Promise<void> {
 
 export async function deleteMediaBlobs(storageKeys: MediaDbKey[]): Promise<void> {
   const cleanKeys = Array.from(
-    new Set(storageKeys.map((key) => key.trim()).filter(Boolean)),
+    new Set(storageKeys.map((key) => String(key ?? "").trim()).filter(Boolean)),
   );
 
   if (cleanKeys.length === 0) {
@@ -434,12 +468,8 @@ export async function deleteMediaBlobs(storageKeys: MediaDbKey[]): Promise<void>
     [FILE_STORE_NAME, META_STORE_NAME],
     "readwrite",
     (stores) => {
-      const fileStore = stores[FILE_STORE_NAME];
-      const metaStore = stores[META_STORE_NAME];
-
-      if (!fileStore || !metaStore) {
-        throw new Error("Media database stores are unavailable.");
-      }
+      const fileStore = getStoreOrThrow(stores, FILE_STORE_NAME);
+      const metaStore = getStoreOrThrow(stores, META_STORE_NAME);
 
       cleanKeys.forEach((key) => {
         fileStore.delete(key);
@@ -464,12 +494,8 @@ export async function clearMediaBlobs(): Promise<void> {
     [FILE_STORE_NAME, META_STORE_NAME],
     "readwrite",
     (stores) => {
-      const fileStore = stores[FILE_STORE_NAME];
-      const metaStore = stores[META_STORE_NAME];
-
-      if (!fileStore || !metaStore) {
-        throw new Error("Media database stores are unavailable.");
-      }
+      const fileStore = getStoreOrThrow(stores, FILE_STORE_NAME);
+      const metaStore = getStoreOrThrow(stores, META_STORE_NAME);
 
       fileStore.clear();
       metaStore.clear();
@@ -516,18 +542,28 @@ export async function getMediaStorageEstimate(): Promise<MediaStorageEstimate> {
     };
   }
 
-  const estimate = await navigator.storage.estimate();
-  const usage = Math.max(0, Math.floor(estimate.usage ?? 0));
-  const quota = Math.max(0, Math.floor(estimate.quota ?? 0));
-  const percentUsed = quota > 0 ? Math.round((usage / quota) * 100) : 0;
+  try {
+    const estimate = await navigator.storage.estimate();
+    const usage = Math.max(0, Math.floor(estimate.usage ?? 0));
+    const quota = Math.max(0, Math.floor(estimate.quota ?? 0));
+    const percentUsed = quota > 0 ? Math.round((usage / quota) * 100) : 0;
 
-  return {
-    usage,
-    quota,
-    usageLabel: formatBytes(usage),
-    quotaLabel: quota > 0 ? formatBytes(quota) : "Unknown",
-    percentUsed,
-  };
+    return {
+      usage,
+      quota,
+      usageLabel: formatBytes(usage),
+      quotaLabel: quota > 0 ? formatBytes(quota) : "Unknown",
+      percentUsed,
+    };
+  } catch {
+    return {
+      usage: 0,
+      quota: 0,
+      usageLabel: "Unknown",
+      quotaLabel: "Unknown",
+      percentUsed: 0,
+    };
+  }
 }
 
 export async function getMediaStorageSummary(): Promise<MediaStorageSummary> {
@@ -578,14 +614,26 @@ export async function requestPersistentStorage(): Promise<boolean | null> {
 
 export function createObjectUrlManager() {
   const urls = new Set<string>();
+  let disposed = false;
 
   return {
     async create(storageKey: MediaDbKey): Promise<string | null> {
+      if (disposed) {
+        return null;
+      }
+
       const url = await blobToObjectUrl(storageKey);
 
-      if (url) {
-        urls.add(url);
+      if (!url) {
+        return null;
       }
+
+      if (disposed) {
+        revokeObjectUrl(url);
+        return null;
+      }
+
+      urls.add(url);
 
       return url;
     },
@@ -605,6 +653,11 @@ export function createObjectUrlManager() {
       });
 
       urls.clear();
+    },
+
+    dispose(): void {
+      disposed = true;
+      this.revokeAll();
     },
 
     size(): number {

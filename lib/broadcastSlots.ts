@@ -14,14 +14,22 @@ export const DRAMA_60_MINUTE_BREAK_DURATIONS = [3 * 60, 3 * 60, 3 * 60] as const
 
 export const STANDARD_COMMERCIAL_STRATEGY: CommercialStrategy = "best-fit";
 
+/**
+ * IMPORTANT:
+ * Presets are allowed only when an admin deliberately applies them.
+ * Do not auto-standardize uploaded shows into 30m/60m commercial blocks.
+ *
+ * This prevents accidental act splitting and prevents the scheduler from
+ * creating unwanted commercial-filled virtual segments.
+ */
+export const AUTO_BROADCAST_STANDARDIZATION_ENABLED = false;
+
 const PLAYABLE_BROADCAST_TYPES: readonly MediaType[] = [
   "show",
   "movie",
   "music",
   "music-video",
 ];
-
-const AUTO_STANDARDIZED_BROADCAST_TYPES: readonly MediaType[] = ["show", "movie"];
 
 const COMMERCIAL_MEDIA_TYPES: readonly MediaType[] = ["commercial", "bumper"];
 
@@ -141,9 +149,15 @@ function cleanBreakPlan(
 
   return {
     breakpoints: cleanedBreakpoints,
-    breakDurations: cleanedBreakpoints.map((_, index) => {
-      return cleanedDurations[index] ?? cleanedDurations[cleanedDurations.length - 1] ?? 0;
-    }).filter((value) => value > 0),
+    breakDurations: cleanedBreakpoints
+      .map((_, index) => {
+        return (
+          cleanedDurations[index] ??
+          cleanedDurations[cleanedDurations.length - 1] ??
+          0
+        );
+      })
+      .filter((value) => value > 0),
   };
 }
 
@@ -157,63 +171,24 @@ function getCleanPresetBreakPlan(
   return cleanBreakPlan(preset.breakpoints, preset.breakDurations, durationLimit);
 }
 
-function hasRealBreakpoints(item: MediaItem): boolean {
-  if (!Array.isArray(item.breakpoints)) {
-    return false;
-  }
-
-  const duration = normalizePositiveSecond(item.duration || item.slotLengthSeconds);
-
-  return cleanBreakpoints(item.breakpoints, duration).length > 0;
-}
-
-function hasRealBreakDurations(item: MediaItem): boolean {
-  if (!Array.isArray(item.breakDurations)) {
-    return false;
-  }
-
-  return cleanBreakDurations(item.breakDurations).length > 0;
-}
-
-function hasCustomSlotLength(item: MediaItem): boolean {
-  const slotLength = normalizePositiveSecond(item.slotLengthSeconds);
-
-  if (slotLength <= 0) {
-    return false;
-  }
-
+function shouldRecommendThirtyMinutePreset(
+  item: Pick<MediaItem, "type" | "duration">,
+): boolean {
   const duration = normalizePositiveSecond(item.duration);
 
-  if (duration >= 18 * 60 && duration <= 26 * 60) {
-    return slotLength !== THIRTY_MINUTE_SLOT_SECONDS;
-  }
-
-  if (duration >= 38 * 60 && duration <= 52 * 60) {
-    return slotLength !== SIXTY_MINUTE_SLOT_SECONDS;
-  }
-
-  return true;
+  return item.type === "show" && duration >= 18 * 60 && duration <= 26 * 60;
 }
 
-function hasCustomCommercialStrategy(item: MediaItem): boolean {
-  return Boolean(
-    item.commercialStrategy &&
-      item.commercialStrategy !== STANDARD_COMMERCIAL_STRATEGY,
+function shouldRecommendSixtyMinutePreset(
+  item: Pick<MediaItem, "type" | "duration">,
+): boolean {
+  const duration = normalizePositiveSecond(item.duration);
+
+  return (
+    (item.type === "show" || item.type === "movie") &&
+    duration >= 38 * 60 &&
+    duration <= 52 * 60
   );
-}
-
-function hasCustomBroadcastSettings(item: MediaItem): boolean {
-  return Boolean(
-    hasRealBreakpoints(item) ||
-      hasRealBreakDurations(item) ||
-      item.fillSlotWithCommercials === false ||
-      hasCustomCommercialStrategy(item) ||
-      hasCustomSlotLength(item),
-  );
-}
-
-function shouldAutoStandardizeMediaType(type: MediaType): boolean {
-  return includesMediaType(AUTO_STANDARDIZED_BROADCAST_TYPES, type);
 }
 
 export function isBroadcastMediaType(type: MediaType): boolean {
@@ -244,6 +219,12 @@ export function getBroadcastPresetOptions(): BroadcastPreset[] {
   return BROADCAST_PRESETS.map(clonePreset);
 }
 
+/**
+ * Explicit admin action only.
+ *
+ * This patch intentionally includes breakpoints and fill-slot behavior because
+ * it is used when the admin manually clicks a preset button.
+ */
 export function createBroadcastPatchFromPreset(
   presetId: BroadcastPresetId,
   durationSeconds?: number,
@@ -261,47 +242,38 @@ export function createBroadcastPatchFromPreset(
 }
 
 export function isThirtyMinuteShowCandidate(item: MediaItem): boolean {
-  if (item.type !== "show") {
-    return false;
-  }
-
-  const duration = normalizePositiveSecond(item.duration);
-
-  return duration >= 18 * 60 && duration <= 26 * 60;
+  return shouldRecommendThirtyMinutePreset(item);
 }
 
 export function isSixtyMinuteBroadcastCandidate(item: MediaItem): boolean {
-  if (!shouldAutoStandardizeMediaType(item.type)) {
-    return false;
-  }
-
-  const duration = normalizePositiveSecond(item.duration);
-
-  return duration >= 38 * 60 && duration <= 52 * 60;
+  return shouldRecommendSixtyMinutePreset(item);
 }
 
+/**
+ * Kept for compatibility with older callers.
+ *
+ * Return false while automatic broadcast standardization is disabled.
+ * Manual preset application should use createBroadcastPatchFromPreset().
+ */
 export function shouldUseThirtyMinuteBroadcastStandard(
   item: MediaItem,
 ): boolean {
-  if (!isThirtyMinuteShowCandidate(item)) {
-    return false;
-  }
-
-  const slotLength = normalizePositiveSecond(item.slotLengthSeconds);
-
-  return slotLength <= 0 || slotLength === THIRTY_MINUTE_SLOT_SECONDS;
+  return AUTO_BROADCAST_STANDARDIZATION_ENABLED && isThirtyMinuteShowCandidate(item);
 }
 
+/**
+ * Kept for compatibility with older callers.
+ *
+ * Return false while automatic broadcast standardization is disabled.
+ * Manual preset application should use createBroadcastPatchFromPreset().
+ */
 export function shouldUseSixtyMinuteBroadcastStandard(
   item: MediaItem,
 ): boolean {
-  if (!isSixtyMinuteBroadcastCandidate(item)) {
-    return false;
-  }
-
-  const slotLength = normalizePositiveSecond(item.slotLengthSeconds);
-
-  return slotLength <= 0 || slotLength === SIXTY_MINUTE_SLOT_SECONDS;
+  return (
+    AUTO_BROADCAST_STANDARDIZATION_ENABLED &&
+    isSixtyMinuteBroadcastCandidate(item)
+  );
 }
 
 export function getThirtyMinuteBroadcastPatch(
@@ -322,6 +294,9 @@ export function getSixtyMinuteBroadcastPatch(
   return createBroadcastPatchFromPreset("drama-60", durationSeconds);
 }
 
+/**
+ * No-op while automatic standardization is disabled.
+ */
 export function standardizeThirtyMinuteBroadcastItem(
   item: MediaItem,
 ): MediaItem {
@@ -335,6 +310,9 @@ export function standardizeThirtyMinuteBroadcastItem(
   };
 }
 
+/**
+ * No-op while automatic standardization is disabled.
+ */
 export function standardizeSixtyMinuteBroadcastItem(item: MediaItem): MediaItem {
   if (!shouldUseSixtyMinuteBroadcastStandard(item)) {
     return item;
@@ -346,48 +324,33 @@ export function standardizeSixtyMinuteBroadcastItem(item: MediaItem): MediaItem 
   };
 }
 
+/**
+ * Release-safe by default.
+ *
+ * This must not automatically add:
+ * - breakpoints
+ * - breakDurations
+ * - slotLengthSeconds
+ * - fillSlotWithCommercials
+ *
+ * Those settings can split shows into acts and create unwanted ad blocks.
+ */
 export function standardizeBroadcastItem(item: MediaItem): MediaItem {
-  if (!isBroadcastMediaType(item.type)) {
-    return item;
-  }
-
-  if (!shouldAutoStandardizeMediaType(item.type)) {
-    return item;
-  }
-
-  if (hasCustomBroadcastSettings(item)) {
-    return item;
-  }
-
-  if (shouldUseThirtyMinuteBroadcastStandard(item)) {
-    return standardizeThirtyMinuteBroadcastItem(item);
-  }
-
-  if (shouldUseSixtyMinuteBroadcastStandard(item)) {
-    return standardizeSixtyMinuteBroadcastItem(item);
-  }
-
   return item;
 }
 
 export function standardizeBroadcastItems(items: MediaItem[]): MediaItem[] {
-  return items.map(standardizeBroadcastItem);
+  return items;
 }
 
 export function getRecommendedBroadcastPresetId(
   item: Pick<MediaItem, "type" | "duration">,
 ): BroadcastPresetId | null {
-  const duration = normalizePositiveSecond(item.duration);
-
-  if (item.type === "show" && duration >= 18 * 60 && duration <= 26 * 60) {
+  if (shouldRecommendThirtyMinutePreset(item)) {
     return "cartoon-30";
   }
 
-  if (
-    shouldAutoStandardizeMediaType(item.type) &&
-    duration >= 38 * 60 &&
-    duration <= 52 * 60
-  ) {
+  if (shouldRecommendSixtyMinutePreset(item)) {
     return "drama-60";
   }
 
