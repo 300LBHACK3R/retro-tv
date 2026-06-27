@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, useId } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Channel, ChannelBranding } from "@/lib/types";
 
 const DEFAULT_ACCENT_COLOR = "#2563eb";
+
 const MAX_CALLSIGN_LENGTH = 12;
 const MAX_LOGO_TEXT_LENGTH = 32;
 const MAX_DISPLAY_NAME_LENGTH = 48;
 const MAX_DESCRIPTION_LENGTH = 140;
+const MAX_LOGO_URL_LENGTH = 500;
 
 const COLOR_PRESETS = [
   { label: "Blue", value: "#2563eb" },
@@ -30,6 +32,7 @@ function getFallbackBranding(channel: Channel): ChannelBranding {
     description: channel.branding?.description ?? "",
     accentColor: channel.branding?.accentColor ?? DEFAULT_ACCENT_COLOR,
     logoText: channel.branding?.logoText ?? channel.name,
+    logoUrl: channel.branding?.logoUrl ?? "",
   };
 }
 
@@ -50,7 +53,10 @@ function sortChannels(channels: Channel[]): Channel[] {
       return aNumber - bNumber;
     }
 
-    return String(a.id).localeCompare(String(b.id));
+    return String(a.id).localeCompare(String(b.id), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 
@@ -87,12 +93,39 @@ function normalizeCallsign(value: string, fallback: string): string {
 
 function normalizeText(value: string, fallback: string, maxLength: number): string {
   const clean = value.trim().replace(/\s+/g, " ").slice(0, maxLength);
-
   return clean || fallback.slice(0, maxLength);
 }
 
 function normalizeDescription(value: string): string {
   return value.trim().replace(/\s+/g, " ").slice(0, MAX_DESCRIPTION_LENGTH);
+}
+
+function normalizeLogoUrl(value: string | undefined): string {
+  const clean = (value ?? "").trim().slice(0, MAX_LOGO_URL_LENGTH);
+
+  if (!clean) {
+    return "";
+  }
+
+  if (clean.startsWith("/") && !clean.startsWith("//")) {
+    return clean;
+  }
+
+  try {
+    const url = new URL(clean);
+
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return url.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function isUsableLogoUrl(value: string | undefined): boolean {
+  return normalizeLogoUrl(value).length > 0;
 }
 
 function normalizeDraft(
@@ -116,6 +149,7 @@ function normalizeDraft(
       draft.accentColor,
       fallback.accentColor || DEFAULT_ACCENT_COLOR,
     ),
+    logoUrl: normalizeLogoUrl(draft.logoUrl),
   };
 }
 
@@ -125,7 +159,8 @@ function areBrandingValuesEqual(a: ChannelBranding, b: ChannelBranding): boolean
     a.callsign === b.callsign &&
     a.logoText === b.logoText &&
     a.description === b.description &&
-    a.accentColor.toLowerCase() === b.accentColor.toLowerCase()
+    a.accentColor.toLowerCase() === b.accentColor.toLowerCase() &&
+    normalizeLogoUrl(a.logoUrl) === normalizeLogoUrl(b.logoUrl)
   );
 }
 
@@ -148,13 +183,14 @@ function getInitials(value: string): string {
 function getBrandingQualityScore(branding: ChannelBranding): number {
   let score = 0;
 
-  if (branding.displayName.trim().length >= 2) score += 25;
-  if (branding.callsign.trim().length >= 2) score += 25;
-  if (branding.logoText.trim().length >= 2) score += 20;
+  if (branding.displayName.trim().length >= 2) score += 20;
+  if (branding.callsign.trim().length >= 2) score += 20;
+  if (branding.logoText.trim().length >= 2) score += 15;
   if (branding.description.trim().length >= 18) score += 20;
   if (isValidHexColor(branding.accentColor)) score += 10;
+  if (isUsableLogoUrl(branding.logoUrl)) score += 15;
 
-  return score;
+  return Math.min(100, score);
 }
 
 function CharacterCount({
@@ -227,6 +263,51 @@ function TextInput({
   );
 }
 
+function LogoMark({
+  channel,
+  draft,
+  accentColor,
+}: {
+  channel: Channel;
+  draft: BrandingDraft;
+  accentColor: string;
+}) {
+  const normalizedLogoUrl = normalizeLogoUrl(draft.logoUrl);
+  const initials = getInitials(draft.callsign || draft.logoText || channel.name);
+
+  if (normalizedLogoUrl) {
+    return (
+      <div
+        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black/35 shadow-2xl"
+        style={{
+          border: `1px solid ${accentColor}88`,
+          boxShadow: `0 0 20px ${accentColor}70`,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={normalizedLogoUrl}
+          alt={`${draft.displayName || channel.name} logo`}
+          className="h-full w-full object-contain p-1.5"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
+      style={{
+        background: accentColor,
+        boxShadow: `0 0 20px ${accentColor}70`,
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 function PreviewCard({
   channel,
   draft,
@@ -236,7 +317,6 @@ function PreviewCard({
   draft: BrandingDraft;
   accentColor: string;
 }) {
-  const initials = getInitials(draft.callsign || draft.logoText || channel.name);
   const channelLabel = getChannelLabel(channel);
   const qualityScore = getBrandingQualityScore(
     normalizeDraft(draft, getFallbackBranding(channel)),
@@ -261,15 +341,7 @@ function PreviewCard({
 
       <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xs font-black uppercase tracking-tight text-white shadow-2xl"
-            style={{
-              background: accentColor,
-              boxShadow: `0 0 20px ${accentColor}70`,
-            }}
-          >
-            {initials}
-          </div>
+          <LogoMark channel={channel} draft={draft} accentColor={accentColor} />
 
           <div className="min-w-0">
             <div className="truncate text-base font-black uppercase tracking-[0.13em] text-white">
@@ -396,6 +468,7 @@ export default function ChannelBrandingPanel() {
     draft.accentColor,
     savedBranding.accentColor,
   );
+  const normalizedLogoUrl = normalizeLogoUrl(draft.logoUrl);
 
   const hasUnsavedChanges = !areBrandingValuesEqual(
     normalizedDraft,
@@ -450,7 +523,6 @@ export default function ChannelBrandingPanel() {
     });
   };
 
-  const descriptionCount = draft.description.length;
   const qualityScore = getBrandingQualityScore(normalizedDraft);
 
   return (
@@ -476,7 +548,7 @@ export default function ChannelBrandingPanel() {
             style={{ color: "var(--text-muted)" }}
           >
             Customize channel identity, viewer overlay, guide accent, callsign,
-            logo label, and channel description.
+            logo label, logo image URL, and channel description.
           </p>
         </div>
 
@@ -539,7 +611,7 @@ export default function ChannelBrandingPanel() {
           value={draft.displayName}
           maxLength={MAX_DISPLAY_NAME_LENGTH}
           onChange={(value) => updateDraft({ displayName: value })}
-          placeholder="Example: TTV Vortex"
+          placeholder="Example: TTV Retro"
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -557,7 +629,7 @@ export default function ChannelBrandingPanel() {
                   .slice(0, MAX_CALLSIGN_LENGTH),
               })
             }
-            placeholder="VORTEX"
+            placeholder="TTVR"
           />
 
           <TextInput
@@ -566,7 +638,7 @@ export default function ChannelBrandingPanel() {
             value={draft.logoText}
             maxLength={MAX_LOGO_TEXT_LENGTH}
             onChange={(value) => updateDraft({ logoText: value })}
-            placeholder="TTV Vortex"
+            placeholder="TTV Retro"
           />
         </div>
 
@@ -581,7 +653,7 @@ export default function ChannelBrandingPanel() {
             </label>
 
             <CharacterCount
-              current={descriptionCount}
+              current={draft.description.length}
               max={MAX_DESCRIPTION_LENGTH}
             />
           </div>
@@ -595,7 +667,7 @@ export default function ChannelBrandingPanel() {
               })
             }
             rows={3}
-            placeholder="Example: High-energy cartoons, anime, action, and after-school chaos."
+            placeholder="Example: Retro cartoons, classic shows, nostalgia, and after-school TV energy."
             className="w-full resize-none rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
             style={{
               background: "var(--panel-alt-bg)",
@@ -603,6 +675,54 @@ export default function ChannelBrandingPanel() {
               color: "var(--text)",
             }}
           />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label
+              htmlFor={`${fieldId}-logo-url`}
+              className="block text-xs font-medium"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Logo Image URL
+            </label>
+
+            <CharacterCount
+              current={(draft.logoUrl ?? "").length}
+              max={MAX_LOGO_URL_LENGTH}
+            />
+          </div>
+
+          <input
+            id={`${fieldId}-logo-url`}
+            value={draft.logoUrl ?? ""}
+            onChange={(event) =>
+              updateDraft({
+                logoUrl: event.target.value.slice(0, MAX_LOGO_URL_LENGTH),
+              })
+            }
+            onBlur={() =>
+              updateDraft({
+                logoUrl: normalizeLogoUrl(draft.logoUrl),
+              })
+            }
+            placeholder="/tatestv-logo.png or https://..."
+            className="w-full rounded-xl border px-3 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
+            style={{
+              background: "var(--panel-alt-bg)",
+              borderColor:
+                !draft.logoUrl || normalizedLogoUrl ? "var(--border)" : "#f87171",
+              color: "var(--text)",
+            }}
+          />
+
+          <div
+            className="mt-1 text-[11px] leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Use a local public path like <code>/tatestv-logo.png</code> or a
+            public image URL. Leave blank to use text initials.
+          </div>
         </div>
 
         <div>
