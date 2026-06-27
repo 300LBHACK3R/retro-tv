@@ -450,7 +450,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} â€¢ {formatLongClock(nextDuration)}
+              {getDisplayTypeLabel(nextVisibleItem)} Ã¢â‚¬Â¢ {formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>

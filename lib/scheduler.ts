@@ -662,8 +662,9 @@ function canFitCommercialInExactBlock(
   targetSeconds: number,
 ): boolean {
   const duration = getSafeDuration(item);
+  const target = Math.max(1, Math.floor(targetSeconds));
 
-  return duration <= targetSeconds || canSliceCommercial(item);
+  return duration > 0 && target > 0;
 }
 
 function createAdCampaignKey(item: MediaItem): string {
@@ -684,9 +685,9 @@ function createCommercialSegment(
 ): BroadcastItem {
   const sourceDuration = getSafeDuration(item);
   const safeRequestedDuration = Math.max(1, Math.floor(requestedDuration));
-  const allowSlicing = canSliceCommercial(item);
+  const shouldSlice = safeRequestedDuration < sourceDuration;
 
-  if (!allowSlicing || safeRequestedDuration >= sourceDuration) {
+  if (!shouldSlice) {
     return {
       ...item,
       id: `${item.id}:break:${breakIndex}:${cursor.index}`,
@@ -717,7 +718,7 @@ function createCommercialSegment(
     sourceTitle: item.title,
     duration: segmentDuration,
     title: item.title,
-    segmentLabel: "Commercial Slice",
+    segmentLabel: "Commercial",
     isVirtualSegment: true,
     hiddenFromGuide: true,
     adPlacement: placement,
@@ -863,7 +864,7 @@ function fillCommercialDuration(
 
   while (remaining > 0 && guard < MAX_COMMERCIAL_SEGMENTS_PER_BLOCK) {
     const selected = pickCommercial(shortForm, remaining, cursor, strategy, {
-      allowOversized: false,
+      allowOversized: true,
       context,
     });
 
@@ -872,11 +873,9 @@ function fillCommercialDuration(
     }
 
     const selectedDuration = getSafeDuration(selected);
-    const segmentDuration = canSliceCommercial(selected)
-      ? Math.min(selectedDuration, remaining)
-      : selectedDuration;
+    const segmentDuration = Math.min(selectedDuration, remaining);
 
-    if (segmentDuration <= 0 || segmentDuration > remaining) {
+    if (segmentDuration <= 0) {
       break;
     }
 
@@ -913,43 +912,13 @@ function takeBreakItems(
     return [];
   }
 
-  const items: BroadcastItem[] = [];
-  const breakIndex = cursor.breakIndex;
-
-  for (let offset = 0; offset < count; offset += 1) {
-    const selected = pickCommercial(
-      shortForm,
-      DEFAULT_INTERNAL_BREAK_SECONDS,
-      cursor,
-      strategy,
-      {
-        allowOversized: true,
-        context,
-      },
-    );
-
-    if (!selected) {
-      break;
-    }
-
-    items.push(
-      createCommercialSegment(
-        selected,
-        getSafeDuration(selected),
-        cursor,
-        context.placement,
-        breakIndex,
-      ),
-    );
-
-    cursor.index += 1;
-  }
-
-  if (items.length > 0) {
-    cursor.breakIndex += 1;
-  }
-
-  return items;
+  return fillCommercialDuration(
+    shortForm,
+    DEFAULT_INTERNAL_BREAK_SECONDS,
+    cursor,
+    strategy,
+    context,
+  );
 }
 
 function getBreakCount(mode: CommercialBreakMode): number {
