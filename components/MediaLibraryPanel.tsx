@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   formatBreakpoints,
   formatDuration,
@@ -10,12 +9,18 @@ import {
 import { useStore } from "@/lib/store";
 import type { Channel, MediaItem, MediaType } from "@/lib/types";
 
-type MediaFilter = MediaType | "all" | "assigned" | "unassigned";
+type MediaFilter =
+  | MediaType
+  | "all"
+  | "assigned"
+  | "unassigned"
+  | "embedded-ads";
 
 type LibraryStat = {
   label: string;
   value: string | number;
   helper: string;
+  tone?: "default" | "good" | "warn" | "danger";
 };
 
 const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
@@ -28,6 +33,7 @@ const FILTER_OPTIONS: Array<{ value: MediaFilter; label: string }> = [
   { value: "bumper", label: "Bumpers" },
   { value: "assigned", label: "Assigned" },
   { value: "unassigned", label: "Unassigned" },
+  { value: "embedded-ads", label: "Embedded Ads" },
 ];
 
 const MAX_LIBRARY_HEIGHT = 580;
@@ -105,6 +111,27 @@ function isRemoteTestableUrl(value: string): boolean {
   return value.startsWith("https://") || value.startsWith("/");
 }
 
+function isProgramItem(item: MediaItem): boolean {
+  return (
+    item.type === "show" ||
+    item.type === "movie" ||
+    item.type === "music" ||
+    item.type === "music-video"
+  );
+}
+
+function isAdInventoryItem(item: MediaItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
+function isPlayableMedia(item: MediaItem): boolean {
+  return (
+    item.file.trim().length > 0 &&
+    Number.isFinite(Number(item.duration)) &&
+    Number(item.duration) > 0
+  );
+}
+
 function getTypeLabel(type: MediaType): string {
   if (type === "commercial") return "Commercial";
   if (type === "bumper") return "Bumper";
@@ -117,6 +144,10 @@ function getTypeLabel(type: MediaType): string {
 
 function getBroadcastDetails(item: MediaItem): string[] {
   const details: string[] = [];
+
+  if (isAdInventoryItem(item)) {
+    details.push("Global Ad Inventory");
+  }
 
   if (item.slotLengthSeconds) {
     details.push(`Slot ${formatDurationClock(item.slotLengthSeconds)}`);
@@ -228,19 +259,71 @@ function filterMediaByMode(
     return assignedChannels.length === 0;
   }
 
+  if (filter === "embedded-ads") {
+    return isAdInventoryItem(item) && assignedChannels.length > 0;
+  }
+
   return item.type === filter;
 }
 
+function getAssignedChannelText(assignedChannels: Channel[]): string {
+  if (assignedChannels.length === 0) {
+    return "None";
+  }
+
+  return assignedChannels
+    .map((channel) =>
+      `${getChannelLabel(channel)} ${channel.branding?.callsign ?? ""}`.trim(),
+    )
+    .join(", ");
+}
+
+function getStatStyles(tone: LibraryStat["tone"] = "default") {
+  if (tone === "good") {
+    return {
+      borderColor: "rgba(34, 197, 94, 0.32)",
+      background: "rgba(34, 197, 94, 0.08)",
+      valueColor: "#86efac",
+    };
+  }
+
+  if (tone === "warn") {
+    return {
+      borderColor: "rgba(250, 204, 21, 0.32)",
+      background: "rgba(250, 204, 21, 0.08)",
+      valueColor: "#fde68a",
+    };
+  }
+
+  if (tone === "danger") {
+    return {
+      borderColor: "rgba(248, 113, 113, 0.35)",
+      background: "rgba(248, 113, 113, 0.09)",
+      valueColor: "#fecaca",
+    };
+  }
+
+  return {
+    borderColor: "var(--border)",
+    background: "var(--panel-bg)",
+    valueColor: "var(--text)",
+  };
+}
+
 function StatCard({ stat }: { stat: LibraryStat }) {
+  const styles = getStatStyles(stat.tone);
+
   return (
     <div
       className="rounded-2xl border p-3"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
+        background: styles.background,
+        borderColor: styles.borderColor,
       }}
     >
-      <div className="text-lg font-black tracking-tight">{stat.value}</div>
+      <div className="text-lg font-black tracking-tight" style={{ color: styles.valueColor }}>
+        {stat.value}
+      </div>
 
       <div
         className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
@@ -357,6 +440,27 @@ export default function MediaLibraryPanel() {
     [assignedChannelMap, media],
   );
 
+  const embeddedAdCount = useMemo(
+    () =>
+      media.filter(
+        (item) =>
+          isAdInventoryItem(item) &&
+          (assignedChannelMap.get(item.id) ?? []).length > 0,
+      ).length,
+    [assignedChannelMap, media],
+  );
+
+  const playableProgramCount = useMemo(
+    () => media.filter((item) => isProgramItem(item) && isPlayableMedia(item)).length,
+    [media],
+  );
+
+  const playableAdCount = useMemo(
+    () =>
+      media.filter((item) => isAdInventoryItem(item) && isPlayableMedia(item)).length,
+    [media],
+  );
+
   const unassignedCount = Math.max(0, media.length - assignedCount);
 
   const currentChannelMediaCount = useMemo(() => {
@@ -378,11 +482,15 @@ export default function MediaLibraryPanel() {
         label: "Total",
         value: formatCompactNumber(media.length),
         helper: "All saved media metadata records.",
+        tone: media.length > 0 ? "good" : "warn",
       },
       {
-        label: "Shows",
-        value: formatCompactNumber(typeCounts.show),
-        helper: "Episode-style long-form items.",
+        label: "Programs",
+        value: formatCompactNumber(
+          typeCounts.show + typeCounts.movie + musicCount,
+        ),
+        helper: `${formatCompactNumber(playableProgramCount)} playable show/movie/music item(s).`,
+        tone: playableProgramCount > 0 ? "good" : "warn",
       },
       {
         label: "Movies",
@@ -397,7 +505,8 @@ export default function MediaLibraryPanel() {
       {
         label: "Ads / Bumpers",
         value: formatCompactNumber(adCount),
-        helper: "Short-form break inventory.",
+        helper: `${formatCompactNumber(playableAdCount)} playable short-form ad item(s).`,
+        tone: playableAdCount > 0 ? "good" : "warn",
       },
       {
         label: "Assigned",
@@ -405,19 +514,22 @@ export default function MediaLibraryPanel() {
         helper: "Media attached to at least one channel.",
       },
       {
-        label: "Unassigned",
-        value: formatCompactNumber(unassignedCount),
-        helper: "Media not currently used by a channel.",
+        label: "Embedded Ads",
+        value: formatCompactNumber(embeddedAdCount),
+        helper: "Commercials/bumpers inside playlists. Should be zero.",
+        tone: embeddedAdCount === 0 ? "good" : "danger",
       },
     ],
     [
       adCount,
       assignedCount,
+      embeddedAdCount,
       media.length,
       musicCount,
+      playableAdCount,
+      playableProgramCount,
       typeCounts.movie,
       typeCounts.show,
-      unassignedCount,
     ],
   );
 
@@ -444,6 +556,14 @@ export default function MediaLibraryPanel() {
     setPendingDeleteId(null);
   };
 
+  const removeItemFromAllChannels = (item: MediaItem, assignedChannels: Channel[]) => {
+    assignedChannels.forEach((channel) => {
+      removeMediaFromChannel(channel.id, item.id);
+    });
+
+    setPendingDeleteId(null);
+  };
+
   return (
     <section
       className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
@@ -466,17 +586,22 @@ export default function MediaLibraryPanel() {
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Manage saved Cloudflare/R2 media metadata, commercial pools, slot
-            settings, source testing, and channel assignments.
+            Manage saved Cloudflare/R2 media metadata, source testing, program
+            assignments, and global ad inventory. Commercials and bumpers should
+            not be added directly to channel playlists.
           </p>
         </div>
 
         <div
           className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
-            borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
-            color: "var(--text-muted)",
+            borderColor:
+              embeddedAdCount > 0 ? "rgba(248, 113, 113, 0.45)" : "var(--border)",
+            background:
+              embeddedAdCount > 0
+                ? "rgba(248, 113, 113, 0.10)"
+                : "var(--panel-alt-bg)",
+            color: embeddedAdCount > 0 ? "#fecaca" : "var(--text-muted)",
           }}
         >
           {formatCompactNumber(media.length)} Items
@@ -542,7 +667,8 @@ export default function MediaLibraryPanel() {
         className="mb-3 rounded-2xl border px-3 py-2 text-xs leading-5"
         style={{
           background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
+          borderColor:
+            embeddedAdCount > 0 ? "rgba(250, 204, 21, 0.45)" : "var(--border)",
           color: "var(--text-muted)",
         }}
       >
@@ -559,7 +685,19 @@ export default function MediaLibraryPanel() {
           </span>
           <span>•</span>
           <span>Current channel items: {currentChannelMediaCount}</span>
+          <span>•</span>
+          <span>Unassigned: {unassignedCount}</span>
+          <span>•</span>
+          <span>Embedded ads: {embeddedAdCount}</span>
         </div>
+
+        {embeddedAdCount > 0 ? (
+          <div className="mt-2 rounded-xl border border-yellow-300/30 bg-yellow-300/10 px-3 py-2 text-yellow-100">
+            Some commercials/bumpers are assigned directly to channel playlists.
+            Use the cleanup buttons on those items to keep ads as global
+            inventory only.
+          </div>
+        ) : null}
 
         {query ? (
           <div className="mt-2">
@@ -594,14 +732,23 @@ export default function MediaLibraryPanel() {
 
             const isPendingDelete = pendingDeleteId === item.id;
             const details = getBroadcastDetails(item);
+            const isAdInventory = isAdInventoryItem(item);
+            const isEmbeddedAd = isAdInventory && assignedChannels.length > 0;
+            const canAssignToCurrent = Boolean(currentChannel) && isProgramItem(item);
 
             return (
               <article
                 key={item.id}
                 className="rounded-2xl border p-3"
                 style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: isPendingDelete ? "#ef4444" : "var(--border)",
+                  background: isEmbeddedAd
+                    ? "rgba(248, 113, 113, 0.08)"
+                    : "var(--panel-alt-bg)",
+                  borderColor: isPendingDelete
+                    ? "#ef4444"
+                    : isEmbeddedAd
+                      ? "rgba(248, 113, 113, 0.35)"
+                      : "var(--border)",
                 }}
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -610,12 +757,20 @@ export default function MediaLibraryPanel() {
                       <div
                         className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
                         style={{
-                          borderColor: "var(--border)",
-                          color: "var(--text-muted)",
+                          borderColor: isAdInventory
+                            ? "rgba(34, 197, 94, 0.35)"
+                            : "var(--border)",
+                          color: isAdInventory ? "#86efac" : "var(--text-muted)",
                         }}
                       >
                         {getTypeLabel(item.type)}
                       </div>
+
+                      {isEmbeddedAd ? (
+                        <div className="rounded-full border border-red-300/40 bg-red-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-100">
+                          Embedded Ad
+                        </div>
+                      ) : null}
 
                       <div className="truncate text-sm font-black" title={item.title}>
                         {item.title}
@@ -639,13 +794,15 @@ export default function MediaLibraryPanel() {
 
                     {details.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {details.map((detail) => (
+                        {details.map((detail, detailIndex) => (
                           <span
-                            key={detail}
+                            key={`${detail}-${detailIndex}`}
                             className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
                             style={{
-                              borderColor: "var(--border)",
-                              color: "var(--text-muted)",
+                              borderColor: isEmbeddedAd
+                                ? "rgba(248, 113, 113, 0.35)"
+                                : "var(--border)",
+                              color: isEmbeddedAd ? "#fecaca" : "var(--text-muted)",
                             }}
                           >
                             {detail}
@@ -666,17 +823,7 @@ export default function MediaLibraryPanel() {
                       className="mt-2 text-[11px]"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Channels:{" "}
-                      {assignedChannels.length > 0
-                        ? assignedChannels
-                            .map(
-                              (channel) =>
-                                `${getChannelLabel(channel)} ${
-                                  channel.branding?.callsign ?? ""
-                                }`.trim(),
-                            )
-                            .join(", ")
-                        : "None"}
+                      Channels: {getAssignedChannelText(assignedChannels)}
                     </div>
                   </div>
 
@@ -705,8 +852,27 @@ export default function MediaLibraryPanel() {
                   </div>
                 ) : null}
 
+                {isAdInventory ? (
+                  <div
+                    className="mt-2 rounded-xl border px-3 py-2 text-[11px] leading-5"
+                    style={{
+                      background: isEmbeddedAd
+                        ? "rgba(248, 113, 113, 0.10)"
+                        : "rgba(34, 197, 94, 0.08)",
+                      borderColor: isEmbeddedAd
+                        ? "rgba(248, 113, 113, 0.30)"
+                        : "rgba(34, 197, 94, 0.24)",
+                      color: isEmbeddedAd ? "#fecaca" : "#bbf7d0",
+                    }}
+                  >
+                    {isEmbeddedAd
+                      ? "This ad/bump is currently inside a playlist. Remove it from playlists so the scheduler can insert it correctly."
+                      : "This item is clean global ad inventory. It does not need to be added to channel playlists."}
+                  </div>
+                ) : null}
+
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {!isAssignedToCurrent ? (
+                  {!isAssignedToCurrent && !isAdInventory ? (
                     <ActionButton
                       onClick={() => {
                         if (!currentChannel) return;
@@ -714,11 +880,13 @@ export default function MediaLibraryPanel() {
                         assignMediaToChannel(currentChannel.id, item.id);
                         setPendingDeleteId(null);
                       }}
-                      disabled={!currentChannel}
+                      disabled={!canAssignToCurrent}
                     >
                       Add to {getChannelLabel(currentChannel)}
                     </ActionButton>
-                  ) : (
+                  ) : null}
+
+                  {isAssignedToCurrent ? (
                     <ActionButton
                       onClick={() => {
                         if (!currentChannel) return;
@@ -730,7 +898,16 @@ export default function MediaLibraryPanel() {
                     >
                       Remove from {getChannelLabel(currentChannel)}
                     </ActionButton>
-                  )}
+                  ) : null}
+
+                  {isEmbeddedAd ? (
+                    <ActionButton
+                      danger
+                      onClick={() => removeItemFromAllChannels(item, assignedChannels)}
+                    >
+                      Remove From All Playlists
+                    </ActionButton>
+                  ) : null}
 
                   <ActionButton
                     onClick={() => openSource(item)}
