@@ -52,6 +52,10 @@ function getMediaForChannel(
     .filter((item): item is MediaItem => Boolean(item));
 }
 
+function isCommercialInventoryItem(item: MediaItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
 function createThemeVars(theme: ReturnType<typeof getThemeById>): CSSProperties {
   return {
     "--app-bg": theme.colors.appBg,
@@ -200,19 +204,28 @@ export default function Home() {
     [activeChannel, media],
   );
 
+  const availableAds = useMemo(
+    () => media.filter(isCommercialInventoryItem),
+    [media],
+  );
+
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
         channel: activeChannel,
+        availableAds,
       }),
-    [activeChannel, activeChannelMedia],
+    [activeChannel, activeChannelMedia, availableAds],
   );
 
   const channelSchedules = useMemo(
     () =>
       enabledChannels.map((channel) => {
         const channelMedia = getMediaForChannel(channel, media);
-        const playbackSchedule = buildSchedule(channelMedia, { channel });
+        const playbackSchedule = buildSchedule(channelMedia, {
+          channel,
+          availableAds,
+        });
 
         return {
           channel,
@@ -674,3 +687,6 @@ export default function Home() {
     </main>
   );
 }
+
+
+
