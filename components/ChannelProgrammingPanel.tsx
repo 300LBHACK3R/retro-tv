@@ -26,9 +26,10 @@ type PlaylistStat = {
   label: string;
   value: string | number;
   helper: string;
+  tone?: "default" | "good" | "warn" | "danger";
 };
 
-type PlaylistFilter = "all" | "programs" | "ads" | "missing" | "duplicates";
+type PlaylistFilter = "all" | "programs" | "embedded-ads" | "missing" | "duplicates";
 
 const MAX_PLAYLIST_HEIGHT = 620;
 
@@ -57,7 +58,10 @@ function sortChannels(channels: Channel[]): Channel[] {
       return aNumber - bNumber;
     }
 
-    return String(a.id).localeCompare(String(b.id));
+    return String(a.id).localeCompare(String(b.id), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 }
 
@@ -85,7 +89,9 @@ function getProviderLabel(item: MediaItem): string {
 function matchesQuery(entry: ProgrammedItem, query: string): boolean {
   const cleanQuery = query.trim().toLowerCase();
 
-  if (!cleanQuery) return true;
+  if (!cleanQuery) {
+    return true;
+  }
 
   if (!entry.item) {
     return entry.mediaId.toLowerCase().includes(cleanQuery);
@@ -106,8 +112,74 @@ function matchesQuery(entry: ProgrammedItem, query: string): boolean {
     .some((value) => String(value).toLowerCase().includes(cleanQuery));
 }
 
+function isTestableSource(file: string): boolean {
+  return file.startsWith("https://") || file.startsWith("/");
+}
+
+function isProgramItem(item: MediaItem | null): boolean {
+  return (
+    item?.type === "show" ||
+    item?.type === "movie" ||
+    item?.type === "music" ||
+    item?.type === "music-video"
+  );
+}
+
+function isEmbeddedAdItem(item: MediaItem | null): boolean {
+  return item?.type === "commercial" || item?.type === "bumper";
+}
+
+function hasPlayableSource(item: MediaItem | null): boolean {
+  return Boolean(
+    item &&
+      item.file.trim().length > 0 &&
+      Number.isFinite(Number(item.duration)) &&
+      Number(item.duration) > 0,
+  );
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("en-CA", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function createDuplicateMediaIdSet(programmedItems: ProgrammedItem[]): Set<string> {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  programmedItems.forEach((entry) => {
+    if (seen.has(entry.mediaId)) {
+      duplicates.add(entry.mediaId);
+      return;
+    }
+
+    seen.add(entry.mediaId);
+  });
+
+  return duplicates;
+}
+
+function matchesFilter(
+  entry: ProgrammedItem,
+  filter: PlaylistFilter,
+  duplicateMediaIds: Set<string>,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "programs") return isProgramItem(entry.item);
+  if (filter === "embedded-ads") return isEmbeddedAdItem(entry.item);
+  if (filter === "missing") return !entry.item;
+  if (filter === "duplicates") return duplicateMediaIds.has(entry.mediaId);
+
+  return true;
+}
+
 function getItemBadges(item: MediaItem): string[] {
   const badges: string[] = [];
+
+  if (isEmbeddedAdItem(item)) {
+    badges.push("Embedded Ad - Clean Up");
+  }
 
   if (item.slotLengthSeconds) {
     badges.push(`Slot ${formatDurationClock(item.slotLengthSeconds)}`);
@@ -148,87 +220,33 @@ function getItemBadges(item: MediaItem): string[] {
   return badges;
 }
 
-function isTestableSource(file: string): boolean {
-  return file.startsWith("https://") || file.startsWith("/");
-}
-
-function isLongForm(item: MediaItem | null): boolean {
-  return (
-    item?.type === "show" ||
-    item?.type === "movie" ||
-    item?.type === "music" ||
-    item?.type === "music-video"
-  );
-}
-
-function isShortForm(item: MediaItem | null): boolean {
-  return item?.type === "commercial" || item?.type === "bumper";
-}
-
-function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat("en-CA", {
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function createDuplicateMediaIdSet(programmedItems: ProgrammedItem[]): Set<string> {
-  const seen = new Set<string>();
-  const duplicates = new Set<string>();
-
-  programmedItems.forEach((entry) => {
-    if (seen.has(entry.mediaId)) {
-      duplicates.add(entry.mediaId);
-      return;
-    }
-
-    seen.add(entry.mediaId);
-  });
-
-  return duplicates;
-}
-
-function matchesFilter(
-  entry: ProgrammedItem,
-  filter: PlaylistFilter,
-  duplicateMediaIds: Set<string>,
-): boolean {
-  if (filter === "all") return true;
-  if (filter === "programs") return isLongForm(entry.item);
-  if (filter === "ads") return isShortForm(entry.item);
-  if (filter === "missing") return !entry.item;
-  if (filter === "duplicates") return duplicateMediaIds.has(entry.mediaId);
-
-  return true;
-}
-
 function createPlaylistStats({
   programmedItems,
   visibleItems,
   validProgrammedItems,
   missingProgrammedItems,
   duplicateSlotCount,
-  totalRuntime,
+  programCount,
+  embeddedAdCount,
+  playableProgramCount,
+  totalProgramRuntime,
 }: {
   programmedItems: ProgrammedItem[];
   visibleItems: ProgrammedItem[];
   validProgrammedItems: ProgrammedItem[];
   missingProgrammedItems: ProgrammedItem[];
   duplicateSlotCount: number;
-  totalRuntime: number;
+  programCount: number;
+  embeddedAdCount: number;
+  playableProgramCount: number;
+  totalProgramRuntime: number;
 }): PlaylistStat[] {
-  const longFormCount = validProgrammedItems.filter((entry) =>
-    isLongForm(entry.item),
-  ).length;
-
-  const shortFormCount = validProgrammedItems.filter((entry) =>
-    isShortForm(entry.item),
-  ).length;
-
   return [
     {
       label: "Slots",
       value: formatCompactNumber(programmedItems.length),
-      helper: "Total programmed channel entries.",
+      helper: "Total channel playlist entries.",
+      tone: programmedItems.length > 0 ? "good" : "warn",
     },
     {
       label: "Visible",
@@ -237,42 +255,83 @@ function createPlaylistStats({
     },
     {
       label: "Programs",
-      value: formatCompactNumber(longFormCount),
-      helper: "Shows, movies, music, and music videos.",
+      value: formatCompactNumber(programCount),
+      helper: `${formatCompactNumber(playableProgramCount)} playable program item(s).`,
+      tone: programCount > 0 ? "good" : "warn",
     },
     {
-      label: "Ads / Bumpers",
-      value: formatCompactNumber(shortFormCount),
-      helper: "Short-form break/filler inventory.",
+      label: "Embedded Ads",
+      value: formatCompactNumber(embeddedAdCount),
+      helper: "Commercials/bumpers directly inside this playlist. Should be zero.",
+      tone: embeddedAdCount === 0 ? "good" : "danger",
     },
     {
       label: "Missing",
       value: formatCompactNumber(missingProgrammedItems.length),
       helper: "Slots pointing to deleted media.",
+      tone: missingProgrammedItems.length === 0 ? "good" : "danger",
     },
     {
       label: "Duplicates",
       value: formatCompactNumber(duplicateSlotCount),
       helper: "Repeated media IDs inside this channel.",
+      tone: duplicateSlotCount === 0 ? "good" : "warn",
     },
     {
       label: "Runtime",
-      value: formatDuration(totalRuntime),
-      helper: "Raw runtime before broadcast filler.",
+      value: formatDuration(totalProgramRuntime),
+      helper: "Program runtime only, excluding embedded ads.",
+      tone: validProgrammedItems.length > 0 ? "default" : "warn",
     },
   ];
 }
 
+function getStatStyles(tone: PlaylistStat["tone"] = "default") {
+  if (tone === "good") {
+    return {
+      borderColor: "rgba(34, 197, 94, 0.32)",
+      background: "rgba(34, 197, 94, 0.08)",
+      valueColor: "#86efac",
+    };
+  }
+
+  if (tone === "warn") {
+    return {
+      borderColor: "rgba(250, 204, 21, 0.32)",
+      background: "rgba(250, 204, 21, 0.08)",
+      valueColor: "#fde68a",
+    };
+  }
+
+  if (tone === "danger") {
+    return {
+      borderColor: "rgba(248, 113, 113, 0.35)",
+      background: "rgba(248, 113, 113, 0.09)",
+      valueColor: "#fecaca",
+    };
+  }
+
+  return {
+    borderColor: "var(--border)",
+    background: "var(--panel-bg)",
+    valueColor: "var(--text)",
+  };
+}
+
 function StatCard({ stat }: { stat: PlaylistStat }) {
+  const styles = getStatStyles(stat.tone);
+
   return (
     <div
       className="rounded-2xl border p-3"
       style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
+        background: styles.background,
+        borderColor: styles.borderColor,
       }}
     >
-      <div className="text-lg font-black tracking-tight">{stat.value}</div>
+      <div className="text-lg font-black tracking-tight" style={{ color: styles.valueColor }}>
+        {stat.value}
+      </div>
 
       <div
         className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
@@ -442,13 +501,28 @@ export default function ChannelProgrammingPanel() {
     [programmedItems],
   );
 
-  const totalRuntime = useMemo(
+  const embeddedAdItems = useMemo(
+    () => programmedItems.filter((entry) => isEmbeddedAdItem(entry.item)),
+    [programmedItems],
+  );
+
+  const programItems = useMemo(
+    () => programmedItems.filter((entry) => isProgramItem(entry.item)),
+    [programmedItems],
+  );
+
+  const playableProgramCount = useMemo(
+    () => programItems.filter((entry) => hasPlayableSource(entry.item)).length,
+    [programItems],
+  );
+
+  const totalProgramRuntime = useMemo(
     () =>
-      validProgrammedItems.reduce(
+      programItems.reduce(
         (sum, entry) => sum + Math.max(0, entry.item?.duration ?? 0),
         0,
       ),
-    [validProgrammedItems],
+    [programItems],
   );
 
   const playlistStats = useMemo(
@@ -459,13 +533,19 @@ export default function ChannelProgrammingPanel() {
         validProgrammedItems,
         missingProgrammedItems,
         duplicateSlotCount,
-        totalRuntime,
+        programCount: programItems.length,
+        embeddedAdCount: embeddedAdItems.length,
+        playableProgramCount,
+        totalProgramRuntime,
       }),
     [
       duplicateSlotCount,
+      embeddedAdItems.length,
       missingProgrammedItems,
+      playableProgramCount,
+      programItems.length,
       programmedItems,
-      totalRuntime,
+      totalProgramRuntime,
       validProgrammedItems,
       visibleItems,
     ],
@@ -538,6 +618,34 @@ export default function ChannelProgrammingPanel() {
     setMessage(`Removed ${missingProgrammedItems.length} missing slot(s).`);
   };
 
+  const removeEmbeddedAds = () => {
+    if (!activeChannel || embeddedAdItems.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove ${embeddedAdItems.length} embedded ad/bumpers from ${getChannelLabel(
+        activeChannel,
+      )}? This keeps the media in the library and only removes it from this playlist.`,
+    );
+
+    if (!confirmed) return;
+
+    Array.from(new Set(embeddedAdItems.map((entry) => entry.mediaId))).forEach(
+      (mediaId) => {
+        removeMediaFromChannel(activeChannel.id, mediaId);
+      },
+    );
+
+    setTargetSlots({});
+    setFilter("all");
+    setMessage(
+      `Removed ${embeddedAdItems.length} embedded ad/bumpers from ${getChannelLabel(
+        activeChannel,
+      )}.`,
+    );
+  };
+
   const applyDefaultSlotLength = () => {
     if (!activeChannel) {
       setMessage("No active channel selected.");
@@ -557,6 +665,20 @@ export default function ChannelProgrammingPanel() {
 
     setSlotLengthInput("");
     setMessage(`Default slot length set to ${formatDurationClock(parsed)}.`);
+  };
+
+  const clearDefaultSlotLength = () => {
+    if (!activeChannel) {
+      setMessage("No active channel selected.");
+      return;
+    }
+
+    updateChannelSettings(activeChannel.id, {
+      defaultSlotLengthSeconds: undefined,
+    });
+
+    setSlotLengthInput("");
+    setMessage("Default slot length cleared.");
   };
 
   return (
@@ -581,17 +703,24 @@ export default function ChannelProgrammingPanel() {
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Control order, randomization, commercial behavior, slot defaults,
-            and exact channel playlists.
+            Control playlist order, randomization, commercial behavior, default
+            slot length, and release-safe channel hygiene. Commercials should
+            stay in global ad inventory, not inside channel playlists.
           </p>
         </div>
 
         <div
           className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
           style={{
-            borderColor: "var(--border)",
-            background: "var(--panel-alt-bg)",
-            color: "var(--text-muted)",
+            borderColor:
+              embeddedAdItems.length > 0
+                ? "rgba(248, 113, 113, 0.45)"
+                : "var(--border)",
+            background:
+              embeddedAdItems.length > 0
+                ? "rgba(248, 113, 113, 0.10)"
+                : "var(--panel-alt-bg)",
+            color: embeddedAdItems.length > 0 ? "#fecaca" : "var(--text-muted)",
           }}
         >
           {activeChannel
@@ -768,7 +897,7 @@ export default function ChannelProgrammingPanel() {
               Channel Default Slot Length
             </label>
 
-            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
               <input
                 value={slotLengthInput}
                 onChange={(event) =>
@@ -793,6 +922,15 @@ export default function ChannelProgrammingPanel() {
                 className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.1em]"
               >
                 Apply Default
+              </button>
+
+              <button
+                type="button"
+                onClick={clearDefaultSlotLength}
+                disabled={!activeChannel.defaultSlotLengthSeconds}
+                className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.1em] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear Default
               </button>
             </div>
 
@@ -825,7 +963,10 @@ export default function ChannelProgrammingPanel() {
         className="mb-3 rounded-2xl border px-3 py-3"
         style={{
           background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
+          borderColor:
+            embeddedAdItems.length > 0
+              ? "rgba(248, 113, 113, 0.45)"
+              : "var(--border)",
         }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -848,15 +989,23 @@ export default function ChannelProgrammingPanel() {
             className="text-right text-[11px]"
             style={{ color: "var(--text-muted)" }}
           >
-            <div>Total runtime</div>
+            <div>Program runtime</div>
             <div className="font-black" style={{ color: "var(--text)" }}>
-              {formatDuration(totalRuntime)}
+              {formatDuration(totalProgramRuntime)}
             </div>
           </div>
         </div>
+
+        {embeddedAdItems.length > 0 ? (
+          <div className="mt-3 rounded-xl border border-red-300/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-100">
+            This channel has {embeddedAdItems.length} commercial/bumper item(s)
+            directly in its playlist. Remove them from the playlist and keep
+            them as global ad inventory.
+          </div>
+        ) : null}
       </div>
 
-      <div className="mb-3 grid gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
+      <div className="mb-3 grid gap-2 lg:grid-cols-[1fr_auto_auto_auto_auto]">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -880,6 +1029,19 @@ export default function ChannelProgrammingPanel() {
           className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.1em]"
         >
           Clear Search
+        </button>
+
+        <button
+          type="button"
+          onClick={removeEmbeddedAds}
+          disabled={!activeChannel || embeddedAdItems.length === 0}
+          className="ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.1em] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: "#7f1d1d",
+            color: "#fff",
+          }}
+        >
+          Remove Embedded Ads
         </button>
 
         <button
@@ -917,9 +1079,9 @@ export default function ChannelProgrammingPanel() {
           onClick={() => setFilter("programs")}
         />
         <FilterButton
-          label="Ads"
-          active={filter === "ads"}
-          onClick={() => setFilter("ads")}
+          label="Embedded Ads"
+          active={filter === "embedded-ads"}
+          onClick={() => setFilter("embedded-ads")}
         />
         <FilterButton
           label="Missing"
@@ -938,7 +1100,9 @@ export default function ChannelProgrammingPanel() {
         style={{
           background: "var(--panel-alt-bg)",
           borderColor:
-            missingProgrammedItems.length > 0 || duplicateSlotCount > 0
+            missingProgrammedItems.length > 0 ||
+            duplicateSlotCount > 0 ||
+            embeddedAdItems.length > 0
               ? "rgba(250, 204, 21, 0.45)"
               : "var(--border)",
           color: "var(--text-muted)",
@@ -949,7 +1113,9 @@ export default function ChannelProgrammingPanel() {
           <span>•</span>
           <span>Total slots: {programmedItems.length}</span>
           <span>•</span>
-          <span>Playable: {validProgrammedItems.length}</span>
+          <span>Programs: {programItems.length}</span>
+          <span>•</span>
+          <span>Embedded ads: {embeddedAdItems.length}</span>
           <span>•</span>
           <span>Missing: {missingProgrammedItems.length}</span>
           <span>•</span>
@@ -978,6 +1144,7 @@ export default function ChannelProgrammingPanel() {
             const slotKey = `${mediaId}-${index}`;
             const targetSlotValue = targetSlots[slotKey] ?? String(index + 1);
             const isDuplicateSlot = duplicateMediaIds.has(mediaId);
+            const isEmbeddedAd = isEmbeddedAdItem(item);
 
             if (!item) {
               return (
@@ -1029,12 +1196,16 @@ export default function ChannelProgrammingPanel() {
                 key={`${item.id}-${index}`}
                 className="rounded-2xl border p-3"
                 style={{
-                  background: isDuplicateSlot
-                    ? "rgba(250, 204, 21, 0.08)"
-                    : "var(--panel-alt-bg)",
-                  borderColor: isDuplicateSlot
-                    ? "rgba(250, 204, 21, 0.35)"
-                    : "var(--border)",
+                  background: isEmbeddedAd
+                    ? "rgba(248, 113, 113, 0.08)"
+                    : isDuplicateSlot
+                      ? "rgba(250, 204, 21, 0.08)"
+                      : "var(--panel-alt-bg)",
+                  borderColor: isEmbeddedAd
+                    ? "rgba(248, 113, 113, 0.35)"
+                    : isDuplicateSlot
+                      ? "rgba(250, 204, 21, 0.35)"
+                      : "var(--border)",
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1049,6 +1220,12 @@ export default function ChannelProgrammingPanel() {
                       >
                         Slot {index + 1}
                       </div>
+
+                      {isEmbeddedAd ? (
+                        <div className="rounded-full border border-red-300/40 bg-red-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-100">
+                          Embedded Ad
+                        </div>
+                      ) : null}
 
                       {isDuplicateSlot ? (
                         <div className="rounded-full border border-yellow-300/40 bg-yellow-300/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-yellow-100">
@@ -1077,13 +1254,15 @@ export default function ChannelProgrammingPanel() {
 
                     {badges.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {badges.map((badge) => (
+                        {badges.map((badge, badgeIndex) => (
                           <span
-                            key={badge}
+                            key={`${badge}-${badgeIndex}`}
                             className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
                             style={{
-                              borderColor: "var(--border)",
-                              color: "var(--text-muted)",
+                              borderColor: isEmbeddedAd
+                                ? "rgba(248, 113, 113, 0.35)"
+                                : "var(--border)",
+                              color: isEmbeddedAd ? "#fecaca" : "var(--text-muted)",
                             }}
                           >
                             {badge}
@@ -1173,10 +1352,14 @@ export default function ChannelProgrammingPanel() {
                         if (!activeChannel) return;
 
                         removeMediaFromChannel(activeChannel.id, item.id);
-                        setMessage(`Removed "${item.title}" from channel.`);
+                        setMessage(
+                          isEmbeddedAd
+                            ? `Removed embedded ad "${item.title}" from channel playlist.`
+                            : `Removed "${item.title}" from channel.`,
+                        );
                       }}
                     >
-                      Remove
+                      {isEmbeddedAd ? "Remove Embedded Ad" : "Remove"}
                     </ActionButton>
                   </div>
 
