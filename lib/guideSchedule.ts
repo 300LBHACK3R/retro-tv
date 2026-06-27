@@ -8,15 +8,27 @@ type ActiveGuideState = {
 
 const FALLBACK_GUIDE_DURATION_SECONDS = 1;
 
-const ENCODING_REPLACEMENTS: readonly [searchValue: RegExp, replacement: string][] = [
-  [/â€¢/g, " / "],
-  [/â€“/g, "–"],
-  [/â€”/g, "—"],
-  [/â€˜/g, "‘"],
-  [/â€™/g, "’"],
-  [/â€œ/g, "“"],
+const ENCODING_REPLACEMENTS: readonly [
+  searchValue: string | RegExp,
+  replacement: string,
+][] = [
+  ["â€¢", " / "],
+  ["â€˘", " / "],
+  ["Â·", " / "],
+  ["•", " / "],
+
+  ["â€“", "–"],
+  ["â€”", "—"],
+
+  ["â€˜", "‘"],
+  ["â€™", "’"],
+
+  ["â€œ", "“"],
+  ["â€�", "”"],
   [/â€\u009d/g, "”"],
-  [/Â/g, ""],
+
+  ["â€¦", "..."],
+  ["Â", ""],
 ];
 
 export function isHiddenGuideItem(item: BroadcastItem): boolean {
@@ -51,12 +63,43 @@ function cleanEncoding(value: string | undefined): string {
   return output.replace(/\s+/g, " ").trim();
 }
 
+function slugForGuideId(value: string): string {
+  const cleanValue = cleanEncoding(value).toLowerCase();
+
+  return (
+    cleanValue
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 96) || "unknown"
+  );
+}
+
 function getGuideGroupKey(item: BroadcastItem): string {
-  if (item.isVirtualSegment && item.parentMediaId) {
+  if (item.parentMediaId) {
     return item.parentMediaId;
   }
 
-  return item.parentMediaId || item.id || item.title;
+  if (item.isVirtualSegment && item.sourceTitle) {
+    return cleanEncoding(item.sourceTitle);
+  }
+
+  return item.id || item.title;
+}
+
+function removeTrailingSegmentLabel(title: string, segmentLabel: string): string {
+  const cleanTitle = cleanEncoding(title);
+  const cleanSegmentLabel = cleanEncoding(segmentLabel);
+
+  if (!cleanTitle || !cleanSegmentLabel) {
+    return cleanTitle;
+  }
+
+  return cleanEncoding(
+    cleanTitle.replace(
+      new RegExp(`\\s+${escapeRegExp(cleanSegmentLabel)}$`, "i"),
+      "",
+    ),
+  );
 }
 
 function getCleanTitle(item: BroadcastItem): string {
@@ -66,12 +109,7 @@ function getCleanTitle(item: BroadcastItem): string {
     return baseTitle;
   }
 
-  return cleanEncoding(
-    baseTitle.replace(
-      new RegExp(`\\s+${escapeRegExp(item.segmentLabel)}$`),
-      "",
-    ),
-  );
+  return removeTrailingSegmentLabel(baseTitle, item.segmentLabel);
 }
 
 function getCleanSourceTitle(item: BroadcastItem, cleanTitle: string): string {
@@ -85,12 +123,7 @@ function getCleanSourceTitle(item: BroadcastItem, cleanTitle: string): string {
     return sourceTitle;
   }
 
-  return cleanEncoding(
-    sourceTitle.replace(
-      new RegExp(`\\s+${escapeRegExp(item.segmentLabel)}$`),
-      "",
-    ),
-  );
+  return removeTrailingSegmentLabel(sourceTitle, item.segmentLabel);
 }
 
 function getGuideDuration(item: BroadcastItem): number {
@@ -106,8 +139,8 @@ function getGuideDuration(item: BroadcastItem): number {
 }
 
 function createGuideId(groupKey: string, item: BroadcastItem): string {
-  const safeGroupKey = cleanEncoding(groupKey) || "unknown";
-  const safeItemKey = cleanEncoding(item.id || item.parentMediaId || item.title) || "item";
+  const safeGroupKey = slugForGuideId(groupKey);
+  const safeItemKey = slugForGuideId(item.id || item.parentMediaId || item.title);
 
   return `guide:${safeGroupKey}:${safeItemKey}`;
 }
@@ -123,12 +156,12 @@ function createVisibleGuideItem(
   return {
     ...item,
     id: createGuideId(groupKey, item),
-    title: cleanTitle,
+    title: cleanTitle || "Untitled",
     duration,
     guideDuration: duration,
     sourceStart: undefined,
     sourceEnd: undefined,
-    sourceTitle: cleanSourceTitle,
+    sourceTitle: cleanSourceTitle || cleanTitle || "Untitled",
     segmentLabel: undefined,
     isVirtualSegment: false,
     hiddenFromGuide: false,
@@ -163,7 +196,22 @@ function canMergeVisibleItem(
     return false;
   }
 
+  /**
+   * Only merge virtual segments from the same source program.
+   * Normal playlist items with the same title should stay separate entries.
+   */
   return active.canMergeVisibleSegments && nextItem.isVirtualSegment === true;
+}
+
+function createActiveGuideState(
+  item: BroadcastItem,
+  groupKey: string,
+): ActiveGuideState {
+  return {
+    item: createVisibleGuideItem(item, groupKey),
+    groupKey,
+    canMergeVisibleSegments: item.isVirtualSegment === true,
+  };
 }
 
 export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
@@ -181,6 +229,11 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
     const itemDuration = getGuideDuration(item);
 
     if (isHiddenGuideItem(item)) {
+      /**
+       * Hidden commercials/bumpers are not displayed as public guide rows.
+       * Their runtime is folded into the previous visible program so guide time
+       * stays aligned with the actual broadcast clock.
+       */
       if (active) {
         active = {
           ...active,
@@ -194,11 +247,7 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
     const groupKey = getGuideGroupKey(item);
 
     if (!active) {
-      active = {
-        item: createVisibleGuideItem(item, groupKey),
-        groupKey,
-        canMergeVisibleSegments: item.isVirtualSegment === true,
-      };
+      active = createActiveGuideState(item, groupKey);
       continue;
     }
 
@@ -211,12 +260,7 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
     }
 
     flush();
-
-    active = {
-      item: createVisibleGuideItem(item, groupKey),
-      groupKey,
-      canMergeVisibleSegments: item.isVirtualSegment === true,
-    };
+    active = createActiveGuideState(item, groupKey);
   }
 
   flush();
@@ -224,8 +268,15 @@ export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   return guideItems;
 }
 
+/**
+ * Public visible schedule.
+ *
+ * This intentionally returns the merged guide schedule instead of simply
+ * filtering hidden items. That keeps visible rows time-accurate when commercial
+ * breaks are hidden from the guide.
+ */
 export function buildVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
-  return schedule.filter((item) => !isHiddenGuideItem(item));
+  return buildGuideSchedule(schedule);
 }
 
 export function getFirstVisibleGuideItem(
