@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   formatBreakpoints,
-  formatDuration,
   formatDurationClock,
   normalizeAirStartTime,
   parseBreakpoints,
@@ -21,7 +20,7 @@ import type {
   Weekday,
 } from "@/lib/types";
 
-type MediaFilter = "all" | MediaType;
+type MediaFilter = "all" | MediaType | "embedded-ads";
 
 type EditorPreset = "cartoon" | "sitcom" | "drama";
 
@@ -36,12 +35,14 @@ const MEDIA_FILTERS: { id: MediaFilter; label: string }[] = [
   { id: "movie", label: "Movies" },
   { id: "music", label: "Music" },
   { id: "music-video", label: "Music Videos" },
-  { id: "commercial", label: "Ads" },
+  { id: "commercial", label: "Commercials" },
   { id: "bumper", label: "Bumpers" },
+  { id: "embedded-ads", label: "Embedded Ads" },
 ];
 
 const MAX_MEDIA_LIST_HEIGHT = 640;
 const MAX_TITLE_LENGTH = 140;
+const UNASSIGNED_TARGET = "";
 
 function getChannelNumber(
   channelId: string,
@@ -104,8 +105,13 @@ function isValidAirTime(value: string): boolean {
   );
 }
 
-function isBroadcastType(type: MediaType): boolean {
-  return type === "show" || type === "movie";
+function isProgramType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
 }
 
 function isCommercialType(type: MediaType): boolean {
@@ -132,7 +138,10 @@ function sortChannels(channels: Channel[]): Channel[] {
         return aNumber - bNumber;
       }
 
-      return a.id.localeCompare(b.id);
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 }
 
@@ -186,26 +195,45 @@ function getItemChannelSummary(item: MediaItem, channels: Channel[]): string {
   return assigned || "No channel";
 }
 
+function isEmbeddedAd(item: MediaItem, channels: Channel[]): boolean {
+  return (
+    isCommercialType(item.type) &&
+    channels.some((channel) => channel.mediaIds.includes(item.id))
+  );
+}
+
 function getBroadcastSummary({
   parsedSlotLength,
   parsedDuration,
   parsedBreakpoints,
   parsedBreakDurations,
   selectedChannelLabel,
+  isCommercialInventory,
 }: {
   parsedSlotLength: number;
   parsedDuration: number;
   parsedBreakpoints: number[];
   parsedBreakDurations: number[];
   selectedChannelLabel: string;
+  isCommercialInventory: boolean;
 }): string {
+  if (isCommercialInventory) {
+    return [
+      `Runtime: ${
+        parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
+      }`,
+      "Mode: global ad inventory",
+      "Playlist assignment: blocked",
+    ].join(" • ");
+  }
+
   return [
     `Slot: ${parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}`,
     `Runtime: ${
       parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
     }`,
     `Breaks: ${formatBreakpoints(parsedBreakpoints) || "none"}`,
-    `Ad blocks: ${formatBreakpoints(parsedBreakDurations) || "auto"}`,
+    `Ad blocks: ${formatBreakpoints(parsedBreakDurations) || "none"}`,
     `Current channel: ${selectedChannelLabel}`,
   ].join(" • ");
 }
@@ -213,6 +241,7 @@ function getBroadcastSummary({
 function validateEditorState({
   selectedMedia,
   title,
+  type,
   parsedDuration,
   fillSlotWithCommercials,
   parsedSlotLength,
@@ -222,6 +251,7 @@ function validateEditorState({
 }: {
   selectedMedia: MediaItem | undefined;
   title: string;
+  type: MediaType;
   parsedDuration: number;
   fillSlotWithCommercials: boolean;
   parsedSlotLength: number;
@@ -257,7 +287,11 @@ function validateEditorState({
     };
   }
 
-  if (fillSlotWithCommercials && parsedSlotLength <= parsedDuration) {
+  if (
+    isProgramType(type) &&
+    fillSlotWithCommercials &&
+    parsedSlotLength <= parsedDuration
+  ) {
     return {
       ok: false,
       message: "Slot length must be longer than runtime. Example: 30:00.",
@@ -265,6 +299,7 @@ function validateEditorState({
   }
 
   if (
+    isProgramType(type) &&
     targetChannelId &&
     !enabledChannels.some((channel) => channel.id === targetChannelId)
   ) {
@@ -348,7 +383,7 @@ export default function QuickMediaEditorPanel() {
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
-  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
+  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(false);
   const [commercialCategory, setCommercialCategory] = useState("");
 
   const [airStartTime, setAirStartTime] = useState("");
@@ -371,17 +406,28 @@ export default function QuickMediaEditorPanel() {
     [channels, selectedMedia],
   );
 
+  const selectedIsCommercialInventory = isCommercialType(type);
+  const selectedIsEmbeddedAd = Boolean(
+    selectedMedia && isEmbeddedAd(selectedMedia, channels),
+  );
+
   const filteredMedia = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
 
     return sortMedia(media).filter((item) => {
-      const matchesFilter = filter === "all" || item.type === filter;
+      const matchesFilter =
+        filter === "all"
+          ? true
+          : filter === "embedded-ads"
+            ? isEmbeddedAd(item, channels)
+            : item.type === filter;
+
       const matchesSearch =
         !cleanSearch || getMediaSearchLabel(item).includes(cleanSearch);
 
       return matchesFilter && matchesSearch;
     });
-  }, [filter, media, search]);
+  }, [channels, filter, media, search]);
 
   const parsedDuration = useMemo(
     () => parseManualDuration(durationInput, "seconds"),
@@ -413,6 +459,7 @@ export default function QuickMediaEditorPanel() {
       validateEditorState({
         selectedMedia,
         title,
+        type,
         parsedDuration,
         fillSlotWithCommercials,
         parsedSlotLength,
@@ -429,6 +476,7 @@ export default function QuickMediaEditorPanel() {
       selectedMedia,
       targetChannelId,
       title,
+      type,
     ],
   );
 
@@ -447,9 +495,7 @@ export default function QuickMediaEditorPanel() {
     );
     setFillSlotWithCommercials(Boolean(selectedMedia.fillSlotWithCommercials));
     setCommercialStrategy(selectedMedia.commercialStrategy ?? "best-fit");
-    setAllowCommercialSlicing(
-      selectedMedia.allowCommercialSlicing ?? selectedMedia.type === "commercial",
-    );
+    setAllowCommercialSlicing(Boolean(selectedMedia.allowCommercialSlicing));
     setCommercialCategory(selectedMedia.commercialCategory ?? "");
     setAirStartTime(selectedMedia.airStartTime ?? "");
     setAirDays(selectedMedia.airDays ?? []);
@@ -458,12 +504,23 @@ export default function QuickMediaEditorPanel() {
       channel.mediaIds.includes(selectedMedia.id),
     )?.id;
 
-    setTargetChannelId(firstAssignedChannelId ?? currentChannelId);
+    setTargetChannelId(
+      isCommercialType(selectedMedia.type)
+        ? UNASSIGNED_TARGET
+        : firstAssignedChannelId ?? currentChannelId,
+    );
+
     setMessage(`Editing "${selectedMedia.title}".`);
   }, [channels, currentChannelId, selectedMedia]);
 
   useEffect(() => {
-    if (enabledChannels.length === 0) return;
+    if (enabledChannels.length === 0 || selectedIsCommercialInventory) {
+      return;
+    }
+
+    if (targetChannelId === UNASSIGNED_TARGET) {
+      return;
+    }
 
     const targetExists = enabledChannels.some(
       (channel) => channel.id === targetChannelId,
@@ -472,7 +529,12 @@ export default function QuickMediaEditorPanel() {
     if (!targetExists) {
       setTargetChannelId(enabledChannels[0]?.id ?? currentChannelId);
     }
-  }, [currentChannelId, enabledChannels, targetChannelId]);
+  }, [
+    currentChannelId,
+    enabledChannels,
+    selectedIsCommercialInventory,
+    targetChannelId,
+  ]);
 
   const toggleAirDay = (day: Weekday) => {
     setAirDays((current) =>
@@ -488,6 +550,11 @@ export default function QuickMediaEditorPanel() {
   };
 
   const applyPreset = (preset: EditorPreset) => {
+    if (!isProgramType(type)) {
+      setMessage("Presets are only available for shows, movies, music, and music videos.");
+      return;
+    }
+
     if (preset === "cartoon") {
       setSlotLengthInput("30:00");
       setBreakpointsInput("7:30, 15:00");
@@ -516,6 +583,14 @@ export default function QuickMediaEditorPanel() {
     setMessage("Applied 60-minute drama slot preset.");
   };
 
+  const clearCommercialLogic = () => {
+    setSlotLengthInput("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setFillSlotWithCommercials(false);
+    setMessage("Commercial slot logic cleared for this item.");
+  };
+
   const handleTypeChange = (nextType: MediaType) => {
     setType(nextType);
 
@@ -524,13 +599,36 @@ export default function QuickMediaEditorPanel() {
       setBreakDurationsInput("");
       setSlotLengthInput("");
       setFillSlotWithCommercials(false);
-      setAllowCommercialSlicing(true);
-      setMessage(`${getMediaTypeLabel(nextType)} mode selected.`);
+      setTargetChannelId(UNASSIGNED_TARGET);
+      setMessage(`${getMediaTypeLabel(nextType)} mode selected. Playlist assignment is blocked.`);
       return;
     }
 
     setAllowCommercialSlicing(false);
     setMessage(`${getMediaTypeLabel(nextType)} mode selected.`);
+  };
+
+  const removeSelectedFromAllChannels = () => {
+    if (!selectedMedia) {
+      setMessage("Select a media item first.");
+      return;
+    }
+
+    const assignedChannels = channels.filter((channel) =>
+      channel.mediaIds.includes(selectedMedia.id),
+    );
+
+    assignedChannels.forEach((channel) => {
+      removeMediaFromChannel(channel.id, selectedMedia.id);
+    });
+
+    setTargetChannelId(
+      isCommercialType(type) ? UNASSIGNED_TARGET : currentChannelId,
+    );
+
+    setMessage(
+      `Removed "${selectedMedia.title}" from ${assignedChannels.length} channel playlist(s).`,
+    );
   };
 
   const saveChanges = () => {
@@ -546,34 +644,48 @@ export default function QuickMediaEditorPanel() {
 
     const cleanTitle = title.trim().replace(/\s+/g, " ");
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime.trim());
+    const programType = isProgramType(type);
+    const commercialType = isCommercialType(type);
 
     updateMedia(selectedMedia.id, {
       title: cleanTitle.slice(0, MAX_TITLE_LENGTH),
       type,
       duration: parsedDuration,
 
-      breakpoints: isBroadcastType(type) ? parsedBreakpoints : [],
-      breakDurations: isBroadcastType(type) ? parsedBreakDurations : [],
+      breakpoints: programType ? parsedBreakpoints : [],
+      breakDurations: programType ? parsedBreakDurations : [],
       slotLengthSeconds:
-        isBroadcastType(type) && parsedSlotLength > parsedDuration
+        programType && parsedSlotLength > parsedDuration
           ? parsedSlotLength
           : undefined,
-      fillSlotWithCommercials: isBroadcastType(type)
-        ? fillSlotWithCommercials
-        : false,
+      fillSlotWithCommercials: programType ? fillSlotWithCommercials : false,
       commercialStrategy,
 
-      allowCommercialSlicing: isCommercialType(type)
-        ? allowCommercialSlicing
-        : false,
-      commercialCategory: isCommercialType(type)
+      allowCommercialSlicing: commercialType ? allowCommercialSlicing : false,
+      commercialCategory: commercialType
         ? sanitizeCommercialCategory(commercialCategory)
         : undefined,
 
-      airDays,
-      airStartTime: normalizedAirStartTime,
+      airDays: programType ? airDays : [],
+      airStartTime: programType ? normalizedAirStartTime : undefined,
       updatedAt: new Date().toISOString(),
     });
+
+    if (commercialType) {
+      const assignedChannels = channels.filter((channel) =>
+        channel.mediaIds.includes(selectedMedia.id),
+      );
+
+      assignedChannels.forEach((channel) => {
+        removeMediaFromChannel(channel.id, selectedMedia.id);
+      });
+
+      setTargetChannelId(UNASSIGNED_TARGET);
+      setMessage(
+        `Saved "${cleanTitle}" as global ad inventory and removed it from ${assignedChannels.length} playlist(s).`,
+      );
+      return;
+    }
 
     const wasAlreadyAssigned =
       targetChannelId && assignedChannelIds.includes(targetChannelId);
@@ -583,12 +695,14 @@ export default function QuickMediaEditorPanel() {
     }
 
     setMessage(
-      wasAlreadyAssigned
-        ? `Saved "${cleanTitle}". Channel assignments were left unchanged.`
-        : `Saved "${cleanTitle}" and added it to CH ${getChannelNumber(
-            targetChannelId,
-            channels,
-          )}.`,
+      !targetChannelId
+        ? `Saved "${cleanTitle}". No new channel assignment was added.`
+        : wasAlreadyAssigned
+          ? `Saved "${cleanTitle}". Channel assignments were left unchanged.`
+          : `Saved "${cleanTitle}" and added it to CH ${getChannelNumber(
+              targetChannelId,
+              channels,
+            )}.`,
     );
   };
 
@@ -618,9 +732,9 @@ export default function QuickMediaEditorPanel() {
             className="mt-1 max-w-3xl text-xs leading-5"
             style={{ color: "var(--text-muted)" }}
           >
-            Edit runtime, commercial blocks, slot length, fixed air time, air days, title,
-            type, commercial pool settings, and safe channel assignment without
-            deleting/re-uploading.
+            Edit runtime, slot logic, fixed air time, air days, title, type, and
+            commercial pool settings. Programs can be assigned to channels.
+            Commercials and bumpers stay in global ad inventory.
           </p>
         </div>
 
@@ -685,6 +799,7 @@ export default function QuickMediaEditorPanel() {
               filteredMedia.map((item) => {
                 const active = item.id === selectedMediaId;
                 const itemChannels = getItemChannelSummary(item, channels);
+                const embeddedAd = isEmbeddedAd(item, channels);
 
                 return (
                   <button
@@ -693,15 +808,32 @@ export default function QuickMediaEditorPanel() {
                     onClick={() => setSelectedMediaId(item.id)}
                     className="ttv-touch-target w-full rounded-2xl border p-3 text-left transition hover:opacity-95"
                     style={{
-                      background: active
-                        ? "rgba(255,255,255,0.08)"
-                        : "var(--panel-alt-bg)",
-                      borderColor: active ? "var(--primary)" : "var(--border)",
+                      background: embeddedAd
+                        ? "rgba(248, 113, 113, 0.08)"
+                        : active
+                          ? "rgba(255,255,255,0.08)"
+                          : "var(--panel-alt-bg)",
+                      borderColor: embeddedAd
+                        ? "rgba(248, 113, 113, 0.45)"
+                        : active
+                          ? "var(--primary)"
+                          : "var(--border)",
                       color: "var(--text)",
                     }}
                   >
-                    <div className="truncate text-sm font-black" title={item.title}>
-                      {item.title}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div
+                        className="truncate text-sm font-black"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </div>
+
+                      {embeddedAd ? (
+                        <span className="rounded-full border border-red-300/40 bg-red-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-red-100">
+                          Embedded Ad
+                        </span>
+                      ) : null}
                     </div>
 
                     <div
@@ -718,7 +850,7 @@ export default function QuickMediaEditorPanel() {
                     {item.fillSlotWithCommercials || item.commercialCategory ? (
                       <div
                         className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.1em]"
-                        style={{ color: "var(--primary)" }}
+                        style={{ color: embeddedAd ? "#fecaca" : "var(--primary)" }}
                       >
                         {item.fillSlotWithCommercials
                           ? "Slot filler enabled"
@@ -750,14 +882,21 @@ export default function QuickMediaEditorPanel() {
                 <div
                   className="rounded-2xl border px-3 py-2 text-xs leading-5"
                   style={{
-                    background: "var(--panel-bg)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-muted)",
+                    background: selectedIsEmbeddedAd
+                      ? "rgba(248, 113, 113, 0.10)"
+                      : "var(--panel-bg)",
+                    borderColor: selectedIsEmbeddedAd
+                      ? "rgba(248, 113, 113, 0.45)"
+                      : "var(--border)",
+                    color: selectedIsEmbeddedAd ? "#fecaca" : "var(--text-muted)",
                   }}
                 >
                   Editing:{" "}
                   <span style={{ color: "var(--text)" }}>{selectedMedia.title}</span>{" "}
                   • Current channel: {selectedChannelLabel}
+                  {selectedIsEmbeddedAd
+                    ? " • This ad/bump is inside a playlist and will be cleaned when saved."
+                    : ""}
                 </div>
 
                 <div>
@@ -824,15 +963,25 @@ export default function QuickMediaEditorPanel() {
                   <select
                     value={targetChannelId}
                     onChange={(event) => setTargetChannelId(event.target.value)}
-                    className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
+                    disabled={selectedIsCommercialInventory}
+                    className="w-full rounded-xl border px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                     style={{
                       background: "var(--panel-bg)",
-                      borderColor: selectedTargetChannel
-                        ? "var(--border)"
-                        : "#ef4444",
+                      borderColor:
+                        selectedIsCommercialInventory ||
+                        targetChannelId === UNASSIGNED_TARGET ||
+                        selectedTargetChannel
+                          ? "var(--border)"
+                          : "#ef4444",
                       color: "var(--text)",
                     }}
                   >
+                    <option value={UNASSIGNED_TARGET}>
+                      {selectedIsCommercialInventory
+                        ? "Global ad inventory only"
+                        : "Do not add to channel"}
+                    </option>
+
                     {enabledChannels.map((channel) => (
                       <option key={channel.id} value={channel.id}>
                         {getChannelLabel(channel)} / {getChannelName(channel)}
@@ -841,7 +990,7 @@ export default function QuickMediaEditorPanel() {
                   </select>
                 </div>
 
-                {isBroadcastType(type) ? (
+                {isProgramType(type) ? (
                   <div
                     className="rounded-2xl border p-3"
                     style={{
@@ -864,7 +1013,7 @@ export default function QuickMediaEditorPanel() {
                             event.target.value.replace(/[^\d:.]/g, ""),
                           )
                         }
-                        placeholder="Slot 30:00"
+                        placeholder="Optional slot 30:00"
                         className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                         style={{
                           background: "var(--panel-alt-bg)",
@@ -884,7 +1033,7 @@ export default function QuickMediaEditorPanel() {
                             event.target.value.replace(/[^\d:.,\s]/g, ""),
                           )
                         }
-                        placeholder="Breakpoints 7:30, 15:00"
+                        placeholder="Optional breaks 7:30, 15:00"
                         className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                         style={{
                           background: "var(--panel-alt-bg)",
@@ -900,7 +1049,7 @@ export default function QuickMediaEditorPanel() {
                             event.target.value.replace(/[^\d:.,\s]/g, ""),
                           )
                         }
-                        placeholder="Ad blocks 2:00, 2:00"
+                        placeholder="Optional ad blocks 2:00, 2:00"
                         className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
                         style={{
                           background: "var(--panel-alt-bg)",
@@ -910,7 +1059,7 @@ export default function QuickMediaEditorPanel() {
                       />
                     </div>
 
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="mt-3 grid gap-2 sm:grid-cols-4">
                       <PresetButton
                         label="30m Cartoon"
                         onClick={() => applyPreset("cartoon")}
@@ -922,6 +1071,10 @@ export default function QuickMediaEditorPanel() {
                       <PresetButton
                         label="60m Drama"
                         onClick={() => applyPreset("drama")}
+                      />
+                      <PresetButton
+                        label="Clear Logic"
+                        onClick={clearCommercialLogic}
                       />
                     </div>
 
@@ -966,12 +1119,14 @@ export default function QuickMediaEditorPanel() {
                   </div>
                 ) : null}
 
-                {isCommercialType(type) ? (
+                {selectedIsCommercialInventory ? (
                   <div
                     className="rounded-2xl border p-3"
                     style={{
                       background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
+                      borderColor: selectedIsEmbeddedAd
+                        ? "rgba(248, 113, 113, 0.45)"
+                        : "var(--border)",
                     }}
                   >
                     <div
@@ -1014,64 +1169,85 @@ export default function QuickMediaEditorPanel() {
                         }}
                       />
                     </div>
+
+                    <div
+                      className="mt-3 rounded-xl border px-3 py-2 text-[11px] leading-5"
+                      style={{
+                        background: selectedIsEmbeddedAd
+                          ? "rgba(248, 113, 113, 0.10)"
+                          : "rgba(34, 197, 94, 0.08)",
+                        borderColor: selectedIsEmbeddedAd
+                          ? "rgba(248, 113, 113, 0.30)"
+                          : "rgba(34, 197, 94, 0.24)",
+                        color: selectedIsEmbeddedAd ? "#fecaca" : "#bbf7d0",
+                      }}
+                    >
+                      {selectedIsEmbeddedAd
+                        ? "This ad/bump is currently assigned to a channel playlist. Saving will remove it from playlists and keep it as global ad inventory."
+                        : "This item is clean global ad inventory. Do not add it directly to a channel playlist."}
+                    </div>
                   </div>
                 ) : null}
 
-                <input
-                  value={airStartTime}
-                  onChange={(event) =>
-                    setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
-                  }
-                  placeholder="Optional fixed air time 16:00"
-                  className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                  style={{
-                    background: "var(--panel-bg)",
-                    borderColor:
-                      airStartTime && !isValidAirTime(airStartTime)
-                        ? "#ef4444"
-                        : "var(--border)",
-                    color: "var(--text)",
-                  }}
-                />
+                {isProgramType(type) ? (
+                  <input
+                    value={airStartTime}
+                    onChange={(event) =>
+                      setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                    }
+                    placeholder="Optional fixed air time 16:00"
+                    className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor:
+                        airStartTime && !isValidAirTime(airStartTime)
+                          ? "#ef4444"
+                          : "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+                ) : null}
 
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      Air Days
+                {isProgramType(type) ? (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        Air Days
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={clearAirDays}
+                        className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+                      >
+                        Every Day
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={clearAirDays}
-                      className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-                    >
-                      Every Day
-                    </button>
-                  </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {WEEKDAYS.map((day) => {
+                        const active = airDays.includes(day.id);
 
-                  <div className="grid grid-cols-7 gap-1">
-                    {WEEKDAYS.map((day) => {
-                      const active = airDays.includes(day.id);
-
-                      return (
-                        <button
-                          key={day.id}
-                          type="button"
-                          onClick={() => toggleAirDay(day.id)}
-                          className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
-                          style={{
-                            background: active
-                              ? "var(--primary)"
-                              : "var(--button-bg)",
-                            color: "var(--text)",
-                          }}
-                        >
-                          {day.label}
-                        </button>
-                      );
-                    })}
+                        return (
+                          <button
+                            key={day.id}
+                            type="button"
+                            onClick={() => toggleAirDay(day.id)}
+                            className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+                            style={{
+                              background: active
+                                ? "var(--primary)"
+                                : "var(--button-bg)",
+                              color: "var(--text)",
+                            }}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div
                   className="rounded-2xl border px-3 py-2 text-xs leading-5"
@@ -1090,23 +1266,40 @@ export default function QuickMediaEditorPanel() {
                         parsedBreakpoints,
                         parsedBreakDurations,
                         selectedChannelLabel,
+                        isCommercialInventory: selectedIsCommercialInventory,
                       })
                     : validation.message}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={saveChanges}
-                  disabled={!validation.ok}
-                  className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
-                    color: "var(--text)",
-                  }}
-                >
-                  Save Changes
-                </button>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <button
+                    type="button"
+                    onClick={saveChanges}
+                    disabled={!validation.ok}
+                    className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+                      color: "var(--text)",
+                    }}
+                  >
+                    Save Changes
+                  </button>
+
+                  {assignedChannelIds.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={removeSelectedFromAllChannels}
+                      className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90"
+                      style={{
+                        background: "#7f1d1d",
+                        color: "#fff",
+                      }}
+                    >
+                      Remove From Playlists
+                    </button>
+                  ) : null}
+                </div>
               </div>
             )}
           </div>
