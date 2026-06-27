@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
+import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
@@ -12,6 +12,22 @@ interface NowNextBarProps {
 }
 
 const LIVE_TICK_MS = 2_000;
+
+function getSafeDuration(item: BroadcastItem | null | undefined): number {
+  if (!item) {
+    return 0;
+  }
+
+  const guideDuration = Math.floor(Number(item.guideDuration));
+
+  if (Number.isFinite(guideDuration) && guideDuration > 0) {
+    return guideDuration;
+  }
+
+  const duration = Math.floor(Number(item.duration));
+
+  return Number.isFinite(duration) && duration > 0 ? duration : 0;
+}
 
 function formatClock(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -58,7 +74,9 @@ function getChannelCallsign(channel: Channel): string {
 }
 
 function getCleanItemTitle(item: BroadcastItem): string {
-  return cleanDisplayText(item.sourceTitle?.trim() || item.title);
+  return cleanDisplayText(
+    item.sourceTitle?.trim() || item.title?.trim() || "Untitled Program",
+  );
 }
 
 function getDisplayNowTitle(item: BroadcastItem): string {
@@ -83,6 +101,10 @@ function getDisplayTypeLabel(item: BroadcastItem): string {
   return "COMMERCIAL";
 }
 
+function isPublicNowNextItem(item: BroadcastItem | undefined): item is BroadcastItem {
+  return Boolean(item && item.file && getSafeDuration(item) > 0 && !isHiddenGuideItem(item));
+}
+
 function getNextVisibleItem(
   schedule: BroadcastItem[],
   currentIndex: number,
@@ -94,7 +116,7 @@ function getNextVisibleItem(
   for (let offset = 1; offset <= schedule.length; offset += 1) {
     const candidate = schedule[(currentIndex + offset) % schedule.length];
 
-    if (candidate && !isHiddenGuideItem(candidate)) {
+    if (isPublicNowNextItem(candidate)) {
       return candidate;
     }
   }
@@ -114,7 +136,7 @@ function getPreviousVisibleItem(
     const candidate =
       schedule[(currentIndex - offset + schedule.length) % schedule.length];
 
-    if (candidate && !isHiddenGuideItem(candidate)) {
+    if (isPublicNowNextItem(candidate)) {
       return candidate;
     }
   }
@@ -122,12 +144,41 @@ function getPreviousVisibleItem(
   return null;
 }
 
-function getProgressPercent(elapsed: number, duration: number | undefined): number {
+function getProgressPercent(elapsed: number, duration: number): number {
   if (!duration || duration <= 0) {
     return 0;
   }
 
   return Math.min(100, Math.max(0, (elapsed / duration) * 100));
+}
+
+function getScheduleModeLabel(channel: Channel): string {
+  return channel.scheduleMode === "daily-random" ? "Daily Random" : "Ordered";
+}
+
+function getBreakModeLabel(channel: Channel): string {
+  const mode = channel.commercialBreakMode ?? "none";
+
+  if (mode === "none") return "No Breaks";
+  if (mode === "end-only") return "End Breaks";
+  if (mode === "midpoint-and-end") return "Midpoint + End";
+  if (mode === "classic-tv") return "Classic TV";
+
+  return cleanDisplayText(String(mode));
+}
+
+function getNowContextTitle({
+  currentItem,
+  previousVisibleItem,
+}: {
+  currentItem: BroadcastItem;
+  previousVisibleItem: BroadcastItem | null;
+}): string {
+  if (isHiddenGuideItem(currentItem) && previousVisibleItem) {
+    return getCleanItemTitle(previousVisibleItem);
+  }
+
+  return getCleanItemTitle(currentItem);
 }
 
 function EmptyNowNextState({
@@ -140,9 +191,7 @@ function EmptyNowNextState({
   return (
     <section
       className="ttv-glass-panel rounded-2xl p-4"
-      style={{
-        color: "var(--text)",
-      }}
+      style={{ color: "var(--text)" }}
     >
       <div className="text-sm font-black">{title}</div>
 
@@ -153,7 +202,7 @@ function EmptyNowNextState({
   );
 }
 
-function InfoPill({ children }: { children: React.ReactNode }) {
+function InfoPill({ children }: { children: ReactNode }) {
   return (
     <span
       className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
@@ -215,31 +264,31 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     );
   }
 
+  const currentDuration = getSafeDuration(live.item);
+  const currentElapsed = Math.min(Math.max(0, live.elapsed), currentDuration || live.elapsed);
+  const currentRemaining = Math.max(0, live.remaining);
+
   const isCurrentHidden = isHiddenGuideItem(live.item);
   const nowTitle = getDisplayNowTitle(live.item);
+  const contextTitle = getNowContextTitle({
+    currentItem: live.item,
+    previousVisibleItem,
+  });
 
-  const contextTitle =
-    isCurrentHidden && previousVisibleItem
-      ? getCleanItemTitle(previousVisibleItem)
-      : getCleanItemTitle(live.item);
-
-  const progressPercent = getProgressPercent(live.elapsed, live.item.duration);
-
-  const channelMode =
-    channel.scheduleMode === "daily-random" ? "Daily Random" : "Ordered";
-
-  const breakMode = channel.commercialBreakMode ?? "No Breaks";
+  const progressPercent = getProgressPercent(currentElapsed, currentDuration);
+  const channelMode = getScheduleModeLabel(channel);
+  const breakMode = getBreakModeLabel(channel);
 
   const nextTitle = nextVisibleItem
     ? getCleanItemTitle(nextVisibleItem)
     : "Nothing queued";
 
+  const nextDuration = getSafeDuration(nextVisibleItem);
+
   return (
     <section
       className="ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
-      style={{
-        color: "var(--text)",
-      }}
+      style={{ color: "var(--text)" }}
       aria-label="Now and next programming"
     >
       <div
@@ -294,7 +343,9 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           style={{
             background:
               "linear-gradient(135deg, rgba(255,255,255,0.045), transparent 45%), var(--panel-alt-bg)",
-            borderColor: "var(--border)",
+            borderColor: isCurrentHidden
+              ? "rgba(250, 204, 21, 0.35)"
+              : "var(--border)",
           }}
         >
           <div
@@ -304,7 +355,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             <span>Now Playing</span>
 
             {isCurrentHidden ? (
-              <span style={{ color: "var(--primary)" }}>Break</span>
+              <span style={{ color: "#fde68a" }}>Break</span>
             ) : (
               <span style={{ color: "var(--primary)" }}>Live</span>
             )}
@@ -326,13 +377,13 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             <span style={{ color: "var(--text-muted)" }}>
-              {formatClock(live.elapsed)} / {formatClock(live.item.duration)}
+              {formatClock(currentElapsed)} / {formatClock(currentDuration)}
             </span>
 
             <span style={{ color: "var(--text-muted)" }}>•</span>
 
             <span style={{ color: "var(--text-muted)" }}>
-              {formatLongClock(live.remaining)} left
+              {formatLongClock(currentRemaining)} left
             </span>
 
             {!isCurrentHidden && live.item.segmentLabel ? (
@@ -384,8 +435,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} •{" "}
-              {formatLongClock(nextVisibleItem.duration)}
+              {getDisplayTypeLabel(nextVisibleItem)} • {formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
