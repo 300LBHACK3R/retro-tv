@@ -39,6 +39,7 @@ type GuideRowInput = {
   channel: Channel;
   schedule: BroadcastItem[];
   media?: MediaItem[];
+  availableAds?: MediaItem[];
 };
 
 type GuideCell = {

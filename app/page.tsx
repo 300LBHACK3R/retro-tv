@@ -231,6 +231,7 @@ export default function Home() {
           channel,
           schedule: playbackSchedule,
           media: channelMedia,
+          availableAds,
         };
       }),
     [availableAds, enabledChannels, media],
