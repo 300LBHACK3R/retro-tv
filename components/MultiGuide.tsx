@@ -378,6 +378,76 @@ function getMaxBuildSteps(
   return Math.max(MIN_BUILD_STEPS, schedule.length * (cycleCount + 2));
 }
 
+function getProgramKey(item: BroadcastItem): string {
+  return String(
+    item.parentMediaId ??
+      item.sourceTitle ??
+      item.engagementKey ??
+      item.id,
+  );
+}
+
+function getGuideDurationSeconds(item: BroadcastItem): number {
+  const rawGuideDuration = Number(item.guideDuration);
+  const rawSlotDuration = Number(item.slotLengthSeconds);
+  const rawDuration = Number(item.duration);
+
+  const duration =
+    Number.isFinite(rawGuideDuration) && rawGuideDuration > 0
+      ? rawGuideDuration
+      : Number.isFinite(rawSlotDuration) && rawSlotDuration > 0
+        ? rawSlotDuration
+        : Number.isFinite(rawDuration) && rawDuration > 0
+          ? rawDuration
+          : 1;
+
+  return Math.max(1, Math.floor(duration));
+}
+
+function getVisibleGuideItem(item: BroadcastItem): BroadcastItem {
+  const title =
+    cleanDisplayText(item.sourceTitle?.trim() || "") ||
+    cleanDisplayText(item.title?.trim() || "") ||
+    "Untitled Program";
+
+  return {
+    ...item,
+    title,
+    sourceTitle: title,
+    hiddenFromGuide: false,
+  };
+}
+
+function itemsShareGuideProgram(
+  previous: BroadcastItem | undefined,
+  next: BroadcastItem | undefined,
+): boolean {
+  if (!previous || !next) {
+    return false;
+  }
+
+  return getProgramKey(previous) === getProgramKey(next);
+}
+
+function findNextVisibleGuideItem(
+  schedule: BroadcastItem[],
+  startIndex: number,
+): BroadcastItem | undefined {
+  if (schedule.length === 0) {
+    return undefined;
+  }
+
+  for (let step = 1; step <= schedule.length; step += 1) {
+    const item = schedule[(startIndex + step) % schedule.length];
+
+    if (item && isGuideVisibleItem(item)) {
+      return item;
+    }
+  }
+
+  return undefined;
+}
+
 function buildDisplayCellsForWindow(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
@@ -399,12 +469,11 @@ function buildDisplayCellsForWindow(
   let scheduleIndex = startPosition.index;
   let offsetInsideItem = startPosition.offsetInsideItem;
   let cursor = 0;
+
   let lastVisibleItem = startPosition.previousVisibleItem;
-  let guard = 0;
+  let lastVisibleCapEndSec = 0;
 
-  const maxSteps = getMaxBuildSteps(schedule, totalDuration, windowDurationSeconds);
-
-  while (cursor < windowDurationSeconds && guard < maxSteps) {
+  while (cursor < windowDurationSeconds) {
     const item = schedule[scheduleIndex];
 
     if (!item) {
@@ -419,31 +488,57 @@ function buildDisplayCellsForWindow(
     const segmentEnd = cursor + segmentDuration;
 
     if (isGuideVisibleItem(item)) {
-      const shouldMergeVisibleSegment = canMergeVisibleGuideSegment(
-        cells[cells.length - 1],
-        item,
+      const visibleItemStart = Math.max(0, segmentStart - offsetInsideItem);
+      const guideCapEnd = Math.max(
+        segmentEnd,
+        visibleItemStart + getGuideDurationSeconds(item),
       );
 
-      lastVisibleItem = item;
+      const visibleItem = getVisibleGuideItem(item);
+      const shouldMergeVisibleSegment =
+        canMergeVisibleGuideSegment(cells[cells.length - 1], visibleItem) ||
+        itemsShareGuideProgram(lastVisibleItem, visibleItem);
 
-      pushCell(cells, item, segmentStart, segmentEnd, {
-        mergeWithPrevious: shouldMergeVisibleSegment,
-      });
+      lastVisibleItem = visibleItem;
+      lastVisibleCapEndSec = Math.min(guideCapEnd, windowDurationSeconds);
+
+      pushCell(
+        cells,
+        visibleItem,
+        segmentStart,
+        Math.min(segmentEnd, lastVisibleCapEndSec),
+        {
+          mergeWithPrevious: shouldMergeVisibleSegment,
+        },
+      );
     } else if (lastVisibleItem) {
-      pushCell(cells, lastVisibleItem, segmentStart, segmentEnd, {
-        mergeWithPrevious: true,
-      });
+      const nextVisibleItem = findNextVisibleGuideItem(schedule, scheduleIndex);
+      const isInternalHiddenBreak = itemsShareGuideProgram(
+        lastVisibleItem,
+        nextVisibleItem,
+      );
+
+      const shouldFoldHiddenItem =
+        isInternalHiddenBreak || segmentStart < lastVisibleCapEndSec;
+
+      if (shouldFoldHiddenItem) {
+        const hiddenEnd = isInternalHiddenBreak
+          ? segmentEnd
+          : Math.min(segmentEnd, lastVisibleCapEndSec);
+
+        pushCell(cells, lastVisibleItem, segmentStart, hiddenEnd, {
+          mergeWithPrevious: true,
+        });
+      }
     }
 
     cursor = segmentEnd;
     scheduleIndex = (scheduleIndex + 1) % schedule.length;
     offsetInsideItem = 0;
-    guard += 1;
   }
 
   return cells;
 }
-
 function getScheduleForSlice(
   row: GuideRowInput,
   sliceStart: Date,
