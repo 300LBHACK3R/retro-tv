@@ -1,286 +1,138 @@
-﻿import type { BroadcastItem } from "./types";
+import { cleanDisplayText } from "./textClean";
+import type { BroadcastItem } from "./types";
 
-type ActiveGuideState = {
-  item: BroadcastItem;
-  groupKey: string;
-  canMergeVisibleSegments: boolean;
-};
+const MIN_GUIDE_DURATION_SECONDS = 1;
 
-const FALLBACK_GUIDE_DURATION_SECONDS = 1;
+function getPlaybackDuration(item: BroadcastItem): number {
+  const duration = Math.floor(Number(item.duration));
 
-const ENCODING_REPLACEMENTS: readonly [
-  searchValue: string | RegExp,
-  replacement: string,
-][] = [
-  ["â€¢", " / "],
-  ["â€˘", " / "],
-  ["Â·", " / "],
-  ["•", " / "],
+  return Number.isFinite(duration) && duration > 0
+    ? duration
+    : MIN_GUIDE_DURATION_SECONDS;
+}
 
-  ["â€“", "–"],
-  ["â€”", "—"],
+function getProgramKey(item: BroadcastItem): string {
+  return String(
+    item.parentMediaId ??
+      item.sourceTitle ??
+      item.engagementKey ??
+      item.id,
+  );
+}
 
-  ["â€˜", "‘"],
-  ["â€™", "’"],
-
-  ["â€œ", "“"],
-  ["â€�", "”"],
-  [/â€\u009d/g, "”"],
-
-  ["â€¦", "..."],
-  ["Â", ""],
-];
-
-export function isHiddenGuideItem(item: BroadcastItem): boolean {
+function getDisplayTitle(item: BroadcastItem): string {
   return (
-    item.hiddenFromGuide === true ||
-    item.type === "commercial" ||
-    item.type === "bumper"
+    cleanDisplayText(item.sourceTitle?.trim() || "") ||
+    cleanDisplayText(item.title?.trim() || "") ||
+    "Untitled Program"
   );
 }
 
-function normalizePositiveSecond(value: unknown): number {
-  const numberValue = Math.floor(Number(value));
+function isCommercialType(item: BroadcastItem): boolean {
+  return item.type === "commercial" || item.type === "bumper";
+}
 
-  if (!Number.isFinite(numberValue) || numberValue <= 0) {
-    return 0;
+export function isHiddenGuideItem(item: BroadcastItem | undefined): boolean {
+  if (!item) {
+    return true;
   }
 
-  return numberValue;
+  return Boolean(item.hiddenFromGuide) || isCommercialType(item);
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function cleanEncoding(value: string | undefined): string {
-  let output = String(value ?? "");
-
-  for (const [searchValue, replacement] of ENCODING_REPLACEMENTS) {
-    output = output.replace(searchValue, replacement);
-  }
-
-  return output.replace(/\s+/g, " ").trim();
-}
-
-function slugForGuideId(value: string): string {
-  const cleanValue = cleanEncoding(value).toLowerCase();
-
-  return (
-    cleanValue
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 96) || "unknown"
-  );
-}
-
-function getGuideGroupKey(item: BroadcastItem): string {
-  if (item.parentMediaId) {
-    return item.parentMediaId;
-  }
-
-  if (item.isVirtualSegment && item.sourceTitle) {
-    return cleanEncoding(item.sourceTitle);
-  }
-
-  return item.id || item.title;
-}
-
-function removeTrailingSegmentLabel(title: string, segmentLabel: string): string {
-  const cleanTitle = cleanEncoding(title);
-  const cleanSegmentLabel = cleanEncoding(segmentLabel);
-
-  if (!cleanTitle || !cleanSegmentLabel) {
-    return cleanTitle;
-  }
-
-  return cleanEncoding(
-    cleanTitle.replace(
-      new RegExp(`\\s+${escapeRegExp(cleanSegmentLabel)}$`, "i"),
-      "",
-    ),
-  );
-}
-
-function getCleanTitle(item: BroadcastItem): string {
-  const baseTitle = cleanEncoding(item.sourceTitle?.trim() || item.title);
-
-  if (!item.isVirtualSegment || !item.segmentLabel) {
-    return baseTitle;
-  }
-
-  return removeTrailingSegmentLabel(baseTitle, item.segmentLabel);
-}
-
-function getCleanSourceTitle(item: BroadcastItem, cleanTitle: string): string {
-  const sourceTitle = cleanEncoding(item.sourceTitle?.trim());
-
-  if (!sourceTitle) {
-    return cleanTitle;
-  }
-
-  if (!item.isVirtualSegment || !item.segmentLabel) {
-    return sourceTitle;
-  }
-
-  return removeTrailingSegmentLabel(sourceTitle, item.segmentLabel);
-}
-
-function getGuideDuration(item: BroadcastItem): number {
-  const guideDuration = normalizePositiveSecond(item.guideDuration);
-
-  if (guideDuration > 0) {
-    return guideDuration;
-  }
-
-  const duration = normalizePositiveSecond(item.duration);
-
-  return duration > 0 ? duration : FALLBACK_GUIDE_DURATION_SECONDS;
-}
-
-function createGuideId(groupKey: string, item: BroadcastItem): string {
-  const safeGroupKey = slugForGuideId(groupKey);
-  const safeItemKey = slugForGuideId(item.id || item.parentMediaId || item.title);
-
-  return `guide:${safeGroupKey}:${safeItemKey}`;
-}
-
-function createVisibleGuideItem(
-  item: BroadcastItem,
-  groupKey: string,
-): BroadcastItem {
-  const duration = getGuideDuration(item);
-  const cleanTitle = getCleanTitle(item);
-  const cleanSourceTitle = getCleanSourceTitle(item, cleanTitle);
+function createGuideItem(item: BroadcastItem): BroadcastItem {
+  const duration = getPlaybackDuration(item);
+  const title = getDisplayTitle(item);
 
   return {
     ...item,
-    id: createGuideId(groupKey, item),
-    title: cleanTitle || "Untitled",
+    id: `${getProgramKey(item)}:guide:${item.id}`,
+    title,
+    sourceTitle: title,
+    segmentLabel: undefined,
+    hiddenFromGuide: false,
+    isVirtualSegment: false,
     duration,
     guideDuration: duration,
-    sourceStart: undefined,
-    sourceEnd: undefined,
-    sourceTitle: cleanSourceTitle || cleanTitle || "Untitled",
-    segmentLabel: undefined,
-    isVirtualSegment: false,
-    hiddenFromGuide: false,
   };
 }
 
-function addDurationToGuideItem(
+function extendGuideItem(
   item: BroadcastItem,
-  additionalDuration: number,
+  extraSeconds: number,
 ): BroadcastItem {
-  const safeAdditionalDuration = normalizePositiveSecond(additionalDuration);
+  const extra = Math.max(0, Math.floor(extraSeconds));
 
-  if (safeAdditionalDuration <= 0) {
+  if (extra <= 0) {
     return item;
   }
 
-  const duration = getGuideDuration(item) + safeAdditionalDuration;
+  const nextDuration = getPlaybackDuration(item) + extra;
 
   return {
     ...item,
-    duration,
-    guideDuration: duration,
+    duration: nextDuration,
+    guideDuration: nextDuration,
   };
 }
 
-function canMergeVisibleItem(
-  active: ActiveGuideState,
-  nextItem: BroadcastItem,
-  nextGroupKey: string,
+function canMergeVisibleItems(
+  previous: BroadcastItem | undefined,
+  next: BroadcastItem,
 ): boolean {
-  if (active.groupKey !== nextGroupKey) {
+  if (!previous) {
     return false;
   }
 
-  /**
-   * Only merge virtual segments from the same source program.
-   * Normal playlist items with the same title should stay separate entries.
-   */
-  return active.canMergeVisibleSegments && nextItem.isVirtualSegment === true;
+  return getProgramKey(previous) === getProgramKey(next);
 }
 
-function createActiveGuideState(
-  item: BroadcastItem,
-  groupKey: string,
-): ActiveGuideState {
-  return {
-    item: createVisibleGuideItem(item, groupKey),
-    groupKey,
-    canMergeVisibleSegments: item.isVirtualSegment === true,
-  };
-}
-
+/**
+ * Converts the real playback schedule into a public TV guide schedule.
+ *
+ * Playback can be:
+ *   show segment
+ *   hidden commercials
+ *   show segment
+ *   hidden filler commercials
+ *
+ * Public guide becomes:
+ *   one clean show listing with the full broadcast block duration
+ */
 export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
-  const guideItems: BroadcastItem[] = [];
-  let active: ActiveGuideState | undefined;
-
-  const flush = () => {
-    if (active) {
-      guideItems.push(active.item);
-      active = undefined;
-    }
-  };
+  const guide: BroadcastItem[] = [];
 
   for (const item of schedule) {
-    const itemDuration = getGuideDuration(item);
-
     if (isHiddenGuideItem(item)) {
-      /**
-       * Hidden commercials/bumpers are not displayed as public guide rows.
-       * Their runtime is folded into the previous visible program so guide time
-       * stays aligned with the actual broadcast clock.
-       */
-      if (active) {
-        active = {
-          ...active,
-          item: addDurationToGuideItem(active.item, itemDuration),
-        };
+      const previous = guide[guide.length - 1];
+
+      if (previous) {
+        guide[guide.length - 1] = extendGuideItem(
+          previous,
+          getPlaybackDuration(item),
+        );
       }
 
       continue;
     }
 
-    const groupKey = getGuideGroupKey(item);
+    const currentGuideItem = createGuideItem(item);
+    const previous = guide[guide.length - 1];
 
-    if (!active) {
-      active = createActiveGuideState(item, groupKey);
+    if (previous && canMergeVisibleItems(previous, currentGuideItem)) {
+      guide[guide.length - 1] = extendGuideItem(
+        previous,
+        getPlaybackDuration(item),
+      );
       continue;
     }
 
-    if (canMergeVisibleItem(active, item, groupKey)) {
-      active = {
-        ...active,
-        item: addDurationToGuideItem(active.item, itemDuration),
-      };
-      continue;
-    }
-
-    flush();
-    active = createActiveGuideState(item, groupKey);
+    guide.push(currentGuideItem);
   }
 
-  flush();
-
-  return guideItems;
+  return guide;
 }
 
-/**
- * Public visible schedule.
- *
- * This intentionally returns the merged guide schedule instead of simply
- * filtering hidden items. That keeps visible rows time-accurate when commercial
- * breaks are hidden from the guide.
- */
 export function buildVisibleSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   return buildGuideSchedule(schedule);
-}
-
-export function getFirstVisibleGuideItem(
-  schedule: BroadcastItem[],
-): BroadcastItem | null {
-  return buildGuideSchedule(schedule)[0] ?? null;
 }
