@@ -207,3 +207,41 @@ html.ttv-fallback-fullscreen-active body {
   }
 }
 /* === TTV_FULLSCREEN_FALLBACK_END === */
+
+/* TTV channel image logo override START */
+/*
+  Real uploaded channel logos should look like clean broadcast bugs,
+  not boxed fallback text logos.
+*/
+img[src*="/channel-logos/"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  display: block !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove the green frame only when the box contains a real image logo. */
+@supports selector(:has(*)) {
+  :where(div, span, figure):has(> img[src*="/channel-logos/"]) {
+    width: clamp(8.5rem, 9.5vw, 11rem) !important;
+    height: clamp(8.5rem, 9.5vw, 11rem) !important;
+    min-width: clamp(8.5rem, 9.5vw, 11rem) !important;
+    min-height: clamp(8.5rem, 9.5vw, 11rem) !important;
+    padding: 0.35rem !important;
+    border-color: transparent !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  :where(div, span, figure):has(> img[src*="/channel-logos/"]) > img[src*="/channel-logos/"] {
+    transform: scale(1.22);
+    transform-origin: center;
+  }
+}
+/* TTV channel image logo override END */
