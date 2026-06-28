@@ -404,7 +404,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
                   <>
                     <span style={{ color: "var(--text-muted)" }}>/</span>
                     <span style={{ color: "var(--text-muted)" }}>
-                      {live.item.segmentLabel}
+                      ""
                     </span>
                   </>
                 ) : null}
@@ -450,7 +450,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} Ã¢â‚¬Â¢ {formatLongClock(nextDuration)}
+              {getDisplayTypeLabel(nextVisibleItem)}{" / "}{formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>

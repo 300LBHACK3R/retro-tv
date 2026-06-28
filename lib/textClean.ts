@@ -1,4 +1,6 @@
-﻿export type CleanTextInput = string | number | boolean | null | undefined;
+const MOJIBAKE_SEPARATOR_RUN =
+  /[\u00c2\u00c3\u0192\u00e2\u20ac\u0161\u00ac\u201a\u201c\u201d\u2018\u2019\u201e\ufffd]{2,}/gu;
+export type CleanTextInput = string | number | boolean | null | undefined;
 
 type TextReplacement = readonly [searchValue: string | RegExp, replacement: string];
 
@@ -8,47 +10,47 @@ const MAX_SAFE_TEXT_KEY_LENGTH = 96;
 const TEXT_REPLACEMENTS: readonly TextReplacement[] = [
   // Bullets / separators
   ["\u00e2\u20ac\u00a2", " / "],
+  ["Ã¢â‚¬Â¢", " / "],
+  ["Ã¢â‚¬Ë˜", " / "],
+  ["Ã‚Â·", " / "],
   ["â€¢", " / "],
-  ["â€˘", " / "],
-  ["Â·", " / "],
-  ["•", " / "],
 
   // Ellipsis
   ["\u00e2\u20ac\u00a6", "..."],
+  ["Ã¢â‚¬Â¦", "..."],
   ["â€¦", "..."],
-  ["…", "..."],
 
   // Em/en dashes
   ["\u00e2\u20ac\u201d", "-"],
   ["\u00e2\u20ac\u201c", "-"],
+  ["Ã¢â‚¬â€", "-"],
+  ["Ã¢â‚¬â€œ", "-"],
   ["â€”", "-"],
   ["â€“", "-"],
-  ["—", "-"],
-  ["–", "-"],
 
   // Apostrophes / single quotes
   ["\u00e2\u20ac\u2122", "'"],
+  ["Ã¢â‚¬â„¢", "'"],
+  ["Ã¢â‚¬Ëœ", "'"],
   ["â€™", "'"],
   ["â€˜", "'"],
-  ["’", "'"],
-  ["‘", "'"],
 
   // Double quotes
   ["\u00e2\u20ac\u0153", '"'],
   ["\u00e2\u20ac\ufffd", '"'],
+  ["Ã¢â‚¬Å“", '"'],
+  ["Ã¢â‚¬ï¿½", '"'],
+  [/Ã¢â‚¬[\u009d\ufffd]/g, '"'],
   ["â€œ", '"'],
-  ["â€�", '"'],
-  [/â€[\u009d\ufffd]/g, '"'],
-  ["“", '"'],
-  ["”", '"'],
+  ["â€", '"'],
 
   // Copyright / registered / trademark mojibake
+  ["Ã‚Â©", "(c)"],
   ["Â©", "(c)"],
-  ["©", "(c)"],
+  ["Ã‚Â®", "(r)"],
   ["Â®", "(r)"],
-  ["®", "(r)"],
+  ["Ã¢â€žÂ¢", "TM"],
   ["â„¢", "TM"],
-  ["™", "TM"],
 
   // Spaces / invisible characters / leftovers
   ["\u00c2\u00a0", " "],
@@ -58,18 +60,18 @@ const TEXT_REPLACEMENTS: readonly TextReplacement[] = [
   ["\u200d", ""],
   ["\ufeff", ""],
   ["\u00c2", ""],
-  ["Â", ""],
+  ["Ã‚", ""],
 ];
 
 const MOJIBAKE_PATTERN =
-  /Ã|Â|â€|â€¢|â€¦|â€“|â€”|â€™|â€œ|â€�|�|\u00e2\u20ac|\u00c2/;
+  /Ãƒ|Ã‚|Ã¢â‚¬|Ã¢â‚¬Â¢|Ã¢â‚¬Â¦|Ã¢â‚¬â€œ|Ã¢â‚¬â€|Ã¢â‚¬â„¢|Ã¢â‚¬Å“|Ã¢â‚¬ï¿½|ï¿½|\u00e2\u20ac|\u00c2/;
 
 function toText(value: CleanTextInput): string {
   if (value === null || value === undefined) {
     return "";
   }
 
-  return String(value);
+  return String(value).replace(MOJIBAKE_SEPARATOR_RUN, " / ");
 }
 
 function applyTextReplacement(

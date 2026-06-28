@@ -1040,7 +1040,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(live.elapsed)} / {formatTime(itemDuration)}
-          {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak ? ` / $""` : ""}
         </div>
       </div>
 
