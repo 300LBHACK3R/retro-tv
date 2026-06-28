@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -12,22 +12,18 @@ import {
   WEEKDAYS,
 } from "@/lib/mediaUtils";
 import { useStore } from "@/lib/store";
-import type {
-  Channel,
-  CommercialStrategy,
-  MediaItem,
-  MediaType,
-  Weekday,
+import {
+  GLOBAL_AD_CHANNEL_TARGET,
+  type AdPlacement,
+  type Channel,
+  type CommercialStrategy,
+  type MediaItem,
+  type MediaType,
+  type Weekday,
 } from "@/lib/types";
 
-type MediaFilter = "all" | MediaType | "embedded-ads";
-
-type EditorPreset = "cartoon" | "sitcom" | "drama";
-
-type ValidationResult = {
-  ok: boolean;
-  message: string;
-};
+type MediaFilter = "all" | MediaType;
+type AdTargetMode = "channels" | "global";
 
 const MEDIA_FILTERS: { id: MediaFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -35,21 +31,73 @@ const MEDIA_FILTERS: { id: MediaFilter; label: string }[] = [
   { id: "movie", label: "Movies" },
   { id: "music", label: "Music" },
   { id: "music-video", label: "Music Videos" },
-  { id: "commercial", label: "Commercials" },
+  { id: "commercial", label: "Ads" },
   { id: "bumper", label: "Bumpers" },
-  { id: "embedded-ads", label: "Embedded Ads" },
 ];
 
-const MAX_MEDIA_LIST_HEIGHT = 640;
-const MAX_TITLE_LENGTH = 140;
-const UNASSIGNED_TARGET = "";
+const DEFAULT_AD_PLACEMENTS: AdPlacement[] = [
+  "mid-roll",
+  "filler",
+  "between-programs",
+  "post-roll",
+];
 
-function getChannelNumber(
-  channelId: string,
-  channels: { id: string; number?: number }[],
-): string | number {
-  const channel = channels.find((item) => item.id === channelId);
-  return channel?.number ?? channelId;
+function isProgramType(type: MediaType): boolean {
+  return (
+    type === "show" ||
+    type === "movie" ||
+    type === "music" ||
+    type === "music-video"
+  );
+}
+
+function isBroadcastType(type: MediaType): boolean {
+  return type === "show" || type === "movie";
+}
+
+function isCommercialType(type: MediaType): boolean {
+  return type === "commercial" || type === "bumper";
+}
+
+function getMediaTypeLabel(type: MediaType): string {
+  if (type === "movie") return "Movie";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "Music Video";
+  if (type === "commercial") return "Commercial";
+  if (type === "bumper") return "Bumper";
+
+  return "Show";
+}
+
+function sortChannels(channels: Channel[]): Channel[] {
+  return [...channels]
+    .filter((channel) => channel.isEnabled !== false)
+    .sort((a, b) => {
+      const aNumber = Number(a.number ?? a.id);
+      const bNumber = Number(b.number ?? b.id);
+
+      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+        return aNumber - bNumber;
+      }
+
+      return String(a.id).localeCompare(String(b.id), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+}
+
+function sortMedia(media: MediaItem[]): MediaItem[] {
+  return [...media].sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type.localeCompare(b.type);
+    }
+
+    return a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
 }
 
 function getChannelLabel(channel: Channel | undefined): string {
@@ -68,6 +116,10 @@ function getChannelName(channel: Channel | undefined): string {
   return channel.branding?.displayName ?? channel.name;
 }
 
+function getChannelOptionLabel(channel: Channel): string {
+  return `${getChannelLabel(channel)} / ${getChannelName(channel)}`;
+}
+
 function getMediaSearchLabel(item: MediaItem): string {
   return [
     item.title,
@@ -78,7 +130,8 @@ function getMediaSearchLabel(item: MediaItem): string {
     item.provider,
     item.mimeType,
     item.commercialCategory,
-    item.airStartTime,
+    ...(item.adCategories ?? []),
+    ...(item.adChannelIds ?? []),
   ]
     .filter(Boolean)
     .join(" ")
@@ -105,62 +158,7 @@ function isValidAirTime(value: string): boolean {
   );
 }
 
-function isProgramType(type: MediaType): boolean {
-  return (
-    type === "show" ||
-    type === "movie" ||
-    type === "music" ||
-    type === "music-video"
-  );
-}
-
-function isCommercialType(type: MediaType): boolean {
-  return type === "commercial" || type === "bumper";
-}
-
-function getMediaTypeLabel(type: MediaType): string {
-  if (type === "commercial") return "Commercial";
-  if (type === "bumper") return "Bumper";
-  if (type === "movie") return "Movie";
-  if (type === "music") return "Music";
-  if (type === "music-video") return "Music Video";
-  return "Show";
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
-
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
-
-      return String(a.id).localeCompare(String(b.id), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
-}
-
-function sortMedia(media: MediaItem[]): MediaItem[] {
-  return [...media].sort((a, b) => {
-    const typeCompare = a.type.localeCompare(b.type);
-
-    if (typeCompare !== 0) {
-      return typeCompare;
-    }
-
-    return a.title.localeCompare(b.title, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
-  });
-}
-
-function createAssignedChannelIds(
+function getAssignedProgramChannelIds(
   item: MediaItem | undefined,
   channels: Channel[],
 ): string[] {
@@ -173,33 +171,81 @@ function createAssignedChannelIds(
     .map((channel) => channel.id);
 }
 
-function getSelectedChannelLabel(
-  assignedChannelIds: string[],
-  channels: Channel[],
-): string {
-  if (assignedChannelIds.length === 0) {
+function normalizeAdChannelIds(item: MediaItem | undefined): string[] {
+  if (!item) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      (item.adChannelIds ?? [])
+        .map((target) => String(target))
+        .filter(
+          (target) =>
+            target &&
+            target !== GLOBAL_AD_CHANNEL_TARGET &&
+            target !== "all",
+        ),
+    ),
+  );
+}
+
+function itemUsesGlobalAdTarget(item: MediaItem | undefined): boolean {
+  if (!item) {
+    return false;
+  }
+
+  return (item.adChannelIds ?? []).some((target) => {
+    const clean = String(target);
+
+    return clean === GLOBAL_AD_CHANNEL_TARGET || clean === "all";
+  });
+}
+
+function createChannelSummary({
+  item,
+  channels,
+}: {
+  item: MediaItem | undefined;
+  channels: Channel[];
+}): string {
+  if (!item) {
+    return "No media selected";
+  }
+
+  if (isCommercialType(item.type)) {
+    if (itemUsesGlobalAdTarget(item)) {
+      return "Global ad inventory";
+    }
+
+    const targets = normalizeAdChannelIds(item);
+
+    if (targets.length === 0) {
+      return "No ad targets";
+    }
+
+    return targets
+      .map((targetId) => {
+        const channel = channels.find((item) => item.id === targetId);
+
+        return channel ? getChannelLabel(channel) : `CH ${targetId}`;
+      })
+      .join(", ");
+  }
+
+  const assigned = getAssignedProgramChannelIds(item, channels);
+
+  if (assigned.length === 0) {
     return "Not assigned";
   }
 
-  return assignedChannelIds
-    .map((channelId) => `CH ${getChannelNumber(channelId, channels)}`)
+  return assigned
+    .map((channelId) => {
+      const channel = channels.find((item) => item.id === channelId);
+
+      return channel ? getChannelLabel(channel) : `CH ${channelId}`;
+    })
     .join(", ");
-}
-
-function getItemChannelSummary(item: MediaItem, channels: Channel[]): string {
-  const assigned = channels
-    .filter((channel) => channel.mediaIds.includes(item.id))
-    .map((channel) => `CH ${channel.number ?? channel.id}`)
-    .join(", ");
-
-  return assigned || "No channel";
-}
-
-function isEmbeddedAd(item: MediaItem, channels: Channel[]): boolean {
-  return (
-    isCommercialType(item.type) &&
-    channels.some((channel) => channel.mediaIds.includes(item.id))
-  );
 }
 
 function getBroadcastSummary({
@@ -208,111 +254,30 @@ function getBroadcastSummary({
   parsedBreakpoints,
   parsedBreakDurations,
   selectedChannelLabel,
-  isCommercialInventory,
 }: {
   parsedSlotLength: number;
   parsedDuration: number;
   parsedBreakpoints: number[];
   parsedBreakDurations: number[];
   selectedChannelLabel: string;
-  isCommercialInventory: boolean;
 }): string {
-  if (isCommercialInventory) {
-    return [
-      `Runtime: ${
-        parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
-      }`,
-      "Mode: global ad inventory",
-      "Playlist assignment: blocked",
-    ].join(" • ");
-  }
-
   return [
-    `Slot: ${parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}`,
+    `Slot: ${
+      parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"
+    }`,
     `Runtime: ${
       parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
     }`,
-    `Breaks: ${formatBreakpoints(parsedBreakpoints) || "none"}`,
-    `Ad blocks: ${formatBreakpoints(parsedBreakDurations) || "none"}`,
-    `Current channel: ${selectedChannelLabel}`,
+    `Breaks: ${
+      parsedBreakpoints.length > 0 ? formatBreakpoints(parsedBreakpoints) : "auto"
+    }`,
+    `Ad blocks: ${
+      parsedBreakDurations.length > 0
+        ? formatBreakpoints(parsedBreakDurations)
+        : "auto"
+    }`,
+    `Target: ${selectedChannelLabel}`,
   ].join(" • ");
-}
-
-function validateEditorState({
-  selectedMedia,
-  title,
-  type,
-  parsedDuration,
-  fillSlotWithCommercials,
-  parsedSlotLength,
-  airStartTime,
-  targetChannelId,
-  enabledChannels,
-}: {
-  selectedMedia: MediaItem | undefined;
-  title: string;
-  type: MediaType;
-  parsedDuration: number;
-  fillSlotWithCommercials: boolean;
-  parsedSlotLength: number;
-  airStartTime: string;
-  targetChannelId: string;
-  enabledChannels: Channel[];
-}): ValidationResult {
-  if (!selectedMedia) {
-    return {
-      ok: false,
-      message: "Select a media item first.",
-    };
-  }
-
-  if (!title.trim()) {
-    return {
-      ok: false,
-      message: "Title cannot be blank.",
-    };
-  }
-
-  if (parsedDuration <= 0) {
-    return {
-      ok: false,
-      message: "Duration must be valid. Example: 21:57.",
-    };
-  }
-
-  if (!isValidAirTime(airStartTime)) {
-    return {
-      ok: false,
-      message: "Air time must be HH:mm format, like 16:00.",
-    };
-  }
-
-  if (
-    isProgramType(type) &&
-    fillSlotWithCommercials &&
-    parsedSlotLength <= parsedDuration
-  ) {
-    return {
-      ok: false,
-      message: "Slot length must be longer than runtime. Example: 30:00.",
-    };
-  }
-
-  if (
-    isProgramType(type) &&
-    targetChannelId &&
-    !enabledChannels.some((channel) => channel.id === targetChannelId)
-  ) {
-    return {
-      ok: false,
-      message: "Select a valid enabled channel.",
-    };
-  }
-
-  return {
-    ok: true,
-    message: "Valid.",
-  };
 }
 
 function FilterButton({
@@ -383,12 +348,15 @@ export default function QuickMediaEditorPanel() {
   const [commercialStrategy, setCommercialStrategy] =
     useState<CommercialStrategy>("best-fit");
 
-  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(false);
+  const [allowCommercialSlicing, setAllowCommercialSlicing] = useState(true);
   const [commercialCategory, setCommercialCategory] = useState("");
 
   const [airStartTime, setAirStartTime] = useState("");
   const [airDays, setAirDays] = useState<Weekday[]>([]);
+
   const [targetChannelId, setTargetChannelId] = useState(currentChannelId);
+  const [adTargetMode, setAdTargetMode] = useState<AdTargetMode>("channels");
+  const [adChannelIds, setAdChannelIds] = useState<string[]>([]);
 
   const [message, setMessage] = useState(
     "Select any loaded media item to edit it quickly.",
@@ -401,33 +369,21 @@ export default function QuickMediaEditorPanel() {
     [media, selectedMediaId],
   );
 
-  const assignedChannelIds = useMemo(
-    () => createAssignedChannelIds(selectedMedia, channels),
-    [channels, selectedMedia],
-  );
-
-  const selectedIsCommercialInventory = isCommercialType(type);
-  const selectedIsEmbeddedAd = Boolean(
-    selectedMedia && isEmbeddedAd(selectedMedia, channels),
-  );
+  const selectedIsAd = Boolean(selectedMedia && isCommercialType(type));
+  const selectedIsProgram = isProgramType(type);
+  const selectedIsBroadcast = isBroadcastType(type);
 
   const filteredMedia = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
 
     return sortMedia(media).filter((item) => {
-      const matchesFilter =
-        filter === "all"
-          ? true
-          : filter === "embedded-ads"
-            ? isEmbeddedAd(item, channels)
-            : item.type === filter;
-
+      const matchesFilter = filter === "all" || item.type === filter;
       const matchesSearch =
         !cleanSearch || getMediaSearchLabel(item).includes(cleanSearch);
 
       return matchesFilter && matchesSearch;
     });
-  }, [channels, filter, media, search]);
+  }, [filter, media, search]);
 
   const parsedDuration = useMemo(
     () => parseManualDuration(durationInput, "seconds"),
@@ -449,35 +405,14 @@ export default function QuickMediaEditorPanel() {
     [slotLengthInput],
   );
 
-  const selectedChannelLabel = useMemo(
-    () => getSelectedChannelLabel(assignedChannelIds, channels),
-    [assignedChannelIds, channels],
+  const selectedChannelSummary = useMemo(
+    () => createChannelSummary({ item: selectedMedia, channels }),
+    [channels, selectedMedia],
   );
 
-  const validation = useMemo(
-    () =>
-      validateEditorState({
-        selectedMedia,
-        title,
-        type,
-        parsedDuration,
-        fillSlotWithCommercials,
-        parsedSlotLength,
-        airStartTime,
-        targetChannelId,
-        enabledChannels,
-      }),
-    [
-      airStartTime,
-      enabledChannels,
-      fillSlotWithCommercials,
-      parsedDuration,
-      parsedSlotLength,
-      selectedMedia,
-      targetChannelId,
-      title,
-      type,
-    ],
+  const selectedProgramChannel = useMemo(
+    () => enabledChannels.find((channel) => channel.id === targetChannelId),
+    [enabledChannels, targetChannelId],
   );
 
   useEffect(() => {
@@ -486,8 +421,8 @@ export default function QuickMediaEditorPanel() {
     setTitle(selectedMedia.title);
     setType(selectedMedia.type);
     setDurationInput(formatDurationClock(selectedMedia.duration));
-    setBreakpointsInput(formatBreakpoints(selectedMedia.breakpoints));
-    setBreakDurationsInput(formatBreakpoints(selectedMedia.breakDurations));
+    setBreakpointsInput(formatBreakpoints(selectedMedia.breakpoints ?? []));
+    setBreakDurationsInput(formatBreakpoints(selectedMedia.breakDurations ?? []));
     setSlotLengthInput(
       selectedMedia.slotLengthSeconds
         ? formatDurationClock(selectedMedia.slotLengthSeconds)
@@ -495,32 +430,36 @@ export default function QuickMediaEditorPanel() {
     );
     setFillSlotWithCommercials(Boolean(selectedMedia.fillSlotWithCommercials));
     setCommercialStrategy(selectedMedia.commercialStrategy ?? "best-fit");
-    setAllowCommercialSlicing(Boolean(selectedMedia.allowCommercialSlicing));
+    setAllowCommercialSlicing(
+      selectedMedia.allowCommercialSlicing ?? isCommercialType(selectedMedia.type),
+    );
     setCommercialCategory(selectedMedia.commercialCategory ?? "");
     setAirStartTime(selectedMedia.airStartTime ?? "");
-    setAirDays(selectedMedia.airDays ?? []);
+    setAirDays(
+      isCommercialType(selectedMedia.type)
+        ? selectedMedia.adDays ?? []
+        : selectedMedia.airDays ?? [],
+    );
 
-    const firstAssignedChannelId = channels.find((channel) =>
+    const assignedProgramChannelId = channels.find((channel) =>
       channel.mediaIds.includes(selectedMedia.id),
     )?.id;
 
-    setTargetChannelId(
-      isCommercialType(selectedMedia.type)
-        ? UNASSIGNED_TARGET
-        : firstAssignedChannelId ?? currentChannelId,
-    );
+    setTargetChannelId(assignedProgramChannelId ?? currentChannelId);
 
-    setMessage(`Editing "${selectedMedia.title}".`);
+    if (isCommercialType(selectedMedia.type)) {
+      setAdTargetMode(itemUsesGlobalAdTarget(selectedMedia) ? "global" : "channels");
+
+      const targets = normalizeAdChannelIds(selectedMedia);
+      setAdChannelIds(targets.length > 0 ? targets : [currentChannelId]);
+    } else {
+      setAdTargetMode("channels");
+      setAdChannelIds([]);
+    }
   }, [channels, currentChannelId, selectedMedia]);
 
   useEffect(() => {
-    if (enabledChannels.length === 0 || selectedIsCommercialInventory) {
-      return;
-    }
-
-    if (targetChannelId === UNASSIGNED_TARGET) {
-      return;
-    }
+    if (enabledChannels.length === 0) return;
 
     const targetExists = enabledChannels.some(
       (channel) => channel.id === targetChannelId,
@@ -529,12 +468,7 @@ export default function QuickMediaEditorPanel() {
     if (!targetExists) {
       setTargetChannelId(enabledChannels[0]?.id ?? currentChannelId);
     }
-  }, [
-    currentChannelId,
-    enabledChannels,
-    selectedIsCommercialInventory,
-    targetChannelId,
-  ]);
+  }, [currentChannelId, enabledChannels, targetChannelId]);
 
   const toggleAirDay = (day: Weekday) => {
     setAirDays((current) =>
@@ -546,49 +480,61 @@ export default function QuickMediaEditorPanel() {
 
   const clearAirDays = () => {
     setAirDays([]);
-    setMessage("Air days cleared. Item will be eligible every day.");
   };
 
-  const applyPreset = (preset: EditorPreset) => {
-    if (!isProgramType(type)) {
-      setMessage("Presets are only available for shows, movies, music, and music videos.");
-      return;
-    }
+  const toggleAdChannel = (channelId: string) => {
+    setAdChannelIds((current) => {
+      if (current.includes(channelId)) {
+        return current.filter((item) => item !== channelId);
+      }
 
-    if (preset === "cartoon") {
-      setSlotLengthInput("30:00");
-      setBreakpointsInput("7:30, 15:00");
-      setBreakDurationsInput("2:00, 2:00");
-      setFillSlotWithCommercials(true);
-      setCommercialStrategy("best-fit");
-      setMessage("Applied 30-minute cartoon/anime slot preset.");
-      return;
-    }
+      return [...current, channelId];
+    });
+  };
 
-    if (preset === "sitcom") {
-      setSlotLengthInput("30:00");
-      setBreakpointsInput("11:00");
-      setBreakDurationsInput("3:00");
-      setFillSlotWithCommercials(true);
-      setCommercialStrategy("best-fit");
-      setMessage("Applied 30-minute sitcom slot preset.");
-      return;
-    }
+  const selectAllAdChannels = () => {
+    setAdChannelIds(enabledChannels.map((channel) => channel.id));
+    setAdTargetMode("channels");
+  };
 
+  const clearAdChannels = () => {
+    setAdChannelIds([]);
+    setAdTargetMode("channels");
+  };
+
+  const applyCartoonPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("15:00");
+    setBreakDurationsInput("2:00");
+    setFillSlotWithCommercials(true);
+    setCommercialStrategy("best-fit");
+    setMessage("Applied 30-minute cartoon slot preset.");
+  };
+
+  const applySitcomPreset = () => {
+    setSlotLengthInput("30:00");
+    setBreakpointsInput("11:00");
+    setBreakDurationsInput("2:00");
+    setFillSlotWithCommercials(true);
+    setCommercialStrategy("best-fit");
+    setMessage("Applied 30-minute sitcom slot preset.");
+  };
+
+  const applyDramaPreset = () => {
     setSlotLengthInput("60:00");
-    setBreakpointsInput("12:00, 24:00, 36:00");
-    setBreakDurationsInput("3:00, 3:00, 3:00");
+    setBreakpointsInput("14:00, 30:00");
+    setBreakDurationsInput("2:00, 2:00");
     setFillSlotWithCommercials(true);
     setCommercialStrategy("best-fit");
     setMessage("Applied 60-minute drama slot preset.");
   };
 
-  const clearCommercialLogic = () => {
+  const clearBroadcastLogic = () => {
     setSlotLengthInput("");
     setBreakpointsInput("");
     setBreakDurationsInput("");
     setFillSlotWithCommercials(false);
-    setMessage("Commercial slot logic cleared for this item.");
+    setMessage("Broadcast slot and manual commercial logic cleared.");
   };
 
   const handleTypeChange = (nextType: MediaType) => {
@@ -599,723 +545,719 @@ export default function QuickMediaEditorPanel() {
       setBreakDurationsInput("");
       setSlotLengthInput("");
       setFillSlotWithCommercials(false);
-      setTargetChannelId(UNASSIGNED_TARGET);
-      setMessage(`${getMediaTypeLabel(nextType)} mode selected. Playlist assignment is blocked.`);
+      setAllowCommercialSlicing(true);
+      setAdTargetMode("channels");
+      setAdChannelIds((current) =>
+        current.length > 0 ? current : [targetChannelId || currentChannelId],
+      );
+      setMessage("Commercial mode selected. Choose channel targets below.");
       return;
     }
 
+    setAdChannelIds([]);
     setAllowCommercialSlicing(false);
     setMessage(`${getMediaTypeLabel(nextType)} mode selected.`);
   };
 
-  const removeSelectedFromAllChannels = () => {
+  const validate = (): string | null => {
     if (!selectedMedia) {
-      setMessage("Select a media item first.");
-      return;
+      return "Select a media item first.";
     }
 
-    const assignedChannels = channels.filter((channel) =>
-      channel.mediaIds.includes(selectedMedia.id),
-    );
+    if (!title.trim()) {
+      return "Title cannot be blank.";
+    }
 
-    assignedChannels.forEach((channel) => {
-      removeMediaFromChannel(channel.id, selectedMedia.id);
-    });
+    if (parsedDuration <= 0) {
+      return "Duration must be valid. Example: 21:57.";
+    }
 
-    setTargetChannelId(
-      isCommercialType(type) ? UNASSIGNED_TARGET : currentChannelId,
-    );
+    if (!isValidAirTime(airStartTime)) {
+      return "Air time must be HH:mm format, like 16:00.";
+    }
 
-    setMessage(
-      `Removed "${selectedMedia.title}" from ${assignedChannels.length} channel playlist(s).`,
-    );
+    if (selectedIsBroadcast && fillSlotWithCommercials && parsedSlotLength <= parsedDuration) {
+      return "Slot length must be longer than runtime. Example: 30:00.";
+    }
+
+    if (
+      selectedIsProgram &&
+      targetChannelId &&
+      !enabledChannels.some((channel) => channel.id === targetChannelId)
+    ) {
+      return "Select a valid enabled channel.";
+    }
+
+    if (selectedIsAd && adTargetMode === "channels" && adChannelIds.length === 0) {
+      return "Choose at least one ad target channel, or select Global.";
+    }
+
+    return null;
   };
 
   const saveChanges = () => {
-    if (!validation.ok) {
-      setMessage(validation.message);
+    if (!selectedMedia) {
+      setMessage("Select a media item first.");
       return;
     }
 
-    if (!selectedMedia) {
-      setMessage("Select a media item first.");
+    const error = validate();
+
+    if (error) {
+      setMessage(error);
       return;
     }
 
     const cleanTitle = title.trim().replace(/\s+/g, " ");
     const normalizedAirStartTime = normalizeAirStartTime(airStartTime.trim());
-    const programType = isProgramType(type);
-    const commercialType = isCommercialType(type);
+    const cleanCategory = sanitizeCommercialCategory(commercialCategory);
+    const isAd = isCommercialType(type);
+    const isProgram = isProgramType(type);
+    const isBroadcast = isBroadcastType(type);
+
+    const adTargets =
+      adTargetMode === "global"
+        ? [GLOBAL_AD_CHANNEL_TARGET]
+        : Array.from(new Set(adChannelIds.map(String)));
 
     updateMedia(selectedMedia.id, {
-      title: cleanTitle.slice(0, MAX_TITLE_LENGTH),
+      title: cleanTitle,
       type,
       duration: parsedDuration,
 
-      breakpoints: programType ? parsedBreakpoints : [],
-      breakDurations: programType ? parsedBreakDurations : [],
+      breakpoints: isBroadcast ? parsedBreakpoints : [],
+      breakDurations: isBroadcast ? parsedBreakDurations : [],
       slotLengthSeconds:
-        programType && parsedSlotLength > parsedDuration
+        isBroadcast && parsedSlotLength > parsedDuration
           ? parsedSlotLength
           : undefined,
-      fillSlotWithCommercials: programType ? fillSlotWithCommercials : false,
-      commercialStrategy,
+      fillSlotWithCommercials: isBroadcast ? fillSlotWithCommercials : false,
+      commercialStrategy: isBroadcast || isAd ? commercialStrategy : undefined,
 
-      allowCommercialSlicing: commercialType ? allowCommercialSlicing : false,
-      commercialCategory: commercialType
-        ? sanitizeCommercialCategory(commercialCategory)
-        : undefined,
+      allowCommercialSlicing: isAd ? allowCommercialSlicing : false,
+      commercialCategory: isAd ? cleanCategory || "general" : undefined,
+      adCategories: isAd ? [cleanCategory || "general"] : undefined,
+      adChannelIds: isAd ? adTargets : undefined,
+      adPlacements: isAd ? DEFAULT_AD_PLACEMENTS : undefined,
+      adDays: isAd ? airDays : undefined,
 
-      airDays: programType ? airDays : [],
-      airStartTime: programType ? normalizedAirStartTime : undefined,
-      updatedAt: new Date().toISOString(),
+      airDays: isProgram && !isAd ? airDays : [],
+      airStartTime: isProgram && !isAd ? normalizedAirStartTime ?? "" : undefined,
     });
 
-    if (commercialType) {
-      const assignedChannels = channels.filter((channel) =>
-        channel.mediaIds.includes(selectedMedia.id),
-      );
-
-      assignedChannels.forEach((channel) => {
-        removeMediaFromChannel(channel.id, selectedMedia.id);
+    if (isAd) {
+      channels.forEach((channel) => {
+        if (channel.mediaIds.includes(selectedMedia.id)) {
+          removeMediaFromChannel(channel.id, selectedMedia.id);
+        }
       });
 
-      setTargetChannelId(UNASSIGNED_TARGET);
       setMessage(
-        `Saved "${cleanTitle}" as global ad inventory and removed it from ${assignedChannels.length} playlist(s).`,
+        adTargetMode === "global"
+          ? `Saved "${cleanTitle}" as global ad inventory.`
+          : `Saved "${cleanTitle}" for ${adTargets.length} channel target(s).`,
       );
+
       return;
     }
 
-    const wasAlreadyAssigned =
-      targetChannelId && assignedChannelIds.includes(targetChannelId);
+    channels.forEach((channel) => {
+      if (channel.id !== targetChannelId && channel.mediaIds.includes(selectedMedia.id)) {
+        removeMediaFromChannel(channel.id, selectedMedia.id);
+      }
+    });
 
-    if (targetChannelId && !wasAlreadyAssigned) {
+    if (targetChannelId) {
       assignMediaToChannel(targetChannelId, selectedMedia.id);
     }
 
     setMessage(
-      !targetChannelId
-        ? `Saved "${cleanTitle}". No new channel assignment was added.`
-        : wasAlreadyAssigned
-          ? `Saved "${cleanTitle}". Channel assignments were left unchanged.`
-          : `Saved "${cleanTitle}" and added it to CH ${getChannelNumber(
-              targetChannelId,
-              channels,
-            )}.`,
+      `Saved "${cleanTitle}" to ${
+        selectedProgramChannel ? getChannelLabel(selectedProgramChannel) : "selected channel"
+      }.`,
     );
   };
 
-  const selectedTargetChannel = enabledChannels.find(
-    (channel) => channel.id === targetChannelId,
-  );
+  const broadcastSummary = getBroadcastSummary({
+    parsedSlotLength,
+    parsedDuration,
+    parsedBreakpoints,
+    parsedBreakDurations,
+    selectedChannelLabel: selectedChannelSummary,
+  });
 
   return (
     <section
-      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
+      className="grid gap-4 lg:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.4fr)]"
       style={{ color: "var(--text)" }}
     >
-      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div
-            className="text-xs font-black uppercase tracking-[0.18em]"
-            style={{ color: "var(--primary)" }}
-          >
-            Quick Edit
-          </div>
-
-          <h2 className="mt-1 text-base font-black tracking-tight">
-            Safe Media Editor
-          </h2>
-
-          <p
-            className="mt-1 max-w-3xl text-xs leading-5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Edit runtime, slot logic, fixed air time, air days, title, type, and
-            commercial pool settings. Programs can be assigned to channels.
-            Commercials and bumpers stay in global ad inventory.
-          </p>
+      <div className="ttv-glass-panel rounded-2xl p-3 sm:p-4">
+        <div
+          className="text-xs font-black uppercase tracking-[0.18em]"
+          style={{ color: "var(--primary)" }}
+        >
+          Quick Edit
         </div>
 
-        <div
-          className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
+        <h2 className="mt-1 text-base font-black tracking-tight">
+          Media Library
+        </h2>
+
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="mt-3 w-full rounded-xl border px-3 py-3 text-sm outline-none"
+          placeholder="Search title, URL, type, category..."
           style={{
-            borderColor: "var(--border)",
             background: "var(--panel-alt-bg)",
-            color: "var(--text-muted)",
+            borderColor: "var(--border)",
+            color: "var(--text)",
           }}
-        >
-          {filteredMedia.length} visible / {media.length} total
+        />
+
+        <div className="ttv-no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+          {MEDIA_FILTERS.map((item) => (
+            <FilterButton
+              key={item.id}
+              label={item.label}
+              active={filter === item.id}
+              onClick={() => setFilter(item.id)}
+            />
+          ))}
+        </div>
+
+        <div className="ttv-no-scrollbar mt-3 max-h-[640px] overflow-y-auto pr-1">
+          <div className="grid gap-2">
+            {filteredMedia.map((item) => {
+              const active = item.id === selectedMediaId;
+              const summary = createChannelSummary({ item, channels });
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedMediaId(item.id)}
+                  className="rounded-2xl border p-3 text-left transition hover:scale-[1.01]"
+                  style={{
+                    background: active ? "var(--primary)" : "var(--panel-alt-bg)",
+                    borderColor: active ? "var(--primary)" : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                >
+                  <div className="line-clamp-2 text-sm font-black">
+                    {item.title}
+                  </div>
+
+                  <div
+                    className="mt-1 text-[11px] uppercase tracking-[0.1em]"
+                    style={{ color: active ? "inherit" : "var(--text-muted)" }}
+                  >
+                    {getMediaTypeLabel(item.type)} / {formatDurationClock(item.duration)}
+                  </div>
+
+                  <div
+                    className="mt-1 text-[11px]"
+                    style={{ color: active ? "inherit" : "var(--text-muted)" }}
+                  >
+                    {summary}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-3">
-        <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-            }}
-            placeholder="Search loaded media..."
-            className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-            spellCheck={false}
+      <div className="ttv-glass-panel rounded-2xl p-3 sm:p-4">
+        {!selectedMedia ? (
+          <div
+            className="rounded-2xl border p-4 text-sm"
             style={{
               background: "var(--panel-alt-bg)",
               borderColor: "var(--border)",
-              color: "var(--text)",
+              color: "var(--text-muted)",
             }}
-          />
-
-          <div className="ttv-no-scrollbar flex gap-2 overflow-x-auto">
-            {MEDIA_FILTERS.map((item) => (
-              <FilterButton
-                key={item.id}
-                label={item.label}
-                active={filter === item.id}
-                onClick={() => setFilter(item.id)}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-[0.82fr_1.18fr]">
-          <div
-            className="space-y-2 overflow-auto pr-1"
-            style={{ maxHeight: MAX_MEDIA_LIST_HEIGHT }}
           >
-            {filteredMedia.length === 0 ? (
+            Select a media item to edit shows, commercial targets, runtimes,
+            breakpoints, slots, and air days.
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <div
+              className="rounded-2xl border p-3 text-sm leading-6"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+              }}
+            >
+              Editing:{" "}
+              <span className="font-black" style={{ color: "var(--primary)" }}>
+                {selectedMedia.title}
+              </span>{" "}
+              / Current target: {selectedChannelSummary}
+            </div>
+
+            <label className="grid gap-1">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Title
+              </span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                maxLength={140}
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <select
+                value={type}
+                onChange={(event) => handleTypeChange(event.target.value as MediaType)}
+                className="rounded-xl border px-3 py-3 text-base sm:text-sm"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              >
+                <option value="show">Show</option>
+                <option value="movie">Movie</option>
+                <option value="music">Music</option>
+                <option value="music-video">Music Video</option>
+                <option value="commercial">Commercial</option>
+                <option value="bumper">Bumper</option>
+              </select>
+
+              <input
+                value={durationInput}
+                onChange={(event) =>
+                  setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
+                }
+                className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                placeholder="Duration"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
+
+              {!selectedIsAd ? (
+                <select
+                  value={targetChannelId}
+                  onChange={(event) => setTargetChannelId(event.target.value)}
+                  className="rounded-xl border px-3 py-3 text-base sm:text-sm"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                >
+                  {enabledChannels.map((channel) => (
+                    <option key={channel.id} value={channel.id}>
+                      {getChannelOptionLabel(channel)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  className="rounded-xl border px-3 py-3 text-sm"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Ad inventory
+                </div>
+              )}
+            </div>
+
+            {selectedIsAd ? (
+              <section
+                className="rounded-2xl border p-3"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <div
+                  className="text-xs font-black uppercase tracking-[0.18em]"
+                  style={{ color: "var(--primary)" }}
+                >
+                  Commercial Channel Targets
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label
+                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      checked={adTargetMode === "channels"}
+                      onChange={() => setAdTargetMode("channels")}
+                      className="h-5 w-5"
+                    />
+                    <span>Selected channels</span>
+                  </label>
+
+                  <label
+                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      checked={adTargetMode === "global"}
+                      onChange={() => setAdTargetMode("global")}
+                      className="h-5 w-5"
+                    />
+                    <span>Global ad</span>
+                  </label>
+                </div>
+
+                {adTargetMode === "channels" ? (
+                  <>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllAdChannels}
+                        className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+                      >
+                        Select All
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearAdChannels}
+                        className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {enabledChannels.map((channel) => {
+                        const active = adChannelIds.includes(channel.id);
+
+                        return (
+                          <button
+                            key={channel.id}
+                            type="button"
+                            onClick={() => toggleAdChannel(channel.id)}
+                            className="rounded-xl border p-3 text-left text-xs font-black uppercase tracking-[0.08em]"
+                            style={{
+                              background: active
+                                ? "var(--primary)"
+                                : "var(--button-bg)",
+                              borderColor: active
+                                ? "var(--primary)"
+                                : "var(--border)",
+                              color: "var(--text)",
+                            }}
+                          >
+                            {getChannelLabel(channel)}
+                            <div className="mt-1 line-clamp-1 text-[10px] opacity-80">
+                              {getChannelName(channel)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="mt-3 rounded-2xl border p-3 text-xs leading-5"
+                    style={{
+                      background: "rgba(34,197,94,0.08)",
+                      borderColor: "rgba(34,197,94,0.28)",
+                      color: "#86efac",
+                    }}
+                  >
+                    This commercial can run only on channels that allow global
+                    ads in their channel ad policy.
+                  </div>
+                )}
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label
+                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allowCommercialSlicing}
+                      onChange={(event) =>
+                        setAllowCommercialSlicing(event.target.checked)
+                      }
+                      className="h-5 w-5"
+                    />
+                    <span>Allow slicing for exact ad blocks</span>
+                  </label>
+
+                  <input
+                    value={commercialCategory}
+                    onChange={(event) => setCommercialCategory(event.target.value)}
+                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                    placeholder="Category: general, kids, anime..."
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            {selectedIsBroadcast ? (
+              <section
+                className="rounded-2xl border p-3"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <div
+                  className="text-xs font-black uppercase tracking-[0.18em]"
+                  style={{ color: "var(--primary)" }}
+                >
+                  Broadcast Slot / Commercial Logic
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <input
+                    value={slotLengthInput}
+                    onChange={(event) =>
+                      setSlotLengthInput(event.target.value.replace(/[^\d:]/g, ""))
+                    }
+                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                    placeholder="Slot 30:00"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+
+                  <input
+                    value={breakpointsInput}
+                    onChange={(event) =>
+                      setBreakpointsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                    }
+                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                    placeholder="Breaks 15:00"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+
+                  <input
+                    value={breakDurationsInput}
+                    onChange={(event) =>
+                      setBreakDurationsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                    }
+                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                    placeholder="Ads 2:00"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <PresetButton label="30m Cartoon" onClick={applyCartoonPreset} />
+                  <PresetButton label="30m Sitcom" onClick={applySitcomPreset} />
+                  <PresetButton label="60m Drama" onClick={applyDramaPreset} />
+                  <PresetButton label="Clear Logic" onClick={clearBroadcastLogic} />
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label
+                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={fillSlotWithCommercials}
+                      onChange={(event) =>
+                        setFillSlotWithCommercials(event.target.checked)
+                      }
+                      className="h-5 w-5"
+                    />
+                    <span>Fill remaining slot time with commercials</span>
+                  </label>
+
+                  <select
+                    value={commercialStrategy}
+                    onChange={(event) =>
+                      setCommercialStrategy(event.target.value as CommercialStrategy)
+                    }
+                    className="rounded-xl border px-3 py-3 text-base sm:text-sm"
+                    style={{
+                      background: "var(--panel-bg)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    <option value="best-fit">Best Fit Commercials</option>
+                    <option value="sequential">Sequential Commercials</option>
+                    <option value="random">Random Commercials</option>
+                  </select>
+                </div>
+              </section>
+            ) : null}
+
+            {selectedIsProgram ? (
+              <input
+                value={airStartTime}
+                onChange={(event) =>
+                  setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                }
+                className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
+                placeholder="Optional fixed air time 16:00"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor:
+                    airStartTime && !isValidAirTime(airStartTime)
+                      ? "#f87171"
+                      : "var(--border)",
+                  color: "var(--text)",
+                }}
+              />
+            ) : null}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {selectedIsAd ? "Ad Days" : "Air Days"}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={clearAirDays}
+                  className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+                >
+                  Every Day
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {WEEKDAYS.map((day) => {
+                  const active = airDays.includes(day.id);
+
+                  return (
+                    <button
+                      key={day.id}
+                      type="button"
+                      onClick={() => toggleAirDay(day.id)}
+                      className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+                      style={{
+                        background: active ? "var(--primary)" : "var(--button-bg)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div
+              className="rounded-2xl border p-3 text-xs leading-5"
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {selectedIsAd
+                ? `Runtime: ${
+                    parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
+                  } / Mode: ${
+                    adTargetMode === "global"
+                      ? "global ad inventory"
+                      : `${adChannelIds.length} selected channel target(s)`
+                  } / Playlist assignment: blocked`
+                : broadcastSummary}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={saveChanges}
+                className="ttv-touch-target rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.14em] transition hover:scale-[1.01]"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+                  color: "var(--text)",
+                }}
+              >
+                Save Changes
+              </button>
+
+              {!selectedIsAd ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedMedia) return;
+
+                    channels.forEach((channel) => {
+                      if (channel.mediaIds.includes(selectedMedia.id)) {
+                        removeMediaFromChannel(channel.id, selectedMedia.id);
+                      }
+                    });
+
+                    setMessage(`Removed "${selectedMedia.title}" from playlists.`);
+                  }}
+                  className="ttv-touch-target rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.14em]"
+                  style={{
+                    background: "rgba(127,29,29,0.9)",
+                    color: "white",
+                  }}
+                >
+                  Remove From Playlists
+                </button>
+              ) : null}
+            </div>
+
+            {message ? (
               <div
-                className="rounded-2xl border px-3 py-8 text-center text-xs"
+                className="rounded-2xl border px-3 py-2 text-xs leading-5"
                 style={{
                   background: "var(--panel-alt-bg)",
                   borderColor: "var(--border)",
                   color: "var(--text-muted)",
                 }}
+                aria-live="polite"
               >
-                No media found.
+                {message}
               </div>
-            ) : (
-              filteredMedia.map((item) => {
-                const active = item.id === selectedMediaId;
-                const itemChannels = getItemChannelSummary(item, channels);
-                const embeddedAd = isEmbeddedAd(item, channels);
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedMediaId(item.id)}
-                    className="ttv-touch-target w-full rounded-2xl border p-3 text-left transition hover:opacity-95"
-                    style={{
-                      background: embeddedAd
-                        ? "rgba(248, 113, 113, 0.08)"
-                        : active
-                          ? "rgba(255,255,255,0.08)"
-                          : "var(--panel-alt-bg)",
-                      borderColor: embeddedAd
-                        ? "rgba(248, 113, 113, 0.45)"
-                        : active
-                          ? "var(--primary)"
-                          : "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div
-                        className="truncate text-sm font-black"
-                        title={item.title}
-                      >
-                        {item.title}
-                      </div>
-
-                      {embeddedAd ? (
-                        <span className="rounded-full border border-red-300/40 bg-red-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-red-100">
-                          Embedded Ad
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div
-                      className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      <span>{getMediaTypeLabel(item.type).toUpperCase()}</span>
-                      <span>•</span>
-                      <span>{formatDurationClock(item.duration)}</span>
-                      <span>•</span>
-                      <span>{itemChannels}</span>
-                    </div>
-
-                    {item.fillSlotWithCommercials || item.commercialCategory ? (
-                      <div
-                        className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.1em]"
-                        style={{ color: embeddedAd ? "#fecaca" : "var(--primary)" }}
-                      >
-                        {item.fillSlotWithCommercials
-                          ? "Slot filler enabled"
-                          : item.commercialCategory}
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              })
-            )}
+            ) : null}
           </div>
-
-          <div
-            className="rounded-2xl border p-3"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-            }}
-          >
-            {!selectedMedia ? (
-              <div
-                className="flex min-h-[320px] items-center justify-center text-center text-sm"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Select a media item from the list.
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                <div
-                  className="rounded-2xl border px-3 py-2 text-xs leading-5"
-                  style={{
-                    background: selectedIsEmbeddedAd
-                      ? "rgba(248, 113, 113, 0.10)"
-                      : "var(--panel-bg)",
-                    borderColor: selectedIsEmbeddedAd
-                      ? "rgba(248, 113, 113, 0.45)"
-                      : "var(--border)",
-                    color: selectedIsEmbeddedAd ? "#fecaca" : "var(--text-muted)",
-                  }}
-                >
-                  Editing:{" "}
-                  <span style={{ color: "var(--text)" }}>{selectedMedia.title}</span>{" "}
-                  • Current channel: {selectedChannelLabel}
-                  {selectedIsEmbeddedAd
-                    ? " • This ad/bump is inside a playlist and will be cleaned when saved."
-                    : ""}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="quick-edit-title"
-                    className="mb-1 block text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Title
-                  </label>
-
-                  <input
-                    id="quick-edit-title"
-                    value={title}
-                    maxLength={MAX_TITLE_LENGTH}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: title.trim() ? "var(--border)" : "#ef4444",
-                      color: "var(--text)",
-                    }}
-                  />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <select
-                    value={type}
-                    onChange={(event) =>
-                      handleTypeChange(event.target.value as MediaType)
-                    }
-                    className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  >
-                    <option value="show">Show</option>
-                    <option value="movie">Movie</option>
-                    <option value="music">Music</option>
-                    <option value="music-video">Music Video</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="bumper">Bumper</option>
-                  </select>
-
-                  <input
-                    value={durationInput}
-                    onChange={(event) =>
-                      setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
-                    }
-                    placeholder="Runtime 21:57"
-                    className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor:
-                        durationInput && parsedDuration <= 0
-                          ? "#ef4444"
-                          : "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-
-                  <select
-                    value={targetChannelId}
-                    onChange={(event) => setTargetChannelId(event.target.value)}
-                    disabled={selectedIsCommercialInventory}
-                    className="w-full rounded-xl border px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor:
-                        selectedIsCommercialInventory ||
-                        targetChannelId === UNASSIGNED_TARGET ||
-                        selectedTargetChannel
-                          ? "var(--border)"
-                          : "#ef4444",
-                      color: "var(--text)",
-                    }}
-                  >
-                    <option value={UNASSIGNED_TARGET}>
-                      {selectedIsCommercialInventory
-                        ? "Global ad inventory only"
-                        : "Do not add to channel"}
-                    </option>
-
-                    {enabledChannels.map((channel) => (
-                      <option key={channel.id} value={channel.id}>
-                        {getChannelLabel(channel)} / {getChannelName(channel)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {isProgramType(type) ? (
-                  <div
-                    className="rounded-2xl border p-3"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                    }}
-                  >
-                    <div
-                      className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
-                      style={{ color: "var(--primary)" }}
-                    >
-                      Broadcast Slot / Commercial Logic
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <input
-                        value={slotLengthInput}
-                        onChange={(event) =>
-                          setSlotLengthInput(
-                            event.target.value.replace(/[^\d:.]/g, ""),
-                          )
-                        }
-                        placeholder="Optional slot 30:00"
-                        className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor:
-                            fillSlotWithCommercials &&
-                            parsedSlotLength <= parsedDuration
-                              ? "#ef4444"
-                              : "var(--border)",
-                          color: "var(--text)",
-                        }}
-                      />
-
-                      <input
-                        value={breakpointsInput}
-                        onChange={(event) =>
-                          setBreakpointsInput(
-                            event.target.value.replace(/[^\d:.,\s]/g, ""),
-                          )
-                        }
-                        placeholder="Optional breaks 7:30, 15:00"
-                        className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                          color: "var(--text)",
-                        }}
-                      />
-
-                      <input
-                        value={breakDurationsInput}
-                        onChange={(event) =>
-                          setBreakDurationsInput(
-                            event.target.value.replace(/[^\d:.,\s]/g, ""),
-                          )
-                        }
-                        placeholder="Optional ad blocks 2:00, 2:00"
-                        className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                          color: "var(--text)",
-                        }}
-                      />
-                    </div>
-
-                    <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                      <PresetButton
-                        label="30m Cartoon"
-                        onClick={() => applyPreset("cartoon")}
-                      />
-                      <PresetButton
-                        label="30m Sitcom"
-                        onClick={() => applyPreset("sitcom")}
-                      />
-                      <PresetButton
-                        label="60m Drama"
-                        onClick={() => applyPreset("drama")}
-                      />
-                      <PresetButton
-                        label="Clear Logic"
-                        onClick={clearCommercialLogic}
-                      />
-                    </div>
-
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <label
-                        className="flex items-center gap-3 rounded-xl border p-3 text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={fillSlotWithCommercials}
-                          onChange={(event) =>
-                            setFillSlotWithCommercials(event.target.checked)
-                          }
-                          className="h-5 w-5"
-                        />
-                        <span>Fill remaining slot time with commercials</span>
-                      </label>
-
-                      <select
-                        value={commercialStrategy}
-                        onChange={(event) =>
-                          setCommercialStrategy(
-                            event.target.value as CommercialStrategy,
-                          )
-                        }
-                        className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                          color: "var(--text)",
-                        }}
-                      >
-                        <option value="best-fit">Best Fit Commercials</option>
-                        <option value="sequential">Sequential Commercials</option>
-                        <option value="random">Random Commercials</option>
-                      </select>
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedIsCommercialInventory ? (
-                  <div
-                    className="rounded-2xl border p-3"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: selectedIsEmbeddedAd
-                        ? "rgba(248, 113, 113, 0.45)"
-                        : "var(--border)",
-                    }}
-                  >
-                    <div
-                      className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
-                      style={{ color: "var(--primary)" }}
-                    >
-                      Commercial Pool Settings
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label
-                        className="flex items-center gap-3 rounded-xl border p-3 text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={allowCommercialSlicing}
-                          onChange={(event) =>
-                            setAllowCommercialSlicing(event.target.checked)
-                          }
-                          className="h-5 w-5"
-                        />
-                        <span>Allow slicing for exact ad blocks</span>
-                      </label>
-
-                      <input
-                        value={commercialCategory}
-                        onChange={(event) =>
-                          setCommercialCategory(event.target.value)
-                        }
-                        placeholder="Category: general, kids, anime..."
-                        className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                        style={{
-                          background: "var(--panel-alt-bg)",
-                          borderColor: "var(--border)",
-                          color: "var(--text)",
-                        }}
-                      />
-                    </div>
-
-                    <div
-                      className="mt-3 rounded-xl border px-3 py-2 text-[11px] leading-5"
-                      style={{
-                        background: selectedIsEmbeddedAd
-                          ? "rgba(248, 113, 113, 0.10)"
-                          : "rgba(34, 197, 94, 0.08)",
-                        borderColor: selectedIsEmbeddedAd
-                          ? "rgba(248, 113, 113, 0.30)"
-                          : "rgba(34, 197, 94, 0.24)",
-                        color: selectedIsEmbeddedAd ? "#fecaca" : "#bbf7d0",
-                      }}
-                    >
-                      {selectedIsEmbeddedAd
-                        ? "This ad/bump is currently assigned to a channel playlist. Saving will remove it from playlists and keep it as global ad inventory."
-                        : "This item is clean global ad inventory. Do not add it directly to a channel playlist."}
-                    </div>
-                  </div>
-                ) : null}
-
-                {isProgramType(type) ? (
-                  <input
-                    value={airStartTime}
-                    onChange={(event) =>
-                      setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
-                    }
-                    placeholder="Optional fixed air time 16:00"
-                    className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor:
-                        airStartTime && !isValidAirTime(airStartTime)
-                          ? "#ef4444"
-                          : "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-                ) : null}
-
-                {isProgramType(type) ? (
-                  <div>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        Air Days
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={clearAirDays}
-                        className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-                      >
-                        Every Day
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1">
-                      {WEEKDAYS.map((day) => {
-                        const active = airDays.includes(day.id);
-
-                        return (
-                          <button
-                            key={day.id}
-                            type="button"
-                            onClick={() => toggleAirDay(day.id)}
-                            className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
-                            style={{
-                              background: active
-                                ? "var(--primary)"
-                                : "var(--button-bg)",
-                              color: "var(--text)",
-                            }}
-                          >
-                            {day.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div
-                  className="rounded-2xl border px-3 py-2 text-xs leading-5"
-                  style={{
-                    background: "var(--panel-bg)",
-                    borderColor: validation.ok
-                      ? "var(--border)"
-                      : "rgba(248, 113, 113, 0.45)",
-                    color: validation.ok ? "var(--text-muted)" : "#fecaca",
-                  }}
-                >
-                  {validation.ok
-                    ? getBroadcastSummary({
-                        parsedSlotLength,
-                        parsedDuration,
-                        parsedBreakpoints,
-                        parsedBreakDurations,
-                        selectedChannelLabel,
-                        isCommercialInventory: selectedIsCommercialInventory,
-                      })
-                    : validation.message}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <button
-                    type="button"
-                    onClick={saveChanges}
-                    disabled={!validation.ok}
-                    className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
-                      color: "var(--text)",
-                    }}
-                  >
-                    Save Changes
-                  </button>
-
-                  {assignedChannelIds.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={removeSelectedFromAllChannels}
-                      className="ttv-touch-target rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition hover:opacity-90"
-                      style={{
-                        background: "#7f1d1d",
-                        color: "#fff",
-                      }}
-                    >
-                      Remove From Playlists
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="rounded-2xl border px-3 py-2 text-xs leading-5"
-          style={{
-            background: "var(--panel-alt-bg)",
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-          }}
-          aria-live="polite"
-        >
-          {message}
-        </div>
+        )}
       </div>
     </section>
   );
