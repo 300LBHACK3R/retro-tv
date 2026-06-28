@@ -125,12 +125,10 @@ function startOfNextLocalDay(date: Date): Date {
   return nextDate;
 }
 
-function getNoonForDate(date: Date): Date {
-  const nextDate = new Date(date);
-
-  nextDate.setHours(12, 0, 0, 0);
-
-  return nextDate;
+function getBroadcastDayStartForDate(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
 }
 
 function isSameLocalDay(a: Date, b: Date): boolean {
@@ -553,7 +551,7 @@ function getScheduleForSlice(
 
   return buildSchedule(programMedia, {
     channel: row.channel,
-    now: getNoonForDate(sliceStart),
+    now: getBroadcastDayStartForDate(sliceStart),
     availableAds,
   });
 }

@@ -77,15 +77,14 @@ function createThemeVars(theme: ReturnType<typeof getThemeById>): CSSProperties 
 
 function getSharedScheduleAnchor(): Date {
   /*
-    One source of truth for all schedule generation on this page.
+    One source of truth for schedule generation.
 
-    Important:
-    The player schedule and guide schedule must be built with the same
-    date/time anchor. Otherwise Daily Random channels can produce one
-    order for Now Playing and another order for the guide.
+    Broadcast schedules must be anchored to the start of the local day.
+    The player and guide both calculate positions inside this same
+    midnight-based schedule, so CH2 Now Playing and CH2 Guide cannot drift.
   */
   const anchor = new Date();
-  anchor.setHours(12, 0, 0, 0);
+  anchor.setHours(0, 0, 0, 0);
   return anchor;
 }
 
