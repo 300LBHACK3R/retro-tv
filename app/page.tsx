@@ -229,6 +229,7 @@ export default function Home() {
       buildSchedule(activeChannelMedia, {
         channel: activeChannel,
         availableAds,
+        now: scheduleAnchor,
       }),
     [activeChannel, activeChannelMedia, availableAds, scheduleAnchor],
   );
@@ -240,6 +241,7 @@ export default function Home() {
         const playbackSchedule = buildSchedule(channelMedia, {
           channel,
           availableAds,
+          now: scheduleAnchor,
         });
 
         return {

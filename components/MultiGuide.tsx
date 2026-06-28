@@ -148,12 +148,14 @@ function getSecondsSinceBroadcastEpoch(dateMs: number): number {
 }
 
 function getItemDuration(item: BroadcastItem): number {
-  const guideDuration = Math.floor(Number(item.guideDuration));
+  /*
+    Critical:
+    This must use real playback duration only.
 
-  if (Number.isFinite(guideDuration) && guideDuration > 0) {
-    return guideDuration;
-  }
-
+    guideDuration is a public display value used to visually fold hidden
+    commercials into a program block. If the guide walks the timeline using
+    guideDuration, it drifts away from the live player.
+  */
   const duration = Math.floor(Number(item.duration));
 
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
