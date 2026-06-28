@@ -354,11 +354,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           >
             <span>Now Playing</span>
 
-            {isCurrentHidden ? (
-              <span style={{ color: "#fde68a" }}>Station Break</span>
-            ) : (
-              <span style={{ color: "var(--primary)" }}>Live</span>
-            )}
+            <span style={{ color: "var(--primary)" }}>Live</span>
           </div>
 
           <div className="mt-1 truncate text-lg font-black" title={nowTitle}>
@@ -371,7 +367,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               style={{ color: "var(--text-muted)" }}
               title={contextTitle}
             >
-              Continuing shortly: {contextTitle}
+              Now airing: {contextTitle}
             </div>
           ) : null}
 
@@ -379,13 +375,13 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             {isCurrentHidden ? (
               <>
                 <span style={{ color: "var(--text-muted)" }}>
-                  Station break
+                  Live
                 </span>
 
                 <span style={{ color: "var(--text-muted)" }}>/</span>
 
                 <span style={{ color: "var(--text-muted)" }}>
-                  Programming continues shortly
+                  Commercial break inside current program
                 </span>
               </>
             ) : (
@@ -450,7 +446,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} Ã¢â‚¬Â¢ {formatLongClock(nextDuration)}
+              {getDisplayTypeLabel(nextVisibleItem)} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
