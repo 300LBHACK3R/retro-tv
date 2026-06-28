@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
@@ -79,9 +79,18 @@ function getCleanItemTitle(item: BroadcastItem): string {
   );
 }
 
-function getDisplayNowTitle(item: BroadcastItem): string {
-  if (isHiddenGuideItem(item)) {
-    return "We'll Be Right Back";
+function getDisplayNowTitle(
+  item: BroadcastItem,
+  previousVisibleItem: BroadcastItem | null,
+): string {
+  /*
+    Public TV rule:
+    commercials and bumpers are playback-only.
+    Now Playing should stay on the parent show/movie instead of saying
+    "We'll Be Right Back".
+  */
+  if (isHiddenGuideItem(item) && previousVisibleItem) {
+    return getCleanItemTitle(previousVisibleItem);
   }
 
   return getCleanItemTitle(item);
@@ -89,7 +98,7 @@ function getDisplayNowTitle(item: BroadcastItem): string {
 
 function getDisplayTypeLabel(item: BroadcastItem): string {
   if (isHiddenGuideItem(item)) {
-    return "STATION BREAK";
+    return "PROGRAM";
   }
 
   if (item.type === "movie") return "MOVIE";
@@ -165,20 +174,6 @@ function getBreakModeLabel(channel: Channel): string {
   if (mode === "classic-tv") return "Classic TV";
 
   return cleanDisplayText(String(mode));
-}
-
-function getNowContextTitle({
-  currentItem,
-  previousVisibleItem,
-}: {
-  currentItem: BroadcastItem;
-  previousVisibleItem: BroadcastItem | null;
-}): string {
-  if (isHiddenGuideItem(currentItem) && previousVisibleItem) {
-    return getCleanItemTitle(previousVisibleItem);
-  }
-
-  return getCleanItemTitle(currentItem);
 }
 
 function EmptyNowNextState({
@@ -264,18 +259,20 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     );
   }
 
-  const currentDuration = getSafeDuration(live.item);
-  const currentElapsed = Math.min(Math.max(0, live.elapsed), currentDuration || live.elapsed);
-  const currentRemaining = Math.max(0, live.remaining);
-
   const isCurrentHidden = isHiddenGuideItem(live.item);
-  const nowTitle = getDisplayNowTitle(live.item);
-  const contextTitle = getNowContextTitle({
-    currentItem: live.item,
-    previousVisibleItem,
-  });
+  const publicCurrentItem =
+    isCurrentHidden && previousVisibleItem ? previousVisibleItem : live.item;
 
-  const progressPercent = getProgressPercent(currentElapsed, currentDuration);
+  const currentDuration = getSafeDuration(publicCurrentItem);
+  const currentElapsed = isCurrentHidden
+    ? 0
+    : Math.min(Math.max(0, live.elapsed), currentDuration || live.elapsed);
+
+  const nowTitle = getDisplayNowTitle(live.item, previousVisibleItem);
+  const progressPercent = isCurrentHidden
+    ? 100
+    : getProgressPercent(currentElapsed, currentDuration);
+
   const channelMode = getScheduleModeLabel(channel);
   const breakMode = getBreakModeLabel(channel);
 
@@ -343,9 +340,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
           style={{
             background:
               "linear-gradient(135deg, rgba(255,255,255,0.045), transparent 45%), var(--panel-alt-bg)",
-            borderColor: isCurrentHidden
-              ? "rgba(250, 204, 21, 0.35)"
-              : "var(--border)",
+            borderColor: "var(--border)",
           }}
         >
           <div
@@ -353,66 +348,35 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
             style={{ color: "var(--text-muted)" }}
           >
             <span>Now Playing</span>
-
-            {isCurrentHidden ? (
-              <span style={{ color: "#fde68a" }}>Station Break</span>
-            ) : (
-              <span style={{ color: "var(--primary)" }}>Live</span>
-            )}
+            <span style={{ color: "var(--primary)" }}>Live</span>
           </div>
 
           <div className="mt-1 truncate text-lg font-black" title={nowTitle}>
             {nowTitle}
           </div>
 
-          {isCurrentHidden && contextTitle ? (
-            <div
-              className="mt-1 truncate text-xs"
-              style={{ color: "var(--text-muted)" }}
-              title={contextTitle}
-            >
-              Continuing shortly: {contextTitle}
-            </div>
-          ) : null}
-
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             {isCurrentHidden ? (
               <>
                 <span style={{ color: "var(--text-muted)" }}>
-                  Station break
+                  {getDisplayTypeLabel(publicCurrentItem)}
                 </span>
 
                 <span style={{ color: "var(--text-muted)" }}>/</span>
 
                 <span style={{ color: "var(--text-muted)" }}>
-                  Programming continues shortly
+                  Live programming continues
                 </span>
               </>
             ) : (
-              <>
-                <span style={{ color: "var(--text-muted)" }}>
-                  {formatClock(currentElapsed)} / {formatClock(currentDuration)}
-                </span>
-
-                <span style={{ color: "var(--text-muted)" }}>/</span>
-
-                <span style={{ color: "var(--text-muted)" }}>
-                  {formatLongClock(currentRemaining)} left
-                </span>
-
-                {live.item.segmentLabel ? (
-                  <>
-                    <span style={{ color: "var(--text-muted)" }}>/</span>
-                    <span style={{ color: "var(--text-muted)" }}>
-                      ""
-                    </span>
-                  </>
-                ) : null}
-              </>
+              <span style={{ color: "var(--text-muted)" }}>
+                {formatClock(currentElapsed)} / {formatClock(currentDuration)}
+              </span>
             )}
           </div>
 
-          <div className="mt-3 h-2 overflow-hidden rounded-full"
+          <div
+            className="mt-3 h-2 overflow-hidden rounded-full"
             style={{ background: "var(--button-bg)" }}
             aria-hidden="true"
           >
@@ -420,9 +384,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
               className="h-full rounded-full transition-[width] duration-500"
               style={{
                 width: `${progressPercent}%`,
-                background: isCurrentHidden
-                  ? "linear-gradient(90deg, rgba(255,255,255,0.45), var(--primary))"
-                  : "var(--primary)",
+                background: "var(--primary)",
                 boxShadow:
                   "0 0 18px color-mix(in srgb, var(--primary) 45%, transparent)",
               }}
@@ -450,7 +412,8 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)}{" / "}{formatLongClock(nextDuration)}
+              {getDisplayTypeLabel(nextVisibleItem)}{" / "}
+              {formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
