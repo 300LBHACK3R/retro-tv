@@ -80,16 +80,16 @@ function getCleanItemTitle(item: BroadcastItem): string {
 }
 
 function getDisplayNowTitle(item: BroadcastItem): string {
-  if (isHiddenGuideItem(item)) {
-    return "We'll Be Right Back";
-  }
-
+  /*
+    Normal TV behavior:
+    commercials/bumpers are playback segments inside the parent program.
+    Public Now Playing keeps the parent show/movie title through sourceTitle.
+  */
   return getCleanItemTitle(item);
 }
-
 function getDisplayTypeLabel(item: BroadcastItem): string {
   if (isHiddenGuideItem(item)) {
-    return "STATION BREAK";
+    return "PROGRAM";
   }
 
   if (item.type === "movie") return "MOVIE";
@@ -100,11 +100,15 @@ function getDisplayTypeLabel(item: BroadcastItem): string {
 
   return "COMMERCIAL";
 }
+function isPublicNowNextItem(
+  item: BroadcastItem | undefined,
+): item is BroadcastItem {
+  if (!item) {
+    return false;
+  }
 
-function isPublicNowNextItem(item: BroadcastItem | undefined): item is BroadcastItem {
-  return Boolean(item && item.file && getSafeDuration(item) > 0 && !isHiddenGuideItem(item));
+  return !isHiddenGuideItem(item);
 }
-
 function getNextVisibleItem(
   schedule: BroadcastItem[],
   currentIndex: number,
@@ -446,7 +450,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
           {nextVisibleItem ? (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {formatLongClock(nextDuration)}
+              {getDisplayTypeLabel(nextVisibleItem)} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {formatLongClock(nextDuration)}
             </div>
           ) : (
             <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
