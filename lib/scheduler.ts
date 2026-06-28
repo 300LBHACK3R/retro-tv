@@ -889,7 +889,14 @@ function buildProgramBlock(
     );
   }
 
-  return schedule.length > 0 ? schedule : [item];
+  const finalBlockDuration = getScheduleDurationForItems(schedule);
+
+  return schedule.length > 0
+    ? schedule.map((scheduleItem) => ({
+        ...scheduleItem,
+        guideDuration: finalBlockDuration,
+      }))
+    : [item];
 }
 
 function buildMusicBreak(

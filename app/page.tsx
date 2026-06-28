@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Image from "next/image";
@@ -233,7 +233,7 @@ export default function Home() {
           media: channelMedia,
         };
       }),
-    [enabledChannels, media],
+    [availableAds, enabledChannels, media],
   );
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;

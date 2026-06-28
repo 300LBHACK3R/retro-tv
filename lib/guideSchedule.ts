@@ -88,16 +88,16 @@ function canMergeVisibleItems(
 }
 
 /**
- * Converts the real playback schedule into a public TV guide schedule.
+ * Converts the real playback schedule into public TV guide listings.
  *
- * Playback can be:
+ * Playback:
  *   show segment
  *   hidden commercials
  *   show segment
  *   hidden filler commercials
  *
- * Public guide becomes:
- *   one clean show listing with the full broadcast block duration
+ * Guide:
+ *   one clean show listing with the full TV block duration
  */
 export function buildGuideSchedule(schedule: BroadcastItem[]): BroadcastItem[] {
   const guide: BroadcastItem[] = [];
