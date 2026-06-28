@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 const helpSections = [
   {
@@ -62,7 +62,7 @@ export default function HelpPage() {
               <ul>
                 {section.items.map((item) => (
                   <li key={item}>
-                    <span aria-hidden="true">/</span>
+                    <span aria-hidden="true">•</span>
                     {item}
                   </li>
                 ))}
