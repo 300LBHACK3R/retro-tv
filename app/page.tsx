@@ -75,6 +75,20 @@ function createThemeVars(theme: ReturnType<typeof getThemeById>): CSSProperties 
   } as CSSProperties;
 }
 
+function getSharedScheduleAnchor(): Date {
+  /*
+    One source of truth for all schedule generation on this page.
+
+    Important:
+    The player schedule and guide schedule must be built with the same
+    date/time anchor. Otherwise Daily Random channels can produce one
+    order for Now Playing and another order for the guide.
+  */
+  const anchor = new Date();
+  anchor.setHours(12, 0, 0, 0);
+  return anchor;
+}
+
 function sortChannelsByNumber(channels: Channel[]): Channel[] {
   return [...channels].sort((a, b) => {
     const aNumber = Number(a.number ?? a.id);
@@ -209,13 +223,15 @@ export default function Home() {
     [media],
   );
 
+  const scheduleAnchor = useMemo(() => getSharedScheduleAnchor(), []);
+
   const activeSchedule = useMemo(
     () =>
       buildSchedule(activeChannelMedia, {
         channel: activeChannel,
         availableAds,
       }),
-    [activeChannel, activeChannelMedia, availableAds],
+    [activeChannel, activeChannelMedia, availableAds, scheduleAnchor],
   );
 
   const channelSchedules = useMemo(
@@ -234,7 +250,7 @@ export default function Home() {
           availableAds,
         };
       }),
-    [availableAds, enabledChannels, media],
+    [availableAds, enabledChannels, media, scheduleAnchor],
   );
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
