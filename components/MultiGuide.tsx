@@ -493,16 +493,40 @@ function buildDisplayCellsForWindow(
   }
 
   const cells: GuideCell[] = [];
-  const startPosition = findSchedulePosition(schedule, windowStartBroadcastSeconds);
+  const startPosition = findSchedulePosition(
+    schedule,
+    windowStartBroadcastSeconds,
+  );
 
   let scheduleIndex = startPosition.index;
   let offsetInsideItem = startPosition.offsetInsideItem;
   let cursor = 0;
-
   let lastVisibleItem = startPosition.previousVisibleItem;
-  let lastVisibleCapEndSec = 0;
 
-  while (cursor < windowDurationSeconds) {
+  /*
+    This is the public end of the current airing, not the end of every
+    continuation segment. It prevents one repeating program from becoming
+    a 72-hour guide cell.
+  */
+  let currentAiringCapEndSec = lastVisibleItem
+    ? Math.min(
+        windowDurationSeconds,
+        getGuideDurationSeconds(lastVisibleItem),
+      )
+    : 0;
+
+  const maxBuildSteps = getMaxBuildSteps(
+    schedule,
+    totalDuration,
+    windowDurationSeconds,
+  );
+
+  let buildSteps = 0;
+
+  while (
+    cursor < windowDurationSeconds &&
+    buildSteps < maxBuildSteps
+  ) {
     const item = schedule[scheduleIndex];
 
     if (!item) {
@@ -510,60 +534,114 @@ function buildDisplayCellsForWindow(
     }
 
     const itemDuration = getItemDuration(item);
-    const remainingInItem = Math.max(1, itemDuration - offsetInsideItem);
-    const segmentDuration = Math.min(remainingInItem, windowDurationSeconds - cursor);
+    const remainingInItem = Math.max(
+      1,
+      itemDuration - offsetInsideItem,
+    );
+
+    const segmentDuration = Math.min(
+      remainingInItem,
+      windowDurationSeconds - cursor,
+    );
 
     const segmentStart = cursor;
     const segmentEnd = cursor + segmentDuration;
 
     if (isGuideVisibleItem(item)) {
-      const visibleItemStart = Math.max(0, segmentStart - offsetInsideItem);
-      const guideCapEnd = Math.max(
-        segmentEnd,
-        visibleItemStart + getGuideDurationSeconds(item),
-      );
-
       const visibleItem = getVisibleGuideItem(item);
+      const previousCell = cells[cells.length - 1];
+
+      /*
+        Merge only continuation segments belonging to the current airing.
+        A sourceStart of zero always creates a new airing/cell.
+      */
       const shouldMergeVisibleSegment =
-        canMergeVisibleGuideSegment(cells[cells.length - 1], visibleItem) ||
-        itemsShareGuideProgram(lastVisibleItem, visibleItem);
+        canMergeVisibleGuideSegment(
+          previousCell,
+          visibleItem,
+        );
+
+      if (!shouldMergeVisibleSegment) {
+        const visibleItemStart = Math.max(
+          0,
+          segmentStart - offsetInsideItem,
+        );
+
+        currentAiringCapEndSec = Math.min(
+          windowDurationSeconds,
+          visibleItemStart +
+            getGuideDurationSeconds(visibleItem),
+        );
+      }
 
       lastVisibleItem = visibleItem;
-      lastVisibleCapEndSec = Math.min(guideCapEnd, windowDurationSeconds);
 
       pushCell(
         cells,
         visibleItem,
         segmentStart,
-        Math.min(segmentEnd, lastVisibleCapEndSec),
+        Math.min(segmentEnd, currentAiringCapEndSec),
         {
           mergeWithPrevious: shouldMergeVisibleSegment,
         },
       );
     } else if (lastVisibleItem) {
-      const nextVisibleItem = findNextVisibleGuideItem(schedule, scheduleIndex);
-      const isInternalHiddenBreak = itemsShareGuideProgram(
-        lastVisibleItem,
-        nextVisibleItem,
+      const nextVisibleItem = findNextVisibleGuideItem(
+        schedule,
+        scheduleIndex,
       );
 
+      const nextSourceStart = Math.max(
+        0,
+        Math.floor(
+          Number(nextVisibleItem?.sourceStart ?? 0),
+        ),
+      );
+
+      /*
+        A hidden item is an internal commercial only when the next visible
+        item continues later in the same source program.
+
+        sourceStart zero means the next airing is beginning, so it must not
+        merge the two separate guide slots.
+      */
+      const isInternalHiddenBreak =
+        itemsShareGuideProgram(
+          lastVisibleItem,
+          nextVisibleItem,
+        ) &&
+        Boolean(nextVisibleItem?.isVirtualSegment) &&
+        nextSourceStart > 0;
+
       const shouldFoldHiddenItem =
-        isInternalHiddenBreak || segmentStart < lastVisibleCapEndSec;
+        isInternalHiddenBreak ||
+        segmentStart < currentAiringCapEndSec;
 
       if (shouldFoldHiddenItem) {
-        const hiddenEnd = isInternalHiddenBreak
-          ? segmentEnd
-          : Math.min(segmentEnd, lastVisibleCapEndSec);
+        const hiddenEnd = Math.min(
+          segmentEnd,
+          currentAiringCapEndSec,
+        );
 
-        pushCell(cells, lastVisibleItem, segmentStart, hiddenEnd, {
-          mergeWithPrevious: true,
-        });
+        if (hiddenEnd > segmentStart) {
+          pushCell(
+            cells,
+            lastVisibleItem,
+            segmentStart,
+            hiddenEnd,
+            {
+              mergeWithPrevious: true,
+            },
+          );
+        }
       }
     }
 
     cursor = segmentEnd;
-    scheduleIndex = (scheduleIndex + 1) % schedule.length;
+    scheduleIndex =
+      (scheduleIndex + 1) % schedule.length;
     offsetInsideItem = 0;
+    buildSteps += 1;
   }
 
   return cells;
@@ -589,17 +667,21 @@ function getScheduleForSlice(
 
 function appendCells(
   target: GuideCell[],
-  source: GuideCell[],
+  sourceCells: GuideCell[],
   offsetSeconds: number,
 ): void {
-  for (const cell of source) {
+  for (const cell of sourceCells) {
     pushCell(
       target,
       cell.item,
       cell.startSec + offsetSeconds,
       cell.endSec + offsetSeconds,
       {
-        mergeWithPrevious: true,
+        /*
+          Never combine the final airing from one day with the first airing
+          from the following day.
+        */
+        mergeWithPrevious: false,
       },
     );
   }
