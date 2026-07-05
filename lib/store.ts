@@ -679,8 +679,8 @@ function normalizeBreakpoints(value: unknown, duration: number): number[] {
         .filter(
           (point) =>
             Number.isFinite(point) &&
-            point >= 60 &&
-            point <= Math.max(0, safeDuration - 60),
+            point > 0 &&
+            point < safeDuration,
         ),
     ),
   ).sort((a, b) => a - b);
@@ -698,30 +698,12 @@ function normalizeDurationList(
     .map((point) => Math.floor(Number(point)))
     .filter((point) => Number.isFinite(point) && point > 0);
 
-  if (values.length === 0) {
-    return [];
-  }
-
   if (typeof expectedLength !== "number") {
     return values;
   }
 
-  const count = Math.max(0, Math.floor(expectedLength));
-
-  if (count === 0) {
-    return values;
-  }
-
-  const fallback = values[values.length - 1];
-
-  if (fallback === undefined) {
-    return [];
-  }
-
-  return Array.from(
-    { length: count },
-    (_, index) => values[index] ?? fallback,
-  );
+  // Preserve exact positional values. Never deduplicate or fill missing entries.
+  return values.slice(0, Math.max(0, Math.floor(expectedLength)));
 }
 
 function normalizeAirDays(value: unknown): Weekday[] {

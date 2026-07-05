@@ -165,30 +165,12 @@ function validDurationList(
     .map((item) => Math.floor(Number(item)))
     .filter((item) => Number.isFinite(item) && item > 0);
 
-  if (values.length === 0) {
-    return [];
-  }
-
   if (typeof expectedLength !== "number") {
     return values;
   }
 
-  const count = Math.max(0, Math.floor(expectedLength));
-
-  if (count === 0) {
-    return values;
-  }
-
-  const fallback = values[values.length - 1];
-
-  if (fallback === undefined) {
-    return [];
-  }
-
-  return Array.from(
-    { length: count },
-    (_, index) => values[index] ?? fallback,
-  );
+  // Preserve exact positional values. Never deduplicate or fill missing entries.
+  return values.slice(0, Math.max(0, Math.floor(expectedLength)));
 }
 
 function validBreakpoints(value: unknown, duration: number): number[] {
@@ -492,8 +474,8 @@ return {
     createdAt: validOptionalString(value.createdAt),
     updatedAt: validOptionalString(value.updatedAt),
 
-    breakpoints: isCommercial ? [] : validBreakpoints(value.breakpoints, duration),
-    breakDurations: isCommercial ? [] : validDurationList(value.breakDurations),
+    breakpoints,
+    breakDurations,
     slotLengthSeconds:
       !isCommercial && slotLengthSeconds && slotLengthSeconds > duration
         ? slotLengthSeconds

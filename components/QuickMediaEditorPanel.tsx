@@ -246,12 +246,12 @@ function getBroadcastSummary({
     `Slot: ${parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}`,
     `Runtime: ${parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"}`,
     `Breaks: ${
-      parsedBreakpoints.length > 0 ? formatBreakpoints(parsedBreakpoints) : "auto"
+      parsedBreakpoints.length > 0 ? formatBreakpoints(parsedBreakpoints) : "none"
     }`,
     `Ad blocks: ${
       parsedBreakDurations.length > 0
         ? formatBreakpoints(parsedBreakDurations)
-        : "auto"
+        : "none"
     }`,
     `Target: ${selectedChannelLabel}`,
   ].join(" • ");
@@ -619,6 +619,23 @@ export default function QuickMediaEditorPanel() {
       parsedSlotLength <= parsedDuration
     ) {
       return "Slot length must be longer than runtime. Example: 30:00.";
+    }
+
+    if (
+      selectedIsBroadcast &&
+      parsedBreakpoints.length !== parsedBreakDurations.length
+    ) {
+      return "Enter exactly one ad block length for each breakpoint.";
+    }
+
+    if (
+      selectedIsBroadcast &&
+      fillSlotWithCommercials &&
+      parsedSlotLength <
+        parsedDuration +
+          parsedBreakDurations.reduce((sum, seconds) => sum + seconds, 0)
+    ) {
+      return "Broadcast slot must fit the runtime plus every saved ad block.";
     }
 
     if (

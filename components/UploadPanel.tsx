@@ -11,6 +11,8 @@ import {
   isLikelyVideoUrl,
   normalizeAirStartTime,
   normalizeUrl,
+  parseBreakpoints,
+  parseDurationList,
   parseManualDuration,
   sanitizeCommercialCategory,
   titleCase,
@@ -21,6 +23,7 @@ import {
   GLOBAL_AD_CHANNEL_TARGET,
   type AdPlacement,
   type Channel,
+  type CommercialStrategy,
   type MediaItem,
   type MediaType,
   type Weekday,
@@ -58,6 +61,10 @@ function isProgramType(type: MediaType): boolean {
 
 function isAdType(type: MediaType): boolean {
   return type === "commercial" || type === "bumper";
+}
+
+function isBroadcastType(type: MediaType): boolean {
+  return type === "show" || type === "movie";
 }
 
 function getTypeLabel(type: MediaType): string {
@@ -131,6 +138,10 @@ function validateUpload({
   enabledChannels,
   type,
   adTargetMode,
+  breakpoints,
+  breakDurations,
+  slotLengthSeconds,
+  fillSlotWithCommercials,
 }: {
   normalizedTitle: string;
   normalizedFile: string;
@@ -139,6 +150,10 @@ function validateUpload({
   enabledChannels: Channel[];
   type: MediaType;
   adTargetMode: AdTargetMode;
+  breakpoints: number[];
+  breakDurations: number[];
+  slotLengthSeconds: number;
+  fillSlotWithCommercials: boolean;
 }): ValidationResult {
   if (!normalizedTitle) {
     return { ok: false, message: "Enter a title first." };
@@ -170,6 +185,37 @@ function validateUpload({
         message: "The selected channel is disabled or no longer exists.",
       };
     }
+  }
+
+  if (isBroadcastType(type) && breakpoints.length !== breakDurations.length) {
+    return {
+      ok: false,
+      message: "Enter exactly one ad block length for each breakpoint.",
+    };
+  }
+
+  if (
+    isBroadcastType(type) &&
+    fillSlotWithCommercials &&
+    slotLengthSeconds <= parsedDurationSeconds
+  ) {
+    return {
+      ok: false,
+      message: "Broadcast slot must be longer than the actual runtime.",
+    };
+  }
+
+  if (
+    isBroadcastType(type) &&
+    fillSlotWithCommercials &&
+    slotLengthSeconds <
+      parsedDurationSeconds +
+        breakDurations.reduce((sum, seconds) => sum + seconds, 0)
+  ) {
+    return {
+      ok: false,
+      message: "Broadcast slot must fit the runtime plus every saved ad block.",
+    };
   }
 
   return { ok: true, message: "Ready to add media." };
@@ -293,6 +339,12 @@ export default function UploadPanel() {
   const [channelId, setChannelId] = useState(currentChannelId);
   const [adTargetMode, setAdTargetMode] = useState<AdTargetMode>("channel");
   const [commercialCategory, setCommercialCategory] = useState("");
+  const [breakpointsInput, setBreakpointsInput] = useState("");
+  const [breakDurationsInput, setBreakDurationsInput] = useState("");
+  const [slotLengthInput, setSlotLengthInput] = useState("");
+  const [fillSlotWithCommercials, setFillSlotWithCommercials] = useState(false);
+  const [commercialStrategy, setCommercialStrategy] =
+    useState<CommercialStrategy>("best-fit");
   const [selectedAirDays, setSelectedAirDays] = useState<Weekday[]>([]);
   const [airStartTime, setAirStartTime] = useState("");
   const [status, setStatus] = useState(DEFAULT_STATUS);
@@ -302,6 +354,21 @@ export default function UploadPanel() {
   const parsedDurationSeconds = useMemo(
     () => parseManualDuration(durationInput, durationMode),
     [durationInput, durationMode],
+  );
+
+  const parsedBreakpoints = useMemo(
+    () => parseBreakpoints(breakpointsInput, parsedDurationSeconds),
+    [breakpointsInput, parsedDurationSeconds],
+  );
+
+  const parsedBreakDurations = useMemo(
+    () => parseDurationList(breakDurationsInput),
+    [breakDurationsInput],
+  );
+
+  const parsedSlotLengthSeconds = useMemo(
+    () => parseManualDuration(slotLengthInput, "seconds"),
+    [slotLengthInput],
   );
 
   const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
@@ -323,6 +390,7 @@ export default function UploadPanel() {
 
   const normalizedTitle = title.trim().replace(/\s+/g, " ");
   const selectedIsAd = isAdType(type);
+  const selectedIsBroadcast = isBroadcastType(type);
 
   const validation = useMemo(
     () =>
@@ -334,14 +402,25 @@ export default function UploadPanel() {
         enabledChannels,
         type,
         adTargetMode,
+        breakpoints: parsedBreakpoints,
+        breakDurations: parsedBreakDurations,
+        slotLengthSeconds: parsedSlotLengthSeconds,
+        fillSlotWithCommercials,
       }),
     [
       adTargetMode,
+      breakpointsInput,
+      breakDurationsInput,
       channelId,
       enabledChannels,
       normalizedFile,
       normalizedTitle,
+      fillSlotWithCommercials,
+      parsedBreakDurations,
+      parsedBreakpoints,
       parsedDurationSeconds,
+      parsedSlotLengthSeconds,
+      slotLengthInput,
       type,
     ],
   );
@@ -443,6 +522,11 @@ export default function UploadPanel() {
     setDurationStatus(DEFAULT_DURATION_STATUS);
     setAdTargetMode("channel");
     setCommercialCategory("");
+    setBreakpointsInput("");
+    setBreakDurationsInput("");
+    setSlotLengthInput("");
+    setFillSlotWithCommercials(false);
+    setCommercialStrategy("best-fit");
     setSelectedAirDays([]);
     setAirStartTime("");
   };
@@ -484,11 +568,15 @@ export default function UploadPanel() {
       title: normalizedTitle,
       type,
       duration: parsedDurationSeconds,
-      breakpoints: [],
-      breakDurations: [],
-      slotLengthSeconds: undefined,
-      fillSlotWithCommercials: false,
-      commercialStrategy: "best-fit",
+      breakpoints: selectedIsBroadcast ? parsedBreakpoints : [],
+      breakDurations: selectedIsBroadcast ? parsedBreakDurations : [],
+      slotLengthSeconds:
+        selectedIsBroadcast && parsedSlotLengthSeconds > parsedDurationSeconds
+          ? parsedSlotLengthSeconds
+          : undefined,
+      fillSlotWithCommercials:
+        selectedIsBroadcast && fillSlotWithCommercials,
+      commercialStrategy,
       allowCommercialSlicing: false,
       commercialCategory: isAd ? sanitizedCategory : undefined,
       airDays: isProgram ? selectedAirDays : [],
@@ -781,6 +869,110 @@ export default function UploadPanel() {
           </div>
         </SectionCard>
 
+        {selectedIsBroadcast ? (
+          <SectionCard
+            eyebrow="Step 3"
+            title="Broadcast Slot and Commercial Logic"
+            description="These values are saved exactly for this item. Nothing is invented from channel defaults."
+          >
+            <div className="grid gap-4 md:grid-cols-3">
+              <FieldLabel label="Broadcast Slot" helper="Leave blank for no fixed slot. Example: 30:00.">
+                <input
+                  value={slotLengthInput}
+                  onChange={(event) =>
+                    setSlotLengthInput(event.target.value.replace(/[^\d:]/g, ""))
+                  }
+                  className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder="30:00"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </FieldLabel>
+
+              <FieldLabel label="Breakpoints" helper="Source positions inside the program, such as 7:00, 14:00.">
+                <input
+                  value={breakpointsInput}
+                  onChange={(event) =>
+                    setBreakpointsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                  }
+                  className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder="7:00, 14:00"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </FieldLabel>
+
+              <FieldLabel label="Ad Block Lengths" helper="One exact length per breakpoint, such as :52, :52.">
+                <input
+                  value={breakDurationsInput}
+                  onChange={(event) =>
+                    setBreakDurationsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                  }
+                  className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder=":52, :52"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </FieldLabel>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label
+                className="flex items-center gap-3 rounded-2xl border p-4 text-sm"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={fillSlotWithCommercials}
+                  onChange={(event) =>
+                    setFillSlotWithCommercials(event.target.checked)
+                  }
+                  className="h-5 w-5"
+                />
+                <span>
+                  <strong className="block">Fill Remaining Slot Time</strong>
+                  <span className="mt-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                    Fill only the remaining time in this item&apos;s saved slot.
+                  </span>
+                </span>
+              </label>
+
+              <FieldLabel label="Commercial Selection Strategy">
+                <select
+                  value={commercialStrategy}
+                  onChange={(event) =>
+                    setCommercialStrategy(
+                      event.target.value as CommercialStrategy,
+                    )
+                  }
+                  className="w-full rounded-2xl border px-4 py-3 text-base sm:text-sm"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                >
+                  <option value="best-fit">Best Fit</option>
+                  <option value="sequential">Sequential</option>
+                  <option value="random">Random</option>
+                </select>
+              </FieldLabel>
+            </div>
+          </SectionCard>
+        ) : null}
+
         {selectedIsAd ? (
           <SectionCard
             eyebrow="Step 3"
@@ -990,6 +1182,34 @@ export default function UploadPanel() {
               value={parsedDurationSeconds > 0 ? formatDurationClock(parsedDurationSeconds) : "Not set"}
               tone={parsedDurationSeconds > 0 ? "good" : "warn"}
             />
+            {selectedIsBroadcast ? (
+              <>
+                <SummaryRow
+                  label="Broadcast Slot"
+                  value={
+                    parsedSlotLengthSeconds > 0
+                      ? formatDurationClock(parsedSlotLengthSeconds)
+                      : "None"
+                  }
+                />
+                <SummaryRow
+                  label="Breaks"
+                  value={
+                    parsedBreakpoints.length > 0
+                      ? parsedBreakpoints.map(formatDurationClock).join(", ")
+                      : "None"
+                  }
+                />
+                <SummaryRow
+                  label="Ad Blocks"
+                  value={
+                    parsedBreakDurations.length > 0
+                      ? parsedBreakDurations.map(formatDurationClock).join(", ")
+                      : "None"
+                  }
+                />
+              </>
+            ) : null}
             <SummaryRow label={selectedIsAd ? "Ad Target" : "Channel"} value={targetSummary} tone={selectedChannel || adTargetMode === "all" ? "good" : "warn"} />
             <SummaryRow
               label={selectedIsAd ? "Campaign Days" : "Air Days"}
@@ -1022,8 +1242,8 @@ export default function UploadPanel() {
               color: "var(--text-muted)",
             }}
           >
-            Use Quick Edit after adding media to configure broadcast slots,
-            breakpoints, commercial fill logic, and more advanced scheduling.
+            Add Media saves these item-specific broadcast settings immediately.
+            Quick Edit can change the same exact values later.
           </div>
         </div>
       </aside>

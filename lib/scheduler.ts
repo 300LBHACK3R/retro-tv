@@ -31,14 +31,12 @@ type CommercialPickContext = {
 type ProgramBlockPlan = {
   slotLengthSeconds: number;
   breakpoints: number[];
-  breakDurationSeconds: number;
+  breakDurations: number[];
   fillEndOfSlot: boolean;
 };
 
 const DAY_SECONDS = 24 * 60 * 60;
-const DEFAULT_BREAK_SECONDS = 2 * 60;
 const DEFAULT_MUSIC_BREAK_SECONDS = 90;
-const MIN_SEGMENT_SECONDS = 90;
 const MAX_RETURNED_SCHEDULE_ITEMS = 4000;
 const MAX_COMMERCIAL_SEGMENTS_PER_BLOCK = 80;
 const MUSIC_VIDEOS_BETWEEN_BREAKS = 4;
@@ -473,7 +471,7 @@ function createAdPool(
   channel: Channel | undefined,
   now: Date,
 ): MediaItem[] {
-  if (!channel || getBreakMode(channel) === "none" || channel.adPolicy?.enabled === false) {
+  if (!channel || channel.adPolicy?.enabled === false) {
     return [];
   }
 
@@ -698,8 +696,8 @@ function normalizeBreakpoints(item: MediaItem): number[] {
         .filter(
           (value) =>
             Number.isFinite(value) &&
-            value >= MIN_SEGMENT_SECONDS &&
-            value <= duration - MIN_SEGMENT_SECONDS,
+            value > 0 &&
+            value < duration,
         ),
     ),
   ).sort((a, b) => a - b);
@@ -715,104 +713,29 @@ function normalizeBreakDurations(
         .filter((value) => Number.isFinite(value) && value > 0)
     : [];
 
-  const fallback =
-    saved[saved.length - 1] ?? DEFAULT_BREAK_SECONDS;
-
-  return Array.from(
-    { length: Math.max(0, count) },
-    (_, index) => saved[index] ?? fallback,
-  );
+  // Ad block lengths are positional. Missing entries stay missing.
+  return saved.slice(0, Math.max(0, count));
 }
 
-function getExplicitSlotLength(item: MediaItem, channel?: Channel): number {
+function getExplicitSlotLength(item: MediaItem): number {
   const duration = getSafeDuration(item);
   const itemSlot = Math.floor(Number(item.slotLengthSeconds));
 
-  if (Number.isFinite(itemSlot) && itemSlot > duration) {
-    return itemSlot;
-  }
-
-  const channelSlot = Math.floor(Number(channel?.defaultSlotLengthSeconds));
-
-  if (Number.isFinite(channelSlot) && channelSlot > duration) {
-    return channelSlot;
-  }
-
-  return 0;
+  return Number.isFinite(itemSlot) && itemSlot > duration ? itemSlot : 0;
 }
 
-function getAutoSlotLength(item: MediaItem): number {
+function getProgramBlockPlan(item: MediaItem): ProgramBlockPlan {
   const duration = getSafeDuration(item);
-
-  if (item.type === "show") {
-    if (duration >= 18 * 60 && duration <= 29 * 60) {
-      return 30 * 60;
-    }
-
-    if (duration >= 38 * 60 && duration <= 52 * 60) {
-      return 60 * 60;
-    }
-  }
-
-  return 0;
-}
-
-function getMovieBreakpoints(item: MediaItem): number[] {
-  const duration = getSafeDuration(item);
-
-  if (duration < 60 * 60) {
-    return [];
-  }
-
-  const count =
-    duration < 105 * 60 ? 2 : duration < 165 * 60 ? 3 : 4;
-
-  return Array.from({ length: count }, (_, index) =>
-    Math.floor(duration * ((index + 1) / (count + 1))),
-  );
-}
-
-function getDefaultProgramBreakpoints(item: MediaItem): number[] {
-  const duration = getSafeDuration(item);
-
-  if (item.type === "movie") {
-    return getMovieBreakpoints(item);
-  }
-
-  if (duration < 20 * 60) {
-    return [];
-  }
-
-  if (duration < 38 * 60) {
-    return [Math.floor(duration * 0.5)];
-  }
-
-  if (duration < 75 * 60) {
-    return [Math.floor(duration * 0.34), Math.floor(duration * 0.67)];
-  }
-
-  const count = Math.min(3, Math.max(2, Math.floor(duration / (45 * 60))));
-
-  return Array.from({ length: count }, (_, index) =>
-    Math.floor(duration * ((index + 1) / (count + 1))),
-  );
-}
-
-function getProgramBlockPlan(item: MediaItem, channel?: Channel): ProgramBlockPlan {
-  const duration = getSafeDuration(item);
-  const explicitSlot = getExplicitSlotLength(item, channel);
-  const autoSlot = explicitSlot > duration ? explicitSlot : getAutoSlotLength(item);
-  const savedBreakpoints = normalizeBreakpoints(item);
-  const breakpoints =
-    savedBreakpoints.length > 0 ? savedBreakpoints : getDefaultProgramBreakpoints(item);
+  const explicitSlot = getExplicitSlotLength(item);
+  const breakpoints = normalizeBreakpoints(item);
 
   return {
-    slotLengthSeconds: autoSlot > duration ? autoSlot : 0,
+    slotLengthSeconds: explicitSlot > duration ? explicitSlot : 0,
     breakpoints,
-    breakDurationSeconds: DEFAULT_BREAK_SECONDS,
-    fillEndOfSlot:
-      autoSlot > duration ||
-      Boolean(item.fillSlotWithCommercials && explicitSlot > duration),
+    breakDurations: normalizeBreakDurations(item, breakpoints.length),
+    fillEndOfSlot: Boolean(
+      item.fillSlotWithCommercials && explicitSlot > duration,
+    ),
   };
 }
 
@@ -823,23 +746,22 @@ function buildProgramBlock(
   now: Date,
   cursor: CommercialCursor,
 ): BroadcastItem[] {
-  if (!isShowOrMovie(item) || getBreakMode(channel) === "none" || ads.length === 0) {
+  if (!isShowOrMovie(item)) {
     return [item];
   }
 
-  const plan = getProgramBlockPlan(item, channel);
+  const plan = getProgramBlockPlan(item);
   const duration = getSafeDuration(item);
-  const breakpoints = plan.breakpoints.filter(
-    (point) => point >= MIN_SEGMENT_SECONDS && point <= duration - MIN_SEGMENT_SECONDS,
+  const hasManualBreaks = plan.breakpoints.some(
+    (_, index) => (plan.breakDurations[index] ?? 0) > 0,
   );
 
-  if (breakpoints.length === 0 && !plan.fillEndOfSlot) {
+  if ((!hasManualBreaks && !plan.fillEndOfSlot) || ads.length === 0) {
     return [item];
   }
 
   const strategy = getCommercialStrategy(item, channel);
-  const savedBreakDurations = normalizeBreakDurations(item, breakpoints.length);
-  const points = [0, ...breakpoints, duration];
+  const points = [0, ...plan.breakpoints, duration];
   const schedule: BroadcastItem[] = [];
 
   for (let index = 0; index < points.length - 1; index += 1) {
@@ -854,27 +776,23 @@ function buildProgramBlock(
     const isLastSegment = index === points.length - 2;
 
     schedule.push(
-      createProgramSegment(
-        item,
-        start,
-        segmentDuration,
-        points.length <= 3 ? `Part ${index + 1}` : `Act ${index + 1}`,
-      ),
+      createProgramSegment(item, start, segmentDuration, `Segment ${index + 1}`),
     );
 
     if (!isLastSegment) {
-      const requestedBreakDuration =
-        savedBreakDurations[index] ?? plan.breakDurationSeconds;
+      const requestedBreakDuration = plan.breakDurations[index] ?? 0;
 
-      schedule.push(
-        ...fillCommercialDuration(
-          ads,
-          requestedBreakDuration,
-          cursor,
-          strategy,
-          createCommercialContext(channel, now, "mid-roll"),
-        ),
-      );
+      if (requestedBreakDuration > 0) {
+        schedule.push(
+          ...fillCommercialDuration(
+            ads,
+            requestedBreakDuration,
+            cursor,
+            strategy,
+            createCommercialContext(channel, now, "mid-roll"),
+          ),
+        );
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   CommercialStrategy,
   MediaItem,
   MediaType,
@@ -242,7 +242,14 @@ export function formatDurationClock(seconds: number): string {
 }
 
 function parseClockDuration(value: string): number {
-  const rawParts = value.split(":").map((part) => part.trim());
+  let clean = value.trim();
+
+  // Allow seconds-only clock shorthand such as :52.
+  if (/^:\d{1,2}$/.test(clean)) {
+    clean = `0${clean}`;
+  }
+
+  const rawParts = clean.split(":").map((part) => part.trim());
 
   if (rawParts.some((part) => part === "")) {
     return 0;
@@ -320,7 +327,7 @@ export function parseBreakpoints(value: string, mediaDuration?: number): number[
   return Array.from(
     new Set(
       parseDurationList(value).filter(
-        (seconds) => seconds >= 60 && seconds <= Math.max(0, maxDuration - 60),
+        (seconds) => seconds > 0 && seconds < maxDuration,
       ),
     ),
   ).sort((a, b) => a - b);
@@ -479,11 +486,12 @@ function getCleanBreakpoints(
   duration: number,
 ): number[] {
   const cleanBreakpoints = normalizeSecondList(breakpoints);
+  const safeDuration = Math.max(1, Math.floor(Number(duration) || 1));
 
   return Array.from(
     new Set(
       cleanBreakpoints.filter(
-        (seconds) => seconds >= 60 && seconds <= Math.max(0, duration - 60),
+        (seconds) => seconds > 0 && seconds < safeDuration,
       ),
     ),
   ).sort((a, b) => a - b);
@@ -493,23 +501,12 @@ function getCleanBreakDurations(
   breakDurations: number[] | undefined,
   breakpointCount: number,
 ): number[] {
-  const cleanDurations = normalizeSecondList(breakDurations);
-
-  if (breakpointCount <= 0 || cleanDurations.length === 0) {
+  if (breakpointCount <= 0) {
     return [];
   }
 
-  const fallback =
-    cleanDurations[cleanDurations.length - 1];
-
-  if (fallback === undefined) {
-    return [];
-  }
-
-  return Array.from(
-    { length: breakpointCount },
-    (_, index) => cleanDurations[index] ?? fallback,
-  );
+  // Ad block lengths are positional. Preserve duplicates and never invent values.
+  return normalizeSecondList(breakDurations).slice(0, breakpointCount);
 }
 
 export function createMediaItemFromUrl({
