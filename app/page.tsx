@@ -10,6 +10,7 @@ import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaPreloader from "@/components/MediaPreloader";
 import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
+import OpenAdminWindowButton from "@/components/OpenAdminWindowButton";
 import Player from "@/components/Player";
 import QuickTuneBar from "@/components/QuickTuneBar";
 import Remote from "@/components/Remote";
@@ -383,6 +384,7 @@ export default function Home() {
 
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
+            <OpenAdminWindowButton />
 <div className="fixed bottom-5 left-5 z-40">
   <a
     href="/library"
