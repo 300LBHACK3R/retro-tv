@@ -686,20 +686,65 @@ function normalizeBreakpoints(value: unknown, duration: number): number[] {
   ).sort((a, b) => a - b);
 }
 
-function normalizeDurationList(value: unknown, expectedLength?: number): number[] {
-  if (!Array.isArray(value)) return [];
+function normalizeDurationList(
+  value: unknown,
+  expectedLength?: number,
+): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
+  /*
+    Break durations are positional values.
+
+    Important:
+    - Duplicate lengths must be preserved.
+    - One entered duration applies to every saved breakpoint.
+    - A duration may remain saved before breakpoints are configured.
+    - Missing later values repeat the last entered value.
+  */
   const values = value
     .map((point) => Math.floor(Number(point)))
     .filter((point) => Number.isFinite(point) && point > 0);
 
-  const deduped = Array.from(new Set(values));
-
-  if (typeof expectedLength === "number") {
-    return deduped.slice(0, Math.max(0, expectedLength));
+  if (values.length === 0) {
+    return [];
   }
 
-  return deduped;
+  if (typeof expectedLength !== "number") {
+    return values;
+  }
+
+  const count = Math.max(0, Math.floor(expectedLength));
+
+  /*
+    Preserve the entered value even when there are no manual breakpoints yet.
+    The scheduler will simply ignore it until a breakpoint is configured.
+  */
+  if (count === 0) {
+    return values;
+  }
+
+  const firstValue = values[0];
+
+  if (firstValue === undefined) {
+    return [];
+  }
+
+  /*
+    Entering one value such as 2:00 means every manual break should use
+    a two-minute commercial block.
+  */
+  if (values.length === 1) {
+    return Array.from({ length: count }, () => firstValue);
+  }
+
+  const lastValue = values[values.length - 1] ?? firstValue;
+
+  return Array.from(
+    { length: count },
+    (_, index) => values[index] ?? lastValue,
+  );
 }
 
 function normalizeAirDays(value: unknown): Weekday[] {
