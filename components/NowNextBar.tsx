@@ -153,6 +153,160 @@ function getPreviousVisibleItem(
   return null;
 }
 
+
+function getPlaybackDuration(
+  item: BroadcastItem | null | undefined,
+): number {
+  if (!item) {
+    return 0;
+  }
+
+  const duration = Math.floor(Number(item.duration));
+
+  return Number.isFinite(duration) && duration > 0
+    ? duration
+    : 0;
+}
+
+function getPublicProgramKey(item: BroadcastItem): string {
+  return (
+    item.parentMediaId?.trim() ||
+    item.sourceTitle?.trim() ||
+    item.id
+  );
+}
+
+function getPreviousPublicIndex(
+  schedule: BroadcastItem[],
+  fromIndex: number,
+): number {
+  if (schedule.length === 0 || fromIndex < 0) {
+    return -1;
+  }
+
+  for (let offset = 1; offset <= schedule.length; offset += 1) {
+    const index =
+      (fromIndex - offset + schedule.length) % schedule.length;
+
+    const candidate = schedule[index];
+
+    if (isPublicNowNextItem(candidate)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function getPublicBlockStartIndex(
+  schedule: BroadcastItem[],
+  contextIndex: number,
+): number {
+  const contextItem = schedule[contextIndex];
+
+  if (!contextItem) {
+    return contextIndex;
+  }
+
+  const contextKey = getPublicProgramKey(contextItem);
+  let startIndex = contextIndex;
+  let scanIndex = contextIndex;
+
+  for (let guard = 0; guard < schedule.length; guard += 1) {
+    const previousIndex = getPreviousPublicIndex(
+      schedule,
+      scanIndex,
+    );
+
+    if (
+      previousIndex < 0 ||
+      previousIndex === scanIndex ||
+      previousIndex === contextIndex
+    ) {
+      break;
+    }
+
+    const previousItem = schedule[previousIndex];
+
+    if (
+      !previousItem ||
+      getPublicProgramKey(previousItem) !== contextKey
+    ) {
+      break;
+    }
+
+    startIndex = previousIndex;
+    scanIndex = previousIndex;
+  }
+
+  return startIndex;
+}
+
+function getContinuousSlotElapsed(
+  schedule: BroadcastItem[],
+  currentIndex: number,
+  currentItemElapsed: number,
+): number {
+  if (
+    schedule.length === 0 ||
+    currentIndex < 0 ||
+    currentIndex >= schedule.length
+  ) {
+    return Math.max(0, Math.floor(currentItemElapsed));
+  }
+
+  const currentItem = schedule[currentIndex];
+
+  if (!currentItem) {
+    return Math.max(0, Math.floor(currentItemElapsed));
+  }
+
+  const contextIndex = isHiddenGuideItem(currentItem)
+    ? getPreviousPublicIndex(schedule, currentIndex)
+    : currentIndex;
+
+  if (contextIndex < 0) {
+    return Math.max(0, Math.floor(currentItemElapsed));
+  }
+
+  const contextItem = schedule[contextIndex];
+
+  if (!contextItem) {
+    return Math.max(0, Math.floor(currentItemElapsed));
+  }
+
+  const blockStartIndex = getPublicBlockStartIndex(
+    schedule,
+    contextIndex,
+  );
+
+  let elapsed = 0;
+  let index = blockStartIndex;
+  let guard = 0;
+
+  while (
+    index !== currentIndex &&
+    guard < schedule.length
+  ) {
+    elapsed += getPlaybackDuration(schedule[index]);
+    index = (index + 1) % schedule.length;
+    guard += 1;
+  }
+
+  if (index === currentIndex) {
+    elapsed += Math.max(
+      0,
+      Math.floor(currentItemElapsed),
+    );
+  }
+
+  const slotDuration = getSafeDuration(contextItem);
+
+  return slotDuration > 0
+    ? Math.min(elapsed, slotDuration)
+    : elapsed;
+}
+
 function getProgressPercent(elapsed: number, duration: number): number {
   if (!duration || duration <= 0) {
     return 0;
@@ -264,14 +418,17 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     isCurrentHidden && previousVisibleItem ? previousVisibleItem : live.item;
 
   const currentDuration = getSafeDuration(publicCurrentItem);
-  const currentElapsed = isCurrentHidden
-    ? 0
-    : Math.min(Math.max(0, live.elapsed), currentDuration || live.elapsed);
+  const currentElapsed = getContinuousSlotElapsed(
+    schedule,
+    live.index,
+    live.elapsed,
+  );
 
   const nowTitle = getDisplayNowTitle(live.item, previousVisibleItem);
-  const progressPercent = isCurrentHidden
-    ? 100
-    : getProgressPercent(currentElapsed, currentDuration);
+  const progressPercent = getProgressPercent(
+    currentElapsed,
+    currentDuration,
+  );
 
   const channelMode = getScheduleModeLabel(channel);
   const breakMode = getBreakModeLabel(channel);
