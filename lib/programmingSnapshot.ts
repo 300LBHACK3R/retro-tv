@@ -153,17 +153,41 @@ function validStringArray(value: unknown): string[] {
   );
 }
 
-function validDurationList(value: unknown): number[] {
+function validDurationList(
+  value: unknown,
+  expectedLength?: number,
+): number[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
+  const values = value
+    .map((item) => Math.floor(Number(item)))
+    .filter((item) => Number.isFinite(item) && item > 0);
+
+  if (values.length === 0) {
+    return [];
+  }
+
+  if (typeof expectedLength !== "number") {
+    return values;
+  }
+
+  const count = Math.max(0, Math.floor(expectedLength));
+
+  if (count === 0) {
+    return values;
+  }
+
+  const fallback = values[values.length - 1];
+
+  if (fallback === undefined) {
+    return [];
+  }
+
   return Array.from(
-    new Set(
-      value
-        .map((item) => Math.floor(Number(item)))
-        .filter((item) => Number.isFinite(item) && item > 0),
-    ),
+    { length: count },
+    (_, index) => values[index] ?? fallback,
   );
 }
 
@@ -442,7 +466,18 @@ function sanitizeMediaItem(value: unknown): MediaItem | null {
   const adCategories = validAdCategories(value.adCategories);
   const adPlacements = validAdPlacements(value.adPlacements);
 
-  return {
+  
+  const breakpoints = isCommercial
+    ? []
+    : validBreakpoints(value.breakpoints, duration);
+
+  const breakDurations = isCommercial
+    ? []
+    : validDurationList(
+        value.breakDurations,
+        breakpoints.length,
+      );
+return {
     id,
     title,
     type,

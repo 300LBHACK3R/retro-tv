@@ -495,13 +495,21 @@ function getCleanBreakDurations(
 ): number[] {
   const cleanDurations = normalizeSecondList(breakDurations);
 
-  if (breakpointCount <= 0) {
+  if (breakpointCount <= 0 || cleanDurations.length === 0) {
     return [];
   }
 
-  return Array.from({ length: breakpointCount })
-    .map((_, index) => cleanDurations[index] ?? 0)
-    .filter((seconds) => seconds > 0);
+  const fallback =
+    cleanDurations[cleanDurations.length - 1];
+
+  if (fallback === undefined) {
+    return [];
+  }
+
+  return Array.from(
+    { length: breakpointCount },
+    (_, index) => cleanDurations[index] ?? fallback,
+  );
 }
 
 export function createMediaItemFromUrl({

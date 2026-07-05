@@ -204,42 +204,36 @@ function getPublicBlockStartIndex(
 ): number {
   const contextItem = schedule[contextIndex];
 
-  if (!contextItem) {
+  if (!contextItem || schedule.length === 0) {
     return contextIndex;
   }
 
   const contextKey = getPublicProgramKey(contextItem);
-  let startIndex = contextIndex;
-  let scanIndex = contextIndex;
+  let index = contextIndex;
 
   for (let guard = 0; guard < schedule.length; guard += 1) {
-    const previousIndex = getPreviousPublicIndex(
-      schedule,
-      scanIndex,
-    );
+    const candidate = schedule[index];
 
     if (
-      previousIndex < 0 ||
-      previousIndex === scanIndex ||
-      previousIndex === contextIndex
+      candidate &&
+      isPublicNowNextItem(candidate) &&
+      getPublicProgramKey(candidate) === contextKey
     ) {
-      break;
+      const sourceStart = Math.max(
+        0,
+        Math.floor(Number(candidate.sourceStart ?? 0)),
+      );
+
+      if (sourceStart === 0) {
+        return index;
+      }
     }
 
-    const previousItem = schedule[previousIndex];
-
-    if (
-      !previousItem ||
-      getPublicProgramKey(previousItem) !== contextKey
-    ) {
-      break;
-    }
-
-    startIndex = previousIndex;
-    scanIndex = previousIndex;
+    index =
+      (index - 1 + schedule.length) % schedule.length;
   }
 
-  return startIndex;
+  return contextIndex;
 }
 
 function getContinuousSlotElapsed(

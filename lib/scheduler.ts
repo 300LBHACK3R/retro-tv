@@ -705,16 +705,23 @@ function normalizeBreakpoints(item: MediaItem): number[] {
   ).sort((a, b) => a - b);
 }
 
-function normalizeBreakDurations(item: MediaItem, count: number): number[] {
-  const saved = Array.isArray(item.breakDurations) ? item.breakDurations : [];
+function normalizeBreakDurations(
+  item: MediaItem,
+  count: number,
+): number[] {
+  const saved = Array.isArray(item.breakDurations)
+    ? item.breakDurations
+        .map((value) => Math.floor(Number(value)))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    : [];
 
-  return Array.from({ length: count }, (_, index) => {
-    const value = Math.floor(Number(saved[index]));
+  const fallback =
+    saved[saved.length - 1] ?? DEFAULT_BREAK_SECONDS;
 
-    return Number.isFinite(value) && value > 0
-      ? value
-      : DEFAULT_BREAK_SECONDS;
-  });
+  return Array.from(
+    { length: Math.max(0, count) },
+    (_, index) => saved[index] ?? fallback,
+  );
 }
 
 function getExplicitSlotLength(item: MediaItem, channel?: Channel): number {

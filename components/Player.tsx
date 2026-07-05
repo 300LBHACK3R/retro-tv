@@ -119,6 +119,152 @@ function isBreakItem(item: BroadcastItem): boolean {
   );
 }
 
+function getPublicProgramKey(item: BroadcastItem): string {
+  return (
+    item.parentMediaId?.trim() ||
+    item.sourceTitle?.trim() ||
+    item.id
+  );
+}
+
+function isPublicProgramItem(
+  item: BroadcastItem | undefined,
+): item is BroadcastItem {
+  return Boolean(
+    item &&
+      item.file &&
+      getSafeItemDuration(item) > 0 &&
+      !isBreakItem(item),
+  );
+}
+
+function getPreviousPublicProgramIndex(
+  schedule: BroadcastItem[],
+  fromIndex: number,
+): number {
+  for (let offset = 1; offset <= schedule.length; offset += 1) {
+    const index =
+      (fromIndex - offset + schedule.length) %
+      schedule.length;
+
+    if (isPublicProgramItem(schedule[index])) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function getPublicBlockStartIndex(
+  schedule: BroadcastItem[],
+  contextIndex: number,
+): number {
+  const contextItem = schedule[contextIndex];
+
+  if (!contextItem || schedule.length === 0) {
+    return contextIndex;
+  }
+
+  const contextKey = getPublicProgramKey(contextItem);
+  let index = contextIndex;
+
+  for (let guard = 0; guard < schedule.length; guard += 1) {
+    const candidate = schedule[index];
+
+    if (
+      candidate &&
+      isPublicProgramItem(candidate) &&
+      getPublicProgramKey(candidate) === contextKey
+    ) {
+      const sourceStart = Math.max(
+        0,
+        Math.floor(Number(candidate.sourceStart ?? 0)),
+      );
+
+      if (sourceStart === 0) {
+        return index;
+      }
+    }
+
+    index =
+      (index - 1 + schedule.length) % schedule.length;
+  }
+
+  return contextIndex;
+}
+
+function getPublicPlaybackTimeline(
+  schedule: BroadcastItem[],
+  currentIndex: number,
+  currentItemElapsed: number,
+): {
+  item: BroadcastItem;
+  elapsed: number;
+  duration: number;
+} | null {
+  const currentItem = schedule[currentIndex];
+
+  if (!currentItem) {
+    return null;
+  }
+
+  const contextIndex = isBreakItem(currentItem)
+    ? getPreviousPublicProgramIndex(schedule, currentIndex)
+    : currentIndex;
+
+  const contextItem = schedule[contextIndex];
+
+  if (!contextItem) {
+    return null;
+  }
+
+  const blockStartIndex = getPublicBlockStartIndex(
+    schedule,
+    contextIndex,
+  );
+
+  let elapsed = 0;
+  let index = blockStartIndex;
+  let guard = 0;
+
+  while (
+    index !== currentIndex &&
+    guard < schedule.length
+  ) {
+    const item = schedule[index];
+
+    if (!item) {
+      break;
+    }
+
+    elapsed += getSafeItemDuration(item);
+    index = (index + 1) % schedule.length;
+    guard += 1;
+  }
+
+  if (index === currentIndex) {
+    elapsed += Math.max(
+      0,
+      Math.floor(currentItemElapsed),
+    );
+  }
+
+  const guideDuration = Math.floor(
+    Number(contextItem.guideDuration),
+  );
+
+  const duration =
+    Number.isFinite(guideDuration) && guideDuration > 0
+      ? guideDuration
+      : getSafeItemDuration(contextItem);
+
+  return {
+    item: contextItem,
+    elapsed: Math.min(elapsed, duration),
+    duration,
+  };
+}
+
 function getSafeTargetTime(
   video: HTMLVideoElement,
   item: BroadcastItem,
@@ -1002,8 +1148,23 @@ export default function Player({ schedule }: PlayerProps) {
     );
   }
 
-  const title = getDisplayTitle(live.item);
-  const itemDuration = getSafeItemDuration(live.item);
+  const publicTimeline = getPublicPlaybackTimeline(
+    schedule,
+    live.index,
+    live.elapsed,
+  );
+
+  const publicDisplayItem =
+    publicTimeline?.item ?? live.item;
+
+  const title = getDisplayTitle(publicDisplayItem);
+
+  const itemDuration =
+    publicTimeline?.duration ??
+    getSafeItemDuration(publicDisplayItem);
+
+  const displayElapsed =
+    publicTimeline?.elapsed ?? live.elapsed;
 
   return (
     <div
@@ -1035,11 +1196,11 @@ export default function Player({ schedule }: PlayerProps) {
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
-          {isBreak ? "Commercial Break" : title}
+          {title}
         </div>
 
         <div className="mt-1 text-xs text-white/70">
-          {formatTime(live.elapsed)} / {formatTime(itemDuration)}
+          {formatTime(displayElapsed)} / {formatTime(itemDuration)}
           {live.item.segmentLabel && !isBreak ? ` / $""` : ""}
         </div>
       </div>
