@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
@@ -300,9 +300,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={[
-        "ttv-touch-target shrink-0 scroll-mx-3 rounded-2xl border px-3 py-3 text-left transition",
+        "ttv-touch-target min-w-0 rounded-2xl border px-3 py-3 text-left transition",
         "hover:scale-[1.01] hover:opacity-95",
-        "sm:min-w-[9rem] sm:px-4",
+        "sm:px-4",
       ].join(" ")}
       style={{
         background: active
@@ -749,14 +749,14 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="relative mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="relative mb-4 grid gap-2 sm:grid-cols-3 2xl:grid-cols-6">
           {dashboardStats.map((stat) => (
             <StatCard key={stat.label} stat={stat} />
           ))}
         </div>
 
         <div className="relative">
-          <div className="ttv-no-scrollbar flex snap-x gap-2 overflow-x-auto pb-1">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
             {TABS.map((tab) => (
               <TabButton
                 key={tab.id}

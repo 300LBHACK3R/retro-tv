@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   formatBreakpoints,
   formatDurationClock,
@@ -101,23 +101,17 @@ function sortMedia(media: MediaItem[]): MediaItem[] {
 }
 
 function getChannelLabel(channel: Channel | undefined): string {
-  if (!channel) {
-    return "CH --";
-  }
-
+  if (!channel) return "CH --";
   return `CH ${channel.number ?? channel.id}`;
 }
 
 function getChannelName(channel: Channel | undefined): string {
-  if (!channel) {
-    return "Unknown Channel";
-  }
-
+  if (!channel) return "Unknown Channel";
   return channel.branding?.displayName ?? channel.name;
 }
 
 function getChannelOptionLabel(channel: Channel): string {
-  return `${getChannelLabel(channel)} / ${getChannelName(channel)}`;
+  return `${getChannelLabel(channel)} • ${getChannelName(channel)}`;
 }
 
 function getMediaSearchLabel(item: MediaItem): string {
@@ -162,9 +156,7 @@ function getAssignedProgramChannelIds(
   item: MediaItem | undefined,
   channels: Channel[],
 ): string[] {
-  if (!item) {
-    return [];
-  }
+  if (!item) return [];
 
   return channels
     .filter((channel) => channel.mediaIds.includes(item.id))
@@ -172,9 +164,7 @@ function getAssignedProgramChannelIds(
 }
 
 function normalizeAdChannelIds(item: MediaItem | undefined): string[] {
-  if (!item) {
-    return [];
-  }
+  if (!item) return [];
 
   return Array.from(
     new Set(
@@ -191,13 +181,10 @@ function normalizeAdChannelIds(item: MediaItem | undefined): string[] {
 }
 
 function itemUsesGlobalAdTarget(item: MediaItem | undefined): boolean {
-  if (!item) {
-    return false;
-  }
+  if (!item) return false;
 
   return (item.adChannelIds ?? []).some((target) => {
     const clean = String(target);
-
     return clean === GLOBAL_AD_CHANNEL_TARGET || clean === "all";
   });
 }
@@ -209,9 +196,7 @@ function createChannelSummary({
   item: MediaItem | undefined;
   channels: Channel[];
 }): string {
-  if (!item) {
-    return "No media selected";
-  }
+  if (!item) return "No media selected";
 
   if (isCommercialType(item.type)) {
     if (itemUsesGlobalAdTarget(item)) {
@@ -226,8 +211,7 @@ function createChannelSummary({
 
     return targets
       .map((targetId) => {
-        const channel = channels.find((item) => item.id === targetId);
-
+        const channel = channels.find((channelItem) => channelItem.id === targetId);
         return channel ? getChannelLabel(channel) : `CH ${targetId}`;
       })
       .join(", ");
@@ -235,14 +219,11 @@ function createChannelSummary({
 
   const assigned = getAssignedProgramChannelIds(item, channels);
 
-  if (assigned.length === 0) {
-    return "Not assigned";
-  }
+  if (assigned.length === 0) return "Not assigned";
 
   return assigned
     .map((channelId) => {
-      const channel = channels.find((item) => item.id === channelId);
-
+      const channel = channels.find((channelItem) => channelItem.id === channelId);
       return channel ? getChannelLabel(channel) : `CH ${channelId}`;
     })
     .join(", ");
@@ -262,12 +243,8 @@ function getBroadcastSummary({
   selectedChannelLabel: string;
 }): string {
   return [
-    `Slot: ${
-      parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"
-    }`,
-    `Runtime: ${
-      parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
-    }`,
+    `Slot: ${parsedSlotLength > 0 ? formatDurationClock(parsedSlotLength) : "none"}`,
+    `Runtime: ${parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"}`,
     `Breaks: ${
       parsedBreakpoints.length > 0 ? formatBreakpoints(parsedBreakpoints) : "auto"
     }`,
@@ -278,6 +255,68 @@ function getBroadcastSummary({
     }`,
     `Target: ${selectedChannelLabel}`,
   ].join(" • ");
+}
+
+function SectionCard({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className="rounded-3xl border p-4 sm:p-5"
+      style={{
+        background:
+          "linear-gradient(180deg, color-mix(in srgb, var(--panel-alt-bg) 92%, transparent), var(--panel-bg))",
+        borderColor: "var(--border)",
+        boxShadow: "0 18px 45px rgba(0,0,0,0.16)",
+      }}
+    >
+      <div className="mb-4">
+        <div
+          className="text-[10px] font-black uppercase tracking-[0.18em]"
+          style={{ color: "var(--primary)" }}
+        >
+          {eyebrow}
+        </div>
+        <h3 className="mt-1 text-base font-black tracking-tight">{title}</h3>
+        {description ? (
+          <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FieldLabel({
+  label,
+  helper,
+  children,
+}: {
+  label: string;
+  helper?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="grid min-w-0 gap-1.5">
+      <span className="text-xs font-black">{label}</span>
+      {children}
+      {helper ? (
+        <span className="text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
+          {helper}
+        </span>
+      ) : null}
+    </label>
+  );
 }
 
 function FilterButton({
@@ -293,9 +332,11 @@ function FilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="ttv-touch-target shrink-0 rounded-xl border px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
+      className="ttv-touch-target shrink-0 rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] transition"
       style={{
-        background: active ? "var(--primary)" : "var(--button-bg)",
+        background: active
+          ? "color-mix(in srgb, var(--primary) 20%, var(--panel-bg))"
+          : "var(--button-bg)",
         borderColor: active ? "var(--primary)" : "var(--border)",
         color: "var(--text)",
       }}
@@ -305,21 +346,30 @@ function FilterButton({
   );
 }
 
-function PresetButton({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
+function PresetButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="ttv-action-button ttv-touch-target rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.1em]"
+      className="ttv-action-button ttv-touch-target rounded-xl px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.1em]"
     >
       {label}
     </button>
+  );
+}
+
+function MediaBadge({ type }: { type: MediaType }) {
+  return (
+    <span
+      className="rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em]"
+      style={{
+        background: "var(--panel-bg)",
+        borderColor: "var(--border)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {getMediaTypeLabel(type)}
+    </span>
   );
 }
 
@@ -359,7 +409,7 @@ export default function QuickMediaEditorPanel() {
   const [adChannelIds, setAdChannelIds] = useState<string[]>([]);
 
   const [message, setMessage] = useState(
-    "Select any loaded media item to edit it quickly.",
+    "Select a media item to edit its title, channel, schedule, and commercial behavior.",
   );
 
   const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
@@ -478,18 +528,14 @@ export default function QuickMediaEditorPanel() {
     );
   };
 
-  const clearAirDays = () => {
-    setAirDays([]);
-  };
+  const clearAirDays = () => setAirDays([]);
 
   const toggleAdChannel = (channelId: string) => {
-    setAdChannelIds((current) => {
-      if (current.includes(channelId)) {
-        return current.filter((item) => item !== channelId);
-      }
-
-      return [...current, channelId];
-    });
+    setAdChannelIds((current) =>
+      current.includes(channelId)
+        ? current.filter((item) => item !== channelId)
+        : [...current, channelId],
+    );
   };
 
   const selectAllAdChannels = () => {
@@ -508,7 +554,7 @@ export default function QuickMediaEditorPanel() {
     setBreakDurationsInput("2:00");
     setFillSlotWithCommercials(true);
     setCommercialStrategy("best-fit");
-    setMessage("Applied 30-minute cartoon slot preset.");
+    setMessage("Applied the 30-minute cartoon preset.");
   };
 
   const applySitcomPreset = () => {
@@ -517,7 +563,7 @@ export default function QuickMediaEditorPanel() {
     setBreakDurationsInput("2:00");
     setFillSlotWithCommercials(true);
     setCommercialStrategy("best-fit");
-    setMessage("Applied 30-minute sitcom slot preset.");
+    setMessage("Applied the 30-minute sitcom preset.");
   };
 
   const applyDramaPreset = () => {
@@ -526,7 +572,7 @@ export default function QuickMediaEditorPanel() {
     setBreakDurationsInput("2:00, 2:00");
     setFillSlotWithCommercials(true);
     setCommercialStrategy("best-fit");
-    setMessage("Applied 60-minute drama slot preset.");
+    setMessage("Applied the 60-minute drama preset.");
   };
 
   const clearBroadcastLogic = () => {
@@ -560,23 +606,18 @@ export default function QuickMediaEditorPanel() {
   };
 
   const validate = (): string | null => {
-    if (!selectedMedia) {
-      return "Select a media item first.";
-    }
-
-    if (!title.trim()) {
-      return "Title cannot be blank.";
-    }
-
-    if (parsedDuration <= 0) {
-      return "Duration must be valid. Example: 21:57.";
-    }
-
+    if (!selectedMedia) return "Select a media item first.";
+    if (!title.trim()) return "Title cannot be blank.";
+    if (parsedDuration <= 0) return "Duration must be valid. Example: 21:57.";
     if (!isValidAirTime(airStartTime)) {
-      return "Air time must be HH:mm format, like 16:00.";
+      return "Air time must use HH:mm format, such as 16:00.";
     }
 
-    if (selectedIsBroadcast && fillSlotWithCommercials && parsedSlotLength <= parsedDuration) {
+    if (
+      selectedIsBroadcast &&
+      fillSlotWithCommercials &&
+      parsedSlotLength <= parsedDuration
+    ) {
       return "Slot length must be longer than runtime. Example: 30:00.";
     }
 
@@ -588,7 +629,11 @@ export default function QuickMediaEditorPanel() {
       return "Select a valid enabled channel.";
     }
 
-    if (selectedIsAd && adTargetMode === "channels" && adChannelIds.length === 0) {
+    if (
+      selectedIsAd &&
+      adTargetMode === "channels" &&
+      adChannelIds.length === 0
+    ) {
       return "Choose at least one ad target channel, or select Global.";
     }
 
@@ -624,7 +669,6 @@ export default function QuickMediaEditorPanel() {
       title: cleanTitle,
       type,
       duration: parsedDuration,
-
       breakpoints: isBroadcast ? parsedBreakpoints : [],
       breakDurations: isBroadcast ? parsedBreakDurations : [],
       slotLengthSeconds:
@@ -633,14 +677,12 @@ export default function QuickMediaEditorPanel() {
           : undefined,
       fillSlotWithCommercials: isBroadcast ? fillSlotWithCommercials : false,
       commercialStrategy: isBroadcast || isAd ? commercialStrategy : undefined,
-
       allowCommercialSlicing: isAd ? allowCommercialSlicing : false,
       commercialCategory: isAd ? cleanCategory || "general" : undefined,
       adCategories: isAd ? [cleanCategory || "general"] : undefined,
       adChannelIds: isAd ? adTargets : undefined,
       adPlacements: isAd ? DEFAULT_AD_PLACEMENTS : undefined,
       adDays: isAd ? airDays : undefined,
-
       airDays: isProgram && !isAd ? airDays : [],
       airStartTime: isProgram && !isAd ? normalizedAirStartTime ?? "" : undefined,
     });
@@ -657,12 +699,14 @@ export default function QuickMediaEditorPanel() {
           ? `Saved "${cleanTitle}" as global ad inventory.`
           : `Saved "${cleanTitle}" for ${adTargets.length} channel target(s).`,
       );
-
       return;
     }
 
     channels.forEach((channel) => {
-      if (channel.id !== targetChannelId && channel.mediaIds.includes(selectedMedia.id)) {
+      if (
+        channel.id !== targetChannelId &&
+        channel.mediaIds.includes(selectedMedia.id)
+      ) {
         removeMediaFromChannel(channel.id, selectedMedia.id);
       }
     });
@@ -673,9 +717,23 @@ export default function QuickMediaEditorPanel() {
 
     setMessage(
       `Saved "${cleanTitle}" to ${
-        selectedProgramChannel ? getChannelLabel(selectedProgramChannel) : "selected channel"
+        selectedProgramChannel
+          ? getChannelLabel(selectedProgramChannel)
+          : "the selected channel"
       }.`,
     );
+  };
+
+  const removeFromPlaylists = () => {
+    if (!selectedMedia) return;
+
+    channels.forEach((channel) => {
+      if (channel.mediaIds.includes(selectedMedia.id)) {
+        removeMediaFromChannel(channel.id, selectedMedia.id);
+      }
+    });
+
+    setMessage(`Removed "${selectedMedia.title}" from channel playlists.`);
   };
 
   const broadcastSummary = getBroadcastSummary({
@@ -686,268 +744,387 @@ export default function QuickMediaEditorPanel() {
     selectedChannelLabel: selectedChannelSummary,
   });
 
+  const validationError = selectedMedia ? validate() : null;
+  const messageLooksSuccessful = message.startsWith("Saved");
+
   return (
     <section
-      className="grid gap-4 lg:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.4fr)]"
+      className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(20rem,0.72fr)_minmax(0,1.45fr)]"
       style={{ color: "var(--text)" }}
     >
-      <div className="ttv-glass-panel rounded-2xl p-3 sm:p-4">
+      <aside className="min-w-0 2xl:sticky 2xl:top-4 2xl:self-start">
         <div
-          className="text-xs font-black uppercase tracking-[0.18em]"
-          style={{ color: "var(--primary)" }}
-        >
-          Quick Edit
-        </div>
-
-        <h2 className="mt-1 text-base font-black tracking-tight">
-          Media Library
-        </h2>
-
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="mt-3 w-full rounded-xl border px-3 py-3 text-sm outline-none"
-          placeholder="Search title, URL, type, category..."
+          className="rounded-3xl border p-3 sm:p-4"
           style={{
-            background: "var(--panel-alt-bg)",
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, var(--panel-alt-bg) 94%, transparent), var(--panel-bg))",
             borderColor: "var(--border)",
-            color: "var(--text)",
+            boxShadow: "0 20px 55px rgba(0,0,0,0.2)",
           }}
-        />
-
-        <div className="ttv-no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
-          {MEDIA_FILTERS.map((item) => (
-            <FilterButton
-              key={item.id}
-              label={item.label}
-              active={filter === item.id}
-              onClick={() => setFilter(item.id)}
-            />
-          ))}
-        </div>
-
-        <div className="ttv-no-scrollbar mt-3 max-h-[640px] overflow-y-auto pr-1">
-          <div className="grid gap-2">
-            {filteredMedia.map((item) => {
-              const active = item.id === selectedMediaId;
-              const summary = createChannelSummary({ item, channels });
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedMediaId(item.id)}
-                  className="rounded-2xl border p-3 text-left transition hover:scale-[1.01]"
-                  style={{
-                    background: active ? "var(--primary)" : "var(--panel-alt-bg)",
-                    borderColor: active ? "var(--primary)" : "var(--border)",
-                    color: "var(--text)",
-                  }}
-                >
-                  <div className="line-clamp-2 text-sm font-black">
-                    {item.title}
-                  </div>
-
-                  <div
-                    className="mt-1 text-[11px] uppercase tracking-[0.1em]"
-                    style={{ color: active ? "inherit" : "var(--text-muted)" }}
-                  >
-                    {getMediaTypeLabel(item.type)} / {formatDurationClock(item.duration)}
-                  </div>
-
-                  <div
-                    className="mt-1 text-[11px]"
-                    style={{ color: active ? "inherit" : "var(--text-muted)" }}
-                  >
-                    {summary}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="ttv-glass-panel rounded-2xl p-3 sm:p-4">
-        {!selectedMedia ? (
-          <div
-            className="rounded-2xl border p-4 text-sm"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-            }}
-          >
-            Select a media item to edit shows, commercial targets, runtimes,
-            breakpoints, slots, and air days.
-          </div>
-        ) : (
-          <div className="grid gap-4">
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div
+                className="text-[10px] font-black uppercase tracking-[0.2em]"
+                style={{ color: "var(--primary)" }}
+              >
+                Quick Edit
+              </div>
+              <h2 className="mt-1 text-lg font-black tracking-tight">Media Library</h2>
+            </div>
             <div
-              className="rounded-2xl border p-3 text-sm leading-6"
+              className="rounded-full border px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.12em]"
               style={{
                 background: "var(--panel-alt-bg)",
                 borderColor: "var(--border)",
+                color: "var(--text-muted)",
               }}
             >
-              Editing:{" "}
-              <span className="font-black" style={{ color: "var(--primary)" }}>
-                {selectedMedia.title}
-              </span>{" "}
-              / Current target: {selectedChannelSummary}
+              {filteredMedia.length} shown
             </div>
+          </div>
 
-            <label className="grid gap-1">
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Title
-              </span>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                maxLength={140}
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
+          <div className="relative mt-4">
+            <span
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm"
+              style={{ color: "var(--text-muted)" }}
+            >
+              ⌕
+            </span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full rounded-2xl border py-3 pl-9 pr-3 text-sm outline-none"
+              placeholder="Search title, type, URL, category..."
+              style={{
+                background: "var(--panel-alt-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            />
+          </div>
+
+          <div className="ttv-no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+            {MEDIA_FILTERS.map((item) => (
+              <FilterButton
+                key={item.id}
+                label={item.label}
+                active={filter === item.id}
+                onClick={() => setFilter(item.id)}
               />
-            </label>
+            ))}
+          </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <select
-                value={type}
-                onChange={(event) => handleTypeChange(event.target.value as MediaType)}
-                className="rounded-xl border px-3 py-3 text-base sm:text-sm"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-              >
-                <option value="show">Show</option>
-                <option value="movie">Movie</option>
-                <option value="music">Music</option>
-                <option value="music-video">Music Video</option>
-                <option value="commercial">Commercial</option>
-                <option value="bumper">Bumper</option>
-              </select>
-
-              <input
-                value={durationInput}
-                onChange={(event) =>
-                  setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
-                }
-                className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                placeholder="Duration"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-              />
-
-              {!selectedIsAd ? (
-                <select
-                  value={targetChannelId}
-                  onChange={(event) => setTargetChannelId(event.target.value)}
-                  className="rounded-xl border px-3 py-3 text-base sm:text-sm"
-                  style={{
-                    background: "var(--panel-alt-bg)",
-                    borderColor: "var(--border)",
-                    color: "var(--text)",
-                  }}
-                >
-                  {enabledChannels.map((channel) => (
-                    <option key={channel.id} value={channel.id}>
-                      {getChannelOptionLabel(channel)}
-                    </option>
-                  ))}
-                </select>
-              ) : (
+          <div className="ttv-no-scrollbar mt-3 max-h-[34rem] overflow-y-auto pr-1 2xl:max-h-[calc(100dvh-15rem)]">
+            <div className="grid gap-2">
+              {filteredMedia.length === 0 ? (
                 <div
-                  className="rounded-xl border px-3 py-3 text-sm"
+                  className="rounded-2xl border p-4 text-center text-xs leading-5"
                   style={{
                     background: "var(--panel-alt-bg)",
                     borderColor: "var(--border)",
                     color: "var(--text-muted)",
                   }}
                 >
-                  Ad inventory
+                  No media matches this search and filter.
                 </div>
-              )}
+              ) : null}
+
+              {filteredMedia.map((item) => {
+                const active = item.id === selectedMediaId;
+                const summary = createChannelSummary({ item, channels });
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedMediaId(item.id)}
+                    className="relative overflow-hidden rounded-2xl border p-3 text-left transition hover:translate-x-0.5"
+                    style={{
+                      background: active
+                        ? "color-mix(in srgb, var(--primary) 16%, var(--panel-bg))"
+                        : "var(--panel-alt-bg)",
+                      borderColor: active ? "var(--primary)" : "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {active ? (
+                      <span
+                        className="absolute inset-y-0 left-0 w-1"
+                        style={{ background: "var(--primary)" }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="line-clamp-2 text-sm font-black leading-5">
+                          {item.title}
+                        </div>
+                        <div
+                          className="mt-1 text-[10px] leading-4"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {formatDurationClock(item.duration)} • {summary}
+                        </div>
+                      </div>
+                      <MediaBadge type={item.type} />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+          </div>
+        </div>
+      </aside>
+
+      <div className="min-w-0">
+        {!selectedMedia ? (
+          <div
+            className="flex min-h-[28rem] items-center justify-center rounded-3xl border p-6 text-center"
+            style={{
+              background:
+                "radial-gradient(circle at top, color-mix(in srgb, var(--primary) 10%, transparent), var(--panel-bg) 60%)",
+              borderColor: "var(--border)",
+            }}
+          >
+            <div className="max-w-md">
+              <div className="text-4xl" aria-hidden="true">✦</div>
+              <h2 className="mt-4 text-xl font-black tracking-tight">Select a media item</h2>
+              <p className="mt-2 text-sm leading-6" style={{ color: "var(--text-muted)" }}>
+                Choose an item from the library to edit its title, runtime,
+                channel assignment, broadcast slot, commercial logic, and air schedule.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid min-w-0 gap-4">
+            <header
+              className="relative overflow-hidden rounded-3xl border p-4 sm:p-6"
+              style={{
+                background:
+                  "linear-gradient(135deg, color-mix(in srgb, var(--primary) 13%, var(--panel-bg)), var(--panel-bg) 65%)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full opacity-20 blur-3xl"
+                style={{ background: "var(--primary)" }}
+                aria-hidden="true"
+              />
+
+              <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] font-black uppercase tracking-[0.2em]"
+                    style={{ color: "var(--primary)" }}
+                  >
+                    Editing Media
+                  </div>
+                  <h2 className="mt-1 line-clamp-2 text-xl font-black tracking-tight sm:text-2xl">
+                    {selectedMedia.title}
+                  </h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <MediaBadge type={selectedMedia.type} />
+                    <span
+                      className="rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em]"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {formatDurationClock(selectedMedia.duration)}
+                    </span>
+                    <span
+                      className="rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em]"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {selectedChannelSummary}
+                    </span>
+                  </div>
+                </div>
+
+                <a
+                  href={selectedMedia.file}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ttv-action-button ttv-touch-target inline-flex w-fit items-center justify-center rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em]"
+                >
+                  Open Source
+                </a>
+              </div>
+            </header>
+
+            <SectionCard
+              eyebrow="Basics"
+              title="Identity and Assignment"
+              description="Edit the public title, media type, actual runtime, and channel destination."
+            >
+              <div className="grid gap-4">
+                <FieldLabel label="Display Title">
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                    maxLength={140}
+                    style={{
+                      background: "var(--panel-alt-bg)",
+                      borderColor: title.trim() ? "var(--border)" : "#f87171",
+                      color: "var(--text)",
+                    }}
+                  />
+                </FieldLabel>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.8fr_0.9fr_1.3fr]">
+                  <FieldLabel label="Media Type">
+                    <select
+                      value={type}
+                      onChange={(event) =>
+                        handleTypeChange(event.target.value as MediaType)
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base sm:text-sm"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      <option value="show">Show</option>
+                      <option value="movie">Movie</option>
+                      <option value="music">Music</option>
+                      <option value="music-video">Music Video</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="bumper">Bumper</option>
+                    </select>
+                  </FieldLabel>
+
+                  <FieldLabel label="Actual Runtime" helper="Use MM:SS or HH:MM:SS.">
+                    <input
+                      value={durationInput}
+                      onChange={(event) =>
+                        setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="21:57"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: parsedDuration > 0 ? "var(--border)" : "#f87171",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
+
+                  {!selectedIsAd ? (
+                    <FieldLabel label="Channel Assignment">
+                      <select
+                        value={targetChannelId}
+                        onChange={(event) => setTargetChannelId(event.target.value)}
+                        className="w-full rounded-2xl border px-4 py-3 text-base sm:text-sm"
+                        style={{
+                          background: "var(--panel-alt-bg)",
+                          borderColor: "var(--border)",
+                          color: "var(--text)",
+                        }}
+                      >
+                        {enabledChannels.map((channel) => (
+                          <option key={channel.id} value={channel.id}>
+                            {getChannelOptionLabel(channel)}
+                          </option>
+                        ))}
+                      </select>
+                    </FieldLabel>
+                  ) : (
+                    <div
+                      className="flex items-center rounded-2xl border px-4 py-3 text-sm"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      Ads remain outside normal channel playlists.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </SectionCard>
 
             {selectedIsAd ? (
-              <section
-                className="rounded-2xl border p-3"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                }}
+              <SectionCard
+                eyebrow="Ad Inventory"
+                title="Commercial Targeting"
+                description="Choose whether this ad runs globally or only on selected channels."
               >
-                <div
-                  className="text-xs font-black uppercase tracking-[0.18em]"
-                  style={{ color: "var(--primary)" }}
-                >
-                  Commercial Channel Targets
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <label
-                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                <div className="grid gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdTargetMode("channels")}
+                    className="rounded-2xl border p-4 text-left transition"
                     style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
+                      background:
+                        adTargetMode === "channels"
+                          ? "color-mix(in srgb, var(--primary) 18%, var(--panel-bg))"
+                          : "var(--panel-alt-bg)",
+                      borderColor:
+                        adTargetMode === "channels" ? "var(--primary)" : "var(--border)",
                     }}
                   >
-                    <input
-                      type="radio"
-                      checked={adTargetMode === "channels"}
-                      onChange={() => setAdTargetMode("channels")}
-                      className="h-5 w-5"
-                    />
-                    <span>Selected channels</span>
-                  </label>
+                    <div className="text-sm font-black">Selected Channels</div>
+                    <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                      Target this commercial to specific channels only.
+                    </div>
+                  </button>
 
-                  <label
-                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                  <button
+                    type="button"
+                    onClick={() => setAdTargetMode("global")}
+                    className="rounded-2xl border p-4 text-left transition"
                     style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
+                      background:
+                        adTargetMode === "global"
+                          ? "color-mix(in srgb, var(--primary) 18%, var(--panel-bg))"
+                          : "var(--panel-alt-bg)",
+                      borderColor:
+                        adTargetMode === "global" ? "var(--primary)" : "var(--border)",
                     }}
                   >
-                    <input
-                      type="radio"
-                      checked={adTargetMode === "global"}
-                      onChange={() => setAdTargetMode("global")}
-                      className="h-5 w-5"
-                    />
-                    <span>Global ad</span>
-                  </label>
+                    <div className="text-sm font-black">Global Ad</div>
+                    <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                      Allow this ad on every channel whose policy permits global ads.
+                    </div>
+                  </button>
                 </div>
 
                 {adTargetMode === "channels" ? (
-                  <>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={selectAllAdChannels}
-                        className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-                      >
-                        Select All
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={clearAdChannels}
-                        className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-                      >
-                        Clear
-                      </button>
+                  <div className="mt-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-xs font-black" style={{ color: "var(--text-muted)" }}>
+                        {adChannelIds.length} selected channel(s)
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={selectAllAdChannels}
+                          className="ttv-action-button rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearAdChannels}
+                          className="ttv-action-button rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
+                        >
+                          Clear
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       {enabledChannels.map((channel) => {
                         const active = adChannelIds.includes(channel.id);
 
@@ -956,45 +1133,44 @@ export default function QuickMediaEditorPanel() {
                             key={channel.id}
                             type="button"
                             onClick={() => toggleAdChannel(channel.id)}
-                            className="rounded-xl border p-3 text-left text-xs font-black uppercase tracking-[0.08em]"
+                            className="rounded-2xl border p-3 text-left transition"
                             style={{
                               background: active
-                                ? "var(--primary)"
+                                ? "color-mix(in srgb, var(--primary) 18%, var(--panel-bg))"
                                 : "var(--button-bg)",
-                              borderColor: active
-                                ? "var(--primary)"
-                                : "var(--border)",
+                              borderColor: active ? "var(--primary)" : "var(--border)",
                               color: "var(--text)",
                             }}
                           >
-                            {getChannelLabel(channel)}
-                            <div className="mt-1 line-clamp-1 text-[10px] opacity-80">
+                            <div className="text-xs font-black uppercase tracking-[0.08em]">
+                              {getChannelLabel(channel)}
+                            </div>
+                            <div className="mt-1 line-clamp-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
                               {getChannelName(channel)}
                             </div>
                           </button>
                         );
                       })}
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div
-                    className="mt-3 rounded-2xl border p-3 text-xs leading-5"
+                    className="mt-4 rounded-2xl border p-4 text-xs leading-5"
                     style={{
                       background: "rgba(34,197,94,0.08)",
                       borderColor: "rgba(34,197,94,0.28)",
                       color: "#86efac",
                     }}
                   >
-                    This commercial can run only on channels that allow global
-                    ads in their channel ad policy.
+                    Global inventory is still limited by each channel&apos;s ad policy.
                   </div>
                 )}
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <label
-                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    className="flex items-center gap-3 rounded-2xl border p-4 text-sm"
                     style={{
-                      background: "var(--panel-bg)",
+                      background: "var(--panel-alt-bg)",
                       borderColor: "var(--border)",
                     }}
                   >
@@ -1006,95 +1182,99 @@ export default function QuickMediaEditorPanel() {
                       }
                       className="h-5 w-5"
                     />
-                    <span>Allow slicing for exact ad blocks</span>
+                    <span>
+                      <strong className="block">Allow Commercial Slicing</strong>
+                      <span className="mt-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                        Permit exact-length cuts when filling an ad block.
+                      </span>
+                    </span>
                   </label>
 
-                  <input
-                    value={commercialCategory}
-                    onChange={(event) => setCommercialCategory(event.target.value)}
-                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    placeholder="Category: general, kids, anime..."
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
+                  <FieldLabel label="Commercial Category" helper="Examples: general, kids, anime, gaming.">
+                    <input
+                      value={commercialCategory}
+                      onChange={(event) => setCommercialCategory(event.target.value)}
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="general"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
                 </div>
-              </section>
+              </SectionCard>
             ) : null}
 
             {selectedIsBroadcast ? (
-              <section
-                className="rounded-2xl border p-3"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                }}
+              <SectionCard
+                eyebrow="Broadcast"
+                title="Slot and Commercial Logic"
+                description="Keep actual runtime separate from the public broadcast slot. Presets fill common cable-TV timing quickly."
               >
-                <div
-                  className="text-xs font-black uppercase tracking-[0.18em]"
-                  style={{ color: "var(--primary)" }}
-                >
-                  Broadcast Slot / Commercial Logic
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <input
-                    value={slotLengthInput}
-                    onChange={(event) =>
-                      setSlotLengthInput(event.target.value.replace(/[^\d:]/g, ""))
-                    }
-                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    placeholder="Slot 30:00"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-
-                  <input
-                    value={breakpointsInput}
-                    onChange={(event) =>
-                      setBreakpointsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
-                    }
-                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    placeholder="Breaks 15:00"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-
-                  <input
-                    value={breakDurationsInput}
-                    onChange={(event) =>
-                      setBreakDurationsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
-                    }
-                    className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                    placeholder="Ads 2:00"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  />
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mb-4 flex flex-wrap gap-2">
                   <PresetButton label="30m Cartoon" onClick={applyCartoonPreset} />
                   <PresetButton label="30m Sitcom" onClick={applySitcomPreset} />
                   <PresetButton label="60m Drama" onClick={applyDramaPreset} />
                   <PresetButton label="Clear Logic" onClick={clearBroadcastLogic} />
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FieldLabel label="Broadcast Slot" helper="Example: 30:00 or 60:00.">
+                    <input
+                      value={slotLengthInput}
+                      onChange={(event) =>
+                        setSlotLengthInput(event.target.value.replace(/[^\d:]/g, ""))
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="30:00"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
+
+                  <FieldLabel label="Breakpoints" helper="Comma-separated positions, such as 15:00.">
+                    <input
+                      value={breakpointsInput}
+                      onChange={(event) =>
+                        setBreakpointsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="15:00"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
+
+                  <FieldLabel label="Ad Block Lengths" helper="Comma-separated lengths, such as 2:00.">
+                    <input
+                      value={breakDurationsInput}
+                      onChange={(event) =>
+                        setBreakDurationsInput(event.target.value.replace(/[^\d:,\s]/g, ""))
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="2:00"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <label
-                    className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                    className="flex items-center gap-3 rounded-2xl border p-4 text-sm"
                     style={{
-                      background: "var(--panel-bg)",
+                      background: "var(--panel-alt-bg)",
                       borderColor: "var(--border)",
                     }}
                   >
@@ -1106,64 +1286,91 @@ export default function QuickMediaEditorPanel() {
                       }
                       className="h-5 w-5"
                     />
-                    <span>Fill remaining slot time with commercials</span>
+                    <span>
+                      <strong className="block">Fill Remaining Slot Time</strong>
+                      <span className="mt-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                        Use eligible commercials to complete the broadcast slot.
+                      </span>
+                    </span>
                   </label>
 
-                  <select
-                    value={commercialStrategy}
-                    onChange={(event) =>
-                      setCommercialStrategy(event.target.value as CommercialStrategy)
-                    }
-                    className="rounded-xl border px-3 py-3 text-base sm:text-sm"
-                    style={{
-                      background: "var(--panel-bg)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
-                  >
-                    <option value="best-fit">Best Fit Commercials</option>
-                    <option value="sequential">Sequential Commercials</option>
-                    <option value="random">Random Commercials</option>
-                  </select>
-                </div>
-              </section>
-            ) : null}
-
-            {selectedIsProgram ? (
-              <input
-                value={airStartTime}
-                onChange={(event) =>
-                  setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
-                }
-                className="rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                placeholder="Optional fixed air time 16:00"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor:
-                    airStartTime && !isValidAirTime(airStartTime)
-                      ? "#f87171"
-                      : "var(--border)",
-                  color: "var(--text)",
-                }}
-              />
-            ) : null}
-
-            <section>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  {selectedIsAd ? "Ad Days" : "Air Days"}
+                  <FieldLabel label="Commercial Selection Strategy">
+                    <select
+                      value={commercialStrategy}
+                      onChange={(event) =>
+                        setCommercialStrategy(
+                          event.target.value as CommercialStrategy,
+                        )
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base sm:text-sm"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      <option value="best-fit">Best Fit</option>
+                      <option value="sequential">Sequential</option>
+                      <option value="random">Random</option>
+                    </select>
+                  </FieldLabel>
                 </div>
 
+                <div
+                  className="mt-4 rounded-2xl border p-4 text-xs leading-5"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {broadcastSummary}
+                </div>
+              </SectionCard>
+            ) : null}
+
+            <SectionCard
+              eyebrow="Schedule"
+              title={selectedIsAd ? "Campaign Schedule" : "Air Schedule"}
+              description="No selected days means every day. Fixed air time is optional for normal rotation."
+            >
+              {selectedIsProgram ? (
+                <div className="mb-4 max-w-sm">
+                  <FieldLabel label="Optional Fixed Air Time" helper="Use HH:mm, such as 16:00.">
+                    <input
+                      value={airStartTime}
+                      onChange={(event) =>
+                        setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                      }
+                      className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                      placeholder="16:00"
+                      style={{
+                        background: "var(--panel-alt-bg)",
+                        borderColor:
+                          airStartTime && !isValidAirTime(airStartTime)
+                            ? "#f87171"
+                            : "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </FieldLabel>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs font-black" style={{ color: "var(--text-muted)" }}>
+                  {airDays.length === 0 ? "Every day" : `${airDays.length} selected day(s)`}
+                </div>
                 <button
                   type="button"
                   onClick={clearAirDays}
-                  className="ttv-action-button rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
+                  className="ttv-action-button rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]"
                 >
                   Every Day
                 </button>
               </div>
 
-              <div className="grid grid-cols-7 gap-1">
+              <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
                 {WEEKDAYS.map((day) => {
                   const active = airDays.includes(day.id);
 
@@ -1172,9 +1379,12 @@ export default function QuickMediaEditorPanel() {
                       key={day.id}
                       type="button"
                       onClick={() => toggleAirDay(day.id)}
-                      className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+                      className="ttv-touch-target rounded-2xl border px-2 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition"
                       style={{
-                        background: active ? "var(--primary)" : "var(--button-bg)",
+                        background: active
+                          ? "color-mix(in srgb, var(--primary) 22%, var(--panel-bg))"
+                          : "var(--button-bg)",
+                        borderColor: active ? "var(--primary)" : "var(--border)",
                         color: "var(--text)",
                       }}
                     >
@@ -1183,79 +1393,73 @@ export default function QuickMediaEditorPanel() {
                   );
                 })}
               </div>
-            </section>
+            </SectionCard>
 
             <div
-              className="rounded-2xl border p-3 text-xs leading-5"
+              className="sticky bottom-2 z-20 rounded-3xl border p-3 shadow-2xl backdrop-blur-xl sm:p-4"
               style={{
-                background: "var(--panel-alt-bg)",
-                borderColor: "var(--border)",
-                color: "var(--text-muted)",
+                background: "color-mix(in srgb, var(--panel-bg) 94%, transparent)",
+                borderColor: validationError
+                  ? "rgba(248,113,113,0.42)"
+                  : "color-mix(in srgb, var(--primary) 40%, var(--border))",
               }}
             >
-              {selectedIsAd
-                ? `Runtime: ${
-                    parsedDuration > 0 ? formatDurationClock(parsedDuration) : "invalid"
-                  } / Mode: ${
-                    adTargetMode === "global"
-                      ? "global ad inventory"
-                      : `${adChannelIds.length} selected channel target(s)`
-                  } / Playlist assignment: blocked`
-                : broadcastSummary}
-            </div>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] font-black uppercase tracking-[0.14em]"
+                    style={{
+                      color: validationError
+                        ? "#fca5a5"
+                        : messageLooksSuccessful
+                          ? "#86efac"
+                          : "var(--primary)",
+                    }}
+                  >
+                    {validationError
+                      ? "Action Required"
+                      : messageLooksSuccessful
+                        ? "Saved"
+                        : "Ready to Save"}
+                  </div>
+                  <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                    {validationError ?? message}
+                  </div>
+                </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={saveChanges}
-                className="ttv-touch-target rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.14em] transition hover:scale-[1.01]"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
-                  color: "var(--text)",
-                }}
-              >
-                Save Changes
-              </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {!selectedIsAd ? (
+                    <button
+                      type="button"
+                      onClick={removeFromPlaylists}
+                      className="ttv-touch-target rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em]"
+                      style={{
+                        background: "rgba(127,29,29,0.55)",
+                        borderColor: "rgba(248,113,113,0.35)",
+                        color: "#fecaca",
+                      }}
+                    >
+                      Remove from Playlists
+                    </button>
+                  ) : null}
 
-              {!selectedIsAd ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedMedia) return;
-
-                    channels.forEach((channel) => {
-                      if (channel.mediaIds.includes(selectedMedia.id)) {
-                        removeMediaFromChannel(channel.id, selectedMedia.id);
-                      }
-                    });
-
-                    setMessage(`Removed "${selectedMedia.title}" from playlists.`);
-                  }}
-                  className="ttv-touch-target rounded-xl px-5 py-4 text-sm font-black uppercase tracking-[0.14em]"
-                  style={{
-                    background: "rgba(127,29,29,0.9)",
-                    color: "white",
-                  }}
-                >
-                  Remove From Playlists
-                </button>
-              ) : null}
-            </div>
-
-            {message ? (
-              <div
-                className="rounded-2xl border px-3 py-2 text-xs leading-5"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                }}
-                aria-live="polite"
-              >
-                {message}
+                  <button
+                    type="button"
+                    onClick={saveChanges}
+                    className="ttv-touch-target rounded-2xl px-6 py-3 text-xs font-black uppercase tracking-[0.14em] transition hover:scale-[1.01]"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+                      color: "var(--text)",
+                      boxShadow:
+                        "0 14px 35px color-mix(in srgb, var(--primary) 24%, transparent)",
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
-            ) : null}
+            </div>
           </div>
         )}
       </div>

@@ -35,7 +35,7 @@ type ValidationResult = {
 };
 
 const DEFAULT_STATUS =
-  "Simple mode: add one show, movie, music video, commercial, or bumper. Commercials are channel-targeted by default.";
+  "Add one public R2 or HTTPS video URL. Programs go to a channel playlist; commercials stay in targeted ad inventory.";
 
 const DEFAULT_DURATION_STATUS =
   "Auto-detect will try first. Manual duration always works.";
@@ -75,11 +75,11 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
 
   if (seconds <= 0) {
     return mode === "minutes"
-      ? "Type minutes, like 22.5, or use 22:19."
-      : "Type seconds, like 1339, or use 22:19.";
+      ? "Type minutes, such as 22.5, or use 22:19."
+      : "Type seconds, such as 1339, or use 22:19.";
   }
 
-  return `${formatDuration(seconds)} / ${formatDurationClock(seconds)}`;
+  return `${formatDuration(seconds)} • ${formatDurationClock(seconds)}`;
 }
 
 function sortChannels(channels: Channel[]): Channel[] {
@@ -101,18 +101,12 @@ function sortChannels(channels: Channel[]): Channel[] {
 }
 
 function getChannelLabel(channel: Channel | undefined): string {
-  if (!channel) {
-    return "CH --";
-  }
-
+  if (!channel) return "CH --";
   return `CH ${channel.number ?? channel.id}`;
 }
 
 function getChannelName(channel: Channel | undefined): string {
-  if (!channel) {
-    return "Unknown Channel";
-  }
-
+  if (!channel) return "Unknown Channel";
   return channel.branding?.displayName ?? channel.name;
 }
 
@@ -120,9 +114,7 @@ function getExistingUrlMatch(
   media: MediaItem[],
   normalizedFile: string,
 ): MediaItem | null {
-  if (!normalizedFile) {
-    return null;
-  }
+  if (!normalizedFile) return null;
 
   const normalizedTarget = normalizeUrl(normalizedFile);
 
@@ -149,56 +141,108 @@ function validateUpload({
   adTargetMode: AdTargetMode;
 }): ValidationResult {
   if (!normalizedTitle) {
-    return {
-      ok: false,
-      message: "Enter a title first.",
-    };
+    return { ok: false, message: "Enter a title first." };
   }
 
   if (!normalizedFile) {
-    return {
-      ok: false,
-      message: "Paste a public https:// video URL.",
-    };
+    return { ok: false, message: "Paste a public HTTPS video URL." };
   }
 
   if (!normalizedFile.startsWith("https://")) {
-    return {
-      ok: false,
-      message: "Use a full public https:// video URL.",
-    };
+    return { ok: false, message: "Use a full public https:// video URL." };
   }
 
   if (parsedDurationSeconds <= 0) {
     return {
       ok: false,
-      message: "Enter a valid duration manually or use Auto.",
+      message: "Enter a valid duration manually or use Auto Detect.",
     };
   }
 
   if (isProgramType(type) || adTargetMode === "channel") {
     if (!channelId.trim()) {
-      return {
-        ok: false,
-        message: "Select a channel first.",
-      };
+      return { ok: false, message: "Select a channel first." };
     }
 
     if (!enabledChannels.some((channel) => channel.id === channelId)) {
       return {
         ok: false,
-        message: "Selected channel is not enabled or does not exist.",
+        message: "The selected channel is disabled or no longer exists.",
       };
     }
   }
 
-  return {
-    ok: true,
-    message: "Ready to add media.",
-  };
+  return { ok: true, message: "Ready to add media." };
 }
 
-function SummaryPill({
+function SectionCard({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className="rounded-3xl border p-4 sm:p-5"
+      style={{
+        background:
+          "linear-gradient(180deg, color-mix(in srgb, var(--panel-alt-bg) 92%, transparent), var(--panel-bg))",
+        borderColor: "var(--border)",
+        boxShadow: "0 18px 45px rgba(0,0,0,0.18)",
+      }}
+    >
+      <div className="mb-4">
+        <div
+          className="text-[10px] font-black uppercase tracking-[0.18em]"
+          style={{ color: "var(--primary)" }}
+        >
+          {eyebrow}
+        </div>
+        <h3 className="mt-1 text-base font-black tracking-tight">{title}</h3>
+        {description ? (
+          <p
+            className="mt-1 max-w-3xl text-xs leading-5"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FieldLabel({
+  label,
+  helper,
+  children,
+}: {
+  label: string;
+  helper?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="grid min-w-0 gap-1.5">
+      <span className="text-xs font-black" style={{ color: "var(--text)" }}>
+        {label}
+      </span>
+      {children}
+      {helper ? (
+        <span className="text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
+          {helper}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+function SummaryRow({
   label,
   value,
   tone = "default",
@@ -212,26 +256,22 @@ function SummaryPill({
       ? "#86efac"
       : tone === "warn"
         ? "#fde68a"
-        : "var(--text-muted)";
+        : "var(--text)";
 
   return (
     <div
-      className="rounded-2xl border px-3 py-2"
-      style={{
-        background: "var(--panel-bg)",
-        borderColor: "var(--border)",
-      }}
+      className="flex items-start justify-between gap-4 border-b py-3 last:border-b-0"
+      style={{ borderColor: "color-mix(in srgb, var(--border) 65%, transparent)" }}
     >
-      <div
+      <span
         className="text-[10px] font-black uppercase tracking-[0.14em]"
         style={{ color: "var(--text-muted)" }}
       >
         {label}
-      </div>
-
-      <div className="mt-1 truncate text-xs font-black" style={{ color }}>
+      </span>
+      <span className="max-w-[65%] text-right text-xs font-black" style={{ color }}>
         {value}
-      </div>
+      </span>
     </div>
   );
 }
@@ -246,12 +286,10 @@ export default function UploadPanel() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState("");
   const [type, setType] = useState<MediaType>("show");
-
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
   const [isDetectingDuration, setIsDetectingDuration] = useState(false);
   const [durationStatus, setDurationStatus] = useState(DEFAULT_DURATION_STATUS);
-
   const [channelId, setChannelId] = useState(currentChannelId);
   const [adTargetMode, setAdTargetMode] = useState<AdTargetMode>("channel");
   const [commercialCategory, setCommercialCategory] = useState("");
@@ -353,9 +391,7 @@ export default function UploadPanel() {
       setDurationMode("seconds");
       setDurationInput(String(result.duration));
       setDurationStatus(
-        `Detected ${result.durationLabel} / ${formatDurationClock(
-          result.duration,
-        )}.`,
+        `Detected ${result.durationLabel} • ${formatDurationClock(result.duration)}.`,
       );
     } catch {
       setDurationStatus(
@@ -388,12 +424,14 @@ export default function UploadPanel() {
       setAdTargetMode("channel");
       setAirStartTime("");
       setStatus(
-        `${getTypeLabel(nextType)} selected. It will save as channel-targeted ad inventory.`,
+        `${getTypeLabel(nextType)} selected. It will save as targeted ad inventory.`,
       );
       return;
     }
 
-    setStatus(`${getTypeLabel(nextType)} selected. It will save to the selected channel playlist.`);
+    setStatus(
+      `${getTypeLabel(nextType)} selected. It will save to the selected channel playlist.`,
+    );
   };
 
   const resetFormAfterAdd = () => {
@@ -407,6 +445,11 @@ export default function UploadPanel() {
     setCommercialCategory("");
     setSelectedAirDays([]);
     setAirStartTime("");
+  };
+
+  const resetForm = () => {
+    resetFormAfterAdd();
+    setStatus(DEFAULT_STATUS);
   };
 
   const addItem = () => {
@@ -480,479 +523,510 @@ export default function UploadPanel() {
       : `${getChannelLabel(selectedChannel)} playlist`;
 
     setStatus(
-      `Added "${item.title}" to ${targetLabel} / ${formatDuration(item.duration)}.`,
+      `Added "${item.title}" to ${targetLabel} • ${formatDuration(item.duration)}.`,
     );
 
     resetFormAfterAdd();
   };
 
+  const targetSummary = selectedIsAd
+    ? adTargetMode === "all"
+      ? "All Channels"
+      : `${getChannelLabel(selectedChannel)} • ${getChannelName(selectedChannel)}`
+    : `${getChannelLabel(selectedChannel)} • ${getChannelName(selectedChannel)}`;
+
+  const statusLooksSuccessful =
+    status.startsWith("Added") || status.startsWith("Days cleared");
+
   return (
-    <section
-      className="ttv-glass-panel rounded-2xl p-3 sm:p-4"
-      style={{ color: "var(--text)" }}
-    >
-      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div
-            className="text-xs font-black uppercase tracking-[0.18em]"
-            style={{ color: "var(--primary)" }}
-          >
-            Add Media
-          </div>
-
-          <h2 className="mt-1 text-base font-black tracking-tight">
-            Simple TV Station Uploader
-          </h2>
-
-          <p
-            className="mt-1 max-w-3xl text-xs leading-5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Shows, movies, and music videos go to the selected channel playlist.
-            Commercials and bumpers save as ad inventory for the selected
-            channel. Break timing is handled automatically by the TV scheduler.
-          </p>
-        </div>
-
-        <div
-          className="w-fit rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em]"
+    <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]" style={{ color: "var(--text)" }}>
+      <div className="grid min-w-0 gap-4">
+        <header
+          className="relative overflow-hidden rounded-3xl border p-4 sm:p-6"
           style={{
-            borderColor: validation.ok
-              ? "rgba(34, 197, 94, 0.35)"
-              : "var(--border)",
-            background: validation.ok
-              ? "rgba(34, 197, 94, 0.12)"
-              : "var(--panel-alt-bg)",
-            color: validation.ok ? "#86efac" : "var(--text-muted)",
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--primary) 13%, var(--panel-bg)), var(--panel-bg) 65%)",
+            borderColor: "var(--border)",
           }}
         >
-          {validation.ok ? "Ready" : "Incomplete"}
-        </div>
-      </div>
-
-      <div
-        className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-5"
-        style={{
-          background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <SummaryPill label="Type" value={getTypeLabel(type)} />
-        <SummaryPill
-          label="Runtime"
-          value={
-            parsedDurationSeconds > 0
-              ? formatDurationClock(parsedDurationSeconds)
-              : "Unset"
-          }
-          tone={parsedDurationSeconds > 0 ? "good" : "warn"}
-        />
-        <SummaryPill
-          label={selectedIsAd ? "Ad Target" : "Channel"}
-          value={
-            selectedIsAd && adTargetMode === "all"
-              ? "All Channels"
-              : getChannelLabel(selectedChannel)
-          }
-          tone={selectedChannel || adTargetMode === "all" ? "good" : "warn"}
-        />
-        <SummaryPill
-          label={selectedIsAd ? "Campaign Days" : "Air Days"}
-          value={
-            selectedAirDays.length === 0
-              ? "Every Day"
-              : `${selectedAirDays.length} selected`
-          }
-        />
-        <SummaryPill
-          label="Break Logic"
-          value="Automatic"
-          tone="good"
-        />
-      </div>
-
-      <div className="grid gap-3">
-        <div className="grid gap-3 lg:grid-cols-[1fr_1.25fr]">
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-            placeholder="Title"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: normalizedTitle ? "var(--border)" : "#f87171",
-              color: "var(--text)",
-            }}
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full opacity-20 blur-3xl"
+            style={{ background: "var(--primary)" }}
+            aria-hidden="true"
           />
 
-          <input
-            value={file}
-            onChange={(event) => handleUrlChange(event.target.value)}
-            onBlur={(event) => {
-              if (!durationInput.trim()) {
-                void detectDuration(event.target.value);
-              }
-            }}
-            className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-            placeholder="https://pub-xxxx.r2.dev/video.mp4"
-            spellCheck={false}
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor:
-                normalizedFile && !normalizedFile.startsWith("https://")
-                  ? "#f87171"
-                  : existingUrlMatch
-                    ? "rgba(250, 204, 21, 0.55)"
-                    : "var(--border)",
-              color: "var(--text)",
-            }}
-          />
-        </div>
-
-        {existingUrlMatch ? (
-          <div
-            className="rounded-2xl border px-3 py-2 text-xs leading-5"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "rgba(250, 204, 21, 0.35)",
-              color: "#fde68a",
-            }}
-          >
-            Duplicate warning: this URL is already saved as{" "}
-            <span className="font-black">
-              &quot;{existingUrlMatch.title}&quot;
-            </span>
-            .
-          </div>
-        ) : null}
-
-        {compatibilityWarning ? (
-          <div
-            className="rounded-2xl border px-3 py-2 text-xs leading-5"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "rgba(250, 204, 21, 0.35)",
-              color: "#fde68a",
-            }}
-          >
-            {compatibilityWarning}
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 xl:grid-cols-[0.8fr_1.8fr_1fr]">
-          <select
-            value={type}
-            onChange={(event) => handleTypeChange(event.target.value as MediaType)}
-            className="w-full rounded-xl border px-3 py-3 text-base sm:text-sm"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-              color: "var(--text)",
-            }}
-          >
-            <option value="show">Show</option>
-            <option value="movie">Movie</option>
-            <option value="music">Music</option>
-            <option value="music-video">Music Video</option>
-            <option value="commercial">Commercial</option>
-            <option value="bumper">Bumper</option>
-          </select>
-
-          <div>
-            <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-              <input
-                value={durationInput}
-                onChange={(event) =>
-                  setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
-                }
-                className="min-w-0 rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                placeholder="Duration: 1339, 22.3, or 22:19"
-                inputMode="decimal"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor:
-                    durationInput && parsedDurationSeconds <= 0
-                      ? "#f87171"
-                      : "var(--border)",
-                  color: "var(--text)",
-                }}
-              />
-
-              <select
-                value={durationMode}
-                onChange={(event) =>
-                  setDurationMode(event.target.value as DurationMode)
-                }
-                className="rounded-xl border px-2 py-3 text-sm outline-none"
-                style={{
-                  background: "var(--panel-alt-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div
+                className="text-[10px] font-black uppercase tracking-[0.2em]"
+                style={{ color: "var(--primary)" }}
               >
-                <option value="seconds">sec</option>
-                <option value="minutes">min</option>
-              </select>
-
-              <button
-                type="button"
-                onClick={() => void detectDuration(file)}
-                disabled={isDetectingDuration || !normalizedFile}
-                className="ttv-action-button ttv-touch-target rounded-xl px-3 py-3 text-xs font-black uppercase tracking-[0.1em] disabled:cursor-not-allowed disabled:opacity-50"
+                Media Ingest
+              </div>
+              <h2 className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
+                Add Media to Tate&apos;s TV
+              </h2>
+              <p
+                className="mt-2 max-w-3xl text-xs leading-5 sm:text-sm"
+                style={{ color: "var(--text-muted)" }}
               >
-                {isDetectingDuration ? "..." : "Auto"}
-              </button>
+                Paste a public R2 URL, confirm the title and runtime, choose the
+                content type, then assign it to a channel or targeted ad inventory.
+              </p>
             </div>
 
             <div
-              className="mt-1 text-[11px] leading-5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {durationStatus} / {getDurationHelperText(durationInput, durationMode)}
-            </div>
-          </div>
-
-          <select
-            value={channelId}
-            onChange={(event) => setChannelId(event.target.value)}
-            disabled={selectedIsAd && adTargetMode === "all"}
-            className="w-full rounded-xl border px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor:
-                selectedChannel || (selectedIsAd && adTargetMode === "all")
-                  ? "var(--border)"
-                  : "#f87171",
-              color: "var(--text)",
-            }}
-          >
-            {enabledChannels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {getChannelLabel(channel)} / {getChannelName(channel)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedIsAd ? (
-          <div
-            className="rounded-2xl border p-3"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-            }}
-          >
-            <div
-              className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
-              style={{ color: "var(--primary)" }}
-            >
-              Commercial Targeting
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label
-                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                }}
-              >
-                <input
-                  type="radio"
-                  checked={adTargetMode === "channel"}
-                  onChange={() => setAdTargetMode("channel")}
-                  className="h-5 w-5"
-                />
-                <span>Selected channel only</span>
-              </label>
-
-              <label
-                className="flex items-center gap-3 rounded-xl border p-3 text-sm"
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                }}
-              >
-                <input
-                  type="radio"
-                  checked={adTargetMode === "all"}
-                  onChange={() => setAdTargetMode("all")}
-                  className="h-5 w-5"
-                />
-                <span>All channels</span>
-              </label>
-
-              <input
-                value={commercialCategory}
-                onChange={(event) => setCommercialCategory(event.target.value)}
-                className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-                placeholder="Category: general, kids, anime..."
-                style={{
-                  background: "var(--panel-bg)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-              />
-            </div>
-
-            <div
-              className="mt-2 text-[11px] leading-5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Default: commercials belong to the selected channel. Use All
-              Channels only for Tate&apos;s TV-wide station promos.
-            </div>
-          </div>
-        ) : null}
-
-        {isProgramType(type) ? (
-          <div
-            className="rounded-2xl border p-3"
-            style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: "var(--border)",
-            }}
-          >
-            <label
-              className="mb-1 block text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Optional Fixed Air Time
-            </label>
-
-            <input
-              value={airStartTime}
-              onChange={(event) =>
-                setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
-              }
-              className="w-full rounded-xl border px-3 py-3 text-base outline-none sm:text-sm"
-              placeholder="Optional HH:mm, like 16:00"
+              className="w-fit rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em]"
               style={{
-                background: "var(--panel-bg)",
-                borderColor:
-                  airStartTime && !normalizeAirStartTime(airStartTime)
-                    ? "#f87171"
-                    : "var(--border)",
-                color: "var(--text)",
+                borderColor: validation.ok
+                  ? "rgba(34,197,94,0.38)"
+                  : "var(--border)",
+                background: validation.ok
+                  ? "rgba(34,197,94,0.12)"
+                  : "var(--panel-alt-bg)",
+                color: validation.ok ? "#86efac" : "var(--text-muted)",
               }}
-            />
-
-            <div
-              className="mt-1 text-[11px] leading-5"
-              style={{ color: "var(--text-muted)" }}
             >
-              Leave blank for normal cable rotation.
+              {validation.ok ? "Ready to Add" : "Needs Details"}
             </div>
           </div>
-        ) : null}
+        </header>
 
-        <div>
-          <div
-            className="mb-2 flex items-center justify-between gap-2 text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <span>{selectedIsAd ? "Campaign Days" : "Air Days"}</span>
+        <SectionCard
+          eyebrow="Step 1"
+          title="Source and Identity"
+          description="Use a direct public HTTPS video URL. Tate’s TV stores the URL and streams the media from R2."
+        >
+          <div className="grid gap-4 xl:grid-cols-[minmax(15rem,0.85fr)_minmax(20rem,1.4fr)]">
+            <FieldLabel label="Display Title" helper="Shown in the guide, player, library, and Now/Next display.">
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="w-full rounded-2xl border px-4 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
+                placeholder="Example: Foster's Home S01E01"
+                maxLength={140}
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: normalizedTitle ? "var(--border)" : "#f87171",
+                  color: "var(--text)",
+                }}
+              />
+            </FieldLabel>
 
-            <button
-              type="button"
-              onClick={selectEveryDay}
-              className="ttv-action-button rounded-lg px-3 py-2 text-xs font-black uppercase tracking-[0.1em]"
-            >
-              Every Day
-            </button>
+            <FieldLabel label="Public Video URL" helper="Paste the direct .mp4, .webm, .mov, or compatible public R2 URL.">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                  value={file}
+                  onChange={(event) => handleUrlChange(event.target.value)}
+                  onBlur={(event) => {
+                    if (!durationInput.trim()) {
+                      void detectDuration(event.target.value);
+                    }
+                  }}
+                  className="min-w-0 rounded-2xl border px-4 py-3 text-base outline-none transition focus:ring-2 sm:text-sm"
+                  placeholder="https://pub-xxxx.r2.dev/folder/video.mp4"
+                  spellCheck={false}
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor:
+                      normalizedFile && !normalizedFile.startsWith("https://")
+                        ? "#f87171"
+                        : existingUrlMatch
+                          ? "rgba(250,204,21,0.55)"
+                          : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.open(normalizedFile, "_blank", "noopener,noreferrer")
+                  }
+                  disabled={!normalizedFile.startsWith("https://")}
+                  className="ttv-action-button ttv-touch-target rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Test URL
+                </button>
+              </div>
+            </FieldLabel>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {WEEKDAYS.map((day) => {
-              const active = selectedAirDays.includes(day.id);
-
-              return (
-                <button
-                  key={day.id}
-                  type="button"
-                  onClick={() => toggleAirDay(day.id)}
-                  className="ttv-touch-target rounded-lg px-2 py-3 text-[11px] font-black uppercase tracking-[0.08em]"
+          {existingUrlMatch || compatibilityWarning ? (
+            <div className="mt-4 grid gap-3">
+              {existingUrlMatch ? (
+                <div
+                  className="rounded-2xl border px-4 py-3 text-xs leading-5"
                   style={{
-                    background: active ? "var(--primary)" : "var(--button-bg)",
+                    background: "rgba(250,204,21,0.08)",
+                    borderColor: "rgba(250,204,21,0.35)",
+                    color: "#fde68a",
+                  }}
+                >
+                  Duplicate URL: already saved as <strong>{existingUrlMatch.title}</strong>.
+                </div>
+              ) : null}
+
+              {compatibilityWarning ? (
+                <div
+                  className="rounded-2xl border px-4 py-3 text-xs leading-5"
+                  style={{
+                    background: "rgba(250,204,21,0.08)",
+                    borderColor: "rgba(250,204,21,0.35)",
+                    color: "#fde68a",
+                  }}
+                >
+                  {compatibilityWarning}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Step 2"
+          title="Content Details"
+          description="Choose how the scheduler should treat this media and confirm its actual runtime."
+        >
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[0.75fr_1.25fr_1fr]">
+            <FieldLabel label="Media Type">
+              <select
+                value={type}
+                onChange={(event) => handleTypeChange(event.target.value as MediaType)}
+                className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              >
+                <option value="show">Show</option>
+                <option value="movie">Movie</option>
+                <option value="music">Music</option>
+                <option value="music-video">Music Video</option>
+                <option value="commercial">Commercial</option>
+                <option value="bumper">Bumper</option>
+              </select>
+            </FieldLabel>
+
+            <FieldLabel label="Runtime" helper={`${durationStatus} ${getDurationHelperText(durationInput, durationMode)}`}>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
+                <input
+                  value={durationInput}
+                  onChange={(event) =>
+                    setDurationInput(event.target.value.replace(/[^\d:.]/g, ""))
+                  }
+                  className="min-w-0 rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder="22:19"
+                  inputMode="decimal"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor:
+                      durationInput && parsedDurationSeconds <= 0
+                        ? "#f87171"
+                        : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+
+                <select
+                  value={durationMode}
+                  onChange={(event) =>
+                    setDurationMode(event.target.value as DurationMode)
+                  }
+                  className="rounded-2xl border px-3 py-3 text-sm outline-none"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
                     color: "var(--text)",
                   }}
                 >
-                  {day.label}
-                </button>
-              );
-            })}
-          </div>
+                  <option value="seconds">sec</option>
+                  <option value="minutes">min</option>
+                </select>
 
-          <div
-            className="mt-1 text-[11px] leading-5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            No days selected means every day.
+                <button
+                  type="button"
+                  onClick={() => void detectDuration(file)}
+                  disabled={isDetectingDuration || !normalizedFile}
+                  className="ttv-action-button ttv-touch-target rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.1em] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isDetectingDuration ? "Reading" : "Auto"}
+                </button>
+              </div>
+            </FieldLabel>
+
+            <FieldLabel label={selectedIsAd ? "Primary Target Channel" : "Channel Assignment"}>
+              <select
+                value={channelId}
+                onChange={(event) => setChannelId(event.target.value)}
+                disabled={selectedIsAd && adTargetMode === "all"}
+                className="w-full rounded-2xl border px-4 py-3 text-base disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                style={{
+                  background: "var(--panel-alt-bg)",
+                  borderColor:
+                    selectedChannel || (selectedIsAd && adTargetMode === "all")
+                      ? "var(--border)"
+                      : "#f87171",
+                  color: "var(--text)",
+                }}
+              >
+                {enabledChannels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {getChannelLabel(channel)} • {getChannelName(channel)}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
           </div>
-        </div>
+        </SectionCard>
+
+        {selectedIsAd ? (
+          <SectionCard
+            eyebrow="Step 3"
+            title="Commercial Targeting"
+            description="Commercials remain outside normal playlists and are selected by the scheduler during eligible breaks."
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setAdTargetMode("channel")}
+                className="rounded-2xl border p-4 text-left transition hover:scale-[1.005]"
+                style={{
+                  background:
+                    adTargetMode === "channel"
+                      ? "color-mix(in srgb, var(--primary) 18%, var(--panel-bg))"
+                      : "var(--panel-alt-bg)",
+                  borderColor:
+                    adTargetMode === "channel" ? "var(--primary)" : "var(--border)",
+                }}
+              >
+                <div className="text-sm font-black">Selected Channel</div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                  Run this ad only on {getChannelLabel(selectedChannel)}.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdTargetMode("all")}
+                className="rounded-2xl border p-4 text-left transition hover:scale-[1.005]"
+                style={{
+                  background:
+                    adTargetMode === "all"
+                      ? "color-mix(in srgb, var(--primary) 18%, var(--panel-bg))"
+                      : "var(--panel-alt-bg)",
+                  borderColor:
+                    adTargetMode === "all" ? "var(--primary)" : "var(--border)",
+                }}
+              >
+                <div className="text-sm font-black">All Eligible Channels</div>
+                <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                  Use for Tate&apos;s TV network promos and truly global campaigns.
+                </div>
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <FieldLabel label="Commercial Category" helper="Examples: general, kids, anime, gaming, local-business.">
+                <input
+                  value={commercialCategory}
+                  onChange={(event) => setCommercialCategory(event.target.value)}
+                  className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder="general"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </FieldLabel>
+            </div>
+          </SectionCard>
+        ) : null}
+
+        <SectionCard
+          eyebrow={selectedIsAd ? "Step 4" : "Step 3"}
+          title={selectedIsAd ? "Campaign Schedule" : "Air Schedule"}
+          description="No selected days means every day. Fixed air time is optional for normal cable rotation."
+        >
+          {isProgramType(type) ? (
+            <div className="mb-4 max-w-sm">
+              <FieldLabel label="Optional Fixed Air Time" helper="Use HH:mm, such as 16:00. Leave blank for regular rotation.">
+                <input
+                  value={airStartTime}
+                  onChange={(event) =>
+                    setAirStartTime(event.target.value.replace(/[^\d:]/g, ""))
+                  }
+                  className="w-full rounded-2xl border px-4 py-3 text-base outline-none sm:text-sm"
+                  placeholder="16:00"
+                  style={{
+                    background: "var(--panel-alt-bg)",
+                    borderColor:
+                      airStartTime && !normalizeAirStartTime(airStartTime)
+                        ? "#f87171"
+                        : "var(--border)",
+                    color: "var(--text)",
+                  }}
+                />
+              </FieldLabel>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs font-black" style={{ color: "var(--text-muted)" }}>
+                {selectedIsAd ? "Campaign Days" : "Air Days"}
+              </div>
+              <button
+                type="button"
+                onClick={selectEveryDay}
+                className="ttv-action-button rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em]"
+              >
+                Every Day
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {WEEKDAYS.map((day) => {
+                const active = selectedAirDays.includes(day.id);
+
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => toggleAirDay(day.id)}
+                    className="ttv-touch-target rounded-2xl border px-2 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition"
+                    style={{
+                      background: active
+                        ? "color-mix(in srgb, var(--primary) 22%, var(--panel-bg))"
+                        : "var(--button-bg)",
+                      borderColor: active ? "var(--primary)" : "var(--border)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {day.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </SectionCard>
 
         <div
-          className="rounded-2xl border px-3 py-2 text-xs leading-5"
+          className="sticky bottom-2 z-20 rounded-3xl border p-3 shadow-2xl backdrop-blur-xl sm:p-4"
           style={{
-            background: "var(--panel-alt-bg)",
+            background: "color-mix(in srgb, var(--panel-bg) 94%, transparent)",
             borderColor: validation.ok
-              ? "var(--border)"
-              : "rgba(248, 113, 113, 0.45)",
-            color: validation.ok ? "var(--text-muted)" : "#fecaca",
+              ? "color-mix(in srgb, var(--primary) 45%, var(--border))"
+              : "var(--border)",
           }}
         >
-          {validation.ok
-            ? selectedIsAd
-              ? "Ready to add as channel-targeted commercial inventory."
-              : "Ready to add to the selected channel playlist."
-            : validation.message}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div
+                className="text-[10px] font-black uppercase tracking-[0.14em]"
+                style={{ color: validation.ok ? "#86efac" : "#fca5a5" }}
+              >
+                {validation.ok ? "Ready" : "Action Required"}
+              </div>
+              <div className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                {validation.ok ? "Review the summary, then add the item." : validation.message}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="ttv-action-button ttv-touch-target rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={addItem}
+                disabled={!validation.ok}
+                className="ttv-touch-target rounded-2xl px-6 py-3 text-xs font-black uppercase tracking-[0.14em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
+                  color: "var(--text)",
+                  boxShadow: validation.ok
+                    ? "0 14px 35px color-mix(in srgb, var(--primary) 24%, transparent)"
+                    : "none",
+                }}
+              >
+                Add Media
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={() =>
-              window.open(normalizedFile, "_blank", "noopener,noreferrer")
-            }
-            disabled={!normalizedFile.startsWith("https://")}
-            className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Test URL
-          </button>
-
-          <button
-            type="button"
-            onClick={addItem}
-            disabled={!validation.ok}
-            className="ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 58%, transparent))",
-              color: "var(--text)",
-            }}
-          >
-            Add Media
-          </button>
-        </div>
-
-        {status ? (
+      <aside className="min-w-0 2xl:sticky 2xl:top-4 2xl:self-start">
+        <div
+          className="rounded-3xl border p-4 sm:p-5"
+          style={{
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, var(--panel-alt-bg) 94%, transparent), var(--panel-bg))",
+            borderColor: "var(--border)",
+            boxShadow: "0 20px 55px rgba(0,0,0,0.22)",
+          }}
+        >
           <div
-            className="rounded-2xl border px-3 py-2 text-xs leading-5"
+            className="text-[10px] font-black uppercase tracking-[0.18em]"
+            style={{ color: "var(--primary)" }}
+          >
+            Review
+          </div>
+          <h3 className="mt-1 text-lg font-black tracking-tight">Media Summary</h3>
+
+          <div className="mt-4">
+            <SummaryRow label="Title" value={normalizedTitle || "Not set"} tone={normalizedTitle ? "good" : "warn"} />
+            <SummaryRow label="Type" value={getTypeLabel(type)} />
+            <SummaryRow
+              label="Runtime"
+              value={parsedDurationSeconds > 0 ? formatDurationClock(parsedDurationSeconds) : "Not set"}
+              tone={parsedDurationSeconds > 0 ? "good" : "warn"}
+            />
+            <SummaryRow label={selectedIsAd ? "Ad Target" : "Channel"} value={targetSummary} tone={selectedChannel || adTargetMode === "all" ? "good" : "warn"} />
+            <SummaryRow
+              label={selectedIsAd ? "Campaign Days" : "Air Days"}
+              value={selectedAirDays.length === 0 ? "Every Day" : `${selectedAirDays.length} selected`}
+            />
+            <SummaryRow label="URL" value={normalizedFile ? "Public URL set" : "Not set"} tone={normalizedFile ? "good" : "warn"} />
+          </div>
+
+          <div
+            className="mt-5 rounded-2xl border p-4 text-xs leading-5"
             style={{
-              background: "var(--panel-alt-bg)",
-              borderColor: status.toLowerCase().includes("failed")
-                ? "rgba(248, 113, 113, 0.45)"
+              background: statusLooksSuccessful
+                ? "rgba(34,197,94,0.08)"
+                : "var(--panel-alt-bg)",
+              borderColor: statusLooksSuccessful
+                ? "rgba(34,197,94,0.35)"
                 : "var(--border)",
-              color: status.toLowerCase().includes("failed")
-                ? "#fecaca"
-                : "var(--text-muted)",
+              color: statusLooksSuccessful ? "#86efac" : "var(--text-muted)",
             }}
             aria-live="polite"
           >
             {status}
           </div>
-        ) : null}
-      </div>
+
+          <div
+            className="mt-4 rounded-2xl border p-4 text-[11px] leading-5"
+            style={{
+              background: "rgba(14,165,233,0.06)",
+              borderColor: "rgba(14,165,233,0.22)",
+              color: "var(--text-muted)",
+            }}
+          >
+            Use Quick Edit after adding media to configure broadcast slots,
+            breakpoints, commercial fill logic, and more advanced scheduling.
+          </div>
+        </div>
+      </aside>
     </section>
   );
 }
