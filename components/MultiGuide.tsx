@@ -330,11 +330,40 @@ function canMergeVisibleGuideSegment(
     return false;
   }
 
-  if (item.isVirtualSegment && item.parentMediaId) {
-    return previous.stableKey === cleanDisplayText(item.parentMediaId);
+  if (!item.isVirtualSegment || !item.parentMediaId) {
+    return false;
   }
 
-  return previous.stableKey === getStableItemKey(item);
+  const parentKey = cleanDisplayText(item.parentMediaId);
+
+  if (previous.stableKey !== parentKey) {
+    return false;
+  }
+
+  const currentSourceStart = Math.max(
+    0,
+    Math.floor(Number(item.sourceStart ?? 0)),
+  );
+
+  /*
+    sourceStart 0 means the program has started again in a new
+    broadcast slot. It must create a new guide cell even when the
+    same show repeats immediately afterward.
+  */
+  if (currentSourceStart === 0) {
+    return false;
+  }
+
+  const previousSourceStart = Math.max(
+    0,
+    Math.floor(Number(previous.item.sourceStart ?? 0)),
+  );
+
+  /*
+    Only merge later segments of the same current airing.
+    A source timeline reset must never merge into the prior slot.
+  */
+  return currentSourceStart > previousSourceStart;
 }
 
 function pushCell(
