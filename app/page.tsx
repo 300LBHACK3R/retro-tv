@@ -385,14 +385,17 @@ export default function Home() {
           <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
             <OpenAdminWindowButton />
-<div className="fixed bottom-5 left-5 z-40">
-  <a
-    href="/library"
-    className="inline-flex items-center justify-center rounded-full border border-white/15 bg-black/70 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-white/80 shadow-[0_0_30px_rgba(255,255,255,0.08)] backdrop-blur-xl transition hover:border-pink-300/40 hover:bg-pink-500/15 hover:text-pink-100"
-  >
-    Library
-  </a>
-</div>
+<a
+              href="/library"
+              className="ttv-touch-target inline-flex items-center justify-center rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
+              style={{
+                background: "var(--button-bg)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              Library
+            </a>
 <button
               type="button"
               onClick={() => setSettingsOpen(true)}
