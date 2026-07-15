@@ -20,6 +20,7 @@ import ThemeButton from "@/components/ThemeButton";
 import ViewerHeader from "@/components/ViewerHeader";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
+import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
@@ -197,6 +198,7 @@ export default function Home() {
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
+  const themeLayoutClass = useMemo(() => getThemeLayoutClass(themeId), [themeId]);
 
   const enabledChannels = useMemo(
     () =>
@@ -356,7 +358,7 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden"
+      className={`ttv-app-shell ${themeLayoutClass} min-h-screen overflow-x-hidden`}
       style={{
         ...themeVars,
         background:
@@ -369,8 +371,8 @@ export default function Home() {
       <MediaPreloader activeSchedule={activeSchedule} activeChannel={activeChannel} />
 
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3 p-3 sm:p-4">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+        <header className="ttv-main-header flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="ttv-brand-lockup min-w-0">
             <Image
               src="/tatestv-logo.png"
               alt="TatesTv"
@@ -382,10 +384,10 @@ export default function Home() {
             />
           </div>
 
-          <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+          <div className="ttv-header-actions flex flex-wrap items-start gap-2 sm:justify-end">
             <ThemeButton />
             <OpenAdminWindowButton />
-<a
+            <a
               href="/library"
               className="ttv-touch-target inline-flex items-center justify-center rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
               style={{
@@ -396,7 +398,7 @@ export default function Home() {
             >
               Library
             </a>
-<button
+            <button
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="ttv-touch-target rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"

@@ -327,9 +327,15 @@ function Poster({ group }: { group: LibraryGroup }) {
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.4),transparent_45%),linear-gradient(135deg,#111827,#020617)] p-5 text-center">
+    <div className="ttv-library-poster-fallback flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.4),transparent_45%),linear-gradient(135deg,#111827,#020617)] p-5 text-center">
       <div>
-        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200/70">
+        <img
+          src="/brand/ttv-neon-mini.png"
+          alt=""
+          loading="lazy"
+          className="mx-auto h-16 w-16 rounded-2xl object-cover opacity-90 shadow-[0_0_28px_rgba(55,216,255,0.22)]"
+        />
+        <div className="mt-3 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200/70">
           {getTypeLabel(group.type)}
         </div>
         <div className="mt-2 line-clamp-3 text-base font-black text-white">
@@ -595,7 +601,7 @@ export default function PublicLibrary() {
 
   return (
     <main
-      className="min-h-screen bg-[#020617] text-white"
+      className="ttv-library-shell ttv-layout-neon-crt-broadcast min-h-screen bg-[#020617] text-white"
       style={pageStyle}
     >
       <TextEncodingCleaner />
@@ -972,9 +978,12 @@ export default function PublicLibrary() {
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
-                                  <span className="px-2 text-center text-[10px] font-black uppercase tracking-[0.1em] text-white/35">
-                                    Play
-                                  </span>
+                                  <img
+                                    src="/brand/ttv-neon-mini.png"
+                                    alt=""
+                                    loading="lazy"
+                                    className="h-full w-full object-cover opacity-80"
+                                  />
                                 )}
                               </div>
 

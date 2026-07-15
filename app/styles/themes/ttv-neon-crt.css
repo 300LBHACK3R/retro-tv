@@ -1,0 +1,155 @@
+/* Tate's TV official Neon CRT launch theme.
+   Scope stays on the public shell/library classes so scheduler/admin logic is untouched. */
+
+.ttv-layout-neon-crt-broadcast {
+  --ttv-neon-pink: #ff3a78;
+  --ttv-neon-pink-soft: rgba(255, 58, 120, 0.34);
+  --ttv-neon-cyan: #37d8ff;
+  --ttv-neon-cyan-soft: rgba(55, 216, 255, 0.32);
+  --ttv-neon-purple-soft: rgba(139, 92, 246, 0.16);
+  --ttv-crt-glass: rgba(2, 5, 17, 0.58);
+  position: relative;
+  isolation: isolate;
+}
+
+.ttv-layout-neon-crt-broadcast::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(rgba(255,255,255,0.032) 1px, transparent 1px),
+    radial-gradient(circle at 14% 8%, rgba(255, 58, 120, 0.18), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(55, 216, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 50% 105%, rgba(139, 92, 246, 0.12), transparent 44%);
+  background-size: 100% 3px, auto, auto, auto;
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+
+.ttv-layout-neon-crt-broadcast::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at center, transparent 42%, rgba(0,0,0,0.38) 100%),
+    linear-gradient(90deg, rgba(255,58,120,0.055), transparent 22%, transparent 78%, rgba(55,216,255,0.055));
+  opacity: 0.82;
+}
+
+.ttv-layout-neon-crt-broadcast > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-main-header {
+  border: 1px solid rgba(74, 222, 255, 0.22);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(135deg, rgba(10, 12, 30, 0.82), rgba(3, 5, 16, 0.72)),
+    radial-gradient(circle at 12% 18%, var(--ttv-neon-pink-soft), transparent 36%),
+    radial-gradient(circle at 84% 30%, var(--ttv-neon-cyan-soft), transparent 34%);
+  box-shadow:
+    0 18px 80px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 0 34px rgba(55, 216, 255, 0.08);
+  padding: 0.85rem;
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-brand-lockup {
+  display: flex;
+  align-items: center;
+  min-height: 4.25rem;
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-brand-lockup img {
+  filter:
+    drop-shadow(0 0 12px rgba(255, 58, 120, 0.34))
+    drop-shadow(0 0 16px rgba(55, 216, 255, 0.28));
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-header-actions a,
+.ttv-layout-neon-crt-broadcast .ttv-header-actions button {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.035),
+    0 0 18px rgba(55,216,255,0.08);
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-header-actions a:hover,
+.ttv-layout-neon-crt-broadcast .ttv-header-actions button:hover {
+  border-color: rgba(255, 58, 120, 0.58) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.06),
+    0 0 22px rgba(255,58,120,0.16),
+    0 0 26px rgba(55,216,255,0.10);
+}
+
+.ttv-layout-neon-crt-broadcast section,
+.ttv-layout-neon-crt-broadcast footer,
+.ttv-layout-neon-crt-broadcast aside {
+  backdrop-filter: blur(14px);
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-player-expanded {
+  border-radius: 0 !important;
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-guide-shell {
+  border-color: rgba(55,216,255,0.34);
+  background:
+    linear-gradient(135deg, rgba(3,5,16,0.96), rgba(10,12,30,0.92)),
+    radial-gradient(circle at 14% 8%, rgba(255,58,120,0.20), transparent 32%),
+    radial-gradient(circle at 88% 14%, rgba(55,216,255,0.16), transparent 34%);
+  box-shadow: 0 0 52px rgba(55,216,255,0.10);
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-guide-day[data-active="true"] {
+  background:
+    linear-gradient(135deg, var(--ttv-neon-cyan), #7df0ff);
+  color: #020617;
+  box-shadow:
+    0 0 24px rgba(55,216,255,0.25),
+    inset 0 0 0 1px rgba(255,255,255,0.42);
+}
+
+.ttv-layout-neon-crt-broadcast .ttv-guide-scroll {
+  background:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    rgba(2,5,17,0.92);
+  background-size: 100% 4px, auto;
+}
+
+.ttv-layout-neon-crt-broadcast [style*="--guide-active-bg"],
+.ttv-layout-neon-crt-broadcast [style*="--guide-current-bg"] {
+  text-shadow: none;
+}
+
+.ttv-library-shell.ttv-layout-neon-crt-broadcast {
+  background:
+    radial-gradient(circle at 12% 6%, rgba(255,58,120,0.20), transparent 34%),
+    radial-gradient(circle at 90% 10%, rgba(55,216,255,0.18), transparent 36%),
+    linear-gradient(135deg, #03030b, #070816 48%, #02040c) !important;
+}
+
+.ttv-library-shell .ttv-library-poster-fallback {
+  background:
+    linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+    radial-gradient(circle at 24% 20%, rgba(255,58,120,0.34), transparent 40%),
+    radial-gradient(circle at 76% 18%, rgba(55,216,255,0.30), transparent 42%),
+    linear-gradient(135deg, #090717, #03040c) !important;
+  background-size: 100% 4px, auto, auto, auto !important;
+}
+
+@media (max-width: 640px) {
+  .ttv-layout-neon-crt-broadcast .ttv-main-header {
+    border-radius: 1.15rem;
+    padding: 0.7rem;
+  }
+
+  .ttv-layout-neon-crt-broadcast .ttv-brand-lockup {
+    justify-content: center;
+  }
+}
