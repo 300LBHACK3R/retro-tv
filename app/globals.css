@@ -246,3 +246,352 @@ img[src*="/channel-logos/"] {
   }
 }
 /* TTV channel image logo override END */
+
+/* Tate's TV FailZone submit page */
+.ttv-submit-page {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 3vw, 3rem);
+  color: var(--text, #ffffff);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 79, 139, 0.22), transparent 32rem),
+    radial-gradient(circle at 88% 12%, rgba(55, 216, 255, 0.18), transparent 34rem),
+    linear-gradient(180deg, rgba(4, 6, 18, 0.96), rgba(7, 8, 22, 1));
+}
+
+.ttv-submit-page * {
+  box-sizing: border-box;
+}
+
+.ttv-submit-hero,
+.ttv-submit-grid,
+.ttv-submit-rules,
+.ttv-submit-process,
+.ttv-submit-panel {
+  width: min(1180px, 100%);
+  margin-inline: auto;
+}
+
+.ttv-submit-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 2rem;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 79, 139, 0.16), rgba(55, 216, 255, 0.08)),
+    rgba(8, 12, 32, 0.78);
+  box-shadow: 0 0 42px rgba(55, 216, 255, 0.12), inset 0 0 60px rgba(255, 79, 139, 0.06);
+}
+
+.ttv-submit-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045) 0,
+    rgba(255, 255, 255, 0.045) 1px,
+    transparent 1px,
+    transparent 5px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.22;
+}
+
+.ttv-submit-hero-copy,
+.ttv-submit-hero-card,
+.ttv-submit-panel,
+.ttv-submit-rules,
+.ttv-submit-process,
+.ttv-submit-grid article {
+  position: relative;
+  z-index: 1;
+}
+
+.ttv-submit-kicker,
+.ttv-submit-grid article > span,
+.ttv-submit-hero-card > span {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+  color: #6ae6ff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(55, 216, 255, 0.72);
+}
+
+.ttv-submit-hero h1 {
+  max-width: 780px;
+  margin: 0;
+  font-size: clamp(2.75rem, 8vw, 6.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 28px rgba(255, 79, 139, 0.45), 0 0 52px rgba(55, 216, 255, 0.2);
+}
+
+.ttv-submit-hero p,
+.ttv-submit-panel-heading p,
+.ttv-submit-rules p,
+.ttv-submit-grid article p,
+.ttv-submit-hero-card p,
+.ttv-submit-note {
+  max-width: 760px;
+  color: rgba(232, 240, 255, 0.78);
+  line-height: 1.7;
+}
+
+.ttv-submit-hero-actions,
+.ttv-submit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.ttv-submit-hero-actions a,
+.ttv-submit-actions button,
+.ttv-submit-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 0.85rem 1.15rem;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  background: linear-gradient(135deg, rgba(255, 79, 139, 0.28), rgba(55, 216, 255, 0.16));
+  box-shadow: 0 0 24px rgba(255, 79, 139, 0.14);
+  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+}
+
+.ttv-submit-hero-actions a:hover,
+.ttv-submit-actions button:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.015);
+  border-color: rgba(106, 230, 255, 0.55);
+}
+
+.ttv-submit-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ttv-submit-hero-card,
+.ttv-submit-grid article,
+.ttv-submit-rules,
+.ttv-submit-process,
+.ttv-submit-panel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.5rem;
+  background: rgba(8, 12, 32, 0.72);
+  box-shadow: 0 0 34px rgba(55, 216, 255, 0.09);
+  backdrop-filter: blur(18px);
+}
+
+.ttv-submit-hero-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.35rem;
+}
+
+.ttv-submit-hero-card strong {
+  color: #ffffff;
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+  text-shadow: 0 0 24px rgba(255, 79, 139, 0.42);
+}
+
+.ttv-submit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ttv-submit-grid article,
+.ttv-submit-rules,
+.ttv-submit-process,
+.ttv-submit-panel {
+  padding: clamp(1.15rem, 3vw, 1.75rem);
+}
+
+.ttv-submit-grid h2,
+.ttv-submit-rules h2,
+.ttv-submit-process h2,
+.ttv-submit-panel h2 {
+  margin: 0 0 0.65rem;
+  color: #ffffff;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-rules,
+.ttv-submit-process,
+.ttv-submit-panel {
+  margin-top: 1rem;
+}
+
+.ttv-submit-rules {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.ttv-submit-rules ul,
+.ttv-submit-process ol,
+.ttv-submit-errors ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: rgba(232, 240, 255, 0.82);
+  line-height: 1.65;
+}
+
+.ttv-submit-process ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.ttv-submit-process li {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ttv-submit-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.ttv-submit-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ttv-submit-form label,
+.ttv-submit-release-box label,
+.ttv-submit-checks label {
+  display: grid;
+  gap: 0.45rem;
+  color: rgba(232, 240, 255, 0.9);
+  font-weight: 800;
+}
+
+.ttv-submit-form label > span {
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-form input,
+.ttv-submit-form textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  color: #ffffff;
+  outline: none;
+  background: rgba(0, 0, 0, 0.26);
+  box-shadow: inset 0 0 18px rgba(55, 216, 255, 0.04);
+}
+
+.ttv-submit-form input:focus,
+.ttv-submit-form textarea:focus {
+  border-color: rgba(106, 230, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(55, 216, 255, 0.16);
+}
+
+.ttv-submit-checks,
+.ttv-submit-release-box,
+.ttv-submit-errors,
+.ttv-submit-message {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ttv-submit-checks label,
+.ttv-submit-release-box label {
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.ttv-submit-checks input,
+.ttv-submit-release-box input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  accent-color: #ff4f8b;
+}
+
+.ttv-submit-release-box strong,
+.ttv-submit-errors strong {
+  color: #ffffff;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-release-box p {
+  margin: 0;
+  color: rgba(232, 240, 255, 0.78);
+  line-height: 1.7;
+}
+
+.ttv-submit-errors {
+  border-color: rgba(255, 108, 108, 0.48);
+  background: rgba(255, 63, 91, 0.08);
+}
+
+.ttv-submit-message[data-success="true"] {
+  border-color: rgba(106, 230, 255, 0.48);
+  color: #dff8ff;
+}
+
+.ttv-submit-note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 880px) {
+  .ttv-submit-hero,
+  .ttv-submit-rules {
+    grid-template-columns: 1fr;
+  }
+
+  .ttv-submit-grid,
+  .ttv-submit-process ol,
+  .ttv-submit-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -398,6 +398,18 @@ export default function Home() {
             >
               Library
             </a>
+            <a
+              href="/submit"
+              className="ttv-touch-target inline-flex items-center justify-center rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
+              style={{
+                background: "linear-gradient(135deg, rgba(255, 79, 139, 0.24), rgba(55, 216, 255, 0.18))",
+                borderColor: "rgba(255, 255, 255, 0.24)",
+                color: "var(--text)",
+                boxShadow: "0 0 22px rgba(255, 79, 139, 0.18)",
+              }}
+            >
+              Submit Clip
+            </a>
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
