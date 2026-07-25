@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
@@ -8,7 +9,6 @@ import AppModeToggle from "@/components/AppModeToggle";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaPreloader from "@/components/MediaPreloader";
-import MultiGuide from "@/components/MultiGuide";
 import NowNextBar from "@/components/NowNextBar";
 import OpenAdminWindowButton from "@/components/OpenAdminWindowButton";
 import Player from "@/components/Player";
@@ -23,6 +23,31 @@ import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
+
+const MultiGuide = dynamic(() => import("@/components/MultiGuide"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="ttv-glass-panel flex h-full min-h-[20rem] items-center justify-center rounded-2xl border p-6 text-center"
+      style={{
+        borderColor: "var(--border)",
+        color: "var(--text-muted)",
+      }}
+    >
+      <div>
+        <div
+          className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-current"
+          style={{ color: "var(--primary)" }}
+          aria-hidden="true"
+        />
+        <div className="mt-4 text-xs font-black uppercase tracking-[0.16em]">
+          Opening Live Guide
+        </div>
+        <div className="mt-2 text-xs">Loading guide code and preparing channel rows...</div>
+      </div>
+    </div>
+  ),
+});
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -41,13 +66,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function getMediaForChannel(
   channel: Channel | undefined,
-  media: MediaItem[],
+  mediaById: Map<string, MediaItem>,
 ): MediaItem[] {
   if (!channel) {
     return [];
   }
-
-  const mediaById = new Map(media.map((item) => [item.id, item]));
 
   return channel.mediaIds
     .map((mediaId) => mediaById.get(mediaId))
@@ -196,6 +219,11 @@ export default function Home() {
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
 
+  const mediaById = useMemo(
+    () => new Map(media.map((item) => [item.id, item])),
+    [media],
+  );
+
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const themeVars = useMemo(() => createThemeVars(theme), [theme]);
   const themeLayoutClass = useMemo(() => getThemeLayoutClass(themeId), [themeId]);
@@ -216,8 +244,8 @@ export default function Home() {
   );
 
   const activeChannelMedia = useMemo(
-    () => getMediaForChannel(activeChannel, media),
-    [activeChannel, media],
+    () => getMediaForChannel(activeChannel, mediaById),
+    [activeChannel, mediaById],
   );
 
   const availableAds = useMemo(
@@ -237,25 +265,17 @@ export default function Home() {
     [activeChannel, activeChannelMedia, availableAds, scheduleAnchor],
   );
 
-  const channelSchedules = useMemo(
-    () =>
-      enabledChannels.map((channel) => {
-        const channelMedia = getMediaForChannel(channel, media);
-        const playbackSchedule = buildSchedule(channelMedia, {
-          channel,
-          availableAds,
-          now: scheduleAnchor,
-        });
+  const channelGuideData = useMemo(() => {
+    if (!isGuideOpen) {
+      return [];
+    }
 
-        return {
-          channel,
-          schedule: playbackSchedule,
-          media: channelMedia,
-          availableAds,
-        };
-      }),
-    [availableAds, enabledChannels, media, scheduleAnchor],
-  );
+    return enabledChannels.map((channel) => ({
+      channel,
+      media: getMediaForChannel(channel, mediaById),
+      availableAds,
+    }));
+  }, [availableAds, enabledChannels, isGuideOpen, mediaById]);
 
   const showAdminSidebar = appMode === "admin" && isAdminAuthorized;
   const playerFrameClass = getPlayerFrameClass(playerViewMode);
@@ -300,18 +320,14 @@ export default function Home() {
 
     const previousOverflow = document.body.style.overflow;
     const previousOverscrollBehavior = document.body.style.overscrollBehavior;
-    const previousTouchAction = document.body.style.touchAction;
-
     if (shouldLockPage) {
       document.body.style.overflow = "hidden";
       document.body.style.overscrollBehavior = "none";
-      document.body.style.touchAction = "none";
     }
 
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.overscrollBehavior = previousOverscrollBehavior;
-      document.body.style.touchAction = previousTouchAction;
     };
   }, [isGuideOpen, isSettingsOpen]);
 
@@ -348,7 +364,7 @@ export default function Home() {
 
   const guideOverlay = (
     <MultiGuide
-      data={channelSchedules}
+      data={channelGuideData}
       onProgramSelect={({ channel }) => {
         setChannel(channel.id);
         closeGuide();

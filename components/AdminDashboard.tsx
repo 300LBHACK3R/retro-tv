@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
 import QuickMediaEditorPanel from "@/components/QuickMediaEditorPanel";
+import SubmissionInboxPanel from "@/components/SubmissionInboxPanel";
 import StationConfigPanel from "@/components/StationConfigPanel";
 import UploadPanel from "@/components/UploadPanel";
 import { useStore } from "@/lib/store";
@@ -13,6 +14,7 @@ import type { Channel, MediaItem } from "@/lib/types";
 type AdminTab =
   | "quick-edit"
   | "add"
+  | "submissions"
   | "programming"
   | "branding"
   | "library"
@@ -54,6 +56,12 @@ const TABS: AdminTabMeta[] = [
     label: "Add Media",
     shortLabel: "Add",
     description: "Add one media item from a public R2 or video URL.",
+  },
+  {
+    id: "submissions",
+    label: "Submissions",
+    shortLabel: "Inbox",
+    description: "Review FailZone uploads, rights confirmations, notes, and approval status.",
   },
   {
     id: "programming",
@@ -735,7 +743,7 @@ export default function AdminDashboard() {
               background: "var(--panel-alt-bg)",
               color: "var(--text-muted)",
             }}
-            title={`${getChannelLabel(activeChannel)} â€¢ ${getChannelName(
+            title={`${getChannelLabel(activeChannel)} • ${getChannelName(
               activeChannel,
             )}`}
           >
@@ -756,7 +764,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
             {TABS.map((tab) => (
               <TabButton
                 key={tab.id}
@@ -788,6 +796,7 @@ export default function AdminDashboard() {
 
       <div className="min-w-0">
         {activeTab === "add" ? <UploadPanel /> : null}
+        {activeTab === "submissions" ? <SubmissionInboxPanel /> : null}
         {activeTab === "quick-edit" ? <QuickMediaEditorPanel /> : null}
         {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}
         {activeTab === "branding" ? <ChannelBrandingPanel /> : null}

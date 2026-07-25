@@ -29,6 +29,7 @@ const ROW_HEIGHT_COMPACT = 58;
 const SLOT_SECONDS = SLOT_MINUTES * 60;
 const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 const LIVE_TICK_MS = 15_000;
+const GUIDE_PREPARE_BATCH_SIZE = 2;
 
 const MIN_CELL_WIDTH = 52;
 const MIN_BUILD_STEPS = 500;
@@ -37,7 +38,7 @@ const SLOT_INDEXES = Array.from({ length: SLOT_COUNT }, (_, index) => index);
 
 type GuideRowInput = {
   channel: Channel;
-  schedule: BroadcastItem[];
+  schedule?: BroadcastItem[];
   media?: MediaItem[];
   availableAds?: MediaItem[];
 };
@@ -51,6 +52,7 @@ type GuideCell = {
 
 type PreparedGuideRow = GuideRowInput & {
   cells: GuideCell[];
+  isPrepared: boolean;
 };
 
 type GuideMarker = {
@@ -651,12 +653,19 @@ function getScheduleForSlice(
   sliceStart: Date,
   currentDayReference: Date,
 ): BroadcastItem[] {
-  if (!row.media || isSameLocalDay(sliceStart, currentDayReference)) {
+  if (
+    row.schedule &&
+    row.schedule.length > 0 &&
+    isSameLocalDay(sliceStart, currentDayReference)
+  ) {
     return row.schedule;
   }
 
   const programMedia = getProgramMediaItems(row.media);
-  const availableAds = getAvailableAdItems(row.media);
+  const availableAds =
+    row.availableAds && row.availableAds.length > 0
+      ? row.availableAds
+      : getAvailableAdItems(row.media);
 
   return buildSchedule(programMedia, {
     channel: row.channel,
@@ -770,6 +779,29 @@ function getCellWidth(startSec: number, endSec: number): number {
   return ((endSec - startSec) / GUIDE_WINDOW_SECONDS) * TIMELINE_WIDTH;
 }
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
+function scheduleGuideWork(callback: () => void): () => void {
+  const idleWindow = window as IdleWindow;
+
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    const handle = idleWindow.requestIdleCallback(() => callback(), {
+      timeout: 120,
+    });
+
+    return () => idleWindow.cancelIdleCallback?.(handle);
+  }
+
+  const handle = window.setTimeout(callback, 0);
+  return () => window.clearTimeout(handle);
+}
+
 function EmptyGuideState() {
   return (
     <div
@@ -783,6 +815,7 @@ function EmptyGuideState() {
 
 export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
 
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
@@ -820,17 +853,88 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     setActiveMarkerIndex(0);
   }, [windowStartMs]);
 
-  const preparedRows = useMemo<PreparedGuideRow[]>(() => {
-    return sortRows(data).map((row) => ({
+  const sortedRows = useMemo(() => sortRows(data), [data]);
+  const [preparedRows, setPreparedRows] = useState<PreparedGuideRow[]>([]);
+  const [preparedCount, setPreparedCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let cancelScheduledWork = () => {};
+
+    const placeholders: PreparedGuideRow[] = sortedRows.map((row) => ({
       ...row,
-      cells: buildForwardGuideCells(
-        row,
-        windowStart,
-        GUIDE_WINDOW_SECONDS,
-        currentDayReference,
-      ),
+      cells: [],
+      isPrepared: false,
     }));
-  }, [currentDayReference, data, windowStart]);
+
+    setPreparedRows(placeholders);
+    setPreparedCount(0);
+
+    if (sortedRows.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const activeRowIndex = sortedRows.findIndex(
+      (row) => row.channel.id === currentChannelId,
+    );
+    const queue = sortedRows.map((_, index) => index);
+
+    if (activeRowIndex > 0) {
+      queue.splice(activeRowIndex, 1);
+      queue.unshift(activeRowIndex);
+    }
+
+    let queueIndex = 0;
+
+    const processBatch = () => {
+      if (cancelled) return;
+
+      const updates = new Map<string, PreparedGuideRow>();
+      const batchEnd = Math.min(
+        queue.length,
+        queueIndex + GUIDE_PREPARE_BATCH_SIZE,
+      );
+
+      while (queueIndex < batchEnd) {
+        const rowIndex = queue[queueIndex];
+        const row = rowIndex === undefined ? undefined : sortedRows[rowIndex];
+        queueIndex += 1;
+
+        if (!row) continue;
+
+        updates.set(row.channel.id, {
+          ...row,
+          cells: buildForwardGuideCells(
+            row,
+            windowStart,
+            GUIDE_WINDOW_SECONDS,
+            currentDayReference,
+          ),
+          isPrepared: true,
+        });
+      }
+
+      if (updates.size > 0) {
+        setPreparedRows((current) =>
+          current.map((row) => updates.get(row.channel.id) ?? row),
+        );
+        setPreparedCount(queueIndex);
+      }
+
+      if (queueIndex < queue.length && !cancelled) {
+        cancelScheduledWork = scheduleGuideWork(processBatch);
+      }
+    };
+
+    cancelScheduledWork = scheduleGuideWork(processBatch);
+
+    return () => {
+      cancelled = true;
+      cancelScheduledWork();
+    };
+  }, [currentChannelId, currentDayReference, sortedRows, windowStart]);
 
   const guideMarkers = useMemo(
     () => buildGuideMarkers(windowStart),
@@ -860,23 +964,44 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const handleGuideScroll = useCallback(
     (event: UIEvent<HTMLDivElement>): void => {
       const scrollElement = event.currentTarget;
-      const centerLeft = scrollElement.scrollLeft + scrollElement.clientWidth * 0.35;
-      const centerSeconds = (centerLeft / TIMELINE_WIDTH) * GUIDE_WINDOW_SECONDS;
 
-      let nextIndex = 0;
-
-      for (let index = 0; index < guideMarkers.length; index += 1) {
-        const marker = guideMarkers[index];
-
-        if (marker && centerSeconds >= marker.offsetSec) {
-          nextIndex = index;
-        }
+      if (scrollRafRef.current !== null) {
+        return;
       }
 
-      setActiveMarkerIndex((current) => (current === nextIndex ? current : nextIndex));
+      scrollRafRef.current = window.requestAnimationFrame(() => {
+        scrollRafRef.current = null;
+
+        const centerLeft =
+          scrollElement.scrollLeft + scrollElement.clientWidth * 0.35;
+        const centerSeconds =
+          (centerLeft / TIMELINE_WIDTH) * GUIDE_WINDOW_SECONDS;
+
+        let nextIndex = 0;
+
+        for (let index = 0; index < guideMarkers.length; index += 1) {
+          const marker = guideMarkers[index];
+
+          if (marker && centerSeconds >= marker.offsetSec) {
+            nextIndex = index;
+          }
+        }
+
+        setActiveMarkerIndex((current) =>
+          current === nextIndex ? current : nextIndex,
+        );
+      });
     },
     [guideMarkers],
   );
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   if (!mounted) {
     return null;
@@ -948,6 +1073,20 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           >
             {GUIDE_HOURS} hour forward guide
           </div>
+
+          {preparedCount < sortedRows.length ? (
+            <div
+              className="rounded-full border px-3 py-2 text-xs font-black"
+              style={{
+                borderColor: "color-mix(in srgb, var(--primary) 42%, var(--border))",
+                background: "color-mix(in srgb, var(--primary) 10%, var(--panel-alt-bg))",
+                color: "var(--primary)",
+              }}
+              aria-live="polite"
+            >
+              Preparing {preparedCount}/{sortedRows.length}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1045,7 +1184,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           {preparedRows.length === 0 ? (
             <EmptyGuideState />
           ) : (
-            preparedRows.map(({ channel, cells }, rowIndex) => {
+            preparedRows.map(({ channel, cells, isPrepared }, rowIndex) => {
               const isActive = channel.id === currentChannelId;
               const accent = getSafeAccent(channel);
 
@@ -1054,6 +1193,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
                   key={channel.id}
                   channel={channel}
                   cells={cells}
+                  isPrepared={isPrepared}
                   isActive={isActive}
                   accent={accent}
                   rowIndex={rowIndex}
@@ -1078,6 +1218,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
 function GuideRow({
   channel,
   cells,
+  isPrepared,
   isActive,
   accent,
   rowIndex,
@@ -1089,6 +1230,7 @@ function GuideRow({
 }: {
   channel: Channel;
   cells: GuideCell[];
+  isPrepared: boolean;
   isActive: boolean;
   accent: string;
   rowIndex: number;
@@ -1151,23 +1293,27 @@ function GuideRow({
         }}
       >
         <div
-          className="grid h-full"
+          className="absolute inset-0"
           style={{
-            width: `${TIMELINE_WIDTH}px`,
-            gridTemplateColumns: `repeat(${SLOT_COUNT}, ${SLOT_WIDTH}px)`,
+            backgroundImage:
+              "linear-gradient(to right, var(--border) 1px, transparent 1px)",
+            backgroundSize: `${SLOT_WIDTH}px 100%`,
+            opacity: 0.7,
           }}
           aria-hidden="true"
-        >
-          {SLOT_INDEXES.map((index) => (
-            <div
-              key={index}
-              className="border-r last:border-r-0"
-              style={{ borderColor: "var(--border)" }}
-            />
-          ))}
-        </div>
+        />
 
-        {cells.length === 0 ? (
+        {!isPrepared ? (
+          <div className="absolute inset-0 flex items-center gap-3 px-4">
+            <div
+              className="h-7 w-44 animate-pulse rounded-lg"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+            />
+            <span className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: "var(--text-muted)" }}>
+              Preparing schedule
+            </span>
+          </div>
+        ) : cells.length === 0 ? (
           <div
             className="absolute inset-0 flex items-center justify-center text-xs font-semibold"
             style={{ color: "var(--text-muted)" }}

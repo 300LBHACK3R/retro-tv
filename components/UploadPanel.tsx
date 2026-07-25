@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AdminDirectUploadCard from "@/components/AdminDirectUploadCard";
 import { probeVideoDuration } from "@/lib/mediaDuration";
 import {
   createMediaItemFromUrl,
@@ -75,6 +76,15 @@ function getTypeLabel(type: MediaType): string {
   if (type === "bumper") return "Bumper";
 
   return "Show";
+}
+
+function getR2FolderForType(type: MediaType): string {
+  if (type === "movie") return "Movies";
+  if (type === "music") return "Music";
+  if (type === "music-video") return "MusicVideos";
+  if (type === "commercial") return "Commercials";
+  if (type === "bumper") return "Bumpers";
+  return "Shows";
 }
 
 function getDurationHelperText(value: string, mode: DurationMode): string {
@@ -496,6 +506,28 @@ export default function UploadPanel() {
     }
   };
 
+  const handleDirectUploadComplete = ({
+    publicUrl,
+    filename,
+  }: {
+    publicUrl: string;
+    objectKey: string;
+    filename: string;
+  }) => {
+    setFile(publicUrl);
+
+    if (!title.trim()) {
+      const inferredTitle = inferNameFromUrl(filename) || inferNameFromUrl(publicUrl);
+      if (inferredTitle) setTitle(titleCase(inferredTitle));
+    }
+
+    setStatus("Direct R2 upload complete. Confirm the title, runtime, type, and channel before adding it to programming.");
+
+    if (!durationInput.trim()) {
+      void detectDuration(publicUrl);
+    }
+  };
+
   const handleTypeChange = (nextType: MediaType) => {
     setType(nextType);
 
@@ -679,6 +711,11 @@ export default function UploadPanel() {
             </div>
           </div>
         </header>
+
+        <AdminDirectUploadCard
+          defaultFolder={getR2FolderForType(type)}
+          onUploaded={handleDirectUploadComplete}
+        />
 
         <SectionCard
           eyebrow="Step 1"

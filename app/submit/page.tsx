@@ -21,10 +21,10 @@ const prohibitedItems = [
 ];
 
 const reviewSteps = [
-  "Upload your clip to a shareable cloud link.",
-  "Complete the submission form and required release agreement.",
-  "Tate's TV reviews the clip for rights, quality, safety, and fit.",
-  "Approved clips may be edited, credited, scheduled, and featured on FailZone.",
+  "Upload your clip directly or provide a secure shareable link.",
+  "Complete the clip details, ownership confirmations, and release agreement.",
+  "Receive a submission reference code after the clip enters the moderation queue.",
+  "Tate's TV reviews rights, quality, safety, and fit before any public use.",
 ];
 
 export default function SubmitClipPage() {
@@ -124,9 +124,9 @@ export default function SubmitClipPage() {
           <p className="ttv-submit-kicker">Official submission form</p>
           <h2>Send your FailZone clip for review</h2>
           <p>
-            Paste a shareable video link and complete the rights agreement. This
-            first version uses email submission so every clip can be manually
-            screened before being added to Tate&apos;s TV.
+            Upload the video directly to Tate&apos;s TV or use a shareable cloud link.
+            You will see live upload progress and receive a reference code when the
+            clip has entered the protected moderation queue.
           </p>
         </div>
 

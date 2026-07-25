@@ -595,3 +595,356 @@ img[src*="/channel-logos/"] {
   }
 }
 
+
+/* === TATE'S TV PREMIUM SUBMISSION V2 === */
+.ttv-submit-form-section {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.5rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.045), transparent 45%),
+    rgba(3, 7, 24, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.ttv-submit-form-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.ttv-submit-form-section-heading > span {
+  display: inline-flex;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(106, 230, 255, 0.48);
+  border-radius: 0.8rem;
+  color: #09111e;
+  font-size: 0.82rem;
+  font-weight: 950;
+  background: linear-gradient(135deg, #6ae6ff, #ff79ae);
+  box-shadow: 0 0 24px rgba(55, 216, 255, 0.2);
+}
+
+.ttv-submit-form-section-heading h3 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.1rem, 3vw, 1.45rem);
+  font-weight: 950;
+  letter-spacing: -0.025em;
+}
+
+.ttv-submit-form-section-heading p {
+  margin: 0.3rem 0 0;
+  color: rgba(232, 240, 255, 0.7);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.ttv-submit-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 1rem;
+  padding: 0.35rem;
+  background: rgba(0,0,0,0.22);
+}
+
+.ttv-submit-mode-switch button {
+  min-height: 2.9rem;
+  border: 1px solid transparent;
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.85rem;
+  color: rgba(232,240,255,0.68);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.ttv-submit-mode-switch button:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.ttv-submit-mode-switch button[data-active="true"] {
+  border-color: rgba(106,230,255,0.42);
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255,79,139,0.22), rgba(55,216,255,0.16));
+  box-shadow: 0 0 20px rgba(55,216,255,0.1);
+}
+
+.ttv-submit-dropzone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  min-height: 9rem;
+  border: 1px dashed rgba(106,230,255,0.42);
+  border-radius: 1.25rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background:
+    radial-gradient(circle at left center, rgba(55,216,255,0.1), transparent 52%),
+    rgba(0,0,0,0.2);
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.ttv-submit-dropzone[data-active="true"] {
+  border-color: #ff79ae;
+  background:
+    radial-gradient(circle at left center, rgba(255,79,139,0.18), transparent 55%),
+    rgba(0,0,0,0.2);
+  transform: scale(1.005);
+}
+
+.ttv-submit-dropzone[data-has-file="true"] {
+  border-style: solid;
+}
+
+.ttv-submit-dropzone-copy {
+  min-width: 0;
+}
+
+.ttv-submit-dropzone-copy strong,
+.ttv-submit-dropzone-copy span {
+  display: block;
+}
+
+.ttv-submit-dropzone-copy strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttv-submit-dropzone-copy span {
+  margin-top: 0.4rem;
+  color: rgba(232,240,255,0.66);
+  font-size: 0.78rem;
+}
+
+.ttv-submit-dropzone button {
+  min-height: 2.9rem;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, rgba(255,79,139,0.26), rgba(55,216,255,0.16));
+}
+
+.ttv-submit-preview {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 1.25rem;
+  background: #000;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.35);
+}
+
+.ttv-submit-preview video {
+  width: 100%;
+  max-height: min(62vh, 560px);
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
+}
+
+.ttv-submit-form label small {
+  color: rgba(232,240,255,0.55);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.ttv-submit-progress-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(106,230,255,0.24);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  background: rgba(55,216,255,0.055);
+}
+
+.ttv-submit-progress-panel[data-state="error"] {
+  border-color: rgba(248,113,113,0.45);
+  background: rgba(248,113,113,0.07);
+}
+
+.ttv-submit-progress-copy strong,
+.ttv-submit-progress-copy span {
+  display: block;
+}
+
+.ttv-submit-progress-copy strong {
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-progress-copy span {
+  margin-top: 0.35rem;
+  color: rgba(232,240,255,0.72);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.ttv-submit-progress-track {
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+}
+
+.ttv-submit-progress-track > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff4f8b, #6ae6ff, #fff);
+  box-shadow: 0 0 18px rgba(55,216,255,0.5);
+  transition: width 180ms ease;
+}
+
+.ttv-submit-primary-button {
+  border-color: rgba(106,230,255,0.5) !important;
+  background: linear-gradient(135deg, #ff3f84, #6ae6ff) !important;
+  box-shadow: 0 0 28px rgba(255,79,139,0.25) !important;
+}
+
+.ttv-submit-honeypot {
+  position: absolute !important;
+  left: -10000px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+}
+
+.ttv-submit-success {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(106,230,255,0.38);
+  border-radius: 1.75rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  text-align: center;
+  background:
+    radial-gradient(circle at top, rgba(55,216,255,0.16), transparent 48%),
+    rgba(3,7,24,0.62);
+  box-shadow: 0 0 48px rgba(55,216,255,0.11);
+}
+
+.ttv-submit-success-icon {
+  display: inline-flex;
+  width: 4.5rem;
+  height: 4.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(134,239,172,0.5);
+  border-radius: 50%;
+  color: #052e16;
+  font-size: 2.2rem;
+  font-weight: 950;
+  background: #86efac;
+  box-shadow: 0 0 34px rgba(34,197,94,0.25);
+}
+
+.ttv-submit-success h3 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.6rem, 5vw, 2.7rem);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-success > p {
+  margin: 0;
+  max-width: 44rem;
+  color: rgba(232,240,255,0.76);
+  line-height: 1.65;
+}
+
+.ttv-submit-reference {
+  display: grid;
+  gap: 0.35rem;
+  width: min(100%, 28rem);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 1.1rem;
+  padding: 1rem;
+  background: rgba(0,0,0,0.24);
+}
+
+.ttv-submit-reference span {
+  color: rgba(232,240,255,0.6);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ttv-submit-reference strong {
+  color: #6ae6ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: clamp(1rem, 3.5vw, 1.35rem);
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 640px) {
+  .ttv-submit-page {
+    padding: 0.75rem;
+  }
+
+  .ttv-submit-hero {
+    border-radius: 1.35rem;
+    padding: 1.15rem;
+  }
+
+  .ttv-submit-hero h1 {
+    font-size: clamp(2.35rem, 14vw, 4.2rem);
+  }
+
+  .ttv-submit-panel,
+  .ttv-submit-rules,
+  .ttv-submit-process,
+  .ttv-submit-grid article {
+    border-radius: 1.2rem;
+    padding: 1rem;
+  }
+
+  .ttv-submit-mode-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .ttv-submit-dropzone {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .ttv-submit-dropzone-copy strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ttv-submit-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .ttv-submit-actions button {
+    width: 100%;
+  }
+}
+/* === END TATE'S TV PREMIUM SUBMISSION V2 === */
