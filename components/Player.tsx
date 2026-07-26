@@ -1,7 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
+import { useGoogleCast, type CastQueueEntry } from "@/components/GoogleCastProvider";
+import WatchOnTVModal from "@/components/WatchOnTVModal";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
@@ -453,7 +455,7 @@ function configureVideoForAppPlayback(video: HTMLVideoElement): void {
   castVideo.disableRemotePlayback = false;
 }
 
-async function requestPlaybackTarget(video: HTMLVideoElement): Promise<string> {
+async function requestAirPlayTarget(video: HTMLVideoElement): Promise<string> {
   const castVideo = video as WebKitVideoElement;
 
   try {
@@ -464,13 +466,117 @@ async function requestPlaybackTarget(video: HTMLVideoElement): Promise<string> {
 
     if (castVideo.remote?.prompt) {
       await castVideo.remote.prompt();
-      return "Opening TV playback picker.";
+      return "Opening the browser TV playback picker.";
     }
   } catch {
     return "Could not open TV playback picker.";
   }
 
-  return "TV casting is not available in this browser. On Apple, use AirPlay. On Samsung, use Smart View. On Android/Chrome, use Cast or screen mirroring.";
+  return "AirPlay is not available in this browser. Use Google Cast, TV Mode, screen mirroring, or HDMI instead.";
+}
+
+
+const CAST_QUEUE_MAX_ITEMS = 180;
+const CAST_QUEUE_MAX_SECONDS = 8 * 60 * 60;
+
+function getCastMimeType(item: BroadcastItem): string {
+  const explicit = item.mimeType?.trim();
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const cleanUrl = item.file.split("?")[0]?.toLowerCase() ?? "";
+
+  if (cleanUrl.endsWith(".m3u8")) {
+    return "application/x-mpegURL";
+  }
+
+  if (cleanUrl.endsWith(".webm")) {
+    return "video/webm";
+  }
+
+  if (cleanUrl.endsWith(".mp3")) {
+    return "audio/mpeg";
+  }
+
+  if (cleanUrl.endsWith(".m4a")) {
+    return "audio/mp4";
+  }
+
+  return "video/mp4";
+}
+
+function getAbsoluteAssetUrl(value: string | undefined): string | undefined {
+  const cleanValue = value?.trim();
+
+  if (!cleanValue) {
+    return undefined;
+  }
+
+  try {
+    return new URL(cleanValue, window.location.origin).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function buildCastQueueEntries(
+  schedule: BroadcastItem[],
+  currentIndex: number,
+  currentElapsed: number,
+  currentSourceElapsed: number,
+  channelName: string,
+): CastQueueEntry[] {
+  if (schedule.length === 0 || currentIndex < 0) {
+    return [];
+  }
+
+  const entries: CastQueueEntry[] = [];
+  let queuedSeconds = 0;
+
+  for (let offset = 0; offset < CAST_QUEUE_MAX_ITEMS; offset += 1) {
+    if (queuedSeconds >= CAST_QUEUE_MAX_SECONDS) {
+      break;
+    }
+
+    const index = (currentIndex + offset) % schedule.length;
+    const item = schedule[index];
+
+    if (!item?.file || getSafeItemDuration(item) <= 0) {
+      continue;
+    }
+
+    const firstItem = offset === 0;
+    const itemDuration = getSafeItemDuration(item);
+    const playbackDuration = firstItem
+      ? Math.max(1, itemDuration - Math.max(0, currentElapsed))
+      : itemDuration;
+    const startTime = firstItem
+      ? Math.max(0, currentSourceElapsed)
+      : getSourceStart(item);
+
+    const mediaUrl = getAbsoluteAssetUrl(item.file);
+
+    if (!mediaUrl) {
+      continue;
+    }
+
+    entries.push({
+      id: `${item.id}-${index}-${offset}`,
+      url: mediaUrl,
+      mimeType: getCastMimeType(item),
+      title: getDisplayTitle(item),
+      subtitle: `${channelName}${item.segmentLabel ? ` • ${item.segmentLabel}` : ""}`,
+      poster: getAbsoluteAssetUrl(item.poster),
+      startTime,
+      playbackDuration,
+    });
+
+    queuedSeconds += playbackDuration;
+  }
+
+  return entries;
 }
 
 export default function Player({ schedule }: PlayerProps) {
@@ -484,10 +590,21 @@ export default function Player({ schedule }: PlayerProps) {
   const wakeLockRef = useRef<ScreenWakeLockSentinelLike | null>(null);
   const castMessageTimerRef = useRef<number | null>(null);
   const fullscreenBusyTimerRef = useRef<number | null>(null);
+  const lastCastQueueKeyRef = useRef("");
+  const wasCastingRef = useRef(false);
+  const isCastingRef = useRef(false);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
   const fitMode = usePlayerControls((state) => state.fitMode);
+  const {
+    remote: castRemote,
+    deviceName: castDeviceName,
+    loadQueue: loadCastQueue,
+  } = useGoogleCast();
+
+  isCastingRef.current = castRemote.isConnected;
+
   const fullscreenRequestId = usePlayerControls(
     (state) => state.fullscreenRequestId,
   );
@@ -504,9 +621,18 @@ export default function Player({ schedule }: PlayerProps) {
   const [fallbackFullscreen, setFallbackFullscreen] = useState(false);
   const [isElementFullscreen, setIsElementFullscreen] = useState(false);
   const [isNativeVideoFullscreen, setIsNativeVideoFullscreen] = useState(false);
+  const [watchOnTvOpen, setWatchOnTvOpen] = useState(false);
+  const [castSyncRequestId, setCastSyncRequestId] = useState(0);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
+  const liveRef = useRef(live);
+  liveRef.current = live;
+
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+  const scheduleSignature = useMemo(
+    () => schedule.map((item) => getPlaybackKey(item)).join("~"),
+    [schedule],
+  );
 
   const orderedChannels = useMemo(() => sortChannelsByNumber(channels), [channels]);
   const currentChannel = useMemo(
@@ -609,6 +735,10 @@ export default function Player({ schedule }: PlayerProps) {
       const video = videoRef.current;
       const item = live.item;
 
+      if (castRemote.isConnected) {
+        return;
+      }
+
       if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
         return;
       }
@@ -634,13 +764,20 @@ export default function Player({ schedule }: PlayerProps) {
         // Seeking can be rejected briefly while metadata settles.
       }
     },
-    [live.item, live.sourceElapsed],
+    [castRemote.isConnected, live.item, live.sourceElapsed],
   );
 
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
 
     if (!video) {
+      return;
+    }
+
+    if (castRemote.isConnected) {
+      video.pause();
+      setStatus("playing");
+      setMessage("");
       return;
     }
 
@@ -656,7 +793,7 @@ export default function Player({ schedule }: PlayerProps) {
       setStatus("paused");
       setMessage("Tap to start playback.");
     }
-  }, [applyAudio]);
+  }, [applyAudio, castRemote.isConnected]);
 
   const loadCurrentSource = useCallback(() => {
     const video = videoRef.current;
@@ -828,16 +965,104 @@ export default function Player({ schedule }: PlayerProps) {
     });
   }, [exitFullscreenView, toggleGuide]);
 
-  const openPlaybackTarget = useCallback(async () => {
+  const openAirPlayTarget = useCallback(async (): Promise<string> => {
     const video = videoRef.current;
 
     if (!video) {
+      return "The video player is not ready yet.";
+    }
+
+    const result = await requestAirPlayTarget(video);
+    setTimedCastMessage(result);
+    return result;
+  }, [setTimedCastMessage]);
+
+  const requestCastLiveSync = useCallback(() => {
+    lastCastQueueKeyRef.current = "";
+    setTimedCastMessage("Resyncing the live channel on your TV...");
+    setCastSyncRequestId((value) => value + 1);
+  }, [setTimedCastMessage]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!castRemote.isConnected) {
+      lastCastQueueKeyRef.current = "";
+
+      if (wasCastingRef.current) {
+        wasCastingRef.current = false;
+        setNowMs(Date.now());
+        loadCurrentSource();
+      }
+
       return;
     }
 
-    const result = await requestPlaybackTarget(video);
-    setTimedCastMessage(result);
-  }, [setTimedCastMessage]);
+    wasCastingRef.current = true;
+    video?.pause();
+    setStatus("playing");
+    setMessage("");
+
+    const channelName = currentChannel?.branding?.displayName ?? currentChannel?.name ?? "Tate's TV";
+    const queueKey = `${currentChannelId}|${scheduleSignature}`;
+
+    if (lastCastQueueKeyRef.current === queueKey) {
+      return;
+    }
+
+    const castLive = liveRef.current;
+    const entries = buildCastQueueEntries(
+      schedule,
+      castLive.index,
+      castLive.elapsed,
+      castLive.sourceElapsed,
+      `${getChannelLabel(currentChannel)} • ${channelName}`,
+    );
+
+    if (entries.length === 0) {
+      setTimedCastMessage("Nothing is scheduled to send to the TV.");
+      return;
+    }
+
+    lastCastQueueKeyRef.current = queueKey;
+
+    void loadCastQueue({
+      entries,
+      queueName: `${getChannelLabel(currentChannel)} • ${channelName}`,
+      queueDescription: "Tate's TV live scheduled channel",
+      channelId: currentChannelId,
+    }).then((loaded) => {
+      if (loaded) {
+        setTimedCastMessage(
+          `Playing on ${castDeviceName || "your TV"}.`,
+        );
+        return;
+      }
+
+      lastCastQueueKeyRef.current = "";
+      setTimedCastMessage("The TV connected, but the live channel could not be loaded.");
+    });
+  }, [
+    castDeviceName,
+    castRemote.isConnected,
+    castSyncRequestId,
+    currentChannel,
+    currentChannelId,
+    loadCastQueue,
+    loadCurrentSource,
+    schedule,
+    scheduleSignature,
+    setTimedCastMessage,
+  ]);
+
+  useEffect(() => {
+    if (!castRemote.isConnected) {
+      return;
+    }
+
+    const video = videoRef.current;
+    video?.pause();
+  }, [castRemote.isConnected]);
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -875,11 +1100,17 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
+    if (castRemote.isConnected) {
+      lastPlaybackKeyRef.current = playbackKey;
+      video.pause();
+      return;
+    }
+
     if (lastPlaybackKeyRef.current !== playbackKey) {
       lastPlaybackKeyRef.current = playbackKey;
       loadCurrentSource();
     }
-  }, [live.item, loadCurrentSource, playbackKey]);
+  }, [castRemote.isConnected, live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -912,7 +1143,7 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handlePause = () => {
-      if (sourceTransitionRef.current) {
+      if (sourceTransitionRef.current || isCastingRef.current) {
         return;
       }
 
@@ -922,11 +1153,19 @@ export default function Player({ schedule }: PlayerProps) {
     };
 
     const handleError = () => {
+      if (isCastingRef.current) {
+        return;
+      }
+
       setStatus("error");
       setMessage(getErrorMessage(video));
     };
 
     const handleEnded = () => {
+      if (isCastingRef.current) {
+        return;
+      }
+
       setNowMs(Date.now());
       hardSyncPosition({ force: true });
       void tryPlay();
@@ -1201,7 +1440,7 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(displayElapsed)} / {formatTime(itemDuration)}
-          {live.item.segmentLabel && !isBreak ? ` / $""` : ""}
+          {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
         </div>
       </div>
 
@@ -1258,11 +1497,11 @@ export default function Player({ schedule }: PlayerProps) {
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            void openPlaybackTarget();
+            setWatchOnTvOpen(true);
           }}
           className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
         >
-          Cast
+          Watch on TV
         </button>
 
         {fullscreenActive ? (
@@ -1278,6 +1517,19 @@ export default function Player({ schedule }: PlayerProps) {
           </button>
         ) : null}
       </div>
+
+      {castRemote.isConnected ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setWatchOnTvOpen(true);
+          }}
+          className="absolute right-3 top-3 z-40 max-w-[calc(100%-1.5rem)] rounded-full border border-emerald-300/30 bg-emerald-300/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100 shadow-xl backdrop-blur-md transition hover:bg-emerald-300/20"
+        >
+          Playing on {castDeviceName || "TV"}
+        </button>
+      ) : null}
 
       {castMessage ? (
         <div className="pointer-events-none absolute bottom-[5.8rem] left-1/2 z-40 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl border border-white/15 bg-black/80 px-3 py-2 text-center text-xs font-semibold text-white shadow-2xl backdrop-blur-md">
@@ -1307,6 +1559,25 @@ export default function Player({ schedule }: PlayerProps) {
       >
         {status}
       </div>
+
+      <WatchOnTVModal
+        open={watchOnTvOpen}
+        onClose={() => setWatchOnTvOpen(false)}
+        onAirPlay={openAirPlayTarget}
+        onPreviousChannel={() => stepChannel("previous")}
+        onNextChannel={() => stepChannel("next")}
+        onOpenGuide={() => {
+          setWatchOnTvOpen(false);
+          openGuideFromFullscreen();
+        }}
+        onSyncLive={requestCastLiveSync}
+        currentTitle={title}
+        channelLabel={getChannelLabel(currentChannel)}
+        channelName={
+          currentChannel?.branding?.displayName ?? currentChannel?.name ?? "Tate's TV"
+        }
+        channelId={currentChannelId}
+      />
     </div>
   );
 }

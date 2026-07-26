@@ -1,0 +1,42 @@
+/* Tate's TV living-room mode */
+.ttv-tv-mode {
+  min-height: 100dvh;
+  background: #000 !important;
+}
+
+.ttv-tv-mode > .ttv-page-frame {
+  max-width: none !important;
+  min-height: 100dvh;
+  padding: clamp(0.5rem, 1.2vw, 1rem) !important;
+}
+
+.ttv-tv-mode .ttv-main-header,
+.ttv-tv-mode footer {
+  display: none !important;
+}
+
+.ttv-tv-mode .ttv-tv-player-frame {
+  min-height: min(78dvh, calc(100vw * 0.5625));
+  border-radius: clamp(0.75rem, 1.4vw, 1.5rem);
+}
+
+.ttv-tv-mode .ttv-touch-target {
+  min-height: 52px;
+  min-width: 52px;
+}
+
+@media (min-width: 1200px) {
+  .ttv-tv-mode > .ttv-page-frame {
+    gap: 0.75rem !important;
+  }
+
+  .ttv-tv-mode .ttv-tv-player-frame {
+    min-height: calc(100dvh - 12rem);
+  }
+}
+
+@media (max-height: 720px) and (min-width: 900px) {
+  .ttv-tv-mode .ttv-tv-player-frame {
+    min-height: calc(100dvh - 8rem);
+  }
+}

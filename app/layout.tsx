@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import InstallPromptBanner from "@/components/InstallPromptBanner";
+import { GoogleCastProvider } from "@/components/GoogleCastProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const FALLBACK_SITE_URL = "https://www.tatestv.ca";
@@ -230,7 +231,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <JsonLd />
         <ServiceWorkerRegister />
         <InstallPromptBanner />
-        {children}
+        <GoogleCastProvider>{children}</GoogleCastProvider>
         <Analytics />
       </body>
     </html>

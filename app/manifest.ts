@@ -14,6 +14,21 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#020617",
     categories: ["entertainment", "video", "utilities"],
     lang: "en-CA",
+    shortcuts: [
+      {
+        name: "Open Tate's TV Mode",
+        short_name: "TV Mode",
+        description: "Open the fullscreen-first living-room experience.",
+        url: "/tv",
+        icons: [
+          {
+            src: "/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+        ],
+      },
+    ],
     icons: [
       {
         src: "/icon.svg",
