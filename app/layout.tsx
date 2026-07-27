@@ -6,6 +6,9 @@ import { Analytics } from "@vercel/analytics/next";
 import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { GoogleCastProvider } from "@/components/GoogleCastProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import ThemeBootstrapScript from "@/components/ThemeBootstrapScript";
+import ThemeRuntime from "@/components/ThemeRuntime";
+import { getDefaultTheme } from "@/lib/themes";
 
 const FALLBACK_SITE_URL = "https://www.tatestv.ca";
 const DEFAULT_OG_IMAGE = "/opengraph-image.png";
@@ -15,6 +18,8 @@ const APP_SHORT_NAME = "TTV";
 const APP_AUTHOR = "Tate Byers";
 const APP_LOCALE = "en_CA";
 const APP_THEME_COLOR = "#020617";
+
+const DEFAULT_THEME = getDefaultTheme();
 
 const APP_DESCRIPTION =
   "Tate's TV is a retro live-TV simulator with custom channels, scheduled programming, nostalgic guide styling, and premium visual themes.";
@@ -153,10 +158,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
   themeColor: APP_THEME_COLOR,
-  colorScheme: "dark",
+  colorScheme: "dark light",
 };
 
 type RootLayoutProps = Readonly<{
@@ -226,10 +230,20 @@ function JsonLd() {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en-CA" suppressHydrationWarning>
-      <body className="min-h-screen bg-[#020617] antialiased selection:bg-cyan-300/30 selection:text-white">
+    <html
+      lang="en-CA"
+      data-ttv-theme={DEFAULT_THEME.id}
+      data-ttv-category={DEFAULT_THEME.category}
+      data-ttv-layout={DEFAULT_THEME.layout}
+      data-ttv-appearance={DEFAULT_THEME.appearance}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <body className="ttv-root-body min-h-screen antialiased">
+        <ThemeBootstrapScript />
         <JsonLd />
         <ServiceWorkerRegister />
+        <ThemeRuntime />
         <InstallPromptBanner />
         <GoogleCastProvider>{children}</GoogleCastProvider>
         <Analytics />

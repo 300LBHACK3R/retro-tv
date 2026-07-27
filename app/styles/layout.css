@@ -1,0 +1,225 @@
+.ttv-root-body {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--app-bg);
+  color: var(--text);
+}
+
+.ttv-app-shell,
+.ttv-library-shell,
+.ttv-submit-page,
+.ttv-ops-screen,
+.ttv-launch-screen {
+  position: relative;
+  isolation: isolate;
+  background: var(--app-bg);
+  color: var(--text);
+  transition:
+    background-color 220ms ease,
+    color 180ms ease;
+}
+
+.ttv-app-shell::before,
+.ttv-library-shell::before,
+.ttv-submit-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: var(--ttv-ambient-bg);
+  opacity: var(--ttv-ambient-opacity);
+}
+
+.ttv-app-shell::after,
+.ttv-library-shell::after,
+.ttv-submit-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ttv-texture-bg);
+  background-size: var(--ttv-texture-size);
+  opacity: var(--ttv-texture-opacity);
+}
+
+.ttv-page-frame {
+  position: relative;
+  z-index: 1;
+}
+
+.ttv-main-header,
+.ttv-glass-panel,
+.ttv-glass-panel-strong,
+.ttv-surface {
+  border: var(--ttv-border-width) solid var(--border);
+  border-radius: var(--ttv-radius-panel);
+  background: var(--panel-bg);
+  box-shadow: var(--ttv-shadow-panel);
+  color: var(--text);
+}
+
+.ttv-main-header,
+.ttv-glass-panel {
+  -webkit-backdrop-filter: blur(var(--ttv-panel-blur));
+  backdrop-filter: blur(var(--ttv-panel-blur));
+}
+
+.ttv-glass-panel-strong {
+  background: var(--panel-alt-bg);
+  box-shadow: var(--ttv-shadow-elevated);
+}
+
+.ttv-main-header {
+  position: relative;
+  overflow: visible;
+  padding: clamp(0.7rem, 1.25vw, 1rem);
+}
+
+.ttv-main-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--ttv-header-highlight);
+  opacity: 0.76;
+}
+
+.ttv-brand-lockup {
+  display: flex;
+  align-items: center;
+  min-height: 4rem;
+}
+
+.ttv-brand-lockup img {
+  filter: var(--ttv-logo-filter);
+  transition: filter 180ms ease, transform 180ms ease;
+}
+
+.ttv-header-actions {
+  align-items: stretch;
+}
+
+.ttv-header-actions > * {
+  flex: 0 0 auto;
+}
+
+.ttv-action-button,
+.ttv-themed-button,
+.ttv-header-actions :where(a, button),
+.theme-trigger {
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-control);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.ttv-action-button:hover:not(:disabled),
+.ttv-themed-button:hover:not(:disabled),
+.ttv-header-actions :where(a, button):hover:not(:disabled),
+.theme-trigger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 76%, var(--border));
+  background: var(--button-hover);
+  box-shadow: var(--ttv-shadow-control-hover);
+}
+
+.ttv-action-button:active:not(:disabled),
+.ttv-themed-button:active:not(:disabled),
+.ttv-header-actions :where(a, button):active:not(:disabled),
+.theme-trigger:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.ttv-primary-action {
+  border-color: color-mix(in srgb, var(--primary) 74%, transparent) !important;
+  background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+  color: var(--on-primary) !important;
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--primary) 22%, transparent) !important;
+}
+
+.ttv-muted-copy {
+  color: var(--text-muted);
+}
+
+.ttv-kicker {
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Uploaded station logos render as broadcast bugs, never as boxed thumbnails. */
+img[src*="/channel-logos/"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+@supports selector(:has(*)) {
+  :where(div, span, figure):has(> img[src*="/channel-logos/"]) {
+    width: clamp(8.25rem, 9vw, 10.75rem) !important;
+    height: clamp(8.25rem, 9vw, 10.75rem) !important;
+    min-width: clamp(8.25rem, 9vw, 10.75rem) !important;
+    min-height: clamp(8.25rem, 9vw, 10.75rem) !important;
+    overflow: visible !important;
+    border-color: transparent !important;
+    outline: 0 !important;
+    padding: 0.35rem !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  :where(div, span, figure):has(> img[src*="/channel-logos/"]) > img[src*="/channel-logos/"] {
+    transform: scale(1.16);
+    transform-origin: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .ttv-main-header {
+    border-radius: var(--ttv-radius-mobile);
+  }
+
+  .ttv-brand-lockup {
+    justify-content: center;
+  }
+
+  .ttv-header-actions {
+    display: grid !important;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ttv-header-actions > * {
+    width: 100%;
+  }
+
+  .ttv-header-actions :where(a, button) {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .ttv-header-actions {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,18 @@
+.ttv-theme-marketplace {
+  background: var(--panel-bg);
+  color: var(--text);
+}
+
+.ttv-theme-card[data-theme-locked="true"] {
+  opacity: 0.82;
+}
+
+.ttv-theme-preview {
+  background: var(--theme-preview, linear-gradient(135deg, var(--primary), var(--secondary)));
+}
+
+.theme-unlock-button {
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: var(--on-primary);
+}

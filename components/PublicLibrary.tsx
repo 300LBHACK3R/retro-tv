@@ -11,7 +11,10 @@ import {
 } from "react";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import TextEncodingCleaner from "@/components/TextEncodingCleaner";
+import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
+import { getThemeLayoutClass } from "@/lib/themeLayouts";
+import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { MediaItem, MediaType } from "@/lib/types";
 
@@ -349,6 +352,17 @@ function Poster({ group }: { group: LibraryGroup }) {
 export default function PublicLibrary() {
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
+  const themeId = useStore((state) => state.themeId);
+
+  const theme = useMemo(() => getThemeById(themeId), [themeId]);
+  const themeLayoutClass = useMemo(
+    () => getThemeLayoutClass(themeId),
+    [themeId],
+  );
+  const themeVars = useMemo(
+    () => createThemeCssVars(theme) as CSSProperties,
+    [theme],
+  );
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -595,25 +609,26 @@ export default function PublicLibrary() {
   }
 
   const pageStyle = {
-    "--library-border": "rgba(34,211,238,0.24)",
-    "--library-panel": "rgba(9,15,32,0.88)",
+    ...themeVars,
+    "--library-border": "var(--border)",
+    "--library-panel": "var(--panel-bg)",
   } as CSSProperties;
 
   return (
     <main
-      className="ttv-library-shell ttv-layout-neon-crt-broadcast min-h-screen bg-[#020617] text-white"
+      className={`ttv-library-shell ${themeLayoutClass} min-h-screen`}
       style={pageStyle}
     >
       <TextEncodingCleaner />
       <GlobalProgrammingSync isAdminAuthorized={false} />
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
-        <div className="absolute right-0 top-24 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/10 blur-3xl" />
+      <div className="ttv-library-ambient pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="ttv-library-ambient__primary absolute -left-32 top-0 h-96 w-96 rounded-full blur-3xl" />
+        <div className="ttv-library-ambient__secondary absolute right-0 top-24 h-[28rem] w-[28rem] rounded-full blur-3xl" />
       </div>
 
-      <header className="sticky top-0 z-40 border-b border-cyan-300/15 bg-[#020617]/90 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1700px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <header className="ttv-library-header sticky top-0 z-40 border-b backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1700px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" aria-label="Back to Tate's TV live channels">
             <Image
               src="/tatestv-logo.png"
@@ -625,7 +640,8 @@ export default function PublicLibrary() {
             />
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ThemeButton />
             <span className="hidden rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200 sm:inline-flex">
               Free at launch
             </span>

@@ -1,0 +1,26 @@
+:root[data-ttv-layout="neon-arcade"],
+.ttv-layout-neon-arcade {
+  --ttv-radius-shell: 1.55rem;
+  --ttv-radius-panel: 1rem;
+  --ttv-radius-mobile: 0.85rem;
+  --ttv-radius-control: 0.65rem;
+  --ttv-radius-player: 0.95rem;
+  --ttv-panel-blur: 16px;
+  --ttv-texture-opacity: 0.24;
+  --ttv-texture-size: 36px 36px;
+  --ttv-texture-bg:
+    linear-gradient(color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--secondary) 6%, transparent) 1px, transparent 1px);
+  --ttv-header-highlight: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent 42%, color-mix(in srgb, var(--secondary) 12%, transparent));
+  --ttv-logo-filter:
+    drop-shadow(0 0 14px color-mix(in srgb, var(--primary) 38%, transparent))
+    drop-shadow(0 0 24px color-mix(in srgb, var(--secondary) 24%, transparent));
+}
+
+:root[data-ttv-layout="neon-arcade"] :where(.ttv-main-header, .ttv-glass-panel, .ttv-guide-shell),
+.ttv-layout-neon-arcade :where(.ttv-main-header, .ttv-glass-panel, .ttv-guide-shell) {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent),
+    0 0 34px color-mix(in srgb, var(--secondary) 10%, transparent),
+    var(--ttv-shadow-panel);
+}

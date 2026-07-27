@@ -1,0 +1,33 @@
+:root[data-ttv-layout="cartoon-pop"],
+.ttv-layout-cartoon-pop {
+  --ttv-radius-shell: 2.1rem;
+  --ttv-radius-panel: 1.6rem;
+  --ttv-radius-mobile: 1.2rem;
+  --ttv-radius-control: 1rem;
+  --ttv-radius-player: 1.4rem;
+  --ttv-border-width: 2px;
+  --ttv-panel-blur: 10px;
+  --ttv-texture-opacity: 0.2;
+  --ttv-texture-size: 56px 56px;
+  --ttv-texture-bg:
+    radial-gradient(circle, color-mix(in srgb, var(--primary) 12%, transparent) 0 4px, transparent 4px 100%);
+  --ttv-header-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 46%);
+  --ttv-logo-filter:
+    drop-shadow(3px 4px 0 color-mix(in srgb, var(--secondary) 42%, transparent))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 22%, transparent));
+  --ttv-shadow-panel:
+    0 10px 0 color-mix(in srgb, var(--secondary) 22%, rgba(0, 0, 0, 0.35)),
+    0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-ttv-layout="cartoon-pop"] :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button),
+.ttv-layout-cartoon-pop :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button) {
+  font-weight: 950;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--secondary) 28%, rgba(0, 0, 0, 0.35));
+}
+
+:root[data-ttv-layout="cartoon-pop"] :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button):active,
+.ttv-layout-cartoon-pop :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button):active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--secondary) 28%, rgba(0, 0, 0, 0.35));
+}

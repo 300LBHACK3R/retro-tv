@@ -21,7 +21,7 @@ import ViewerHeader from "@/components/ViewerHeader";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
-import { getThemeById } from "@/lib/themes";
+import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import type { Channel, MediaItem } from "@/lib/types";
 
 const MultiGuide = dynamic(() => import("@/components/MultiGuide"), {
@@ -79,25 +79,6 @@ function getMediaForChannel(
 
 function isCommercialInventoryItem(item: MediaItem): boolean {
   return item.type === "commercial" || item.type === "bumper";
-}
-
-function createThemeVars(theme: ReturnType<typeof getThemeById>): CSSProperties {
-  return {
-    "--app-bg": theme.colors.appBg,
-    "--panel-bg": theme.colors.panelBg,
-    "--panel-alt-bg": theme.colors.panelAltBg,
-    "--border": theme.colors.border,
-    "--text": theme.colors.text,
-    "--text-muted": theme.colors.textMuted,
-    "--button-bg": theme.colors.buttonBg,
-    "--button-hover": theme.colors.buttonHover,
-    "--primary": theme.colors.primary,
-    "--guide-header-bg": theme.colors.guideHeaderBg,
-    "--guide-row-bg": theme.colors.guideRowBg,
-    "--guide-row-alt-bg": theme.colors.guideRowAltBg,
-    "--guide-active-bg": theme.colors.guideActiveBg,
-    "--guide-current-bg": theme.colors.guideCurrentBg,
-  } as CSSProperties;
 }
 
 function getSharedScheduleAnchor(): Date {
@@ -179,7 +160,10 @@ function EmptyStationState() {
         Tate&apos;s TV
       </div>
 
-      <h2 className="mt-2 text-lg font-black tracking-tight text-white">
+      <h2
+        className="mt-2 text-lg font-black tracking-tight"
+        style={{ color: "var(--text)" }}
+      >
         No Enabled Channels
       </h2>
 
@@ -229,7 +213,10 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
   );
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
-  const themeVars = useMemo(() => createThemeVars(theme), [theme]);
+  const themeVars = useMemo(
+    () => createThemeCssVars(theme) as CSSProperties,
+    [theme],
+  );
   const themeLayoutClass = useMemo(() => getThemeLayoutClass(themeId), [themeId]);
 
   const enabledChannels = useMemo(
@@ -410,6 +397,7 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
               width={260}
               height={90}
               className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
+              style={{ height: "auto" }}
               draggable={false}
               priority
             />
@@ -431,13 +419,7 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
             </a>
             <a
               href="/submit"
-              className="ttv-touch-target inline-flex items-center justify-center rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
-              style={{
-                background: "linear-gradient(135deg, rgba(255, 79, 139, 0.24), rgba(55, 216, 255, 0.18))",
-                borderColor: "rgba(255, 255, 255, 0.24)",
-                color: "var(--text)",
-                boxShadow: "0 0 22px rgba(255, 79, 139, 0.18)",
-              }}
+              className="ttv-primary-action ttv-touch-target inline-flex items-center justify-center rounded-xl border px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:scale-[1.02] hover:opacity-95"
             >
               Submit Clip
             </a>
@@ -645,11 +627,13 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
         >
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3 sm:mb-3">
             <div className="min-w-0">
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-white/55">
+              <div className="text-xs font-black uppercase tracking-[0.2em]"
+                style={{ color: "var(--text-muted)" }}>
                 Tate&apos;s TV
               </div>
 
-              <div className="text-lg font-black text-white sm:text-xl">
+              <div className="text-lg font-black sm:text-xl"
+                style={{ color: "var(--text)" }}>
                 Live Guide
               </div>
             </div>

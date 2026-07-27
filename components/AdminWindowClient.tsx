@@ -12,8 +12,10 @@ import {
 import AdminDashboard from "@/components/AdminDashboard";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import TextEncodingCleaner from "@/components/TextEncodingCleaner";
+import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
-import { getThemeById } from "@/lib/themes";
+import { getThemeLayoutClass } from "@/lib/themeLayouts";
+import { createThemeCssVars, getThemeById } from "@/lib/themes";
 
 type AccessStatus = "checking" | "locked" | "authorized" | "error";
 
@@ -27,27 +29,6 @@ type LoginResponse = {
   error?: string;
 };
 
-function createThemeVars(
-  theme: ReturnType<typeof getThemeById>,
-): CSSProperties {
-  return {
-    "--app-bg": theme.colors.appBg,
-    "--panel-bg": theme.colors.panelBg,
-    "--panel-alt-bg": theme.colors.panelAltBg,
-    "--border": theme.colors.border,
-    "--text": theme.colors.text,
-    "--text-muted": theme.colors.textMuted,
-    "--button-bg": theme.colors.buttonBg,
-    "--button-hover": theme.colors.buttonHover,
-    "--primary": theme.colors.primary,
-    "--guide-header-bg": theme.colors.guideHeaderBg,
-    "--guide-row-bg": theme.colors.guideRowBg,
-    "--guide-row-alt-bg": theme.colors.guideRowAltBg,
-    "--guide-active-bg": theme.colors.guideActiveBg,
-    "--guide-current-bg": theme.colors.guideCurrentBg,
-  } as CSSProperties;
-}
-
 async function readJsonSafe<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -60,7 +41,14 @@ export default function AdminWindowClient() {
   const themeId = useStore((state) => state.themeId);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
-  const themeVars = useMemo(() => createThemeVars(theme), [theme]);
+  const themeVars = useMemo(
+    () => createThemeCssVars(theme) as CSSProperties,
+    [theme],
+  );
+  const themeLayoutClass = useMemo(
+    () => getThemeLayoutClass(themeId),
+    [themeId],
+  );
 
   const [status, setStatus] = useState<AccessStatus>("checking");
   const [authorized, setAuthorized] = useState(false);
@@ -181,7 +169,7 @@ export default function AdminWindowClient() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden"
+      className={`ttv-admin-shell ttv-app-shell ${themeLayoutClass} min-h-screen overflow-x-hidden`}
       style={{
         ...themeVars,
         background:
@@ -231,6 +219,8 @@ export default function AdminWindowClient() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <ThemeButton />
+
             <button
               type="button"
               onClick={returnToTv}

@@ -191,11 +191,11 @@ export default function WatchOnTVModal({
         aria-modal="true"
         aria-labelledby="watch-on-tv-title"
         tabIndex={-1}
-        className="max-h-[96dvh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-white/15 bg-[rgba(3,7,18,0.97)] p-4 text-white shadow-[0_0_80px_rgba(55,216,255,0.18)] outline-none sm:max-h-[90dvh] sm:rounded-3xl sm:p-6"
+        className="ttv-watch-tv-modal max-h-[96dvh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-white/15 bg-[rgba(3,7,18,0.97)] p-4 text-white shadow-[0_0_80px_rgba(55,216,255,0.18)] outline-none sm:max-h-[90dvh] sm:rounded-3xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300/80">
+            <div className="ttv-watch-label text-[10px] font-black uppercase tracking-[0.24em]">
               Tate&apos;s TV Living Room
             </div>
             <h2
@@ -204,7 +204,7 @@ export default function WatchOnTVModal({
             >
               Watch on TV
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
+            <p className="ttv-watch-muted mt-2 max-w-2xl text-sm leading-6">
               Use Google Cast, AirPlay, or open Tate&apos;s TV directly in the
               television browser. The current live channel stays selected.
             </p>
@@ -213,27 +213,27 @@ export default function WatchOnTVModal({
           <button
             type="button"
             onClick={onClose}
-            className="ttv-touch-target shrink-0 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:bg-white/15"
+            className="ttv-themed-button ttv-touch-target shrink-0 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:bg-white/15"
           >
             Close
           </button>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
+        <div className="ttv-watch-card mt-5 rounded-2xl border p-4">
+          <div className="ttv-watch-muted text-[10px] font-black uppercase tracking-[0.18em]">
             Live Now
           </div>
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-sm font-black uppercase tracking-[0.12em] text-cyan-300">
+            <span className="ttv-watch-accent text-sm font-black uppercase tracking-[0.12em]">
               {channelLabel}
             </span>
             <span className="text-lg font-black">{channelName}</span>
           </div>
-          <div className="mt-2 truncate text-sm text-white/65">{currentTitle}</div>
+          <div className="ttv-watch-muted mt-2 truncate text-sm">{currentTitle}</div>
         </div>
 
         {connected ? (
-          <section className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-300/[0.08] p-4">
+          <section className="ttv-watch-status mt-4 rounded-2xl border p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-200/70">
@@ -266,35 +266,35 @@ export default function WatchOnTVModal({
                 type="button"
                 onClick={playOrPause}
                 disabled={!remote.canPause}
-                className="ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition enabled:hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition enabled:hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {remote.isPaused ? "Play" : "Pause"}
               </button>
               <button
                 type="button"
                 onClick={muteOrUnmute}
-                className="ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
               >
                 {remote.isMuted ? "Unmute" : "Mute"}
               </button>
               <button
                 type="button"
                 onClick={onPreviousChannel}
-                className="ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
               >
                 CH −
               </button>
               <button
                 type="button"
                 onClick={onNextChannel}
-                className="ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
               >
                 CH +
               </button>
               <button
                 type="button"
                 onClick={onSyncLive}
-                className="ttv-touch-target col-span-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] text-cyan-50 transition hover:bg-cyan-300/15 sm:col-span-1"
+                className="ttv-themed-button ttv-touch-target col-span-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] text-cyan-50 transition hover:bg-cyan-300/15 sm:col-span-1"
               >
                 Sync Live
               </button>
@@ -318,7 +318,7 @@ export default function WatchOnTVModal({
         ) : null}
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-4">
+          <section className="ttv-watch-card rounded-2xl border p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-black">Google Cast</div>
@@ -336,7 +336,7 @@ export default function WatchOnTVModal({
               type="button"
               onClick={() => void startGoogleCast()}
               disabled={!castAvailable || isStartingCast}
-              className="ttv-touch-target mt-4 w-full rounded-xl bg-gradient-to-r from-cyan-300 to-blue-400 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-950 shadow-lg shadow-cyan-400/20 transition enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
+              className="ttv-primary-action ttv-themed-button ttv-touch-target mt-4 w-full rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-950 shadow-lg shadow-cyan-400/20 transition enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
             >
               {isStartingCast
                 ? "Opening devices..."
@@ -358,7 +358,7 @@ export default function WatchOnTVModal({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-300/[0.05] p-4">
+          <section className="ttv-watch-card rounded-2xl border p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-black">AirPlay</div>
@@ -375,13 +375,13 @@ export default function WatchOnTVModal({
             <button
               type="button"
               onClick={() => void startAirPlay()}
-              className="ttv-touch-target mt-4 w-full rounded-xl border border-fuchsia-200/25 bg-fuchsia-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-fuchsia-50 transition hover:bg-fuchsia-300/15"
+              className="ttv-themed-button ttv-touch-target mt-4 w-full rounded-xl border border-fuchsia-200/25 bg-fuchsia-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-fuchsia-50 transition hover:bg-fuchsia-300/15"
             >
               Open AirPlay Picker
             </button>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+          <section className="ttv-watch-card rounded-2xl border p-4">
             <div className="text-sm font-black">TV Mode</div>
             <p className="mt-1 text-xs leading-5 text-white/55">
               Open a fullscreen-first, remote-friendly Tate&apos;s TV layout on a
@@ -390,13 +390,13 @@ export default function WatchOnTVModal({
             <button
               type="button"
               onClick={openTvMode}
-              className="ttv-touch-target mt-4 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] transition hover:bg-white/15"
+              className="ttv-themed-button ttv-touch-target mt-4 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] transition hover:bg-white/15"
             >
               Open TV Mode
             </button>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+          <section className="ttv-watch-card rounded-2xl border p-4">
             <div className="text-sm font-black">Open on Another Device</div>
             <p className="mt-1 break-all text-xs leading-5 text-white/55">
               {tvUrl}
@@ -405,14 +405,14 @@ export default function WatchOnTVModal({
               <button
                 type="button"
                 onClick={() => void copyTvLink()}
-                className="ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
               >
                 Copy Link
               </button>
               <button
                 type="button"
                 onClick={() => void shareTvLink()}
-                className="ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
               >
                 Share
               </button>
@@ -424,21 +424,21 @@ export default function WatchOnTVModal({
           <button
             type="button"
             onClick={onPreviousChannel}
-            className="ttv-touch-target rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10"
+            className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10"
           >
             Previous Channel
           </button>
           <button
             type="button"
             onClick={onNextChannel}
-            className="ttv-touch-target rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10"
+            className="ttv-themed-button ttv-touch-target rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10"
           >
             Next Channel
           </button>
           <button
             type="button"
             onClick={onOpenGuide}
-            className="ttv-touch-target col-span-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10 sm:col-span-1"
+            className="ttv-themed-button ttv-touch-target col-span-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/10 sm:col-span-1"
           >
             Open Guide
           </button>
@@ -456,7 +456,7 @@ export default function WatchOnTVModal({
           </div>
         ) : null}
 
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-[11px] leading-5 text-white/45">
+        <div className="ttv-watch-card ttv-watch-muted mt-4 rounded-xl border px-4 py-3 text-[11px] leading-5">
           For the smoothest television playback, media should be served over
           HTTPS as MP4/H.264/AAC or compatible HLS. Some television models still
           require their built-in browser, screen mirroring, or HDMI.

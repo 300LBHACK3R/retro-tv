@@ -1,8 +1,49 @@
-.ttv-launch-screen
-.ttv-launch-card
-.ttv-launch-logo
-.ttv-launch-actions
+.ttv-launch-screen {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+}
 
-.ttv-launch-hub-card
-.ttv-launch-status-grid
-.ttv-launch-hub-grid
+.ttv-launch-card,
+.ttv-launch-hub-card,
+.ttv-launch-hub-tile,
+.ttv-launch-status-card {
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-panel);
+  background: var(--panel-bg);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-panel);
+}
+
+.ttv-launch-logo {
+  filter: var(--ttv-logo-filter);
+}
+
+.ttv-launch-kicker,
+.ttv-launch-status-card strong {
+  color: var(--primary);
+}
+
+.ttv-launch-actions,
+.ttv-launch-status-grid,
+.ttv-launch-hub-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ttv-launch-actions a,
+.ttv-launch-link {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  background: var(--button-bg);
+  color: var(--text);
+}
+
+@media (min-width: 720px) {
+  .ttv-launch-status-grid,
+  .ttv-launch-hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

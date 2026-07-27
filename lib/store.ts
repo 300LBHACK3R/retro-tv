@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_THEME_ID, isThemeId } from "./themes";
+import { DEFAULT_THEME_ID, isThemeId, THEME_STORAGE_KEY } from "./themes";
 import type {
   AdCategory,
   AdChannelTarget,
@@ -88,7 +88,7 @@ interface AppState {
   exportProgrammingSnapshot: () => ProgrammingSnapshot;
 }
 
-export const programmingStoreName = "retro-tv-programming-v1";
+export const programmingStoreName = THEME_STORAGE_KEY;
 export const programmingStoreVersion = 6;
 
 const DEFAULT_CHANNEL_COUNT = 23;

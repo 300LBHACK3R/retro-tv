@@ -1,3 +1,31 @@
-.ttv-recovery-*
-.ttv-ops-*
-.ttv-backup-*
+:where(.ttv-ops-screen, .ttv-recovery-screen) {
+  min-height: 100dvh;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: var(--app-bg);
+  color: var(--text);
+}
+
+:where(.ttv-ops-card, .ttv-backup-upload) {
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-panel);
+  background: var(--panel-bg);
+  box-shadow: var(--ttv-shadow-panel);
+}
+
+:where(.ttv-ops-kicker, .ttv-ops-status) {
+  color: var(--primary);
+}
+
+.ttv-ops-logo {
+  filter: var(--ttv-logo-filter);
+}
+
+.ttv-ops-list {
+  color: var(--text-muted);
+}
+
+.ttv-ops-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

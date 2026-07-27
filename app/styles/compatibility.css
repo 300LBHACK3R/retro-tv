@@ -1,9 +1,28 @@
-.ttv-install-*
+:where(.ttv-install-card, .ttv-help-card, .ttv-readiness-card, .ttv-compat-card, .ttv-offline-card, .ttv-help-callout, .ttv-readiness-section) {
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-panel);
+  background: var(--panel-bg);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-panel);
+}
 
-.ttv-help-*
+:where(.ttv-install-grid, .ttv-help-grid, .ttv-readiness-grid, .ttv-compat-grid) {
+  display: grid;
+  gap: 1rem;
+}
 
-.ttv-readiness-*
+:where(.ttv-install-status, .ttv-readiness-score, .ttv-compat-check) {
+  color: var(--primary);
+}
 
-.ttv-compat-*
+.ttv-install-card-step {
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  background: var(--panel-alt-bg);
+}
 
-.ttv-offline-*
+@media (min-width: 760px) {
+  :where(.ttv-install-grid, .ttv-help-grid, .ttv-readiness-grid, .ttv-compat-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

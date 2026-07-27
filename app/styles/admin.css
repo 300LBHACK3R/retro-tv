@@ -1,7 +1,59 @@
-.admin-mobile-scroll
+.admin-mobile-scroll,
+.ttv-admin-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 
-admin panel scrolling
+.ttv-admin-shell {
+  color: var(--text);
+}
 
-modal scrolling
+.ttv-admin-shell :where(section, article, aside) {
+  border-color: var(--border);
+}
 
-dialog sizing
+.ttv-admin-shell :where(input, select, textarea) {
+  border-color: var(--border);
+  background: var(--panel-alt-bg);
+  color: var(--text);
+}
+
+.ttv-admin-shell :where(input, select, textarea)::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.ttv-admin-shell :where(input, select, textarea):focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 28%, transparent);
+}
+
+.ttv-admin-shell table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.ttv-admin-shell th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--guide-header-bg);
+  color: var(--text);
+}
+
+.ttv-admin-shell tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--panel-alt-bg) 75%, transparent);
+}
+
+.ttv-admin-shell :where(dialog, [role="dialog"]) {
+  max-width: min(96vw, 72rem);
+  max-height: min(92dvh, 64rem);
+}
+
+@media (max-width: 720px) {
+  .ttv-admin-shell :where(button, a, input, select) {
+    min-height: 44px;
+  }
+}

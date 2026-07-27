@@ -1,11 +1,161 @@
-:root
-html
-body
-*
-button
-a
-img
-video
-scrollbars
-focus-visible
-selection
+@layer base {
+  :root {
+    color-scheme: dark;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+    scrollbar-color: var(--primary) color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    scrollbar-width: thin;
+  }
+
+  html {
+    min-height: 100%;
+    background: var(--app-bg);
+    overscroll-behavior: none;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+    background: var(--app-bg);
+    color: var(--text);
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+    overscroll-behavior-x: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  [role="button"],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  video {
+    background: #000;
+  }
+
+  a {
+    color: inherit;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.18em;
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 34%, transparent);
+    color: var(--text);
+  }
+
+  ::-webkit-scrollbar {
+    width: 0.78rem;
+    height: 0.78rem;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--panel-bg) 86%, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 70%, var(--panel-alt-bg));
+    background-clip: padding-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  @media (forced-colors: active) {
+    :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+      outline: 3px solid CanvasText;
+    }
+  }
+}
+
+@layer utilities {
+  .ttv-no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .ttv-no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ttv-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .ttv-safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .ttv-safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  .ttv-text-balance {
+    text-wrap: balance;
+  }
+
+  .ttv-scroll-locked {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+}

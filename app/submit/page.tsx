@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
+import ThemeButton from "@/components/ThemeButton";
 
 import SubmitClipForm from "./SubmitClipForm";
 
@@ -30,6 +32,25 @@ const reviewSteps = [
 export default function SubmitClipPage() {
   return (
     <main className="ttv-submit-page">
+      <header className="ttv-submit-nav">
+        <Link href="/" aria-label="Back to Tate's TV live channels">
+          <Image
+            src="/tatestv-logo.png"
+            alt="Tate's TV"
+            width={210}
+            height={72}
+            className="h-auto w-[150px] sm:w-[190px]"
+            priority
+          />
+        </Link>
+
+        <nav className="ttv-submit-nav__actions" aria-label="Submission page navigation">
+          <ThemeButton />
+          <Link href="/library">Library</Link>
+          <Link href="/">Live TV</Link>
+        </nav>
+      </header>
+
       <section className="ttv-submit-hero">
         <div className="ttv-submit-hero-copy">
           <p className="ttv-submit-kicker">FailZone submissions</p>

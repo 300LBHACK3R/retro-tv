@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -20,6 +20,26 @@ function canUseServiceWorker(): boolean {
 
 function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
+}
+
+async function clearDevelopmentServiceWorkerState(): Promise<void> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+
+  await Promise.all(
+    registrations.map((registration) => registration.unregister()),
+  );
+
+  if (typeof caches === "undefined") {
+    return;
+  }
+
+  const cacheKeys = await caches.keys();
+
+  await Promise.all(
+    cacheKeys
+      .filter((cacheKey) => cacheKey.startsWith("tates-tv-"))
+      .map((cacheKey) => caches.delete(cacheKey)),
+  );
 }
 
 function postSkipWaiting(worker: ServiceWorker): void {
@@ -77,6 +97,9 @@ export default function ServiceWorkerRegister() {
     }
 
     if (!isProductionBuild()) {
+      void clearDevelopmentServiceWorkerState().catch(() => {
+        // Stale development caches must never break local rendering.
+      });
       return;
     }
 

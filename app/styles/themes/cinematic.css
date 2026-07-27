@@ -1,0 +1,36 @@
+:root[data-ttv-layout="cinematic-premium"],
+.ttv-layout-cinematic-premium {
+  --ttv-radius-shell: 1.65rem;
+  --ttv-radius-panel: 1.15rem;
+  --ttv-radius-mobile: 0.95rem;
+  --ttv-radius-control: 0.75rem;
+  --ttv-radius-player: 1.05rem;
+  --ttv-panel-blur: 20px;
+  --ttv-texture-opacity: 0.17;
+  --ttv-texture-size: 140px 140px;
+  --ttv-texture-bg:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.018) 25%, transparent 25%) 0 0 / 26px 26px,
+    radial-gradient(circle at center, transparent 45%, rgba(0, 0, 0, 0.3) 100%);
+  --ttv-header-highlight: linear-gradient(115deg, rgba(255, 255, 255, 0.055), transparent 42%, color-mix(in srgb, var(--primary) 8%, transparent));
+  --ttv-logo-filter: drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 26%, transparent));
+  --ttv-shadow-player:
+    0 34px 110px rgba(0, 0, 0, 0.64),
+    0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+:root[data-ttv-layout="cinematic-premium"] .ttv-main-header::after,
+.ttv-layout-cinematic-premium .ttv-main-header::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  bottom: -1px;
+  left: 1rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+:root[data-ttv-layout="cinematic-premium"] :where(.ttv-main-header, .ttv-glass-panel, .ttv-guide-shell),
+.ttv-layout-cinematic-premium :where(.ttv-main-header, .ttv-glass-panel, .ttv-guide-shell) {
+  border-color: color-mix(in srgb, var(--primary) 46%, var(--border));
+}
