@@ -61,6 +61,7 @@ const SOURCE_END_PADDING_SECONDS = 0.4;
 const FULLSCREEN_BUSY_UNLOCK_MS = 900;
 const CAST_MESSAGE_CLEAR_MS = 3500;
 const SOURCE_TRANSITION_RELEASE_MS = 150;
+const CONTROLS_HIDE_DELAY_MS = 3500;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -590,6 +591,7 @@ export default function Player({ schedule }: PlayerProps) {
   const wakeLockRef = useRef<ScreenWakeLockSentinelLike | null>(null);
   const castMessageTimerRef = useRef<number | null>(null);
   const fullscreenBusyTimerRef = useRef<number | null>(null);
+  const controlsHideTimerRef = useRef<number | null>(null);
   const lastCastQueueKeyRef = useRef("");
   const wasCastingRef = useRef(false);
   const isCastingRef = useRef(false);
@@ -623,6 +625,7 @@ export default function Player({ schedule }: PlayerProps) {
   const [isNativeVideoFullscreen, setIsNativeVideoFullscreen] = useState(false);
   const [watchOnTvOpen, setWatchOnTvOpen] = useState(false);
   const [castSyncRequestId, setCastSyncRequestId] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const liveRef = useRef(live);
@@ -643,6 +646,48 @@ export default function Player({ schedule }: PlayerProps) {
   const isBreak = Boolean(live.item && isBreakItem(live.item));
   const fullscreenActive =
     fallbackFullscreen || isElementFullscreen || isNativeVideoFullscreen;
+
+  const clearControlsHideTimer = useCallback(() => {
+    if (controlsHideTimerRef.current !== null) {
+      window.clearTimeout(controlsHideTimerRef.current);
+      controlsHideTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleControlsHide = useCallback(() => {
+    clearControlsHideTimer();
+
+    if (status !== "playing" || watchOnTvOpen) {
+      setControlsVisible(true);
+      return;
+    }
+
+    controlsHideTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      controlsHideTimerRef.current = null;
+    }, CONTROLS_HIDE_DELAY_MS);
+  }, [clearControlsHideTimer, status, watchOnTvOpen]);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleControlsHide();
+  }, [scheduleControlsHide]);
+
+  useEffect(() => {
+    if (status === "playing" && !watchOnTvOpen) {
+      scheduleControlsHide();
+    } else {
+      clearControlsHideTimer();
+      setControlsVisible(true);
+    }
+
+    return clearControlsHideTimer;
+  }, [
+    clearControlsHideTimer,
+    scheduleControlsHide,
+    status,
+    watchOnTvOpen,
+  ]);
 
   const clearCastMessageTimer = useCallback(() => {
     if (castMessageTimerRef.current) {
@@ -1004,7 +1049,7 @@ export default function Player({ schedule }: PlayerProps) {
     setMessage("");
 
     const channelName = currentChannel?.branding?.displayName ?? currentChannel?.name ?? "Tate's TV";
-    const queueKey = `${currentChannelId}|${scheduleSignature}`;
+    const queueKey = `${currentChannelId}|${scheduleSignature}|${playbackKey}`;
 
     if (lastCastQueueKeyRef.current === queueKey) {
       return;
@@ -1050,6 +1095,7 @@ export default function Player({ schedule }: PlayerProps) {
     currentChannelId,
     loadCastQueue,
     loadCurrentSource,
+    playbackKey,
     schedule,
     scheduleSignature,
     setTimedCastMessage,
@@ -1352,6 +1398,7 @@ export default function Player({ schedule }: PlayerProps) {
   useEffect(() => {
     return () => {
       clearCastMessageTimer();
+      clearControlsHideTimer();
 
       if (fullscreenBusyTimerRef.current) {
         window.clearTimeout(fullscreenBusyTimerRef.current);
@@ -1369,7 +1416,7 @@ export default function Player({ schedule }: PlayerProps) {
       video.removeAttribute("src");
       video.load();
     };
-  }, [clearCastMessageTimer, releaseWakeLock]);
+  }, [clearCastMessageTimer, clearControlsHideTimer, releaseWakeLock]);
 
   if (!live.item) {
     return (
@@ -1411,6 +1458,13 @@ export default function Player({ schedule }: PlayerProps) {
       className={`ttv-player-shell group relative h-full w-full bg-black ${
         fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
+      data-controls-visible={controlsVisible ? "true" : "false"}
+      onPointerDown={revealControls}
+      onPointerMove={revealControls}
+      onTouchStart={revealControls}
+      onFocusCapture={revealControls}
+      onKeyDown={revealControls}
+      onMouseLeave={scheduleControlsHide}
     >
       <video
         ref={videoRef}
@@ -1433,7 +1487,11 @@ export default function Player({ schedule }: PlayerProps) {
         tabIndex={-1}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3 opacity-100 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3 transition-opacity duration-300 md:group-hover:opacity-100 ${
+          controlsVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
         <div className="max-w-[70%] truncate text-sm font-semibold text-white drop-shadow">
           {title}
         </div>
@@ -1444,7 +1502,13 @@ export default function Player({ schedule }: PlayerProps) {
         </div>
       </div>
 
-      <div className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-100">
+      <div
+        className={`absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white shadow-2xl backdrop-blur-md transition-[opacity,transform] duration-300 md:group-hover:pointer-events-auto md:group-hover:translate-y-0 md:group-hover:opacity-100 ${
+          controlsVisible
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-2 opacity-0"
+        }`}
+      >
         <button
           type="button"
           onClick={(event) => {
@@ -1562,7 +1626,10 @@ export default function Player({ schedule }: PlayerProps) {
 
       <WatchOnTVModal
         open={watchOnTvOpen}
-        onClose={() => setWatchOnTvOpen(false)}
+        onClose={() => {
+          setWatchOnTvOpen(false);
+          revealControls();
+        }}
         onAirPlay={openAirPlayTarget}
         onPreviousChannel={() => stepChannel("previous")}
         onNextChannel={() => stepChannel("next")}

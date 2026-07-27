@@ -55,6 +55,18 @@ function isAppleDevice(): boolean {
   return /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
 }
 
+function isCastSecureContext(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    window.isSecureContext ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  );
+}
+
 export default function WatchOnTVModal({
   open,
   onClose,
@@ -115,6 +127,13 @@ export default function WatchOnTVModal({
   }, [onClose, open]);
 
   const startGoogleCast = useCallback(async () => {
+    if (!isCastSecureContext()) {
+      setNotice(
+        "Google Cast requires the secure HTTPS site. Open https://tatestv.ca in Chrome or Edge.",
+      );
+      return;
+    }
+
     setIsStartingCast(true);
     setNotice("");
 
@@ -171,7 +190,8 @@ export default function WatchOnTVModal({
     return null;
   }
 
-  const castAvailable = sdkState === "ready";
+  const secureCastContext = isCastSecureContext();
+  const castAvailable = sdkState === "ready" && secureCastContext;
   const devicesAvailable = castState !== "NO_DEVICES_AVAILABLE";
   const connected = remote.isConnected;
 
@@ -179,7 +199,7 @@ export default function WatchOnTVModal({
     <div
       className="fixed inset-0 z-[120] flex items-end justify-center bg-black/85 p-0 backdrop-blur-md sm:items-center sm:p-4"
       role="presentation"
-      onMouseDown={(event) => {
+      onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
@@ -214,6 +234,7 @@ export default function WatchOnTVModal({
             type="button"
             onClick={onClose}
             className="ttv-themed-button ttv-touch-target shrink-0 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:bg-white/15"
+            aria-label="Close Watch on TV"
           >
             Close
           </button>
@@ -346,15 +367,17 @@ export default function WatchOnTVModal({
             </button>
 
             <div className="mt-2 text-[11px] leading-5 text-white/45">
-              {sdkState === "loading"
-                ? "Loading Google Cast support..."
-                : sdkState === "unavailable"
-                  ? "This browser does not expose Google Cast. Try current Chrome or Edge."
-                  : sdkState === "error"
-                    ? "Google Cast could not load in this browser."
-                    : devicesAvailable
-                      ? `Cast is ready • ${sessionState.replace(/_/g, " ").toLowerCase()}`
-                      : "Cast is ready, but no device is currently visible on this network."}
+              {!secureCastContext
+                ? "Open the HTTPS production site to use Google Cast."
+                : sdkState === "loading"
+                  ? "Loading Google Cast support..."
+                  : sdkState === "unavailable"
+                    ? "This browser does not expose Google Cast. Try current Chrome or Edge."
+                    : sdkState === "error"
+                      ? "Google Cast could not load in this browser."
+                      : devicesAvailable
+                        ? `Cast is ready • ${sessionState.replace(/_/g, " ").toLowerCase()}`
+                        : "Cast is ready, but no device is currently visible on this network."}
             </div>
           </section>
 
@@ -394,6 +417,38 @@ export default function WatchOnTVModal({
             >
               Open TV Mode
             </button>
+          </section>
+
+          <section className="ttv-watch-card rounded-2xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-black">Roku & Smart TV</div>
+                <p className="mt-1 text-xs leading-5 text-white/55">
+                  Open TV Mode in a television browser, or use Roku/TV screen
+                  mirroring from your phone or computer. Direct browser-to-Roku
+                  casting is not universally available without a native Roku channel.
+                </p>
+              </div>
+              <span className="rounded-full bg-violet-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-violet-200">
+                Reliable fallback
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={openTvMode}
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+              >
+                Open TV Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => void copyTvLink()}
+                className="ttv-themed-button ttv-touch-target rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+              >
+                Copy TV Link
+              </button>
+            </div>
           </section>
 
           <section className="ttv-watch-card rounded-2xl border p-4">

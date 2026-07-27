@@ -131,8 +131,9 @@
 .theme-dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 150;
+  z-index: 2147483000;
   display: grid;
+  isolation: isolate;
   align-items: end;
   justify-items: center;
   padding: 0;
@@ -142,8 +143,12 @@
 }
 
 .theme-dialog {
+  display: flex;
   width: min(72rem, 100%);
-  max-height: min(92dvh, 58rem);
+  height: min(94dvh, 58rem);
+  max-height: min(94dvh, 58rem);
+  min-height: 0;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 1.5rem 1.5rem 0 0;
@@ -191,7 +196,11 @@
 }
 
 .theme-dialog__close {
+  display: inline-flex;
   min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   border: 1px solid var(--border);
   border-radius: 0.85rem;
   padding: 0.7rem 0.9rem;
@@ -259,10 +268,48 @@
 }
 
 .theme-dialog__body {
-  max-height: calc(min(92dvh, 58rem) - 13.5rem);
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1rem;
+}
+
+
+.theme-dialog__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+  padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--panel-bg) 94%, transparent);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
+}
+
+.theme-dialog__footer strong {
+  color: var(--text);
+}
+
+.theme-dialog__done {
+  min-width: 6.5rem;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--primary) 68%, var(--border));
+  border-radius: 0.85rem;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: var(--on-primary);
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .theme-grid {
@@ -506,6 +553,9 @@
   }
 
   .theme-dialog {
+    width: min(72rem, calc(100vw - 3rem));
+    height: min(90dvh, 58rem);
+    max-height: min(90dvh, 58rem);
     border-radius: 1.5rem;
   }
 
@@ -531,8 +581,29 @@
     padding-right: 5.5rem;
   }
 
-  .theme-dialog__body {
-    max-height: calc(92dvh - 17rem);
+  .theme-dialog {
+    height: 96dvh;
+    max-height: 96dvh;
+    border-radius: 1.35rem 1.35rem 0 0;
+  }
+
+  .theme-dialog__header {
+    padding-right: 4.75rem;
+  }
+
+  .theme-dialog__title,
+  .theme-dialog__description {
+    padding-right: 0;
+  }
+
+  .theme-dialog__footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .theme-dialog__done {
+    width: 100%;
   }
 }
 

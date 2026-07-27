@@ -472,35 +472,57 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
       const castWindow = getCastWindow();
       const mediaApi = castWindow?.chrome?.cast?.media;
       const session = castContextRef.current?.getCurrentSession();
+      const firstEntry = request.entries[0];
 
-      if (!mediaApi || !session || request.entries.length === 0) {
+      if (!mediaApi || !session || !firstEntry) {
         return false;
       }
 
+      const createMediaInfo = (entry: CastQueueEntry) => {
+        const mediaInfo = new mediaApi.MediaInfo(entry.url, entry.mimeType);
+        const metadata = new mediaApi.GenericMediaMetadata();
+
+        metadata.title = entry.title;
+        metadata.subtitle = entry.subtitle || request.queueName;
+
+        if (entry.poster) {
+          const CastImage = castWindow?.chrome?.cast?.Image;
+          metadata.images = CastImage
+            ? [new CastImage(entry.poster)]
+            : [{ url: entry.poster }];
+        }
+
+        mediaInfo.streamType = mediaApi.StreamType.BUFFERED;
+        mediaInfo.metadata = metadata;
+        mediaInfo.customData = {
+          tatesTv: true,
+          queueEntryId: entry.id,
+          channelId: request.channelId,
+        };
+
+        return mediaInfo;
+      };
+
+      const loadSingleItem = async (): Promise<void> => {
+        const mediaInfo = createMediaInfo(firstEntry);
+        const loadRequest = new mediaApi.LoadRequest(mediaInfo);
+
+        loadRequest.autoplay = true;
+        loadRequest.currentTime = Math.max(0, firstEntry.startTime);
+        loadRequest.customData = {
+          tatesTv: true,
+          channelId: request.channelId,
+          fallbackMode: true,
+        };
+
+        await session.loadMedia(loadRequest);
+      };
+
       try {
         const queueItems = request.entries.map((entry, index) => {
-          const mediaInfo = new mediaApi.MediaInfo(entry.url, entry.mimeType);
-          const metadata = new mediaApi.GenericMediaMetadata();
-
-          metadata.title = entry.title;
-          metadata.subtitle = entry.subtitle || request.queueName;
-
-          if (entry.poster) {
-            const CastImage = castWindow?.chrome?.cast?.Image;
-            metadata.images = CastImage
-              ? [new CastImage(entry.poster)]
-              : [{ url: entry.poster }];
-          }
-
-          mediaInfo.streamType = mediaApi.StreamType.BUFFERED;
-          mediaInfo.metadata = metadata;
-          mediaInfo.customData = {
-            tatesTv: true,
-            queueEntryId: entry.id,
-            channelId: request.channelId,
-          };
-
+          const mediaInfo = createMediaInfo(entry);
           const queueItem = new mediaApi.QueueItem(mediaInfo);
+
           queueItem.autoplay = true;
           queueItem.startTime = Math.max(0, entry.startTime);
           queueItem.playbackDuration = Math.max(1, entry.playbackDuration);
@@ -513,39 +535,45 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
           return queueItem;
         });
 
-        const firstEntry = request.entries[0];
         const firstMediaInfo = queueItems[0]?.media;
 
-        if (!firstEntry || !firstMediaInfo) {
+        if (!firstMediaInfo) {
           return false;
         }
 
-        const queueData = new mediaApi.QueueData(
-          `tates-tv-${request.channelId ?? "live"}-${Date.now()}`,
-          request.queueName,
-          request.queueDescription || "Tate's TV live channel",
-          mediaApi.RepeatMode.OFF,
-          queueItems,
-          0,
-          Math.max(0, firstEntry.startTime),
-        );
+        try {
+          const queueData = new mediaApi.QueueData(
+            `tates-tv-${request.channelId ?? "live"}-${Date.now()}`,
+            request.queueName,
+            request.queueDescription || "Tate's TV live channel",
+            mediaApi.RepeatMode.OFF,
+            queueItems,
+            0,
+            Math.max(0, firstEntry.startTime),
+          );
 
-        queueData.queueType = mediaApi.QueueType.LIVE_TV;
-        queueData.customData = {
-          tatesTv: true,
-          channelId: request.channelId,
-        };
+          queueData.queueType = mediaApi.QueueType.LIVE_TV;
+          queueData.customData = {
+            tatesTv: true,
+            channelId: request.channelId,
+          };
 
-        const loadRequest = new mediaApi.LoadRequest(firstMediaInfo);
-        loadRequest.autoplay = true;
-        loadRequest.currentTime = Math.max(0, firstEntry.startTime);
-        loadRequest.queueData = queueData;
-        loadRequest.customData = {
-          tatesTv: true,
-          channelId: request.channelId,
-        };
+          const queueLoadRequest = new mediaApi.LoadRequest(firstMediaInfo);
+          queueLoadRequest.autoplay = true;
+          queueLoadRequest.currentTime = Math.max(0, firstEntry.startTime);
+          queueLoadRequest.queueData = queueData;
+          queueLoadRequest.customData = {
+            tatesTv: true,
+            channelId: request.channelId,
+          };
 
-        await session.loadMedia(loadRequest);
+          await session.loadMedia(queueLoadRequest);
+        } catch {
+          // Some Cast receivers reject queue metadata even though they can play
+          // the current H.264/AAC MP4. Fall back to a normal media load.
+          await loadSingleItem();
+        }
+
         setErrorMessage("");
         refreshSessionState();
         return true;
@@ -557,6 +585,7 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
     },
     [refreshSessionState],
   );
+
 
   const playOrPause = useCallback(() => {
     remoteControllerRef.current?.playOrPause();

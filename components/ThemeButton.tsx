@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   canUseTheme,
   getAllThemes,
@@ -194,6 +195,7 @@ export default function ThemeButton() {
   const [categoryFilter, setCategoryFilter] =
     useState<CategoryFilter>("all");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+  const [portalReady, setPortalReady] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -221,6 +223,10 @@ export default function ThemeButton() {
 
   const closeDialog = useCallback(() => {
     setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    setPortalReady(true);
   }, []);
 
   const applyTheme = useCallback(
@@ -337,123 +343,149 @@ export default function ThemeButton() {
         </span>
       </button>
 
-      {isOpen ? (
-        <div
-          className="theme-dialog-backdrop"
-          onPointerDown={handleBackdropPointerDown}
-          role="presentation"
-        >
-          <div
-            id={DIALOG_ID}
-            ref={dialogRef}
-            className="theme-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`${DIALOG_ID}-title`}
-            aria-describedby={`${DIALOG_ID}-description`}
-            tabIndex={-1}
-            onKeyDown={handleDialogKeyDown}
-          >
-            <header className="theme-dialog__header">
-              <div>
-                <div className="theme-dialog__eyebrow">Tate&apos;s TV</div>
-                <h2 id={`${DIALOG_ID}-title`} className="theme-dialog__title">
-                  Theme Library
-                </h2>
-                <p
-                  id={`${DIALOG_ID}-description`}
-                  className="theme-dialog__description"
-                >
-                  Every theme now shares one responsive design system while
-                  keeping its own cable, cinema, console, arcade, cartoon, or
-                  Neon CRT personality.
-                  {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
-                    ? " Premium themes are unlocked during launch."
-                    : ""}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="theme-dialog__close"
-                onClick={closeDialog}
+      {portalReady && isOpen
+        ? createPortal(
+            <div
+              className="theme-dialog-backdrop"
+              onPointerDown={handleBackdropPointerDown}
+              role="presentation"
+            >
+              <div
+                id={DIALOG_ID}
+                ref={dialogRef}
+                className="theme-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`${DIALOG_ID}-title`}
+                aria-describedby={`${DIALOG_ID}-description`}
+                tabIndex={-1}
+                onKeyDown={handleDialogKeyDown}
               >
-                Close
-              </button>
-            </header>
-
-            <div className="theme-dialog__toolbar">
-              <input
-                ref={searchRef}
-                className="theme-search"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search themes, moods, or uses..."
-                aria-label="Search Tate's TV themes"
-                autoComplete="off"
-                spellCheck={false}
-              />
-
-              <div className="grid gap-2">
-                <div className="theme-filter-row" role="group" aria-label="Theme categories">
-                  {CATEGORY_FILTERS.map((filter) => (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      className="theme-filter"
-                      aria-pressed={categoryFilter === filter.id}
-                      onClick={() => setCategoryFilter(filter.id)}
+                <header className="theme-dialog__header">
+                  <div>
+                    <div className="theme-dialog__eyebrow">Tate&apos;s TV</div>
+                    <h2 id={`${DIALOG_ID}-title`} className="theme-dialog__title">
+                      Theme Library
+                    </h2>
+                    <p
+                      id={`${DIALOG_ID}-description`}
+                      className="theme-dialog__description"
                     >
-                      {filter.label}
-                    </button>
-                  ))}
+                      Every theme shares one responsive design system while
+                      keeping its own cable, cinema, console, arcade, cartoon,
+                      or Neon CRT personality.
+                      {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
+                        ? " Premium themes are unlocked during launch."
+                        : ""}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="theme-dialog__close"
+                    onClick={closeDialog}
+                    aria-label="Close Theme Library"
+                  >
+                    <span aria-hidden="true">×</span>
+                    <span>Close</span>
+                  </button>
+                </header>
+
+                <div className="theme-dialog__toolbar">
+                  <input
+                    ref={searchRef}
+                    className="theme-search"
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search themes, moods, or uses..."
+                    aria-label="Search Tate's TV themes"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+
+                  <div className="grid gap-2">
+                    <div
+                      className="theme-filter-row"
+                      role="group"
+                      aria-label="Theme categories"
+                    >
+                      {CATEGORY_FILTERS.map((filter) => (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          className="theme-filter"
+                          aria-pressed={categoryFilter === filter.id}
+                          onClick={() => setCategoryFilter(filter.id)}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div
+                      className="theme-filter-row"
+                      role="group"
+                      aria-label="Theme access filters"
+                    >
+                      {ACCESS_FILTERS.map((filter) => (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          className="theme-filter"
+                          aria-pressed={accessFilter === filter.id}
+                          onClick={() => setAccessFilter(filter.id)}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="theme-filter-row" role="group" aria-label="Theme access filters">
-                  {ACCESS_FILTERS.map((filter) => (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      className="theme-filter"
-                      aria-pressed={accessFilter === filter.id}
-                      onClick={() => setAccessFilter(filter.id)}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
+                <div className="theme-dialog__body">
+                  {visibleThemes.length > 0 ? (
+                    <div className="theme-grid">
+                      {visibleThemes.map((theme) => (
+                        <ThemeCard
+                          key={theme.id}
+                          theme={theme}
+                          isActive={theme.id === themeId}
+                          isAvailable={canUseTheme(
+                            theme.id,
+                            ownedPremiumThemes,
+                            false,
+                          )}
+                          accessLabel={getAccessCopy(theme, ownedPremiumThemes)}
+                          onSelect={applyTheme}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="theme-empty-state">
+                      No themes match those filters. Clear the search or choose a
+                      different category.
+                    </div>
+                  )}
                 </div>
+
+                <footer className="theme-dialog__footer">
+                  <div>
+                    <strong>{activeTheme.name}</strong> is currently active.
+                  </div>
+                  <button
+                    type="button"
+                    className="theme-dialog__done"
+                    onClick={closeDialog}
+                  >
+                    Done
+                  </button>
+                </footer>
               </div>
-            </div>
-
-            <div className="theme-dialog__body">
-              {visibleThemes.length > 0 ? (
-                <div className="theme-grid">
-                  {visibleThemes.map((theme) => (
-                    <ThemeCard
-                      key={theme.id}
-                      theme={theme}
-                      isActive={theme.id === themeId}
-                      isAvailable={canUseTheme(
-                        theme.id,
-                        ownedPremiumThemes,
-                        false,
-                      )}
-                      accessLabel={getAccessCopy(theme, ownedPremiumThemes)}
-                      onSelect={applyTheme}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="theme-empty-state">
-                  No themes match those filters. Clear the search or choose a
-                  different category.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
