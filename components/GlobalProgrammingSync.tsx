@@ -503,7 +503,7 @@ export default function GlobalProgrammingSync({
 
   return (
     <div
-      className="fixed bottom-[max(5.75rem,calc(5.75rem+env(safe-area-inset-bottom)))] left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md md:bottom-3"
+      className="ttv-global-sync-status fixed bottom-[max(5.75rem,calc(5.75rem+env(safe-area-inset-bottom)))] left-3 z-[9999] flex max-w-[calc(100vw-24px)] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-2xl backdrop-blur-md md:bottom-3"
       style={{
         background: "rgba(0,0,0,0.76)",
         borderColor: tone.borderColor,

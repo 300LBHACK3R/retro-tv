@@ -9,6 +9,9 @@ type ServiceWorkerMessage = {
 const SERVICE_WORKER_PATH = "/sw.js";
 const SERVICE_WORKER_SCOPE = "/";
 const UPDATE_CHECK_DELAY_MS = 1500;
+const CACHE_SCHEMA_VERSION = "20260727-mobile-guide-v2";
+const CACHE_SCHEMA_STORAGE_KEY = "ttv-cache-schema-version";
+const CACHE_SCHEMA_RELOAD_KEY = "ttv-cache-schema-reloaded";
 
 function canUseServiceWorker(): boolean {
   return (
@@ -20,6 +23,23 @@ function canUseServiceWorker(): boolean {
 
 function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
+}
+
+async function clearLegacyProductionCacheOnce(): Promise<boolean> {
+  try {
+    const currentVersion = window.localStorage.getItem(CACHE_SCHEMA_STORAGE_KEY);
+    if (currentVersion === CACHE_SCHEMA_VERSION) return false;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+    if (typeof caches !== "undefined") {
+      const cacheKeys = await caches.keys();
+      await Promise.all(cacheKeys.filter((key) => key.startsWith("tates-tv-")).map((key) => caches.delete(key)));
+    }
+    window.localStorage.setItem(CACHE_SCHEMA_STORAGE_KEY, CACHE_SCHEMA_VERSION);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function clearDevelopmentServiceWorkerState(): Promise<void> {
@@ -105,6 +125,18 @@ export default function ServiceWorkerRegister() {
 
     let mounted = true;
 
+    const migrateLegacyCache = async () => {
+      const migrated = await clearLegacyProductionCacheOnce();
+      if (!migrated || !mounted) return false;
+      const alreadyReloaded = window.sessionStorage.getItem(CACHE_SCHEMA_RELOAD_KEY);
+      if (!alreadyReloaded) {
+        window.sessionStorage.setItem(CACHE_SCHEMA_RELOAD_KEY, "true");
+        window.location.reload();
+        return true;
+      }
+      return false;
+    };
+
     const handleControllerChange = () => {
       if (!userAcceptedUpdateRef.current || hasReloadedRef.current) {
         return;
@@ -128,10 +160,14 @@ export default function ServiceWorkerRegister() {
 
     const registerServiceWorker = async () => {
       try {
+        const migrated = await migrateLegacyCache();
+        if (migrated || !mounted) return undefined;
+
         const registration = await navigator.serviceWorker.register(
           SERVICE_WORKER_PATH,
           {
             scope: SERVICE_WORKER_SCOPE,
+            updateViaCache: "none",
           },
         );
 

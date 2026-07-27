@@ -16,6 +16,14 @@ import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel, MediaItem } from "@/lib/types";
 
 const GUIDE_HOURS = 72;
+const MOBILE_GUIDE_HOURS = 24;
+const MOBILE_GUIDE_MEDIA_QUERY =
+  "(max-width: 1024px), (pointer: coarse) and (max-width: 1366px)";
+const MOBILE_GUIDE_BREAKPOINT_PX = 1024;
+const TOUCH_GUIDE_BREAKPOINT_PX = 1366;
+const MOBILE_USER_AGENT_PATTERN =
+  /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i;
+const MOBILE_PROGRAM_LIMIT = 14;
 const SLOT_MINUTES = 30;
 const SLOT_COUNT = GUIDE_HOURS * 2;
 
@@ -28,6 +36,7 @@ const ROW_HEIGHT_COMPACT = 58;
 
 const SLOT_SECONDS = SLOT_MINUTES * 60;
 const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
+const MOBILE_GUIDE_WINDOW_SECONDS = MOBILE_GUIDE_HOURS * 60 * 60;
 const LIVE_TICK_MS = 15_000;
 const GUIDE_PREPARE_BATCH_SIZE = 2;
 
@@ -143,6 +152,50 @@ function isSameLocalDay(a: Date, b: Date): boolean {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function getSmallestViewportWidth(): number {
+  if (typeof window === "undefined") {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const candidateWidths = [
+    window.innerWidth,
+    document.documentElement.clientWidth,
+    window.visualViewport?.width,
+  ].filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value) && value > 0,
+  );
+
+  return candidateWidths.length > 0
+    ? Math.min(...candidateWidths)
+    : Number.POSITIVE_INFINITY;
+}
+
+function shouldUseMobileGuide(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const viewportWidth = getSmallestViewportWidth();
+  const mediaQueryMatches = window.matchMedia(
+    MOBILE_GUIDE_MEDIA_QUERY,
+  ).matches;
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const touchCapable = navigator.maxTouchPoints > 0;
+  const mobileUserAgent = MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent);
+  const screenWidth = window.screen?.width ?? Number.POSITIVE_INFINITY;
+  const screenHeight = window.screen?.height ?? Number.POSITIVE_INFINITY;
+  const screenShortSide = Math.min(screenWidth, screenHeight);
+
+  return (
+    viewportWidth <= MOBILE_GUIDE_BREAKPOINT_PX ||
+    mediaQueryMatches ||
+    mobileUserAgent ||
+    ((coarsePointer || touchCapable) &&
+      screenShortSide <= TOUCH_GUIDE_BREAKPOINT_PX)
+  );
 }
 
 function getSecondsSinceBroadcastEpoch(dateMs: number): number {
@@ -736,7 +789,10 @@ function buildForwardGuideCells(
   return result;
 }
 
-function buildGuideMarkers(windowStart: Date): GuideMarker[] {
+function buildGuideMarkers(
+  windowStart: Date,
+  windowDurationSeconds: number = GUIDE_WINDOW_SECONDS,
+): GuideMarker[] {
   const markers: GuideMarker[] = [
     {
       label: "Now",
@@ -745,7 +801,7 @@ function buildGuideMarkers(windowStart: Date): GuideMarker[] {
     },
   ];
 
-  const windowEndMs = windowStart.getTime() + GUIDE_WINDOW_SECONDS * 1000;
+  const windowEndMs = windowStart.getTime() + windowDurationSeconds * 1000;
   let dayCursor = startOfNextLocalDay(windowStart);
   let dayIndex = 1;
 
@@ -824,6 +880,13 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
   const [activeMarkerIndex, setActiveMarkerIndex] = useState(0);
+  const [isMobileGuide, setIsMobileGuide] = useState(() =>
+    shouldUseMobileGuide(),
+  );
+  const [mobileSelectedChannelId, setMobileSelectedChannelId] = useState(
+    currentChannelId,
+  );
+  const [mobileOffsetSec, setMobileOffsetSec] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -838,6 +901,42 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_GUIDE_MEDIA_QUERY);
+    const visualViewport = window.visualViewport;
+    let animationFrame: number | null = null;
+
+    const updateMobileMode = () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = null;
+        setIsMobileGuide(shouldUseMobileGuide());
+      });
+    };
+
+    updateMobileMode();
+    mediaQuery.addEventListener?.("change", updateMobileMode);
+    window.addEventListener("resize", updateMobileMode, { passive: true });
+    window.addEventListener("orientationchange", updateMobileMode);
+    visualViewport?.addEventListener("resize", updateMobileMode, {
+      passive: true,
+    });
+
+    return () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+
+      mediaQuery.removeEventListener?.("change", updateMobileMode);
+      window.removeEventListener("resize", updateMobileMode);
+      window.removeEventListener("orientationchange", updateMobileMode);
+      visualViewport?.removeEventListener("resize", updateMobileMode);
+    };
+  }, []);
+
   const now = useMemo(() => new Date(nowMs), [nowMs]);
 
   const windowStartMs = useMemo(() => floorToHalfHour(now).getTime(), [now]);
@@ -849,11 +948,29 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     [currentDayMs],
   );
 
+  const guideWindowSeconds = isMobileGuide
+    ? MOBILE_GUIDE_WINDOW_SECONDS
+    : GUIDE_WINDOW_SECONDS;
+
   useEffect(() => {
     setActiveMarkerIndex(0);
   }, [windowStartMs]);
 
   const sortedRows = useMemo(() => sortRows(data), [data]);
+
+  useEffect(() => {
+    if (sortedRows.some((row) => row.channel.id === currentChannelId)) {
+      setMobileSelectedChannelId(currentChannelId);
+      return;
+    }
+
+    const firstChannelId = sortedRows[0]?.channel.id;
+
+    if (firstChannelId) {
+      setMobileSelectedChannelId(firstChannelId);
+    }
+  }, [currentChannelId, sortedRows]);
+
   const [preparedRows, setPreparedRows] = useState<PreparedGuideRow[]>([]);
   const [preparedCount, setPreparedCount] = useState(0);
 
@@ -909,7 +1026,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           cells: buildForwardGuideCells(
             row,
             windowStart,
-            GUIDE_WINDOW_SECONDS,
+            guideWindowSeconds,
             currentDayReference,
           ),
           isPrepared: true,
@@ -934,11 +1051,17 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       cancelled = true;
       cancelScheduledWork();
     };
-  }, [currentChannelId, currentDayReference, sortedRows, windowStart]);
+  }, [
+    currentChannelId,
+    currentDayReference,
+    guideWindowSeconds,
+    sortedRows,
+    windowStart,
+  ]);
 
   const guideMarkers = useMemo(
-    () => buildGuideMarkers(windowStart),
-    [windowStart],
+    () => buildGuideMarkers(windowStart, guideWindowSeconds),
+    [guideWindowSeconds, windowStart],
   );
 
   const scrollToMarker = useCallback(
@@ -1013,14 +1136,41 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const secondsSinceWindowStart = clampNumber(
     Math.floor((nowMs - windowStartMs) / 1000),
     0,
-    GUIDE_WINDOW_SECONDS,
+    guideWindowSeconds,
   );
 
   const nowLineLeft = getCellLeft(secondsSinceWindowStart);
 
+  if (isMobileGuide) {
+    const selectedRow =
+      preparedRows.find(
+        (row) => row.channel.id === mobileSelectedChannelId,
+      ) ?? preparedRows[0];
+
+    return (
+      <MobileGuideView
+        rows={preparedRows}
+        selectedRow={selectedRow}
+        currentChannelId={currentChannelId}
+        preparedCount={preparedCount}
+        totalCount={sortedRows.length}
+        now={now}
+        nowOffsetSec={secondsSinceWindowStart}
+        selectedOffsetSec={mobileOffsetSec}
+        windowStartMs={windowStartMs}
+        onOffsetChange={setMobileOffsetSec}
+        onChannelBrowse={setMobileSelectedChannelId}
+        onTune={({ channel, item }) => {
+          setChannel(channel.id);
+          onProgramSelect?.({ channel, item });
+        }}
+      />
+    );
+  }
+
   return (
     <section
-      className="ttv-glass-panel flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border shadow-2xl"
+      className="ttv-desktop-guide ttv-glass-panel flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border shadow-2xl"
       style={{
         borderColor: "var(--border)",
         color: "var(--text)",
@@ -1210,6 +1360,286 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
             })
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function getMobileProgramTime(
+  cell: GuideCell,
+  windowStartMs: number,
+  nowOffsetSec: number,
+): string {
+  if (cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec) {
+    return "LIVE NOW";
+  }
+
+  return formatTime(new Date(windowStartMs + cell.startSec * 1000));
+}
+
+function getChannelLogoUrl(channel: Channel): string | undefined {
+  const value = channel.branding?.logoUrl?.trim();
+  return value || undefined;
+}
+
+function MobileGuideView({
+  rows,
+  selectedRow,
+  currentChannelId,
+  preparedCount,
+  totalCount,
+  now,
+  nowOffsetSec,
+  selectedOffsetSec,
+  windowStartMs,
+  onOffsetChange,
+  onChannelBrowse,
+  onTune,
+}: {
+  rows: PreparedGuideRow[];
+  selectedRow: PreparedGuideRow | undefined;
+  currentChannelId: string;
+  preparedCount: number;
+  totalCount: number;
+  now: Date;
+  nowOffsetSec: number;
+  selectedOffsetSec: number;
+  windowStartMs: number;
+  onOffsetChange: (offsetSec: number) => void;
+  onChannelBrowse: (channelId: string) => void;
+  onTune: (payload: { channel: Channel; item: BroadcastItem }) => void;
+}) {
+  if (!selectedRow) {
+    return (
+      <section className="ttv-mobile-guide" aria-label="Mobile live TV guide">
+        <EmptyGuideState />
+      </section>
+    );
+  }
+
+  const selectedIndex = Math.max(
+    0,
+    rows.findIndex((row) => row.channel.id === selectedRow.channel.id),
+  );
+  const previousRow = rows[(selectedIndex - 1 + rows.length) % rows.length];
+  const nextRow = rows[(selectedIndex + 1) % rows.length];
+  const liveCell = selectedRow.cells.find(
+    (cell) => cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec,
+  );
+  const firstAvailableCell =
+    liveCell ?? selectedRow.cells.find((cell) => cell.endSec > nowOffsetSec);
+  const visibleCells = selectedRow.cells
+    .filter((cell) => cell.endSec > selectedOffsetSec)
+    .slice(0, MOBILE_PROGRAM_LIMIT);
+  const logoUrl = getChannelLogoUrl(selectedRow.channel);
+  const jumpOptions = [
+    { label: "Now", offsetSec: 0 },
+    { label: "+3 hr", offsetSec: 3 * 60 * 60 },
+    { label: "+6 hr", offsetSec: 6 * 60 * 60 },
+    { label: "+12 hr", offsetSec: 12 * 60 * 60 },
+  ];
+
+  return (
+    <section className="ttv-mobile-guide" aria-label="Mobile live TV guide">
+      <div className="ttv-mobile-guide-meta" aria-live="polite">
+        <span>{formatTime(now)}</span>
+        <span>
+          {preparedCount < totalCount
+            ? `Preparing channels ${preparedCount}/${totalCount}`
+            : `${totalCount} channels ready`}
+        </span>
+      </div>
+
+      <div className="ttv-mobile-guide-scroll">
+        <div className="ttv-mobile-channel-picker" aria-label="Choose channel">
+          <button
+            type="button"
+            onClick={() => previousRow && onChannelBrowse(previousRow.channel.id)}
+            aria-label="Previous channel"
+            disabled={!previousRow}
+          >
+            CH −
+          </button>
+
+          <label>
+            <span>Browse channel</span>
+            <select
+              value={selectedRow.channel.id}
+              onChange={(event) => onChannelBrowse(event.target.value)}
+            >
+              {rows.map((row) => (
+                <option key={row.channel.id} value={row.channel.id}>
+                  {getChannelLabel(row.channel)} · {getChannelName(row.channel)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => nextRow && onChannelBrowse(nextRow.channel.id)}
+            aria-label="Next channel"
+            disabled={!nextRow}
+          >
+            CH +
+          </button>
+        </div>
+
+        <article
+          className="ttv-mobile-live-card"
+          data-current-channel={selectedRow.channel.id === currentChannelId}
+        >
+          <div className="ttv-mobile-live-brand">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className="ttv-mobile-live-logo-fallback" aria-hidden="true">
+                {selectedRow.channel.branding?.logoText ||
+                  getChannelLabel(selectedRow.channel)}
+              </div>
+            )}
+
+            <div>
+              <div className="ttv-mobile-live-channel-number">
+                {getChannelLabel(selectedRow.channel)}
+              </div>
+              <h3>{getChannelName(selectedRow.channel)}</h3>
+              <p>{selectedRow.channel.branding?.description || "Live Tate's TV programming."}</p>
+            </div>
+          </div>
+
+          <div className="ttv-mobile-live-program">
+            <span>{liveCell ? "Live now" : "Next available"}</span>
+            <strong>
+              {firstAvailableCell
+                ? getDisplayTitle(firstAvailableCell.item)
+                : "Off Air"}
+            </strong>
+            {firstAvailableCell ? (
+              <small>
+                {getDisplayType(firstAvailableCell.item)} · {formatDuration(
+                  firstAvailableCell.endSec - firstAvailableCell.startSec,
+                )}
+              </small>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            className="ttv-mobile-watch-live"
+            disabled={!firstAvailableCell}
+            onClick={() => {
+              if (firstAvailableCell) {
+                onTune({
+                  channel: selectedRow.channel,
+                  item: firstAvailableCell.item,
+                });
+              }
+            }}
+          >
+            {selectedRow.channel.id === currentChannelId ? "Return to Live TV" : "Watch This Channel"}
+          </button>
+        </article>
+
+        <nav className="ttv-mobile-time-jumps" aria-label="Schedule time">
+          {jumpOptions.map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              data-active={selectedOffsetSec === option.offsetSec}
+              onClick={() => onOffsetChange(option.offsetSec)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="ttv-mobile-program-heading">
+          <div>
+            <span>Schedule</span>
+            <strong>
+              {selectedOffsetSec === 0
+                ? "Starting now"
+                : `From ${formatTime(
+                    new Date(windowStartMs + selectedOffsetSec * 1000),
+                  )}`}
+            </strong>
+          </div>
+          <small>{MOBILE_GUIDE_HOURS}-hour mobile guide</small>
+        </div>
+
+        <div className="ttv-mobile-program-list">
+          {!selectedRow.isPrepared ? (
+            Array.from({ length: 5 }, (_, index) => (
+              <div className="ttv-mobile-program-skeleton" key={index}>
+                <span />
+                <div>
+                  <span />
+                  <span />
+                </div>
+              </div>
+            ))
+          ) : visibleCells.length === 0 ? (
+            <div className="ttv-mobile-guide-empty">
+              No scheduled programs are available in this window.
+            </div>
+          ) : (
+            visibleCells.map((cell, index) => {
+              const isLive =
+                cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec;
+              const title = getDisplayTitle(cell.item);
+              const duration = cell.endSec - cell.startSec;
+
+              return (
+                <button
+                  key={`${selectedRow.channel.id}-${cell.stableKey}-${cell.startSec}-${index}`}
+                  type="button"
+                  className="ttv-mobile-program-card"
+                  data-live={isLive}
+                  onClick={() =>
+                    onTune({
+                      channel: selectedRow.channel,
+                      item: cell.item,
+                    })
+                  }
+                  aria-label={`${getMobileProgramTime(
+                    cell,
+                    windowStartMs,
+                    nowOffsetSec,
+                  )}, ${title}, tune ${getChannelName(selectedRow.channel)}`}
+                >
+                  <div className="ttv-mobile-program-time">
+                    <strong>
+                      {getMobileProgramTime(cell, windowStartMs, nowOffsetSec)}
+                    </strong>
+                    <span>{formatDuration(duration)}</span>
+                  </div>
+
+                  <div className="ttv-mobile-program-copy">
+                    <strong>{title}</strong>
+                    <span>
+                      {getDisplayType(cell.item)} · {getChannelLabel(selectedRow.channel)}
+                    </span>
+                  </div>
+
+                  <span className="ttv-mobile-program-action">
+                    {isLive ? "Watch" : "Tune"}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <p className="ttv-mobile-guide-note">
+          Tate&apos;s TV is a live channel service. Selecting a future listing tunes
+          that channel&apos;s current broadcast.
+        </p>
       </div>
     </section>
   );

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import AdminAccessPanel from "@/components/AdminAccessPanel";
 import AdminDashboard from "@/components/AdminDashboard";
 import AppModeToggle from "@/components/AppModeToggle";
@@ -206,6 +207,8 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
   const setSettingsOpen = useStore((state) => state.setSettingsOpen);
 
   const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
+  const [canUseGuidePortal, setCanUseGuidePortal] = useState(false);
+  const guideCloseButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const mediaById = useMemo(
     () => new Map(media.map((item) => [item.id, item])),
@@ -274,6 +277,24 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
     : getPlayerFrameClass(playerViewMode);
 
   useEffect(() => {
+    setCanUseGuidePortal(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isGuideOpen || !canUseGuidePortal) {
+      return;
+    }
+
+    const focusTimer = window.setTimeout(() => {
+      guideCloseButtonRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+    };
+  }, [canUseGuidePortal, isGuideOpen]);
+
+  useEffect(() => {
     if (!tvMode) {
       return;
     }
@@ -322,6 +343,11 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
 
     const previousOverflow = document.body.style.overflow;
     const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    const previousGuideOpen = document.body.dataset.ttvGuideOpen;
+
+    if (isGuideOpen) document.body.dataset.ttvGuideOpen = "true";
+    else delete document.body.dataset.ttvGuideOpen;
+
     if (shouldLockPage) {
       document.body.style.overflow = "hidden";
       document.body.style.overscrollBehavior = "none";
@@ -330,6 +356,8 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      if (previousGuideOpen) document.body.dataset.ttvGuideOpen = previousGuideOpen;
+      else delete document.body.dataset.ttvGuideOpen;
     };
   }, [isGuideOpen, isSettingsOpen]);
 
@@ -397,7 +425,7 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
               width={260}
               height={90}
               className="h-auto w-full max-w-[220px] sm:max-w-[260px]"
-              style={{ height: "auto" }}
+              style={{ width: "100%", height: "auto" }}
               draggable={false}
               priority
             />
@@ -618,42 +646,42 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
         </footer>
       </div>
 
-      {isGuideOpen ? (
-        <div
-          className="fixed inset-0 z-[90] flex h-[100dvh] min-h-0 flex-col bg-black/90 p-2 backdrop-blur-md sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Tate's TV live guide"
-        >
-          <div className="mb-2 flex shrink-0 items-center justify-between gap-3 sm:mb-3">
-            <div className="min-w-0">
-              <div className="text-xs font-black uppercase tracking-[0.2em]"
-                style={{ color: "var(--text-muted)" }}>
-                Tate&apos;s TV
-              </div>
-
-              <div className="text-lg font-black sm:text-xl"
-                style={{ color: "var(--text)" }}>
-                Live Guide
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={closeGuide}
-              className="rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] transition hover:scale-[1.01]"
-              style={{
-                background: "var(--button-bg)",
-                color: "var(--text)",
+      {canUseGuidePortal && isGuideOpen
+        ? createPortal(
+            <div
+              className="ttv-guide-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ttv-live-guide-title"
+              onPointerDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeGuide();
+                }
               }}
             >
-              Close Guide
-            </button>
-          </div>
+              <header className="ttv-guide-dialog-header">
+                <div className="ttv-guide-dialog-title">
+                  <span>Tate&apos;s TV</span>
+                  <strong id="ttv-live-guide-title">Live Guide</strong>
+                </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">{guideOverlay}</div>
-        </div>
-      ) : null}
+                <button
+                  ref={guideCloseButtonRef}
+                  type="button"
+                  onClick={closeGuide}
+                  className="ttv-guide-close"
+                  aria-label="Close live guide"
+                >
+                  <span aria-hidden="true">×</span>
+                  <span>Close</span>
+                </button>
+              </header>
+
+              <div className="ttv-guide-dialog-body">{guideOverlay}</div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {isSettingsOpen ? (
         <div
