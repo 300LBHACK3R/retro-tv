@@ -6,7 +6,12 @@ const testVideo = Buffer.from(readFileSync('tests/fixtures/test-video.webm.base6
 
 async function openDirectory(page: Page) {
   await page.getByRole('button', { name: 'Browse all', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Channel directory' })).toBeVisible();
+  const directory = page.getByRole('dialog', { name: 'Channel directory', exact: true });
+  await expect(directory).toBeVisible();
+  return directory;
+}
+function currentChannel(page: Page) {
+  return page.getByRole('region', { name: "Current Tate's TV channel", exact: true });
 }
 async function openMore(page: Page) {
   const desktop = page.getByRole('button', { name: 'Open viewer settings and more options', exact: true });
@@ -29,13 +34,15 @@ test.beforeEach(async ({ page }) => {
 test('load programming, search channels, tune, and retain an uncluttered player', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/?ch=24');
-  await expect(page.getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
+  const response = await page.goto('/?ch=24');
+  expect(response?.headers()['content-security-policy']).toContain('upgrade-insecure-requests');
+  await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
   await expect(page.getByRole('region', {name:'On-screen remote'})).toHaveCount(0);
-  await openDirectory(page);
-  await page.getByRole('searchbox', {name:'Find a channel'}).fill('25');
-  await page.getByRole('button', {name:'Tune to CH 25 Local Cinema',exact:true}).click();
-  await expect(page.getByRole('heading', {name:'Local Cinema',exact:true})).toBeVisible();
+  const directory = await openDirectory(page);
+  await directory.getByRole('searchbox', {name:'Find a channel'}).fill('25');
+  await directory.getByRole('button', {name:'Tune to CH 25 Local Cinema',exact:true}).click();
+  await expect(directory).toHaveCount(0);
+  await expect(currentChannel(page).getByRole('heading', {name:'Local Cinema',exact:true})).toBeVisible();
   await expect(page.getByRole('region', {name:'Now and next programming'})).toContainText('A Calgary Evening');
   await noPageOverflow(page);
   expect(errors).toEqual([]);
@@ -44,7 +51,7 @@ test('load programming, search channels, tune, and retain an uncluttered player'
 
 test('guide stays readable and keyboard input stays inside the dialog', async ({ page }) => {
   await page.goto('/?ch=24');
-  await expect(page.getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
+  await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
   const desktop = page.getByRole('button', {name:'Open live guide',exact:true});
   if (await desktop.isVisible()) await desktop.click();
   else await page.getByRole('navigation', {name:'Mobile viewer navigation'}).getByRole('button', {name:'Guide',exact:true}).click();
@@ -52,7 +59,8 @@ test('guide stays readable and keyboard input stays inside the dialog', async ({
   await expect(dialog).toBeVisible();
   if ((page.viewportSize()?.width ?? 1440) <= 1024) await expect(page.getByRole('region', {name:'Mobile live TV guide'})).toBeVisible();
   await page.getByRole('button', {name:'Close live guide',exact:true}).press('ArrowDown');
-  await expect(page.getByRole('heading', {name:'Studio TV',exact:true})).toHaveCount(1);
+  await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
+  await expect(dialog.locator(':focus')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('body')).not.toHaveAttribute('data-ttv-overlay-open','true');
@@ -61,7 +69,7 @@ test('guide stays readable and keyboard input stays inside the dialog', async ({
 
 test('theme changes preserve layout and survive reloading cloud programming', async ({ page }) => {
   await page.goto('/?ch=24');
-  await expect(page.getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
+  await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
   await openMore(page);
   await page.getByRole('button', {name:'Theme library Open',exact:true}).click();
   await expect(page.getByRole('dialog', {name:/Theme Library/i})).toBeVisible();
@@ -70,7 +78,7 @@ test('theme changes preserve layout and survive reloading cloud programming', as
   await expect(page.getByRole('region',{name:"Live Tate's TV player"})).toBeVisible();
   await noPageOverflow(page);
   await page.reload();
-  await expect(page.getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
+  await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-ttv-theme','obsidian-gold');
 });
 
@@ -79,7 +87,7 @@ test('Library filters and selects an on-demand title', async ({ page }, testInfo
   await expect(page.getByRole('heading',{name:'Your time. Your TV.'})).toBeVisible();
   const search = page.getByRole('textbox',{name:"Search the Tate's TV library"});
   await search.fill('A Calgary Evening');
-  await expect(page.getByRole('heading',{name:'A Calgary Evening',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'A Calgary Evening',exact:true,level:2})).toBeVisible();
   await search.fill('no-such-title-123');
   await expect(page.getByText('No matching library titles', {exact:true})).toBeVisible();
   await noPageOverflow(page);
