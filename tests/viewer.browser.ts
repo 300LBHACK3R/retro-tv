@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { programming } from './programming-fixture';
-import { existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+
+const testVideo = Buffer.from(readFileSync('tests/fixtures/test-video.webm.base64', 'utf8'), 'base64');
 
 async function openDirectory(page: Page) {
   await page.getByRole('button', { name: 'Browse all', exact: true }).click();
@@ -21,9 +23,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/programming', route => route.fulfill({ json: {ok:true, programming, source:'database'} }));
   await page.route('https://www.gstatic.com/**', route => route.fulfill({contentType:'application/javascript',body:''}));
   await page.route('**/_vercel/**', route => route.fulfill({status:204}));
-  await page.route('**/qa-media.webm', route => existsSync('.qa/test.webm')
-    ? route.fulfill({path:'.qa/test.webm',contentType:'video/webm'})
-    : route.fulfill({status:404}));
+  await page.route('**/qa-media.webm', route => route.fulfill({body:testVideo,contentType:'video/webm'}));
 });
 
 test('load programming, search channels, tune, and retain an uncluttered player', async ({ page }, testInfo) => {
