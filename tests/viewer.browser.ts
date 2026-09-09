@@ -15,8 +15,10 @@ function currentChannel(page: Page) {
 }
 async function openMore(page: Page) {
   const desktop = page.getByRole('button', { name: 'Open viewer settings and more options', exact: true });
-  if (await desktop.isVisible()) await desktop.click();
-  else await page.getByRole('navigation', { name: 'Mobile viewer navigation' }).getByRole('button', {name:'More',exact:true}).click();
+  const mobile = page.getByRole('navigation', { name: 'Mobile viewer navigation' }).getByRole('button', {name:'More',exact:true});
+  // Keep resolving both controls while hydration/layout settles. isVisible()
+  // is an immediate snapshot and can choose the hidden navigation permanently.
+  await desktop.or(mobile).filter({ visible: true }).click();
   await expect(page.getByRole('dialog', { name: "More from Tate's TV" })).toBeVisible();
 }
 async function noPageOverflow(page: Page) {
@@ -53,8 +55,8 @@ test('guide stays readable and keyboard input stays inside the dialog', async ({
   await page.goto('/?ch=24');
   await expect(currentChannel(page).getByRole('heading', {name:'Studio TV',exact:true})).toBeVisible();
   const desktop = page.getByRole('button', {name:'Open live guide',exact:true});
-  if (await desktop.isVisible()) await desktop.click();
-  else await page.getByRole('navigation', {name:'Mobile viewer navigation'}).getByRole('button', {name:'Guide',exact:true}).click();
+  const mobile = page.getByRole('navigation', {name:'Mobile viewer navigation'}).getByRole('button', {name:'Guide',exact:true});
+  await desktop.or(mobile).filter({ visible: true }).click();
   const dialog = page.getByRole('dialog', {name:'Live Guide',exact:true});
   await expect(dialog).toBeVisible();
   if ((page.viewportSize()?.width ?? 1440) <= 1024) await expect(page.getByRole('region', {name:'Mobile live TV guide'})).toBeVisible();
