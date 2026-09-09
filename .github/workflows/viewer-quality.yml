@@ -1,0 +1,40 @@
+name: Viewer quality
+on:
+  pull_request:
+  push:
+    branches: [refactor/premium-v1]
+permissions:
+  contents: read
+concurrency:
+  group: viewer-quality-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run build
+      - run: git diff --check
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Generate synthetic test video
+        run: |
+          mkdir -p .qa
+          ffmpeg -f lavfi -i color=c=0x10151e:s=320x180:r=10 -t 60 -c:v libvpx -b:v 80k .qa/test.webm
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: viewer-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

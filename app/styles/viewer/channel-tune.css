@@ -1,0 +1,52 @@
+/* Numeric channel tuning ---------------------------------------------------- */
+
+.ttv-channel-tune-overlay {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 2147482600;
+  display: grid;
+  min-width: min(20rem, calc(100vw - 2rem));
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 68%, var(--border));
+  border-radius: 1rem;
+  padding: 0.7rem 0.85rem;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--panel-bg) 95%, transparent);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-elevated);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+
+.ttv-channel-tune-overlay > span {
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.ttv-channel-tune-overlay > strong {
+  font-size: 1.65rem;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.ttv-channel-tune-overlay > small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .ttv-channel-tune-overlay {
+    top: max(0.55rem, env(safe-area-inset-top));
+    min-width: calc(100vw - 1rem);
+  }
+}

@@ -20,6 +20,9 @@ const THEME_CHANGE_EVENT = "ttv:theme-change";
 export default function ThemeRuntime() {
   const themeId = useStore((state) => state.themeId);
   const setTheme = useStore((state) => state.setTheme);
+  const preferReducedMotion = useStore(
+    (state) => state.viewerSettings.preferReducedMotion,
+  );
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
   const cssVars = useMemo(() => createThemeCssVars(theme), [theme]);
 
@@ -52,6 +55,20 @@ export default function ThemeRuntime() {
       }),
     );
   }, [cssVars, theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (preferReducedMotion) {
+      root.dataset.ttvReducedMotion = "true";
+    } else {
+      delete root.dataset.ttvReducedMotion;
+    }
+
+    return () => {
+      delete root.dataset.ttvReducedMotion;
+    };
+  }, [preferReducedMotion]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {

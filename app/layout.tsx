@@ -22,7 +22,7 @@ const APP_THEME_COLOR = "#020617";
 const DEFAULT_THEME = getDefaultTheme();
 
 const APP_DESCRIPTION =
-  "Tate's TV is a retro live-TV simulator with custom channels, scheduled programming, nostalgic guide styling, and premium visual themes.";
+  "Tate's TV is a Calgary-born Canadian streaming network. Watch free live channels, explore the TV guide, and discover creators on demand.";
 
 function getSiteUrl(): string {
   const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || FALLBACK_SITE_URL;
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
 
   title: {
-    default: `${APP_NAME} | Retro Live TV Simulator`,
+    default: `${APP_NAME} | Free Canadian Streaming TV`,
     template: `%s | ${APP_NAME}`,
   },
 
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     "TatesTV",
     "TTV",
     "retro TV",
-    "live TV simulator",
+    "free Canadian streaming TV",
     "custom channels",
     "TV guide",
     "scheduled programming",
@@ -86,9 +86,9 @@ export const metadata: Metadata = {
     locale: APP_LOCALE,
     url: "/",
     siteName: APP_NAME,
-    title: `${APP_NAME} | Retro Live TV Simulator`,
+    title: `${APP_NAME} | Free Canadian Streaming TV`,
     description:
-      "Build channels, schedule shows, and watch a retro-style live TV lineup with a premium guide and app-style experience.",
+      "Free TV, real channels. Discover live programming and on-demand entertainment on Tate’s TV.",
     images: [
       {
         url: DEFAULT_OG_IMAGE,
@@ -101,9 +101,9 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: `${APP_NAME} | Retro Live TV Simulator`,
+    title: `${APP_NAME} | Free Canadian Streaming TV`,
     description:
-      "A nostalgic live-TV simulator with custom channels, TV guide scheduling, and premium themes.",
+      "Calgary-born streaming TV with live channels, a familiar guide, and on-demand entertainment.",
     images: [DEFAULT_OG_IMAGE],
   },
 

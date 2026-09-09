@@ -161,38 +161,6 @@
   text-transform: uppercase;
 }
 
-/* Uploaded station logos render as broadcast bugs, never as boxed thumbnails. */
-img[src*="/channel-logos/"] {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-@supports selector(:has(*)) {
-  :where(div, span, figure):has(> img[src*="/channel-logos/"]) {
-    width: clamp(8.25rem, 9vw, 10.75rem) !important;
-    height: clamp(8.25rem, 9vw, 10.75rem) !important;
-    min-width: clamp(8.25rem, 9vw, 10.75rem) !important;
-    min-height: clamp(8.25rem, 9vw, 10.75rem) !important;
-    overflow: visible !important;
-    border-color: transparent !important;
-    outline: 0 !important;
-    padding: 0.35rem !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-
-  :where(div, span, figure):has(> img[src*="/channel-logos/"]) > img[src*="/channel-logos/"] {
-    transform: scale(1.16);
-    transform-origin: center;
-  }
-}
-
 @media (max-width: 720px) {
   .ttv-main-header {
     border-radius: var(--ttv-radius-mobile);

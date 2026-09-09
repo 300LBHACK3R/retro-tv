@@ -129,29 +129,23 @@ export const THEMES = [
       "radial-gradient(circle at 18% 18%, rgba(255,58,120,0.72), transparent 34%), radial-gradient(circle at 82% 22%, rgba(55,216,255,0.68), transparent 34%), linear-gradient(135deg, #03030b 0%, #090717 45%, #050816 100%)",
     recommendedFor: ["official", "launch", "live TV", "movies", "app"],
     colors: {
-      appBg:
-        "radial-gradient(circle at 16% 10%, rgba(255,58,120,0.20), transparent 34%), radial-gradient(circle at 88% 12%, rgba(55,216,255,0.18), transparent 33%), radial-gradient(circle at 50% 100%, rgba(139,92,246,0.12), transparent 44%), linear-gradient(135deg, #03030b 0%, #070816 46%, #02040c 100%)",
-      panelBg:
-        "linear-gradient(135deg, rgba(8,10,26,0.95), rgba(3,5,14,0.93))",
-      panelAltBg:
-        "linear-gradient(135deg, rgba(13,16,36,0.97), rgba(7,9,24,0.95))",
-      border: "rgba(74,222,255,0.38)",
-      text: "#fff7fb",
-      textMuted: "#aeb8d8",
-      buttonBg:
-        "linear-gradient(135deg, rgba(255,58,120,0.18), rgba(55,216,255,0.12) 52%, rgba(5,8,22,0.94))",
-      buttonHover:
-        "linear-gradient(135deg, rgba(255,58,120,0.32), rgba(55,216,255,0.24) 55%, rgba(15,23,42,0.96))",
-      primary: "#37d8ff",
-      secondary: "#ff3a78",
-      onPrimary: "#04111a",
-      focusRing: "rgba(55,216,255,0.72)",
-      guideHeaderBg:
-        "linear-gradient(135deg, rgba(7,8,23,0.99), rgba(17,9,35,0.97) 48%, rgba(3,23,35,0.97))",
-      guideRowBg: "rgba(4,6,18,0.97)",
-      guideRowAltBg: "rgba(9,12,30,0.97)",
-      guideActiveBg: "#ff3a78",
-      guideCurrentBg: "#37d8ff",
+      appBg: "#090c12",
+      panelBg: "#10151e",
+      panelAltBg: "#171e29",
+      border: "#28303d",
+      text: "#f2f4f8",
+      textMuted: "#a1acbe",
+      buttonBg: "#19222e",
+      buttonHover: "#243142",
+      primary: "#60d8ef",
+      secondary: "#ef719e",
+      onPrimary: "#071219",
+      focusRing: "#60d8ef",
+      guideHeaderBg: "#151d29",
+      guideRowBg: "#10151e",
+      guideRowAltBg: "#151c27",
+      guideActiveBg: "#ef719e",
+      guideCurrentBg: "#60d8ef",
     },
   },
   {

@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
 
     ".history/**",
     "coverage/**",
+    ".qa/**",
+    "test-results/**",
+    "playwright-report/**",
     ".turbo/**",
     ".cache/**",
     "tsconfig.tsbuildinfo",

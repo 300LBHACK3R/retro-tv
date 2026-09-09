@@ -23,6 +23,7 @@ import {
   type ThemeDefinition,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
+import { THEME_LIBRARY_OPEN_EVENT } from "@/lib/themeEvents";
 
 const DIALOG_ID = "ttv-theme-library";
 
@@ -229,6 +230,16 @@ export default function ThemeButton() {
     setPortalReady(true);
   }, []);
 
+  useEffect(() => {
+    const openThemeLibrary = () => setIsOpen(true);
+
+    window.addEventListener(THEME_LIBRARY_OPEN_EVENT, openThemeLibrary);
+
+    return () => {
+      window.removeEventListener(THEME_LIBRARY_OPEN_EVENT, openThemeLibrary);
+    };
+  }, []);
+
   const applyTheme = useCallback(
     (theme: ThemeDefinition) => {
       if (!canUseTheme(theme.id, ownedPremiumThemes, false)) {
@@ -247,11 +258,18 @@ export default function ThemeButton() {
     }
 
     const body = document.body;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const fallbackTrigger = triggerRef.current;
     const previousOverflow = body.style.overflow;
     const previousOverscrollBehavior = body.style.overscrollBehavior;
+    const previousOverlayState = body.dataset.ttvOverlayOpen;
 
     body.style.overflow = "hidden";
     body.style.overscrollBehavior = "none";
+    body.dataset.ttvOverlayOpen = "true";
 
     const focusTimer = window.setTimeout(() => {
       searchRef.current?.focus();
@@ -295,8 +313,32 @@ export default function ThemeButton() {
       window.clearTimeout(focusTimer);
       body.style.overflow = previousOverflow;
       body.style.overscrollBehavior = previousOverscrollBehavior;
+
+      if (previousOverlayState) {
+        body.dataset.ttvOverlayOpen = previousOverlayState;
+      } else {
+        delete body.dataset.ttvOverlayOpen;
+      }
+
       window.removeEventListener("keydown", handleKeyDown);
-      triggerRef.current?.focus({ preventScroll: true });
+
+      window.setTimeout(() => {
+        const canUseFallback = Boolean(
+          fallbackTrigger && fallbackTrigger.offsetParent !== null,
+        );
+        const visibleMoreTrigger = Array.from(
+          document.querySelectorAll<HTMLElement>("[data-viewer-more-trigger]"),
+        ).find((element) => element.offsetParent !== null);
+        const canRestoreFocus = previouslyFocused?.isConnected &&
+          previouslyFocused !== document.body && previouslyFocused.offsetParent !== null;
+        const focusTarget = canRestoreFocus
+          ? previouslyFocused
+          : canUseFallback
+            ? fallbackTrigger
+            : visibleMoreTrigger;
+
+        focusTarget?.focus({ preventScroll: true });
+      }, 0);
     };
   }, [closeDialog, isOpen]);
 
@@ -321,6 +363,7 @@ export default function ThemeButton() {
         type="button"
         className="theme-trigger ttv-touch-target"
         onClick={() => setIsOpen(true)}
+        aria-label="Open theme library"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-controls={DIALOG_ID}

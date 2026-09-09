@@ -1,0 +1,65 @@
+/* Layout responds to available space, not a theme's identity. */
+@media (max-width: 1200px) {
+  .ttv-premium-topbar { gap: 1rem; }
+  .ttv-premium-live-chip { display: none; }
+  .ttv-premium-nav { margin-left: auto; }
+  .ttv-premium-stage-grid { grid-template-columns: minmax(0,1fr) 17rem; gap: 1rem; }
+}
+@media (max-width: 1000px) {
+  .ttv-premium-stage-grid { grid-template-columns: minmax(0,1fr); }
+  .ttv-premium-stage-sidebar { display: grid; grid-template-columns: 1fr 1.2fr; }
+  .ttv-channel-hero { border-bottom: 0; border-right: 1px solid var(--border); }
+  .ttv-premium-nav > :where(button,a) { padding-inline: .65rem; }
+}
+@media (max-width: 760px) {
+  .ttv-premium-viewer-shell:not(.ttv-tv-mode) { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .ttv-premium-frame { padding-inline: max(1rem, env(safe-area-inset-left)); gap: 1.25rem; }
+  .ttv-premium-topbar { min-height: 4.75rem; padding-top: env(safe-area-inset-top); }
+  .ttv-premium-brand-logo { width: 3.6rem; height: 2.4rem; }
+  .ttv-brand-wordmark { font-size: 1.05rem; }
+  .ttv-brand-wordmark small { font-size: .65rem; }
+  .ttv-premium-live-chip { display: flex; }
+  .ttv-premium-live-copy small { display: none; }
+  .ttv-premium-nav { display: none; }
+  .ttv-premium-player-frame { border-radius: .65rem; }
+  .ttv-premium-stage-sidebar, .ttv-premium-viewer-shell[data-player-mode="theater"] .ttv-premium-stage-sidebar { display: flex; flex-direction: column; }
+  .ttv-channel-hero { border-right: 0; border-bottom: 1px solid var(--border); padding: 1rem; }
+  .ttv-channel-hero h1 { font-size: 1.15rem; }
+  .ttv-channel-hero p { -webkit-line-clamp: 1; }
+  .ttv-now-next-compact { padding: 1rem; gap: .8rem; }
+  .ttv-now-next-up-next { padding-top: .8rem; }
+  .ttv-section-heading h2 { font-size: 1.2rem; }
+  .ttv-channel-rail-card { flex-basis: 9.5rem; min-height: 9.5rem; padding: .85rem; }
+  .ttv-channel-rail-logo { height: 3.75rem; }
+  .ttv-premium-player-mini { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); width: min(25rem, calc(100vw - 2rem)); }
+  .ttv-mobile-viewer-nav { display: grid; }
+  .ttv-premium-footer { align-items: flex-start; flex-direction: column; padding-bottom: 1rem; }
+  .ttv-premium-footer nav { justify-content: flex-start; }
+  .ttv-channel-browser-dialog, .ttv-viewer-more-dialog { width: 100%; max-height: 100%; }
+  .ttv-channel-browser-grid, .ttv-channel-browser-tools { grid-template-columns: 1fr; }
+  .ttv-viewer-preference-grid, .ttv-viewer-link-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .ttv-premium-dialog-backdrop { padding: 0; }
+  .ttv-channel-browser-dialog, .ttv-viewer-more-dialog { height: 100%; border-radius: 0; border-width: 0; }
+  .ttv-premium-dialog-header { padding-top: max(1rem, env(safe-area-inset-top)); }
+  .ttv-premium-dialog-close > span:last-child { display: none; }
+  .ttv-channel-browser-card { grid-template-columns: 3rem minmax(0,1fr) auto; }
+  .ttv-channel-browser-logo { width: 3rem !important; height: 3rem !important; min-width: 3rem !important; min-height: 3rem !important; }
+  .ttv-view-mode-grid { grid-template-columns: 1fr; }
+}
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1000px) {
+  .ttv-premium-topbar, .ttv-premium-stage-sidebar, .ttv-channel-rail-section, .ttv-premium-footer { display: none; }
+  .ttv-premium-frame { padding: .5rem max(.5rem, env(safe-area-inset-right)) 5rem max(.5rem, env(safe-area-inset-left)); }
+  .ttv-premium-player-frame:not(.ttv-premium-player-mini) { height: calc(100vh - 5.5rem); height: calc(100dvh - 5.5rem); width: 100%; aspect-ratio: auto; }
+  .ttv-mobile-viewer-nav { display: grid; }
+}
+@media (min-width: 1800px) { .ttv-premium-stage-grid { grid-template-columns: minmax(0,1fr) 22rem; } }
+@media (prefers-reduced-motion: reduce) {
+  .ttv-guide-loading-spinner { animation: none; }
+  .ttv-channel-rail { scroll-behavior: auto; }
+}
+@media (forced-colors: active) {
+  .ttv-premium-stage-sidebar, .ttv-channel-rail-card, .ttv-mobile-viewer-nav { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
+  .ttv-channel-rail-card[data-selected="true"] { outline: 3px solid Highlight; }
+}

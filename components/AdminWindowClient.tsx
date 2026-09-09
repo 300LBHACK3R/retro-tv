@@ -11,7 +11,6 @@ import {
 } from "react";
 import AdminDashboard from "@/components/AdminDashboard";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
-import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
@@ -177,7 +176,6 @@ export default function AdminWindowClient() {
         color: "var(--text)",
       }}
     >
-      <TextEncodingCleaner />
 
       <GlobalProgrammingSync isAdminAuthorized={authorized} />
 

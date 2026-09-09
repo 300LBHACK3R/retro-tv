@@ -1,0 +1,23 @@
+/* Viewer-selected reduced-motion preference -------------------------------- */
+
+:root[data-ttv-reduced-motion="true"] {
+  scroll-behavior: auto !important;
+}
+
+:root[data-ttv-reduced-motion="true"] *,
+:root[data-ttv-reduced-motion="true"] *::before,
+:root[data-ttv-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}
+
+@media (forced-colors: active) {
+  .ttv-install-prompt {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

@@ -1,0 +1,12 @@
+/* Tate's TV Premium V1 viewer foundation.
+ *
+ * Structure is split by responsibility so themes can remain decorative and
+ * responsive behaviour can be maintained without one monolithic stylesheet.
+ */
+@import "./viewer/shell.css";
+@import "./viewer/dialogs.css";
+@import "./viewer/navigation.css";
+@import "./viewer/responsive.css";
+@import "./viewer/install.css";
+@import "./viewer/accessibility.css";
+@import "./viewer/channel-tune.css";

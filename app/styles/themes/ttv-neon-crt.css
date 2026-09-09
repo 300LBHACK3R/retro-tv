@@ -8,8 +8,9 @@
   --ttv-radius-mobile: 1.05rem;
   --ttv-radius-control: 0.9rem;
   --ttv-radius-player: 1.25rem;
-  --ttv-panel-blur: 18px;
-  --ttv-texture-opacity: 0.19;
+  --ttv-panel-blur: 0px;
+  --ttv-ambient-opacity: 0.12;
+  --ttv-texture-opacity: 0.035;
   --ttv-texture-size: 100% 4px;
   --ttv-texture-bg:
     repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 4px),

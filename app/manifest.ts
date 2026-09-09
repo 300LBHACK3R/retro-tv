@@ -5,13 +5,13 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Tate's TV",
     short_name: "TTV",
     description:
-      "A retro live-TV simulator with custom channels, scheduled programming, and premium visual themes.",
+      "Free Canadian streaming TV with live channels, a familiar guide, and on-demand entertainment.",
     start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "any",
-    background_color: "#020617",
-    theme_color: "#020617",
+    background_color: "#090c12",
+    theme_color: "#090c12",
     categories: ["entertainment", "video", "utilities"],
     lang: "en-CA",
     shortcuts: [

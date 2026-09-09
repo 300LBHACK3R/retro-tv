@@ -169,18 +169,6 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-function readRequest<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-
-    request.onerror = () => {
-      reject(createDbError("Media database request failed.", request.error));
-    };
-  });
-}
-
 async function withStore<T>(
   storeName: string,
   mode: IDBTransactionMode,

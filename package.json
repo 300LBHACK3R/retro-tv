@@ -4,7 +4,7 @@
   "private": true,
   "description": "A browser-based retro cable TV simulator built with Next.js, TypeScript, Tailwind CSS, Supabase, and Cloudflare R2.",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "dev:clean": "npm run clean && next dev",
     "build": "next build",
     "start": "next start",
@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run build",
     "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
-    "audit:prod": "npm audit --omit=dev"
+    "audit:prod": "npm audit --omit=dev",
+    "test:unit": "playwright test --config tests/unit.config.ts",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.0",
@@ -24,6 +26,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -9,6 +9,7 @@ import type {
 
 interface GlobalProgrammingSyncProps {
   isAdminAuthorized: boolean;
+  visibility?: "always" | "problems" | "hidden";
 }
 
 type SyncStatus =
@@ -166,6 +167,7 @@ function formatLastSaved(value: string | null): string {
 
 export default function GlobalProgrammingSync({
   isAdminAuthorized,
+  visibility = "always",
 }: GlobalProgrammingSyncProps) {
   const replaceProgramming = useStore((state) => state.replaceProgramming);
   const exportProgrammingSnapshot = useStore(
@@ -347,7 +349,7 @@ export default function GlobalProgrammingSync({
         if (data.programming) {
           const signature = createSnapshotSignature(data.programming);
 
-          replaceProgramming(data.programming);
+          replaceProgramming(data.programming, { preserveViewer: true });
 
           lastSavedSignatureRef.current = signature;
           lastQueuedSignatureRef.current = signature;
@@ -497,9 +499,25 @@ export default function GlobalProgrammingSync({
     };
   }, [clearResetTimer, clearSaveTimer]);
 
+  const displayMessage = visibility === "problems"
+    ? status === "offline"
+      ? "You are offline. Streaming needs an internet connection."
+      : status === "fallback"
+        ? "The latest schedule is unavailable. Please try again shortly."
+        : "The schedule could not refresh. Please try again shortly."
+    : message;
   const isSaving = status === "saving";
   const tone = getStatusTone(status);
   const lastSavedLabel = formatLastSaved(lastSavedAt);
+  const isProblemStatus =
+    status === "error" || status === "offline" || status === "fallback";
+
+  if (
+    visibility === "hidden" ||
+    (visibility === "problems" && !isProblemStatus)
+  ) {
+    return null;
+  }
 
   return (
     <div
@@ -509,7 +527,7 @@ export default function GlobalProgrammingSync({
         borderColor: tone.borderColor,
         color: tone.color,
       }}
-      title={`${message}${lastSavedAt ? ` / Last saved ${lastSavedAt}` : ""}`}
+      title={visibility === "problems" ? displayMessage : `${message}${lastSavedAt ? ` / Last saved ${lastSavedAt}` : ""}`}
       aria-live="polite"
     >
       <span
@@ -521,8 +539,8 @@ export default function GlobalProgrammingSync({
       />
 
       <span className="truncate">
-        {message}
-        {lastSavedLabel && status !== "saving" && status !== "dirty"
+        {displayMessage}
+        {visibility === "always" && lastSavedLabel && status !== "saving" && status !== "dirty"
           ? ` / ${lastSavedLabel}`
           : ""}
       </span>

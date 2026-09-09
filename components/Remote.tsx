@@ -58,6 +58,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 function shouldIgnoreKeyboardShortcut(event: KeyboardEvent): boolean {
   return (
     event.defaultPrevented ||
+    document.body.dataset.ttvOverlayOpen === "true" ||
+    Boolean((event.target as HTMLElement | null)?.closest("button, a, [role=dialog]")) ||
     isTypingTarget(event.target) ||
     event.ctrlKey ||
     event.metaKey ||
@@ -197,7 +199,7 @@ function RemoteButton({
   );
 }
 
-export default function Remote() {
+export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
   const channels = useStore((state) => state.channels);
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
@@ -372,38 +374,6 @@ export default function Remote() {
 
       const key = event.key.toLowerCase();
 
-      if (/^\d$/.test(event.key)) {
-        event.preventDefault();
-        appendChannelDigit(event.key);
-        return;
-      }
-
-      if (event.key === "Enter" && channelEntry) {
-        event.preventDefault();
-        tuneChannelEntry(channelEntry);
-        return;
-      }
-
-      if (event.key === "Escape" && channelEntry) {
-        event.preventDefault();
-        clearChannelEntry();
-        return;
-      }
-
-      if (event.key === "Backspace" && channelEntry) {
-        event.preventDefault();
-
-        setChannelEntry((current) => {
-          const next = normalizeChannelEntry(current.slice(0, -1));
-
-          setStatusMessage(next ? `Tune CH ${next}` : "Channel entry cleared.");
-
-          return next;
-        });
-
-        return;
-      }
-
       if (event.key === "ArrowUp" || event.key === "PageUp") {
         event.preventDefault();
         goNext();
@@ -440,13 +410,13 @@ export default function Remote() {
         return;
       }
 
-      if (key === "p") {
+      if (key === "p" && !tvMode) {
         event.preventDefault();
         toggleMiniMode();
         return;
       }
 
-      if (key === "t") {
+      if (key === "t" && !tvMode) {
         event.preventDefault();
         toggleTheaterMode();
         return;
@@ -464,9 +434,7 @@ export default function Remote() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [
-    appendChannelDigit,
-    channelEntry,
-    clearChannelEntry,
+    tvMode,
     goNext,
     goPrev,
     openSettings,
@@ -484,7 +452,7 @@ export default function Remote() {
       <button
         type="button"
         onClick={() => setRemoteMinimized(false)}
-        className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 rounded-full border px-4 py-3 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95 sm:absolute sm:bottom-4 sm:right-4"
+        className="ttv-remote-launcher fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 rounded-full border px-4 py-3 text-xs font-black uppercase tracking-[0.16em] shadow-2xl backdrop-blur-md transition hover:scale-[1.03] hover:opacity-95 sm:absolute sm:bottom-4 sm:right-4"
         style={{
           background: "rgba(0,0,0,0.78)",
           borderColor: "var(--border)",
@@ -499,9 +467,10 @@ export default function Remote() {
   return (
     <section
       className="
-        fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 max-h-[64vh] overflow-y-auto rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl
+        ttv-remote-panel fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 max-h-[64vh] overflow-y-auto rounded-2xl border p-3 shadow-2xl shadow-black/50 backdrop-blur-xl
         sm:absolute sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(440px,calc(100%-2rem))]
       "
+      data-tv-mode={tvMode}
       style={{
         background:
           "radial-gradient(circle at top right, rgba(212,175,55,0.13), transparent 34%), linear-gradient(135deg, rgba(0,0,0,0.92), rgba(18,18,18,0.84))",
@@ -635,6 +604,7 @@ export default function Remote() {
         </RemoteButton>
       </div>
 
+      {!tvMode ? (
       <div className="mt-2 grid grid-cols-3 gap-2">
         <RemoteButton
           onClick={setNormalMode}
@@ -657,6 +627,8 @@ export default function Remote() {
           Theater
         </RemoteButton>
       </div>
+
+      ) : null}
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (

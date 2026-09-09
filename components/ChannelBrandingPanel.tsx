@@ -448,7 +448,7 @@ export default function ChannelBrandingPanel() {
 
     setDraft(savedBranding);
     setMessage("Edit the fields, then click Save Changes.");
-  }, [selectedChannel?.id, savedBranding]);
+  }, [selectedChannel, savedBranding]);
 
   if (!selectedChannel || !savedBranding || !draft) {
     return (

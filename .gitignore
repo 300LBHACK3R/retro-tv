@@ -45,3 +45,9 @@ public/media/
 *.mov
 *.mkv
 .history/
+
+# Local browser QA captures and test harness
+/.qa/
+
+/playwright-report/
+/test-results/

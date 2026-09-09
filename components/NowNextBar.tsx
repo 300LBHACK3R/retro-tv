@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
@@ -6,9 +6,12 @@ import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
+export type NowNextBarVariant = "default" | "compact";
+
 interface NowNextBarProps {
   channel: Channel | undefined;
   schedule: BroadcastItem[];
+  variant?: NowNextBarVariant;
 }
 
 const LIVE_TICK_MS = 2_000;
@@ -327,13 +330,19 @@ function getBreakModeLabel(channel: Channel): string {
 function EmptyNowNextState({
   title,
   message,
+  variant,
 }: {
   title: string;
   message: string;
+  variant: NowNextBarVariant;
 }) {
   return (
     <section
-      className="ttv-glass-panel rounded-2xl p-4"
+      className={
+        variant === "compact"
+          ? "ttv-now-next-compact ttv-now-next-empty"
+          : "ttv-glass-panel rounded-2xl p-4"
+      }
       style={{ color: "var(--text)" }}
     >
       <div className="text-sm font-black">{title}</div>
@@ -360,7 +369,11 @@ function InfoPill({ children }: { children: ReactNode }) {
   );
 }
 
-export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
+export default function NowNextBar({
+  channel,
+  schedule,
+  variant = "default",
+}: NowNextBarProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
 
@@ -394,6 +407,7 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
       <EmptyNowNextState
         title="Loading channel data..."
         message="Preparing live schedule information."
+        variant={variant}
       />
     );
   }
@@ -402,7 +416,8 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
     return (
       <EmptyNowNextState
         title="No active channel data"
-        message="Load or assign media to begin playback."
+        message="Check another channel while this schedule is being updated."
+        variant={variant}
       />
     );
   }
@@ -433,9 +448,54 @@ export default function NowNextBar({ channel, schedule }: NowNextBarProps) {
 
   const nextDuration = getSafeDuration(nextVisibleItem);
 
+  if (variant === "compact") {
+    return (
+      <section
+        className="ttv-now-next-compact"
+        aria-label="Now and next programming"
+      >
+        <div className="ttv-now-next-compact-header">
+          <span className="ttv-section-kicker">Now playing</span>
+          <span className="ttv-now-next-live">Live</span>
+        </div>
+
+        <div className="ttv-now-next-current">
+          <strong title={nowTitle}>{nowTitle}</strong>
+          <span>
+            {getDisplayTypeLabel(publicCurrentItem)} ·{" "}
+            {formatClock(currentElapsed)} / {formatClock(currentDuration)}
+          </span>
+        </div>
+
+        <div
+          className="ttv-now-next-progress"
+          role="progressbar"
+          aria-label={`${nowTitle} progress`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progressPercent)}
+        >
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
+
+        <div className="ttv-now-next-up-next">
+          <span>Up next</span>
+          <strong title={nextTitle}>{nextTitle}</strong>
+          <small>
+            {nextVisibleItem
+              ? `${getDisplayTypeLabel(nextVisibleItem)} · ${formatLongClock(nextDuration)}`
+              : "Nothing else is queued"}
+          </small>
+        </div>
+
+
+      </section>
+    );
+  }
+
   return (
     <section
-      className="ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
+      className="ttv-now-next-panel ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
       style={{ color: "var(--text)" }}
       aria-label="Now and next programming"
     >

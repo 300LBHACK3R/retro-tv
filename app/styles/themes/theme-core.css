@@ -1,24 +1,21 @@
 :root {
-  --app-bg:
-    radial-gradient(circle at 16% 10%, rgba(255, 58, 120, 0.2), transparent 34%),
-    radial-gradient(circle at 88% 12%, rgba(55, 216, 255, 0.18), transparent 33%),
-    linear-gradient(135deg, #03030b 0%, #070816 46%, #02040c 100%);
-  --panel-bg: linear-gradient(135deg, rgba(8, 10, 26, 0.96), rgba(3, 5, 14, 0.94));
-  --panel-alt-bg: linear-gradient(135deg, rgba(13, 16, 36, 0.98), rgba(7, 9, 24, 0.96));
-  --border: rgba(74, 222, 255, 0.38);
-  --text: #fff7fb;
-  --text-muted: #aeb8d8;
-  --button-bg: linear-gradient(135deg, rgba(255, 58, 120, 0.18), rgba(55, 216, 255, 0.12) 52%, rgba(5, 8, 22, 0.94));
-  --button-hover: linear-gradient(135deg, rgba(255, 58, 120, 0.32), rgba(55, 216, 255, 0.24) 55%, rgba(15, 23, 42, 0.96));
-  --primary: #37d8ff;
-  --secondary: #ff3a78;
-  --on-primary: #04111a;
-  --focus-ring: rgba(55, 216, 255, 0.72);
-  --guide-header-bg: linear-gradient(135deg, rgba(7, 8, 23, 0.99), rgba(17, 9, 35, 0.97) 48%, rgba(3, 23, 35, 0.97));
-  --guide-row-bg: rgba(4, 6, 18, 0.97);
-  --guide-row-alt-bg: rgba(9, 12, 30, 0.97);
-  --guide-active-bg: #ff3a78;
-  --guide-current-bg: #37d8ff;
+  --app-bg: #090c12;
+  --panel-bg: #10151e;
+  --panel-alt-bg: #171e29;
+  --border: #28303d;
+  --text: #f2f4f8;
+  --text-muted: #a1acbe;
+  --button-bg: #19222e;
+  --button-hover: #243142;
+  --primary: #60d8ef;
+  --secondary: #ef719e;
+  --on-primary: #071219;
+  --focus-ring: #60d8ef;
+  --guide-header-bg: #151d29;
+  --guide-row-bg: #10151e;
+  --guide-row-alt-bg: #151c27;
+  --guide-active-bg: #ef719e;
+  --guide-current-bg: #60d8ef;
 
   --ttv-radius-shell: 1.75rem;
   --ttv-radius-panel: 1.35rem;

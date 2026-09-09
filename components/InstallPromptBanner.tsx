@@ -210,12 +210,25 @@ function getPromptMessage(mode: InstallPromptMode, profile: BrowserProfile): str
   return "";
 }
 
+const SUPPRESSED_INSTALL_PROMPT_PREFIXES = [
+  "/install",
+  "/admin",
+  "/tv",
+  "/backup",
+  "/recovery",
+  "/health",
+  "/readiness",
+  "/offline",
+] as const;
+
 function shouldSuppressPrompt(pathname: string | null): boolean {
   if (!pathname) {
     return false;
   }
 
-  return pathname === "/install" || pathname.startsWith("/install/");
+  return SUPPRESSED_INSTALL_PROMPT_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
 export default function InstallPromptBanner() {

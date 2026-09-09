@@ -10,7 +10,6 @@ import {
   type CSSProperties,
 } from "react";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
-import TextEncodingCleaner from "@/components/TextEncodingCleaner";
 import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
@@ -320,7 +319,7 @@ function getProgressPercent(entry: ProgressEntry | undefined): number {
 function Poster({ group }: { group: LibraryGroup }) {
   if (group.poster) {
     return (
-      <img
+      <Image unoptimized width={480} height={270}
         src={group.poster}
         alt=""
         loading="lazy"
@@ -332,16 +331,16 @@ function Poster({ group }: { group: LibraryGroup }) {
   return (
     <div className="ttv-library-poster-fallback flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.4),transparent_45%),linear-gradient(135deg,#111827,#020617)] p-5 text-center">
       <div>
-        <img
+        <Image unoptimized width={480} height={270}
           src="/brand/ttv-neon-mini.png"
           alt=""
           loading="lazy"
           className="mx-auto h-16 w-16 rounded-2xl object-cover opacity-90 shadow-[0_0_28px_rgba(55,216,255,0.22)]"
         />
-        <div className="mt-3 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200/70">
+        <div className="mt-3 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200/70">
           {getTypeLabel(group.type)}
         </div>
-        <div className="mt-2 line-clamp-3 text-base font-black text-white">
+        <div className="mt-2 line-clamp-3 text-base font-semibold text-white">
           {group.title}
         </div>
       </div>
@@ -619,8 +618,7 @@ export default function PublicLibrary() {
       className={`ttv-library-shell ${themeLayoutClass} min-h-screen`}
       style={pageStyle}
     >
-      <TextEncodingCleaner />
-      <GlobalProgrammingSync isAdminAuthorized={false} />
+      <GlobalProgrammingSync isAdminAuthorized={false} visibility="problems" />
 
       <div className="ttv-library-ambient pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div className="ttv-library-ambient__primary absolute -left-32 top-0 h-96 w-96 rounded-full blur-3xl" />
@@ -628,7 +626,7 @@ export default function PublicLibrary() {
       </div>
 
       <header className="ttv-library-header sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1700px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" aria-label="Back to Tate's TV live channels">
             <Image
               src="/tatestv-logo.png"
@@ -642,12 +640,12 @@ export default function PublicLibrary() {
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ThemeButton />
-            <span className="hidden rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200 sm:inline-flex">
-              Free at launch
+            <span className="hidden rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 sm:inline-flex">
+              Watch free
             </span>
             <Link
               href="/"
-              className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-black uppercase tracking-[0.15em] text-cyan-100 transition hover:bg-cyan-400/20"
+              className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.15em] text-cyan-100 transition hover:bg-cyan-400/20"
             >
               Back to Live TV
             </Link>
@@ -655,43 +653,24 @@ export default function PublicLibrary() {
         </div>
       </header>
 
-      <div className="relative mx-auto w-full max-w-[1700px] px-4 py-6 sm:px-6 sm:py-10">
-        <section className="overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(8,47,73,0.58),rgba(17,24,39,0.9)_45%,rgba(88,28,135,0.42))] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.45)] sm:p-9">
-          <div className="max-w-4xl">
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-cyan-200">
-              TTV Library
-            </div>
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">
-              Watch Tate&apos;s TV On Demand
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-white/70 sm:text-base">
-              Browse saved shows, movies, and music without changing the live
-              channel schedule. Pick an episode, resume where you stopped, or
-              let the next episode continue automatically.
-            </p>
+      <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-10">
+        <section className="ttv-library-intro">
+          <div>
+            <span className="ttv-section-kicker">On demand</span>
+            <h1>Your time. Your TV.</h1>
+            <p>Find a favourite. Discover something new. Continue watching.</p>
           </div>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-white/75">
-              {stats.groups} titles
-            </span>
-            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-white/75">
-              {stats.items} playable items
-            </span>
-            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-white/75">
-              {formatDuration(stats.duration)} total
-            </span>
-          </div>
+          <span className="ttv-library-title-count">{stats.groups} titles · {stats.items} videos</span>
         </section>
 
         {continueWatching.length > 0 ? (
           <section className="mt-8">
             <div className="mb-3 flex items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-fuchsia-200">
                   Continue Watching
                 </div>
-                <h2 className="mt-1 text-2xl font-black">Pick up where you left off</h2>
+                <h2 className="mt-1 text-2xl font-semibold">Pick up where you left off</h2>
               </div>
             </div>
 
@@ -705,20 +684,20 @@ export default function PublicLibrary() {
                 >
                   <div className="aspect-video bg-black">
                     {item.media.poster ? (
-                      <img
+                      <Image unoptimized width={480} height={270}
                         src={item.media.poster}
                         alt=""
                         loading="lazy"
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(217,70,239,0.35),transparent_50%),#0f172a] px-4 text-center text-xs font-black text-white/80">
+                      <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(217,70,239,0.35),transparent_50%),#0f172a] px-4 text-center text-xs font-semibold text-white/80">
                         {item.groupTitle}
                       </div>
                     )}
                   </div>
                   <div className="p-3">
-                    <div className="line-clamp-1 text-sm font-black">
+                    <div className="line-clamp-1 text-sm font-semibold">
                       {item.groupTitle}
                     </div>
                     <div className="mt-1 line-clamp-1 text-xs text-white/55">
@@ -730,7 +709,7 @@ export default function PublicLibrary() {
                         style={{ width: `${getProgressPercent(entry)}%` }}
                       />
                     </div>
-                    <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
+                    <div className="mt-2 text-xs font-bold tracking-normal text-white/45">
                       {formatClock(entry.position)} watched
                     </div>
                   </div>
@@ -740,10 +719,10 @@ export default function PublicLibrary() {
           </section>
         ) : null}
 
-        <section className="mt-8 rounded-[2rem] border border-cyan-300/15 bg-[#07101f]/85 p-4 shadow-2xl shadow-black/30 sm:p-5">
+        <section className="mt-8 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 shadow-2xl shadow-black/30 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <label className="block">
-              <span className="sr-only">Search the Tate's TV library</span>
+              <span className="sr-only">Search the Tate&apos;s TV library</span>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -761,7 +740,7 @@ export default function PublicLibrary() {
                     key={item.id}
                     type="button"
                     onClick={() => setFilter(item.id)}
-                    className={`shrink-0 rounded-full border px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition ${
+                    className={`shrink-0 rounded-full border px-4 py-3 text-xs font-semibold tracking-normal transition ${
                       active
                         ? "border-cyan-300 bg-cyan-300 text-slate-950"
                         : "border-white/10 bg-white/[0.04] text-white/65 hover:border-cyan-300/30 hover:text-white"
@@ -776,24 +755,24 @@ export default function PublicLibrary() {
         </section>
 
         {library.length === 0 ? (
-          <section className="mt-6 rounded-[2rem] border border-dashed border-cyan-300/25 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-black">The library is syncing</div>
+          <section className="mt-6 rounded-2xl border border-dashed border-cyan-300/25 bg-white/[0.03] p-10 text-center">
+            <div className="text-xl font-semibold">The library is syncing</div>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/55">
               Playable shows, movies, and music will appear here as soon as the
               public programming snapshot finishes loading.
             </p>
           </section>
         ) : filteredGroups.length === 0 ? (
-          <section className="mt-6 rounded-[2rem] border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-black">No matching library titles</div>
+          <section className="mt-6 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
+            <div className="text-xl font-semibold">No matching library titles</div>
             <p className="mt-2 text-sm text-white/50">
               Try a different search or content filter.
             </p>
           </section>
         ) : (
-          <div className="mt-6 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <aside className="min-w-0 rounded-[2rem] border border-cyan-300/15 bg-[#07101f]/85 p-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto">
-              <div className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">
+          <div className="mt-6 grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+            <aside className="min-w-0 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
                 Browse Titles
               </div>
 
@@ -821,14 +800,14 @@ export default function PublicLibrary() {
                         <Poster group={group} />
                       </div>
                       <div className="min-w-0 p-3">
-                        <div className="line-clamp-2 text-sm font-black">
+                        <div className="line-clamp-2 text-sm font-semibold">
                           {group.title}
                         </div>
-                        <div className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100/55">
+                        <div className="mt-2 text-xs font-semibold tracking-normal text-cyan-100/55">
                           {getTypeLabel(group.type)} · {group.items.length} item
                           {group.items.length === 1 ? "" : "s"}
                         </div>
-                        <div className="mt-1 text-[11px] text-white/40">
+                        <div className="mt-1 text-xs text-white/40">
                           {formatDuration(group.totalDuration)}
                         </div>
                       </div>
@@ -840,16 +819,16 @@ export default function PublicLibrary() {
 
             <section
               id="ttv-library-player"
-              className="min-w-0 rounded-[2rem] border border-cyan-300/15 bg-[#07101f]/85 p-4 sm:p-5"
+              className="min-w-0 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 sm:p-5"
             >
               {selectedGroup && selectedItem ? (
                 <>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <div className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
                         {getTypeLabel(selectedGroup.type)}
                       </div>
-                      <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                      <h2 className="mt-1 text-2xl font-semibold sm:text-3xl">
                         {selectedGroup.title}
                       </h2>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
@@ -872,7 +851,7 @@ export default function PublicLibrary() {
                               setSelectedMediaId(first?.media.id ?? "");
                               setAutoPlayRequested(false);
                             }}
-                            className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] ${
+                            className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold tracking-normal ${
                               season === activeSeason
                                 ? "border-cyan-300 bg-cyan-300 text-slate-950"
                                 : "border-white/10 bg-white/[0.04] text-white/60"
@@ -917,7 +896,7 @@ export default function PublicLibrary() {
 
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <div className="truncate text-lg font-black">
+                      <div className="truncate text-lg font-semibold">
                         {selectedItem.displayTitle}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45">
@@ -933,7 +912,7 @@ export default function PublicLibrary() {
                         type="button"
                         disabled={!previousItem}
                         onClick={() => moveToItem(previousItem)}
-                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white/70 transition enabled:hover:border-cyan-300/30 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-semibold tracking-normal text-white/70 transition enabled:hover:border-cyan-300/30 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         Previous
                       </button>
@@ -941,7 +920,7 @@ export default function PublicLibrary() {
                         type="button"
                         disabled={!nextItem}
                         onClick={() => moveToItem(nextItem)}
-                        className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-cyan-100 transition enabled:hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs font-semibold tracking-normal text-cyan-100 transition enabled:hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         Next
                       </button>
@@ -951,10 +930,10 @@ export default function PublicLibrary() {
                   <div className="mt-6 border-t border-white/10 pt-5">
                     <div className="mb-3 flex items-end justify-between gap-4">
                       <div>
-                        <div className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-200">
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
                           {selectedGroup.type === "show" ? "Episodes" : "Library Item"}
                         </div>
-                        <h3 className="mt-1 text-xl font-black">
+                        <h3 className="mt-1 text-xl font-semibold">
                           {selectedGroup.type === "show"
                             ? `Season ${activeSeason}`
                             : selectedGroup.title}
@@ -987,14 +966,14 @@ export default function PublicLibrary() {
                             <div className="flex gap-3 p-3">
                               <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black/60">
                                 {item.media.poster ? (
-                                  <img
+                                  <Image unoptimized width={480} height={270}
                                     src={item.media.poster}
                                     alt=""
                                     loading="lazy"
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
-                                  <img
+                                  <Image unoptimized width={480} height={270}
                                     src="/brand/ttv-neon-mini.png"
                                     alt=""
                                     loading="lazy"
@@ -1004,10 +983,10 @@ export default function PublicLibrary() {
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <div className="line-clamp-2 text-sm font-black">
+                                <div className="line-clamp-2 text-sm font-semibold">
                                   {item.displayTitle}
                                 </div>
-                                <div className="mt-1 text-[11px] text-white/45">
+                                <div className="mt-1 text-xs text-white/45">
                                   {formatDuration(item.media.duration)}
                                 </div>
 

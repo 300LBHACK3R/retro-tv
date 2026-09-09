@@ -84,7 +84,7 @@ interface AppState {
   toggleGuide: () => void;
   closeGuide: () => void;
   resetProgramming: () => void;
-  replaceProgramming: (snapshot: ProgrammingSnapshot) => void;
+  replaceProgramming: (snapshot: ProgrammingSnapshot, options?: { preserveViewer?: boolean }) => void;
   exportProgrammingSnapshot: () => ProgrammingSnapshot;
 }
 
@@ -600,17 +600,6 @@ function normalizeComparableText(value: unknown): string {
 
 function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
-}
-
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-
-  return dedupeStrings(
-    value
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean),
-  );
 }
 
 function createFallbackId(): string {
@@ -1793,8 +1782,8 @@ export const useStore = create<AppState>()(
           viewerSettings: defaultViewerSettings,
         }),
 
-      replaceProgramming: (snapshot) =>
-        set(() => {
+      replaceProgramming: (snapshot, options) =>
+        set((state) => {
           const normalized = normalizeProgrammingCollections(
             snapshot.media,
             snapshot.channels,
@@ -1804,7 +1793,7 @@ export const useStore = create<AppState>()(
             media: normalized.media,
             channels: normalized.channels,
             currentChannelId: getSafeCurrentChannelId(
-              snapshot.currentChannelId,
+              options?.preserveViewer ? state.currentChannelId : snapshot.currentChannelId,
               normalized.channels,
             ),
             sidebarWidth: clamp(
@@ -1819,10 +1808,10 @@ export const useStore = create<AppState>()(
             ),
             appMode: "viewer",
             isSettingsOpen: false,
-            themeId: getValidThemeId(snapshot.themeId),
+            themeId: options?.preserveViewer ? state.themeId : getValidThemeId(snapshot.themeId),
             ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
             deletedMediaIds: [],
-            viewerSettings: defaultViewerSettings,
+            viewerSettings: options?.preserveViewer ? state.viewerSettings : defaultViewerSettings,
           };
         }),
 

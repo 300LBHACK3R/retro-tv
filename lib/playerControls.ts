@@ -59,7 +59,7 @@ const defaultPlayerControls = {
   fitMode: "contain" as PlayerFitMode,
   playbackQuality: "auto" as PlaybackQualityPreference,
   fullscreenRequestId: 0,
-  remoteMinimized: false,
+  remoteMinimized: true,
   controlsVisible: true,
   lastAudibleVolume: DEFAULT_VOLUME,
 };

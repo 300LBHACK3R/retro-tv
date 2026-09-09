@@ -31,6 +31,7 @@ const cspDirectives = [
   [
     "script-src",
     "'self'",
+    "https://www.gstatic.com",
     isDev ? "'unsafe-eval'" : "",
     /**
      * Next.js currently still needs inline scripts for normal app hydration.

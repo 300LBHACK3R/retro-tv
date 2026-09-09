@@ -419,8 +419,6 @@ export default function UploadPanel() {
       }),
     [
       adTargetMode,
-      breakpointsInput,
-      breakDurationsInput,
       channelId,
       enabledChannels,
       normalizedFile,
@@ -430,7 +428,6 @@ export default function UploadPanel() {
       parsedBreakpoints,
       parsedDurationSeconds,
       parsedSlotLengthSeconds,
-      slotLengthInput,
       type,
     ],
   );

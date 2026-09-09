@@ -9,7 +9,7 @@ type ServiceWorkerMessage = {
 const SERVICE_WORKER_PATH = "/sw.js";
 const SERVICE_WORKER_SCOPE = "/";
 const UPDATE_CHECK_DELAY_MS = 1500;
-const CACHE_SCHEMA_VERSION = "20260727-mobile-guide-v2";
+const CACHE_SCHEMA_VERSION = "20260909-premium-viewer-v3";
 const CACHE_SCHEMA_STORAGE_KEY = "ttv-cache-schema-version";
 const CACHE_SCHEMA_RELOAD_KEY = "ttv-cache-schema-reloaded";
 

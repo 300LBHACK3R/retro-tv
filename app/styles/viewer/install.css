@@ -1,0 +1,151 @@
+/* Install prompt ------------------------------------------------------------ */
+
+.ttv-install-prompt {
+  position: fixed;
+  right: max(0.85rem, env(safe-area-inset-right));
+  bottom: max(0.85rem, env(safe-area-inset-bottom));
+  z-index: 150;
+  display: grid;
+  width: min(34rem, calc(100vw - 1.7rem));
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-panel);
+  padding: 0.75rem;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 13%, transparent), transparent 42%),
+    color-mix(in srgb, var(--panel-bg) 94%, transparent);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-elevated);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.ttv-install-prompt__icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 52%, var(--border));
+  border-radius: 0.9rem;
+  background: var(--button-bg);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  box-shadow: var(--ttv-shadow-control);
+}
+
+.ttv-install-prompt__copy {
+  min-width: 0;
+}
+
+.ttv-install-prompt__copy strong,
+.ttv-install-prompt__copy span {
+  display: block;
+}
+
+.ttv-install-prompt__copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttv-install-prompt__copy span {
+  display: -webkit-box;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ttv-install-prompt__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.ttv-install-prompt__actions :where(button, a) {
+  display: inline-flex;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  padding: 0.62rem 0.75rem;
+  background: var(--button-bg);
+  color: var(--text);
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.07em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.ttv-install-prompt__actions :where(button, a):first-child {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
+  background: var(--guide-current-bg);
+  color: var(--on-primary);
+}
+
+.ttv-install-prompt__actions :where(button, a):hover,
+.ttv-install-prompt__actions :where(button, a):focus-visible {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+body[data-ttv-overlay-open="true"] .ttv-install-prompt,
+body[data-ttv-guide-open="true"] .ttv-install-prompt {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(0.75rem);
+}
+
+body[data-ttv-overlay-open="true"] .ttv-mobile-viewer-nav {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(calc(1rem + env(safe-area-inset-bottom)));
+}
+
+@media (max-width: 900px) {
+  .ttv-install-prompt {
+    right: max(0.5rem, env(safe-area-inset-right));
+    left: max(0.5rem, env(safe-area-inset-left));
+    bottom: calc(4.85rem + env(safe-area-inset-bottom));
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.65rem;
+    border-radius: 1rem;
+    padding: 0.65rem;
+  }
+
+  .ttv-install-prompt__actions {
+    grid-column: 1 / -1;
+  }
+
+  .ttv-install-prompt__actions :where(button, a) {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .ttv-install-prompt__icon {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+
+  .ttv-install-prompt__copy span {
+    -webkit-line-clamp: 1;
+  }
+}

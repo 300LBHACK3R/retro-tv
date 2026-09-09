@@ -183,16 +183,6 @@ function createMediaById(media: MediaItem[]): Map<string, MediaItem> {
   return new Map(media.map((item) => [item.id, item]));
 }
 
-function createAssignedMediaSet(channels: Pick<Channel, "mediaIds">[]): Set<string> {
-  const assigned = new Set<string>();
-
-  channels.forEach((channel) => {
-    channel.mediaIds.forEach((mediaId) => assigned.add(mediaId));
-  });
-
-  return assigned;
-}
-
 function countChannelPrograms(channel: Channel | undefined, mediaById: Map<string, MediaItem>): number {
   if (!channel) {
     return 0;
@@ -508,21 +498,6 @@ export default function AdminDashboard() {
   const activeTabMeta = useMemo<AdminTabMeta>(() => {
     return TABS.find((tab) => tab.id === activeTab) ?? TABS[0]!;
   }, [activeTab]);
-
-  const assignedMediaSet = useMemo(
-    () => createAssignedMediaSet(channels),
-    [channels],
-  );
-
-  const assignedCount = useMemo(
-    () => media.filter((item) => assignedMediaSet.has(item.id)).length,
-    [assignedMediaSet, media],
-  );
-
-  const unassignedCount = useMemo(
-    () => Math.max(0, media.length - assignedCount),
-    [assignedCount, media.length],
-  );
 
   const enabledChannelCount = enabledChannels.length;
   const programInventoryCount = getMediaTypeCount(media, [
