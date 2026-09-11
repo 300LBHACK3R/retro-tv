@@ -121,17 +121,31 @@ test("unavailable station insights do not interrupt tuning", async ({
   await page.route("**/api/engagement", (route) =>
     route.fulfill({ status: 503, json: { ok: false } }),
   );
+  let unavailableResponses = 0;
+  page.on("response", (response) => {
+    if (response.url().endsWith("/api/engagement") && response.status() === 503)
+      unavailableResponses += 1;
+  });
   await page.goto("/?ch=24");
-  await page.locator("video").first().dispatchEvent("playing");
+  await expect(
+    currentChannel(page).getByRole("heading", {
+      name: "Studio TV",
+      exact: true,
+    }),
+  ).toBeVisible();
   const directory = await openDirectory(page);
-  const unavailable = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/engagement") && response.status() === 503,
-  );
+  // Wait for the monitor to attach, then exercise its media-event/flush path.
+  // Observe responses before navigation so an earlier flush cannot be missed.
+  await expect
+    .poll(async () => {
+      await page.locator("video").first().dispatchEvent("playing");
+      await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+      return unavailableResponses;
+    })
+    .toBeGreaterThan(0);
   await directory
     .getByRole("button", { name: "Tune to CH 25 Local Cinema", exact: true })
     .click();
-  await unavailable;
   await expect(
     currentChannel(page).getByRole("heading", {
       name: "Local Cinema",
@@ -354,6 +368,11 @@ test("favourite channels and guide filtering persist without accounts", async ({
     .getByRole("button", { name: "Guide", exact: true });
   await desktop.or(mobile).filter({ visible: true }).click();
   const dialog = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  const channelCount = dialog
+    .locator(".ttv-guide-tools")
+    .getByText(/^\d+ channels? · Local time$/);
+  await expect(channelCount).toBeVisible();
+  const allChannelsText = await channelCount.innerText();
   await dialog.getByRole("button", { name: "Favourites", exact: true }).click();
   await expect(
     dialog.getByText("1 channel · Local time", { exact: true }),
@@ -381,8 +400,9 @@ test("favourite channels and guide filtering persist without accounts", async ({
   await expect(search).toHaveValue("");
   await expect(search).toBeFocused();
   await expect(
-    dialog.getByText("2 channels · Local time", { exact: true }),
-  ).toBeVisible();
+    dialog.getByRole("button", { name: "Favourites", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(channelCount).toHaveText(allChannelsText);
   await noPageOverflow(page);
 });
 

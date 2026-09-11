@@ -28,10 +28,15 @@ export async function sendPlaybackSample(
   sample: Omit<PlaybackSample, "id">,
 ): Promise<boolean> {
   if (disabled || optedOut()) return false;
+  // Safari may disallow starting a session as a page is being hidden or left.
+  // Drop that optional sample; a visible page can establish the session later.
+  if (!session && document.visibilityState !== "visible") return false;
   try {
     session ??= fetch("/api/engagement", {
+      mode: "same-origin",
       cache: "no-store",
       credentials: "same-origin",
+      keepalive: true,
     })
       .then((response) => response.ok)
       .catch(() => false);
@@ -41,6 +46,7 @@ export async function sendPlaybackSample(
     }
     const response = await fetch("/api/engagement", {
       method: "POST",
+      mode: "same-origin",
       credentials: "same-origin",
       keepalive: true,
       headers: { "Content-Type": "application/json" },
