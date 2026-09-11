@@ -1,10 +1,5 @@
 export type MediaType =
-  | "show"
-  | "movie"
-  | "music"
-  | "music-video"
-  | "commercial"
-  | "bumper";
+  "show" | "movie" | "music" | "music-video" | "commercial" | "bumper";
 
 export type AppMode = "viewer" | "admin";
 
@@ -24,10 +19,7 @@ export type ThemeId =
 export type ScheduleMode = "ordered" | "daily-random";
 
 export type CommercialBreakMode =
-  | "none"
-  | "end-only"
-  | "midpoint-and-end"
-  | "classic-tv";
+  "none" | "end-only" | "midpoint-and-end" | "classic-tv";
 
 export type CommercialStrategy = "sequential" | "best-fit" | "random";
 
@@ -332,7 +324,17 @@ export interface MediaItem {
   campaignName?: string;
 }
 
+export interface ProgrammeBlock {
+  id: string;
+  title: string;
+  days: Weekday[];
+  startTime: string;
+  durationMinutes: number;
+  mediaIds: string[];
+}
+
 export interface Channel {
+  programmeBlocks?: ProgrammeBlock[];
   id: string;
   number?: number;
   name: string;
@@ -368,6 +370,9 @@ export interface Channel {
 }
 
 export type BroadcastItem = MediaItem & {
+  /** Runtime schedule metadata; set on the first item of a local-day schedule. */
+  scheduleAnchorMs?: number;
+  programmeBlock?: string;
   sourceStart?: number;
   sourceEnd?: number;
   parentMediaId?: string;

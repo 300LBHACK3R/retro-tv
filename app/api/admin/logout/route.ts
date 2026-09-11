@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from "@/lib/server/requestSecurity";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ADMIN_COOKIE_NAME } from "@/lib/server/adminAuth";
@@ -25,7 +26,9 @@ function jsonResponse(
   return response;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isSameOriginRequest(request))
+    return jsonResponse({ ok: false }, { status: 403 });
   const cookieStore = await cookies();
 
   cookieStore.set({

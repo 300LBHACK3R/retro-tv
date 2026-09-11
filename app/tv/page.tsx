@@ -1,13 +1,12 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/metadata";
 import TatesTvHome from "@/components/TatesTvHome";
 
-export const metadata: Metadata = {
-  title: "TV Mode",
-  description: "Fullscreen-first living-room mode for Tate's TV.",
-  alternates: {
-    canonical: "/tv",
-  },
-};
+export const metadata = pageMetadata(
+  "Watch on your TV",
+  "Watch Tate’s TV with a television-friendly player, live guide and remote navigation.",
+  "/tv",
+  true,
+);
 
 export default function TvModePage() {
   return <TatesTvHome tvMode />;

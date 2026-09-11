@@ -20,6 +20,7 @@ export default function ViewerFooter() {
         >
           L&amp;L Tech Solutions
         </a>
+        <Link href="/privacy">Privacy</Link>
       </nav>
     </footer>
   );

@@ -22,11 +22,7 @@ export type ThemeColorToken =
 export type ThemeColors = Record<ThemeColorToken, string>;
 
 export type ThemeCategory =
-  | "classic"
-  | "console"
-  | "premium"
-  | "cartoon"
-  | "arcade";
+  "classic" | "console" | "premium" | "cartoon" | "arcade";
 
 export type ThemeLayoutMode =
   | "neon-crt-broadcast"
@@ -58,11 +54,7 @@ export type ThemeDefinition = {
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
 export type ThemeAccessLabel =
-  | "Free"
-  | "Unlocked"
-  | "Owned"
-  | "Preview"
-  | "Premium";
+  "Free" | "Unlocked" | "Owned" | "Preview" | "Premium";
 
 export type ThemeCategoryMeta = {
   id: ThemeCategory;
@@ -159,23 +151,22 @@ export const THEMES = [
     category: "classic",
     layout: "classic-cable",
     appearance: "dark",
-    previewGradient:
-      "linear-gradient(135deg, #020617, #0f172a 52%, #2563eb)",
+    previewGradient: "linear-gradient(135deg, #020617, #0f172a 52%, #2563eb)",
     recommendedFor: ["classic cable", "main TV", "guide", "simple"],
     colors: {
       appBg: "linear-gradient(180deg, #020617, #07111f 54%, #020617)",
-      panelBg: "rgba(2, 6, 23, 0.94)",
-      panelAltBg: "rgba(15, 23, 42, 0.96)",
+      panelBg: "#081528",
+      panelAltBg: "#12243a",
       border: "#2b3c55",
       text: "#ffffff",
       textMuted: "#a8b7ca",
-      buttonBg: "linear-gradient(180deg, #23334b, #142033)",
-      buttonHover: "linear-gradient(180deg, #345075, #1d3150)",
+      buttonBg: "#1a3251",
+      buttonHover: "#26466b",
       primary: "#4c8dff",
       secondary: "#7dd3fc",
       onPrimary: "#04142c",
       focusRing: "rgba(76,141,255,0.7)",
-      guideHeaderBg: "linear-gradient(180deg, #172a46, #0b1729)",
+      guideHeaderBg: "#142b49",
       guideRowBg: "#0b1729",
       guideRowAltBg: "#101f34",
       guideActiveBg: "#dbeafe",
@@ -193,27 +184,26 @@ export const THEMES = [
     category: "classic",
     layout: "light-cable",
     appearance: "light",
-    previewGradient:
-      "linear-gradient(135deg, #e9eff3, #ffffff 48%, #4c9aff)",
+    previewGradient: "linear-gradient(135deg, #e9eff3, #ffffff 48%, #4c9aff)",
     recommendedFor: ["light mode", "family", "daytime", "accessibility"],
     colors: {
       appBg: "linear-gradient(180deg, #e8eef5, #f8fbff 42%, #dbe7f3)",
-      panelBg: "rgba(255, 255, 255, 0.96)",
-      panelAltBg: "rgba(239, 245, 251, 0.98)",
+      panelBg: "#ffffff",
+      panelAltBg: "#edf3f9",
       border: "#b8c8d9",
       text: "#10233b",
       textMuted: "#52677e",
-      buttonBg: "linear-gradient(180deg, #ffffff, #dce8f4)",
-      buttonHover: "linear-gradient(180deg, #ffffff, #c9dcf0)",
+      buttonBg: "#e4edf7",
+      buttonHover: "#d2e2f4",
       primary: "#1769c2",
       secondary: "#6b3cc4",
       onPrimary: "#ffffff",
       focusRing: "rgba(23,105,194,0.6)",
-      guideHeaderBg: "linear-gradient(180deg, #dce9f5, #cbdceb)",
+      guideHeaderBg: "#dce9f5",
       guideRowBg: "#f8fbff",
       guideRowAltBg: "#edf4fa",
-      guideActiveBg: "#dbeafe",
-      guideCurrentBg: "#3b82f6",
+      guideActiveBg: "#1769c2",
+      guideCurrentBg: "#1769c2",
     },
   },
   {
@@ -233,19 +223,18 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at 82% 10%, rgba(212,175,55,0.13), transparent 34%), linear-gradient(150deg, #030303, #0c0b08 55%, #020202)",
-      panelBg: "linear-gradient(145deg, rgba(10,10,9,0.97), rgba(3,3,3,0.96))",
-      panelAltBg:
-        "linear-gradient(145deg, rgba(22,19,12,0.97), rgba(8,8,7,0.96))",
+      panelBg: "#12110e",
+      panelAltBg: "#1d1a13",
       border: "rgba(212,175,55,0.38)",
       text: "#f8f4e8",
       textMuted: "#bbae84",
-      buttonBg: "linear-gradient(145deg, #211b0e, #0c0b08)",
-      buttonHover: "linear-gradient(145deg, #3a2f16, #151108)",
+      buttonBg: "#252013",
+      buttonHover: "#342b19",
       primary: "#d4af37",
       secondary: "#f4d675",
       onPrimary: "#120e03",
       focusRing: "rgba(244,214,117,0.7)",
-      guideHeaderBg: "linear-gradient(180deg, #1a160d, #090806)",
+      guideHeaderBg: "#211c12",
       guideRowBg: "#090806",
       guideRowAltBg: "#121009",
       guideActiveBg: "#d4af37",
@@ -269,23 +258,21 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at 16% 12%, rgba(255,238,153,0.22), transparent 32%), linear-gradient(145deg, #140f03, #8f6507 48%, #2a1e04)",
-      panelBg:
-        "linear-gradient(145deg, rgba(211,163,25,0.97), rgba(112,76,4,0.96))",
-      panelAltBg:
-        "linear-gradient(145deg, rgba(245,204,70,0.96), rgba(137,90,5,0.96))",
+      panelBg: "#2b200c",
+      panelAltBg: "#3e2e10",
       border: "rgba(255,232,148,0.58)",
       text: "#fffaf0",
-      textMuted: "#f5e3ae",
-      buttonBg: "linear-gradient(145deg, #11100c, #050505)",
-      buttonHover: "linear-gradient(145deg, #2b271d, #0d0c09)",
+      textMuted: "#e8d39d",
+      buttonBg: "#4c3911",
+      buttonHover: "#604719",
       primary: "#ffe27a",
       secondary: "#0b0a07",
       onPrimary: "#211600",
       focusRing: "rgba(255,226,122,0.78)",
-      guideHeaderBg: "linear-gradient(180deg, #5e4105, #1c1404)",
-      guideRowBg: "#8d650b",
-      guideRowAltBg: "#755107",
-      guideActiveBg: "#090806",
+      guideHeaderBg: "#37290f",
+      guideRowBg: "#2b200c",
+      guideRowAltBg: "#3e2e10",
+      guideActiveBg: "#ffe27a",
       guideCurrentBg: "#ffe27a",
     },
   },
@@ -307,22 +294,18 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at 12% 8%, rgba(141,198,63,0.30), transparent 30%), radial-gradient(circle at 90% 88%, rgba(39,255,103,0.13), transparent 36%), linear-gradient(135deg, #010301, #071007 48%, #000000)",
-      panelBg: "linear-gradient(135deg, rgba(3,8,3,0.98), rgba(12,24,10,0.95))",
-      panelAltBg:
-        "linear-gradient(135deg, rgba(10,22,8,0.98), rgba(2,7,2,0.97))",
+      panelBg: "#091408",
+      panelAltBg: "#142412",
       border: "#5f8f24",
       text: "#f2ffe8",
       textMuted: "#c7e99b",
-      buttonBg:
-        "linear-gradient(135deg, rgba(41,74,20,0.98), rgba(12,22,7,0.98))",
-      buttonHover:
-        "linear-gradient(135deg, rgba(95,143,36,0.98), rgba(22,44,12,0.98))",
+      buttonBg: "#20391a",
+      buttonHover: "#315024",
       primary: "#8dc63f",
       secondary: "#27ff67",
       onPrimary: "#071003",
       focusRing: "rgba(141,198,63,0.74)",
-      guideHeaderBg:
-        "linear-gradient(135deg, rgba(4,12,4,0.99), rgba(33,61,16,0.98))",
+      guideHeaderBg: "#142711",
       guideRowBg: "#030803",
       guideRowAltBg: "#0a1507",
       guideActiveBg: "#8dc63f",
@@ -346,23 +329,18 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at top left, rgba(57,255,20,0.20), transparent 32%), radial-gradient(circle at bottom right, rgba(168,85,247,0.20), transparent 36%), linear-gradient(135deg, #020617, #050014 52%, #061b12)",
-      panelBg:
-        "linear-gradient(135deg, rgba(2,6,23,0.95), rgba(8,13,32,0.93))",
-      panelAltBg:
-        "linear-gradient(135deg, rgba(7,18,34,0.97), rgba(18,8,34,0.94))",
+      panelBg: "#0a0d20",
+      panelAltBg: "#14172e",
       border: "rgba(34,211,238,0.5)",
       text: "#f8fbff",
       textMuted: "#a7f3d0",
-      buttonBg:
-        "linear-gradient(135deg, rgba(6,95,70,0.9), rgba(30,27,75,0.92))",
-      buttonHover:
-        "linear-gradient(135deg, rgba(20,184,166,0.95), rgba(126,34,206,0.92))",
+      buttonBg: "#202642",
+      buttonHover: "#293656",
       primary: "#39ff14",
       secondary: "#22d3ee",
       onPrimary: "#031005",
       focusRing: "rgba(34,211,238,0.76)",
-      guideHeaderBg:
-        "linear-gradient(135deg, rgba(2,6,23,0.99), rgba(30,27,75,0.97))",
+      guideHeaderBg: "#15192e",
       guideRowBg: "#030712",
       guideRowAltBg: "#080f1f",
       guideActiveBg: "#39ff14",
@@ -386,23 +364,18 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at top left, rgba(251,146,60,0.31), transparent 32%), radial-gradient(circle at bottom right, rgba(236,72,153,0.25), transparent 36%), linear-gradient(135deg, #1e1b4b, #5b21b6 48%, #365314)",
-      panelBg:
-        "linear-gradient(135deg, rgba(49,46,129,0.96), rgba(124,58,237,0.91))",
-      panelAltBg:
-        "linear-gradient(135deg, rgba(30,64,175,0.92), rgba(190,24,93,0.88))",
+      panelBg: "#302367",
+      panelAltBg: "#422d82",
       border: "rgba(253,186,116,0.72)",
       text: "#ffffff",
       textMuted: "#fde68a",
-      buttonBg:
-        "linear-gradient(135deg, rgba(249,115,22,0.95), rgba(236,72,153,0.91))",
-      buttonHover:
-        "linear-gradient(135deg, rgba(132,204,22,0.97), rgba(14,165,233,0.93))",
+      buttonBg: "#513393",
+      buttonHover: "#6943af",
       primary: "#fb923c",
       secondary: "#bef264",
       onPrimary: "#2a1102",
       focusRing: "rgba(190,242,100,0.78)",
-      guideHeaderBg:
-        "linear-gradient(135deg, rgba(67,56,202,0.99), rgba(219,39,119,0.95))",
+      guideHeaderBg: "#39286f",
       guideRowBg: "#312e81",
       guideRowAltBg: "#4c1d95",
       guideActiveBg: "#fb923c",
@@ -414,7 +387,7 @@ export const THEMES = [
     name: "Electric Blue Live",
     shortName: "Electric Blue",
     description:
-      "A modern electric-blue control room with layered glass, cyan command rails, premium live-TV polish, and focused mobile presentation.",
+      "Living blue light, drifting auroras, illuminated channel rails, and a slow electric sweep around your television.",
     priceLabel: "$2.99",
     isPremium: true,
     category: "premium",
@@ -426,25 +399,20 @@ export const THEMES = [
     colors: {
       appBg:
         "radial-gradient(circle at 18% 8%, rgba(34,211,238,0.21), transparent 34%), radial-gradient(circle at 92% 22%, rgba(79,70,229,0.17), transparent 30%), linear-gradient(135deg, #020617 0%, #031227 42%, #050b22 100%)",
-      panelBg:
-        "linear-gradient(135deg, rgba(3,14,33,0.95), rgba(1,7,20,0.93))",
-      panelAltBg:
-        "linear-gradient(135deg, rgba(5,22,52,0.95), rgba(2,10,28,0.97))",
+      panelBg: "#07172f",
+      panelAltBg: "#0d2442",
       border: "rgba(56,189,248,0.44)",
       text: "#f8fbff",
       textMuted: "#93c5fd",
-      buttonBg:
-        "linear-gradient(135deg, rgba(8,47,73,0.97), rgba(15,23,42,0.97))",
-      buttonHover:
-        "linear-gradient(135deg, rgba(14,165,233,0.96), rgba(37,99,235,0.91))",
+      buttonBg: "#102f50",
+      buttonHover: "#174667",
       primary: "#22d3ee",
       secondary: "#818cf8",
       onPrimary: "#03151a",
       focusRing: "rgba(34,211,238,0.76)",
-      guideHeaderBg:
-        "linear-gradient(135deg, rgba(8,47,73,0.99), rgba(15,23,42,0.97))",
-      guideRowBg: "rgba(2,12,30,0.97)",
-      guideRowAltBg: "rgba(8,22,48,0.97)",
+      guideHeaderBg: "#0c2545",
+      guideRowBg: "#020c1e",
+      guideRowAltBg: "#081630",
       guideActiveBg: "#22d3ee",
       guideCurrentBg: "#38bdf8",
     },
@@ -488,7 +456,9 @@ function sortThemesByCategory(
   });
 }
 
-function normalizeOwnedThemes(value: readonly ThemeId[] | undefined): ThemeId[] {
+function normalizeOwnedThemes(
+  value: readonly ThemeId[] | undefined,
+): ThemeId[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -508,7 +478,7 @@ export function isThemeId(value: unknown): value is ThemeId {
 }
 
 export function getThemeById(id: unknown): ThemeDefinition {
-  return isThemeId(id) ? THEME_BY_ID.get(id) ?? DEFAULT_THEME : DEFAULT_THEME;
+  return isThemeId(id) ? (THEME_BY_ID.get(id) ?? DEFAULT_THEME) : DEFAULT_THEME;
 }
 
 export function getDefaultTheme(): ThemeDefinition {
@@ -527,7 +497,9 @@ export function getPremiumThemes(): ThemeDefinition[] {
   return sortThemesByCategory(THEMES.filter((theme) => theme.isPremium));
 }
 
-export function getThemesByCategory(category: ThemeCategory): ThemeDefinition[] {
+export function getThemesByCategory(
+  category: ThemeCategory,
+): ThemeDefinition[] {
   return sortThemesByCategory(
     THEMES.filter((theme) => theme.category === category),
   );
@@ -556,7 +528,9 @@ export function canUseTheme(
 
   const theme = getThemeById(themeId);
 
-  return !theme.isPremium || isAdmin || isOwnedTheme(themeId, ownedPremiumThemes);
+  return (
+    !theme.isPremium || isAdmin || isOwnedTheme(themeId, ownedPremiumThemes)
+  );
 }
 
 export function getSafeThemeId(

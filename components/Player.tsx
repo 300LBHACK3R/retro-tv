@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
-import { useGoogleCast, type CastQueueEntry } from "@/components/GoogleCastProvider";
+import {
+  useGoogleCast,
+  type CastQueueEntry,
+} from "@/components/GoogleCastProvider";
 import WatchOnTVModal from "@/components/WatchOnTVModal";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
@@ -116,28 +120,19 @@ function getSafeItemDuration(item: BroadcastItem): number {
 
 function isBreakItem(item: BroadcastItem): boolean {
   return (
-    item.hiddenFromGuide ||
-    item.type === "commercial" ||
-    item.type === "bumper"
+    item.hiddenFromGuide || item.type === "commercial" || item.type === "bumper"
   );
 }
 
 function getPublicProgramKey(item: BroadcastItem): string {
-  return (
-    item.parentMediaId?.trim() ||
-    item.sourceTitle?.trim() ||
-    item.id
-  );
+  return item.parentMediaId?.trim() || item.sourceTitle?.trim() || item.id;
 }
 
 function isPublicProgramItem(
   item: BroadcastItem | undefined,
 ): item is BroadcastItem {
   return Boolean(
-    item &&
-      item.file &&
-      getSafeItemDuration(item) > 0 &&
-      !isBreakItem(item),
+    item && item.file && getSafeItemDuration(item) > 0 && !isBreakItem(item),
   );
 }
 
@@ -146,9 +141,7 @@ function getPreviousPublicProgramIndex(
   fromIndex: number,
 ): number {
   for (let offset = 1; offset <= schedule.length; offset += 1) {
-    const index =
-      (fromIndex - offset + schedule.length) %
-      schedule.length;
+    const index = (fromIndex - offset + schedule.length) % schedule.length;
 
     if (isPublicProgramItem(schedule[index])) {
       return index;
@@ -189,8 +182,7 @@ function getPublicBlockStartIndex(
       }
     }
 
-    index =
-      (index - 1 + schedule.length) % schedule.length;
+    index = (index - 1 + schedule.length) % schedule.length;
   }
 
   return contextIndex;
@@ -221,19 +213,13 @@ function getPublicPlaybackTimeline(
     return null;
   }
 
-  const blockStartIndex = getPublicBlockStartIndex(
-    schedule,
-    contextIndex,
-  );
+  const blockStartIndex = getPublicBlockStartIndex(schedule, contextIndex);
 
   let elapsed = 0;
   let index = blockStartIndex;
   let guard = 0;
 
-  while (
-    index !== currentIndex &&
-    guard < schedule.length
-  ) {
+  while (index !== currentIndex && guard < schedule.length) {
     const item = schedule[index];
 
     if (!item) {
@@ -246,15 +232,10 @@ function getPublicPlaybackTimeline(
   }
 
   if (index === currentIndex) {
-    elapsed += Math.max(
-      0,
-      Math.floor(currentItemElapsed),
-    );
+    elapsed += Math.max(0, Math.floor(currentItemElapsed));
   }
 
-  const guideDuration = Math.floor(
-    Number(contextItem.guideDuration),
-  );
+  const guideDuration = Math.floor(Number(contextItem.guideDuration));
 
   const duration =
     Number.isFinite(guideDuration) && guideDuration > 0
@@ -300,11 +281,11 @@ function getErrorMessage(video: HTMLVideoElement): string {
   const code = video.error?.code;
 
   if (code === MediaError.MEDIA_ERR_NETWORK) {
-    return "Network error loading this video. Check the R2 URL.";
+    return "The connection was interrupted. Tap to try again.";
   }
 
   if (code === MediaError.MEDIA_ERR_DECODE) {
-    return "Video decode issue. Convert it to MP4 H.264/AAC.";
+    return "This programme couldn’t play on your device. Try another channel.";
   }
 
   if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
@@ -315,7 +296,7 @@ function getErrorMessage(video: HTMLVideoElement): string {
     return "Playback was interrupted. Tap to resume.";
   }
 
-  return "Playback failed. Check the video URL or encoding.";
+  return "This programme is temporarily unavailable. Tap to try again.";
 }
 
 function isIPhoneSafariFullscreenPath(): boolean {
@@ -329,7 +310,9 @@ function isIPhoneSafariFullscreenPath(): boolean {
 function getFullscreenElement(): Element | null {
   const webkitDocument = document as WebKitDocument;
 
-  return document.fullscreenElement ?? webkitDocument.webkitFullscreenElement ?? null;
+  return (
+    document.fullscreenElement ?? webkitDocument.webkitFullscreenElement ?? null
+  );
 }
 
 async function exitElementFullscreen(): Promise<boolean> {
@@ -341,12 +324,18 @@ async function exitElementFullscreen(): Promise<boolean> {
       return true;
     }
 
-    if (webkitDocument.webkitFullscreenElement && webkitDocument.webkitExitFullscreen) {
+    if (
+      webkitDocument.webkitFullscreenElement &&
+      webkitDocument.webkitExitFullscreen
+    ) {
       await webkitDocument.webkitExitFullscreen();
       return true;
     }
 
-    if (webkitDocument.webkitFullscreenElement && webkitDocument.webkitCancelFullScreen) {
+    if (
+      webkitDocument.webkitFullscreenElement &&
+      webkitDocument.webkitCancelFullScreen
+    ) {
       webkitDocument.webkitCancelFullScreen();
       return true;
     }
@@ -357,7 +346,9 @@ async function exitElementFullscreen(): Promise<boolean> {
   return false;
 }
 
-async function requestElementFullscreen(element: HTMLElement): Promise<boolean> {
+async function requestElementFullscreen(
+  element: HTMLElement,
+): Promise<boolean> {
   const fullscreenElement = element as WebKitFullscreenElement;
 
   try {
@@ -405,7 +396,8 @@ function enterNativeVideoFullscreen(video: HTMLVideoElement): boolean {
 
 function exitNativeVideoFullscreen(video: HTMLVideoElement): boolean {
   const webkitVideo = video as WebKitVideoElement;
-  const exit = webkitVideo.webkitExitFullscreen ?? webkitVideo.webkitExitFullScreen;
+  const exit =
+    webkitVideo.webkitExitFullscreen ?? webkitVideo.webkitExitFullScreen;
 
   if (!webkitVideo.webkitDisplayingFullscreen || !exit) {
     return false;
@@ -475,7 +467,6 @@ async function requestAirPlayTarget(video: HTMLVideoElement): Promise<string> {
 
   return "AirPlay is not available in this browser. Use Google Cast, TV Mode, screen mirroring, or HDMI instead.";
 }
-
 
 const CAST_QUEUE_MAX_ITEMS = 180;
 const CAST_QUEUE_MAX_SECONDS = 8 * 60 * 60;
@@ -637,7 +628,10 @@ export default function Player({ schedule }: PlayerProps) {
     [schedule],
   );
 
-  const orderedChannels = useMemo(() => sortChannelsByNumber(channels), [channels]);
+  const orderedChannels = useMemo(
+    () => sortChannelsByNumber(channels),
+    [channels],
+  );
   const currentChannel = useMemo(
     () => orderedChannels.find((channel) => channel.id === currentChannelId),
     [currentChannelId, orderedChannels],
@@ -682,12 +676,7 @@ export default function Player({ schedule }: PlayerProps) {
     }
 
     return clearControlsHideTimer;
-  }, [
-    clearControlsHideTimer,
-    scheduleControlsHide,
-    status,
-    watchOnTvOpen,
-  ]);
+  }, [clearControlsHideTimer, scheduleControlsHide, status, watchOnTvOpen]);
 
   const clearCastMessageTimer = useCallback(() => {
     if (castMessageTimerRef.current) {
@@ -784,7 +773,11 @@ export default function Player({ schedule }: PlayerProps) {
         return;
       }
 
-      if (!video || !item || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      if (
+        !video ||
+        !item ||
+        video.readyState < HTMLMediaElement.HAVE_METADATA
+      ) {
         return;
       }
 
@@ -835,6 +828,7 @@ export default function Player({ schedule }: PlayerProps) {
       setStatus("playing");
       setMessage("");
     } catch {
+      video.dispatchEvent(new Event("ttv-autoplay-blocked"));
       setStatus("paused");
       setMessage("Tap to start playback.");
     }
@@ -866,13 +860,27 @@ export default function Player({ schedule }: PlayerProps) {
       video.load();
     } catch {
       setStatus("error");
-      setMessage("Could not load this media source.");
+      setMessage(
+        "This programme is temporarily unavailable. Tap to try again.",
+      );
     } finally {
       window.setTimeout(() => {
         sourceTransitionRef.current = false;
       }, SOURCE_TRANSITION_RELEASE_MS);
     }
   }, [applyAudio, live.item]);
+
+  const playbackMonitor = usePlaybackMonitor(videoRef, {
+    sourceKey: playbackKey,
+    channelId: currentChannelId,
+    mediaId: live.item?.parentMediaId ?? live.item?.id ?? "",
+    mode: "live",
+    disabled: castRemote.isConnected,
+    reload: () => {
+      setNowMs(Date.now());
+      loadCurrentSource();
+    },
+  });
 
   const resume = useCallback(() => {
     setNowMs(Date.now());
@@ -895,7 +903,8 @@ export default function Player({ schedule }: PlayerProps) {
       const nextIndex =
         direction === "next"
           ? (currentIndex + 1) % orderedChannels.length
-          : (currentIndex - 1 + orderedChannels.length) % orderedChannels.length;
+          : (currentIndex - 1 + orderedChannels.length) %
+            orderedChannels.length;
 
       const nextChannel = orderedChannels[nextIndex];
 
@@ -1048,7 +1057,10 @@ export default function Player({ schedule }: PlayerProps) {
     setStatus("playing");
     setMessage("");
 
-    const channelName = currentChannel?.branding?.displayName ?? currentChannel?.name ?? "Tate's TV";
+    const channelName =
+      currentChannel?.branding?.displayName ??
+      currentChannel?.name ??
+      "Tate's TV";
     const queueKey = `${currentChannelId}|${scheduleSignature}|${playbackKey}`;
 
     if (lastCastQueueKeyRef.current === queueKey) {
@@ -1078,14 +1090,14 @@ export default function Player({ schedule }: PlayerProps) {
       channelId: currentChannelId,
     }).then((loaded) => {
       if (loaded) {
-        setTimedCastMessage(
-          `Playing on ${castDeviceName || "your TV"}.`,
-        );
+        setTimedCastMessage(`Playing on ${castDeviceName || "your TV"}.`);
         return;
       }
 
       lastCastQueueKeyRef.current = "";
-      setTimedCastMessage("The TV connected, but the live channel could not be loaded.");
+      setTimedCastMessage(
+        "The TV connected, but the live channel could not be loaded.",
+      );
     });
   }, [
     castDeviceName,
@@ -1279,13 +1291,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [
-    fullscreenActive,
-    hardSyncPosition,
-    requestWakeLock,
-    status,
-    tryPlay,
-  ]);
+  }, [fullscreenActive, hardSyncPosition, requestWakeLock, status, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -1308,7 +1314,9 @@ export default function Player({ schedule }: PlayerProps) {
     document.body.classList.toggle("ttv-scroll-locked", fallbackFullscreen);
 
     return () => {
-      document.documentElement.classList.remove("ttv-fallback-fullscreen-active");
+      document.documentElement.classList.remove(
+        "ttv-fallback-fullscreen-active",
+      );
       document.body.classList.remove("ttv-scroll-locked");
     };
   }, [fallbackFullscreen]);
@@ -1396,6 +1404,7 @@ export default function Player({ schedule }: PlayerProps) {
   }, [fullscreenActive, releaseWakeLock, requestWakeLock, status]);
 
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
       clearCastMessageTimer();
       clearControlsHideTimer();
@@ -1405,8 +1414,6 @@ export default function Player({ schedule }: PlayerProps) {
       }
 
       void releaseWakeLock();
-
-      const video = videoRef.current;
 
       if (!video) {
         return;
@@ -1427,7 +1434,7 @@ export default function Player({ schedule }: PlayerProps) {
         <div>
           <div className="text-lg font-semibold">No media scheduled</div>
           <div className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-            Add media to this channel from the admin panel.
+            Please try another channel. We’ll be back here soon.
           </div>
         </div>
       </div>
@@ -1440,17 +1447,14 @@ export default function Player({ schedule }: PlayerProps) {
     live.elapsed,
   );
 
-  const publicDisplayItem =
-    publicTimeline?.item ?? live.item;
+  const publicDisplayItem = publicTimeline?.item ?? live.item;
 
   const title = getDisplayTitle(publicDisplayItem);
 
   const itemDuration =
-    publicTimeline?.duration ??
-    getSafeItemDuration(publicDisplayItem);
+    publicTimeline?.duration ?? getSafeItemDuration(publicDisplayItem);
 
-  const displayElapsed =
-    publicTimeline?.elapsed ?? live.elapsed;
+  const displayElapsed = publicTimeline?.elapsed ?? live.elapsed;
 
   return (
     <div
@@ -1498,7 +1502,9 @@ export default function Player({ schedule }: PlayerProps) {
 
         <div className="mt-1 text-xs text-white/70">
           {formatTime(displayElapsed)} / {formatTime(itemDuration)}
-          {live.item.segmentLabel && !isBreak ? ` / ${live.item.segmentLabel}` : ""}
+          {live.item.segmentLabel && !isBreak
+            ? ` / ${live.item.segmentLabel}`
+            : ""}
         </div>
       </div>
 
@@ -1601,20 +1607,41 @@ export default function Player({ schedule }: PlayerProps) {
         </div>
       ) : null}
 
-      {status === "loading" ? (
+      {status === "loading" && !playbackMonitor.notice ? (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur-md">
           Loading channel...
         </div>
       ) : null}
 
-      {message ? (
-        <button
-          type="button"
-          onClick={resume}
-          className="absolute left-1/2 top-1/2 z-40 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/15 bg-black/80 px-4 py-3 text-center text-sm font-semibold text-white shadow-2xl backdrop-blur-md transition hover:bg-black/90"
-        >
-          {message}
-        </button>
+      {playbackMonitor.notice || message ? (
+        <div className="ttv-player-message absolute left-1/2 top-1/2 z-40 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2">
+          <div className="ttv-player-notice">
+            <span role="status">{playbackMonitor.notice || message}</span>
+            {status === "paused" && !playbackMonitor.notice ? (
+              <button type="button" onClick={resume}>
+                Play
+              </button>
+            ) : null}
+            {(status === "error" || playbackMonitor.needsHelp) &&
+            !playbackMonitor.notice.startsWith("Reconnecting") ? (
+              <>
+                <button type="button" onClick={playbackMonitor.retry}>
+                  Try again
+                </button>
+                <button
+                  type="button"
+                  disabled={playbackMonitor.reportDisabled}
+                  onClick={() => void playbackMonitor.report()}
+                >
+                  Report problem
+                </button>
+              </>
+            ) : null}
+            {playbackMonitor.reportStatus && (
+              <span role="status">{playbackMonitor.reportStatus}</span>
+            )}
+          </div>
+        </div>
       ) : null}
 
       <div
@@ -1641,7 +1668,9 @@ export default function Player({ schedule }: PlayerProps) {
         currentTitle={title}
         channelLabel={getChannelLabel(currentChannel)}
         channelName={
-          currentChannel?.branding?.displayName ?? currentChannel?.name ?? "Tate's TV"
+          currentChannel?.branding?.displayName ??
+          currentChannel?.name ??
+          "Tate's TV"
         }
         channelId={currentChannelId}
       />

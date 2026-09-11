@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import StationInsightsPanel from "@/components/StationInsightsPanel";
+import ProgrammeBlocksPanel from "@/components/ProgrammeBlocksPanel";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
 import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
 import MediaLibraryPanel from "@/components/MediaLibraryPanel";
@@ -12,6 +14,8 @@ import { useStore } from "@/lib/store";
 import type { Channel, MediaItem } from "@/lib/types";
 
 type AdminTab =
+  | "insights"
+  | "blocks"
   | "quick-edit"
   | "add"
   | "submissions"
@@ -46,10 +50,24 @@ const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
   {
+    id: "insights",
+    label: "Station Insights",
+    shortLabel: "Insights",
+    description: "Viewing activity, playback reports, and station health.",
+  },
+  {
+    id: "blocks",
+    label: "Programme Blocks",
+    shortLabel: "Blocks",
+    description:
+      "Schedule recurring nights, weekend blocks, and daily appointments.",
+  },
+  {
     id: "quick-edit",
     label: "Quick Edit",
     shortLabel: "Edit",
-    description: "Edit titles, runtimes, types, air days, and safe channel assignments.",
+    description:
+      "Edit titles, runtimes, types, air days, and safe channel assignments.",
   },
   {
     id: "add",
@@ -61,7 +79,8 @@ const TABS: AdminTabMeta[] = [
     id: "submissions",
     label: "Submissions",
     shortLabel: "Inbox",
-    description: "Review FailZone uploads, rights confirmations, notes, and approval status.",
+    description:
+      "Review FailZone uploads, rights confirmations, notes, and approval status.",
   },
   {
     id: "programming",
@@ -73,7 +92,8 @@ const TABS: AdminTabMeta[] = [
     id: "branding",
     label: "Branding",
     shortLabel: "Brand",
-    description: "Edit channel identity, callsign, color, logo, and overlay details.",
+    description:
+      "Edit channel identity, callsign, color, logo, and overlay details.",
   },
   {
     id: "library",
@@ -133,7 +153,9 @@ function sortChannels(channels: Channel[]): Channel[] {
   });
 }
 
-function getChannelLabel(channel: Pick<Channel, "id" | "number"> | undefined): string {
+function getChannelLabel(
+  channel: Pick<Channel, "id" | "number"> | undefined,
+): string {
   if (!channel) {
     return "No Channel";
   }
@@ -167,14 +189,17 @@ function isProgramItem(item: MediaItem | undefined): boolean {
 function isPlayableMedia(item: MediaItem | undefined): boolean {
   return Boolean(
     item &&
-      typeof item.file === "string" &&
-      item.file.trim().length > 0 &&
-      Number.isFinite(Number(item.duration)) &&
-      Number(item.duration) > 0,
+    typeof item.file === "string" &&
+    item.file.trim().length > 0 &&
+    Number.isFinite(Number(item.duration)) &&
+    Number(item.duration) > 0,
   );
 }
 
-function getMediaTypeCount(media: MediaItem[], types: MediaItem["type"][]): number {
+function getMediaTypeCount(
+  media: MediaItem[],
+  types: MediaItem["type"][],
+): number {
   const typeSet = new Set(types);
   return media.filter((item) => typeSet.has(item.type)).length;
 }
@@ -183,20 +208,29 @@ function createMediaById(media: MediaItem[]): Map<string, MediaItem> {
   return new Map(media.map((item) => [item.id, item]));
 }
 
-function countChannelPrograms(channel: Channel | undefined, mediaById: Map<string, MediaItem>): number {
+function countChannelPrograms(
+  channel: Channel | undefined,
+  mediaById: Map<string, MediaItem>,
+): number {
   if (!channel) {
     return 0;
   }
 
-  return channel.mediaIds.filter((mediaId) => isProgramItem(mediaById.get(mediaId))).length;
+  return channel.mediaIds.filter((mediaId) =>
+    isProgramItem(mediaById.get(mediaId)),
+  ).length;
 }
 
-function countChannelAds(channel: Channel | undefined, mediaById: Map<string, MediaItem>): number {
+function countChannelAds(
+  channel: Channel | undefined,
+  mediaById: Map<string, MediaItem>,
+): number {
   if (!channel) {
     return 0;
   }
 
-  return channel.mediaIds.filter((mediaId) => isAdItem(mediaById.get(mediaId))).length;
+  return channel.mediaIds.filter((mediaId) => isAdItem(mediaById.get(mediaId)))
+    .length;
 }
 
 function countMissingChannelItems(
@@ -210,20 +244,35 @@ function countMissingChannelItems(
   return channel.mediaIds.filter((mediaId) => !mediaById.has(mediaId)).length;
 }
 
-function countChannelsWithPrograms(channels: Channel[], mediaById: Map<string, MediaItem>): number {
-  return channels.filter((channel) => countChannelPrograms(channel, mediaById) > 0).length;
+function countChannelsWithPrograms(
+  channels: Channel[],
+  mediaById: Map<string, MediaItem>,
+): number {
+  return channels.filter(
+    (channel) => countChannelPrograms(channel, mediaById) > 0,
+  ).length;
 }
 
-function countChannelsWithEmbeddedAds(channels: Channel[], mediaById: Map<string, MediaItem>): number {
-  return channels.filter((channel) => countChannelAds(channel, mediaById) > 0).length;
+function countChannelsWithEmbeddedAds(
+  channels: Channel[],
+  mediaById: Map<string, MediaItem>,
+): number {
+  return channels.filter((channel) => countChannelAds(channel, mediaById) > 0)
+    .length;
 }
 
-function countChannelsWithMissingMedia(channels: Channel[], mediaById: Map<string, MediaItem>): number {
-  return channels.filter((channel) => countMissingChannelItems(channel, mediaById) > 0).length;
+function countChannelsWithMissingMedia(
+  channels: Channel[],
+  mediaById: Map<string, MediaItem>,
+): number {
+  return channels.filter(
+    (channel) => countMissingChannelItems(channel, mediaById) > 0,
+  ).length;
 }
 
 function countPlayablePrograms(media: MediaItem[]): number {
-  return media.filter((item) => isProgramItem(item) && isPlayableMedia(item)).length;
+  return media.filter((item) => isProgramItem(item) && isPlayableMedia(item))
+    .length;
 }
 
 function countPlayableAds(media: MediaItem[]): number {
@@ -344,7 +393,10 @@ function StatCard({ stat }: { stat: DashboardStat }) {
         borderColor: styles.borderColor,
       }}
     >
-      <div className="text-xl font-black tracking-tight" style={{ color: styles.valueColor }}>
+      <div
+        className="text-xl font-black tracking-tight"
+        style={{ color: styles.valueColor }}
+      >
         {stat.value}
       </div>
 
@@ -445,7 +497,10 @@ function LaunchReadinessPanel({
               {check.status === "pass" ? "Ready" : "Review"}
             </div>
 
-            <div className="mt-2 text-sm font-black" style={{ color: "var(--text)" }}>
+            <div
+              className="mt-2 text-sm font-black"
+              style={{ color: "var(--text)" }}
+            >
               {check.label}
             </div>
 
@@ -511,13 +566,31 @@ export default function AdminDashboard() {
   const playableAdCount = countPlayableAds(media);
   const musicCount = getMediaTypeCount(media, ["music", "music-video"]);
 
-  const activeChannelProgramCount = countChannelPrograms(activeChannel, mediaById);
-  const activeChannelEmbeddedAdCount = countChannelAds(activeChannel, mediaById);
-  const activeChannelMissingCount = countMissingChannelItems(activeChannel, mediaById);
+  const activeChannelProgramCount = countChannelPrograms(
+    activeChannel,
+    mediaById,
+  );
+  const activeChannelEmbeddedAdCount = countChannelAds(
+    activeChannel,
+    mediaById,
+  );
+  const activeChannelMissingCount = countMissingChannelItems(
+    activeChannel,
+    mediaById,
+  );
 
-  const channelsWithPrograms = countChannelsWithPrograms(enabledChannels, mediaById);
-  const channelsWithEmbeddedAds = countChannelsWithEmbeddedAds(enabledChannels, mediaById);
-  const channelsWithMissingMedia = countChannelsWithMissingMedia(enabledChannels, mediaById);
+  const channelsWithPrograms = countChannelsWithPrograms(
+    enabledChannels,
+    mediaById,
+  );
+  const channelsWithEmbeddedAds = countChannelsWithEmbeddedAds(
+    enabledChannels,
+    mediaById,
+  );
+  const channelsWithMissingMedia = countChannelsWithMissingMedia(
+    enabledChannels,
+    mediaById,
+  );
 
   const dashboardStats = useMemo<DashboardStat[]>(() => {
     return [
@@ -536,7 +609,8 @@ export default function AdminDashboard() {
       {
         label: "Music",
         value: formatCompactNumber(musicCount),
-        helper: "Music and music-video inventory for The Pulse, Amplify, and worship channels.",
+        helper:
+          "Music and music-video inventory for The Pulse, Amplify, and worship channels.",
         tone: musicCount > 0 ? "good" : "default",
       },
       {
@@ -559,7 +633,8 @@ export default function AdminDashboard() {
       {
         label: "Embedded Ads",
         value: formatCompactNumber(channelsWithEmbeddedAds),
-        helper: "Channels with commercials directly in mediaIds. Should be zero.",
+        helper:
+          "Channels with commercials directly in mediaIds. Should be zero.",
         tone: channelsWithEmbeddedAds === 0 ? "good" : "danger",
       },
     ];
@@ -579,7 +654,9 @@ export default function AdminDashboard() {
       {
         label: "23-Channel Lineup",
         status:
-          enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT ? "pass" : "warn",
+          enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT
+            ? "pass"
+            : "warn",
         helper:
           enabledChannelCount >= REQUIRED_LAUNCH_CHANNEL_COUNT
             ? "All 23 launch channels are enabled."
@@ -590,11 +667,13 @@ export default function AdminDashboard() {
       {
         label: "Every Channel Has Programs",
         status:
-          enabledChannelCount > 0 && channelsWithPrograms === enabledChannelCount
+          enabledChannelCount > 0 &&
+          channelsWithPrograms === enabledChannelCount
             ? "pass"
             : "warn",
         helper:
-          enabledChannelCount > 0 && channelsWithPrograms === enabledChannelCount
+          enabledChannelCount > 0 &&
+          channelsWithPrograms === enabledChannelCount
             ? "Every enabled channel has at least one normal program item."
             : `${formatCompactNumber(
                 channelsWithPrograms,
@@ -648,7 +727,8 @@ export default function AdminDashboard() {
       {
         label: "Station Backup",
         status: media.length > 0 && channels.length > 0 ? "pass" : "warn",
-        helper: "Export Station Config after every major upload, cleanup, or branding pass.",
+        helper:
+          "Export Station Config after every major upload, cleanup, or branding pass.",
       },
     ];
   }, [
@@ -770,6 +850,8 @@ export default function AdminDashboard() {
       </section>
 
       <div className="min-w-0">
+        {activeTab === "insights" ? <StationInsightsPanel /> : null}
+        {activeTab === "blocks" ? <ProgrammeBlocksPanel /> : null}
         {activeTab === "add" ? <UploadPanel /> : null}
         {activeTab === "submissions" ? <SubmissionInboxPanel /> : null}
         {activeTab === "quick-edit" ? <QuickMediaEditorPanel /> : null}

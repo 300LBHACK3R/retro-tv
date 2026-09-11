@@ -1,4 +1,12 @@
-﻿import Link from "next/link";
+import { pageMetadata } from "@/lib/metadata";
+export const metadata = pageMetadata(
+  "Help with watching",
+  "Get help with live playback, the guide, favourites, themes and watching Tate’s TV on your television.",
+  "/help",
+  true,
+);
+
+import Link from "next/link";
 
 const helpSections = [
   {
@@ -49,8 +57,8 @@ export default function HelpPage() {
           <p className="ttv-ops-kicker">Help & support</p>
           <h1>How to use Tate&apos;s TV</h1>
           <p>
-            Quick help for watching, installing, troubleshooting playback, and checking device
-            compatibility.
+            Quick help for watching, installing, troubleshooting playback, and
+            checking device compatibility.
           </p>
         </div>
 
@@ -74,8 +82,8 @@ export default function HelpPage() {
         <div className="ttv-help-callout">
           <strong>Still acting weird?</strong>
           <p>
-            Use Recovery to clear local browser state, or Backup to save and restore local settings
-            before major updates.
+            Use Recovery to clear local browser state, or Backup to save and
+            restore local settings before major updates.
           </p>
         </div>
 

@@ -1,3 +1,5 @@
+import { isSameOriginRequest } from "@/lib/server/requestSecurity";
+import { readBoundedJson } from "@/lib/server/http";
 import { NextResponse } from "next/server";
 import {
   sanitizeProgrammingSnapshot,
@@ -42,9 +44,7 @@ async function readRequestBody(request: Request): Promise<unknown | null> {
     return null;
   }
 
-  const contentLength = Number(
-    request.headers.get("content-length") ?? "0",
-  );
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
 
   if (
     Number.isFinite(contentLength) &&
@@ -54,7 +54,7 @@ async function readRequestBody(request: Request): Promise<unknown | null> {
   }
 
   try {
-    return await request.json();
+    return await readBoundedJson(request, MAX_REQUEST_SIZE_BYTES);
   } catch {
     return null;
   }
@@ -71,10 +71,7 @@ function createSafeProgrammingPayload(
 }
 
 function getPublicErrorMessage(error: unknown): string {
-  if (
-    process.env.NODE_ENV !== "production" &&
-    error instanceof Error
-  ) {
+  if (process.env.NODE_ENV !== "production" && error instanceof Error) {
     return error.message;
   }
 
@@ -82,6 +79,11 @@ function getPublicErrorMessage(error: unknown): string {
 }
 
 export async function PUT(request: Request) {
+  if (!isSameOriginRequest(request))
+    return jsonResponse(
+      { ok: false, error: "Request not allowed." },
+      { status: 403 },
+    );
   const isAuthorized = await isAdminRequestAuthorized();
 
   if (!isAuthorized) {
@@ -123,18 +125,16 @@ export async function PUT(request: Request) {
   try {
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase
-      .from("programming_state")
-      .upsert(
-        {
-          id: PROGRAMMING_STATE_ID,
-          data: safePayload,
-          updated_at: safePayload.updatedAt,
-        },
-        {
-          onConflict: "id",
-        },
-      );
+    const { error } = await supabase.from("programming_state").upsert(
+      {
+        id: PROGRAMMING_STATE_ID,
+        data: safePayload,
+        updated_at: safePayload.updatedAt,
+      },
+      {
+        onConflict: "id",
+      },
+    );
 
     if (error) {
       return jsonResponse(

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -37,6 +38,7 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
 }
 
 export default function AdminWindowClient() {
+  const router = useRouter();
   const themeId = useStore((state) => state.themeId);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
@@ -153,7 +155,7 @@ export default function AdminWindowClient() {
   };
 
   const returnToTv = () => {
-    window.location.assign("/");
+    router.push("/");
   };
 
   const closeAdmin = () => {
@@ -161,7 +163,7 @@ export default function AdminWindowClient() {
 
     window.setTimeout(() => {
       if (!window.closed) {
-        window.location.assign("/");
+        router.push("/");
       }
     }, 150);
   };
@@ -176,7 +178,6 @@ export default function AdminWindowClient() {
         color: "var(--text)",
       }}
     >
-
       <GlobalProgrammingSync isAdminAuthorized={authorized} />
 
       <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-4 p-3 sm:p-5">
@@ -198,7 +199,10 @@ export default function AdminWindowClient() {
               draggable={false}
             />
 
-            <div className="min-w-0 border-l pl-4" style={{ borderColor: "var(--border)" }}>
+            <div
+              className="min-w-0 border-l pl-4"
+              style={{ borderColor: "var(--border)" }}
+            >
               <div
                 className="text-[11px] font-black uppercase tracking-[0.22em]"
                 style={{ color: "var(--primary)" }}
@@ -210,8 +214,12 @@ export default function AdminWindowClient() {
                 Admin Control Centre
               </h1>
 
-              <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                Uploads, programming, commercials, branding and station settings.
+              <p
+                className="mt-1 text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Uploads, programming, commercials, branding and station
+                settings.
               </p>
             </div>
           </div>

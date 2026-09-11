@@ -1,3 +1,4 @@
+import { applyProgrammeBlocks } from "./programmeBlocks";
 import type {
   AdCategory,
   AdPlacement,
@@ -476,7 +477,9 @@ function createAdPool(
   }
 
   const directAds = channelMedia.filter(isAd);
-  const globalAds = Array.isArray(availableAds) ? availableAds.filter(isAd) : [];
+  const globalAds = Array.isArray(availableAds)
+    ? availableAds.filter(isAd)
+    : [];
 
   const context: CommercialPickContext = {
     channel,
@@ -520,7 +523,10 @@ function createCommercialContext(
   };
 }
 
-function getRotatedPool(items: MediaItem[], cursor: CommercialCursor): MediaItem[] {
+function getRotatedPool(
+  items: MediaItem[],
+  cursor: CommercialCursor,
+): MediaItem[] {
   if (items.length === 0) {
     return [];
   }
@@ -571,7 +577,6 @@ function createProgramSegment(
   item: MediaItem,
   sourceStart: number,
   duration: number,
-  label: string,
 ): BroadcastItem {
   const safeStart = Math.max(0, Math.floor(sourceStart));
   const safeDuration = Math.max(1, Math.floor(duration));
@@ -609,7 +614,8 @@ function createCommercialSegment(
   const shouldSlice = segmentDuration < sourceDuration;
   const maxStart = Math.max(0, sourceDuration - segmentDuration);
   const previousOffset = cursor.sourceOffsets[item.id] ?? 0;
-  const sourceStart = shouldSlice && maxStart > 0 ? previousOffset % (maxStart + 1) : 0;
+  const sourceStart =
+    shouldSlice && maxStart > 0 ? previousOffset % (maxStart + 1) : 0;
   const sourceEnd = sourceStart + segmentDuration;
 
   cursor.sourceOffsets[item.id] = sourceEnd >= sourceDuration ? 0 : sourceEnd;
@@ -694,19 +700,13 @@ function normalizeBreakpoints(item: MediaItem): number[] {
       saved
         .map((value) => Math.floor(Number(value)))
         .filter(
-          (value) =>
-            Number.isFinite(value) &&
-            value > 0 &&
-            value < duration,
+          (value) => Number.isFinite(value) && value > 0 && value < duration,
         ),
     ),
   ).sort((a, b) => a - b);
 }
 
-function normalizeBreakDurations(
-  item: MediaItem,
-  count: number,
-): number[] {
+function normalizeBreakDurations(item: MediaItem, count: number): number[] {
   const saved = Array.isArray(item.breakDurations)
     ? item.breakDurations
         .map((value) => Math.floor(Number(value)))
@@ -775,9 +775,7 @@ function buildProgramBlock(
 
     const isLastSegment = index === points.length - 2;
 
-    schedule.push(
-      createProgramSegment(item, start, segmentDuration, `Segment ${index + 1}`),
-    );
+    schedule.push(createProgramSegment(item, start, segmentDuration));
 
     if (!isLastSegment) {
       const requestedBreakDuration = plan.breakDurations[index] ?? 0;
@@ -885,7 +883,10 @@ function createTimedSlice(
 ): BroadcastItem {
   const itemDuration = getSafeDuration(item);
   const safeOffset = Math.max(0, Math.floor(sourceOffset));
-  const safeDuration = Math.max(1, Math.min(Math.floor(duration), itemDuration));
+  const safeDuration = Math.max(
+    1,
+    Math.min(Math.floor(duration), itemDuration),
+  );
   const baseSourceStart = Math.max(0, Math.floor(item.sourceStart ?? 0));
   const sourceStart = baseSourceStart + safeOffset;
   const sourceEnd = sourceStart + safeDuration;
@@ -980,7 +981,10 @@ function buildFixedAirTimeSchedule(
 ): BroadcastItem[] {
   const fixedBlocks = fixedPrograms
     .map((item) => {
-      const startSecond = getUtcDayOffsetForLocalAirStart(item.airStartTime, now);
+      const startSecond = getUtcDayOffsetForLocalAirStart(
+        item.airStartTime,
+        now,
+      );
 
       if (startSecond === null) {
         return null;
@@ -1115,10 +1119,30 @@ export function buildSchedule(
   }
 
   const scheduleMode = getScheduleMode(channel);
-  const ads = createAdPool(playableChannelMedia, options.availableAds, channel, now);
+  const ads = createAdPool(
+    playableChannelMedia,
+    options.availableAds,
+    channel,
+    now,
+  );
+
+  const withBlocks = (schedule: BroadcastItem[]) =>
+    applyProgrammeBlocks(schedule, channel, now, (ids) =>
+      buildRotatingSchedule(
+        ids.flatMap((id) => {
+          const item = programs.find((candidate) => candidate.id === id);
+          return item ? [item] : [];
+        }),
+        ads,
+        channel,
+        now,
+      ),
+    );
 
   const fixedPrograms = programs.filter(hasFixedAirStartTime);
-  const rotatingPrograms = programs.filter((item) => !hasFixedAirStartTime(item));
+  const rotatingPrograms = programs.filter(
+    (item) => !hasFixedAirStartTime(item),
+  );
   const sortedRotatingPrograms = sortByAirStartTime(rotatingPrograms);
 
   const orderedRotatingPrograms =
@@ -1142,17 +1166,19 @@ export function buildSchedule(
     );
 
     if (fixedSchedule.length > 0) {
-      return fixedSchedule;
+      return withBlocks(fixedSchedule);
     }
   }
 
-  return buildRotatingSchedule(
-    orderedRotatingPrograms.length > 0
-      ? orderedRotatingPrograms
-      : sortByAirStartTime(programs),
-    ads,
-    channel,
-    now,
+  return withBlocks(
+    buildRotatingSchedule(
+      orderedRotatingPrograms.length > 0
+        ? orderedRotatingPrograms
+        : sortByAirStartTime(programs),
+      ads,
+      channel,
+      now,
+    ),
   );
 }
 

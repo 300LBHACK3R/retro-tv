@@ -1,3 +1,4 @@
+import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import type {
   AdCategory,
   AdChannelTarget,
@@ -147,16 +148,11 @@ function validStringArray(value: unknown): string[] {
   }
 
   return dedupeStrings(
-    value
-      .map((item) => String(item).trim())
-      .filter((item) => item.length > 0),
+    value.map((item) => String(item).trim()).filter((item) => item.length > 0),
   );
 }
 
-function validDurationList(
-  value: unknown,
-  expectedLength?: number,
-): number[] {
+function validDurationList(value: unknown, expectedLength?: number): number[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -185,10 +181,7 @@ function validBreakpoints(value: unknown, duration: number): number[] {
       value
         .map((item) => Math.floor(Number(item)))
         .filter(
-          (item) =>
-            Number.isFinite(item) &&
-            item > 0 &&
-            item < safeDuration,
+          (item) => Number.isFinite(item) && item > 0 && item < safeDuration,
         ),
     ),
   ).sort((a, b) => a - b);
@@ -414,10 +407,7 @@ function sanitizeAdPolicy(value: unknown): ChannelAdPolicy {
     maxAdsPerHour: validPositiveInteger(policy.maxAdsPerHour),
     allowedCategories: validAdCategories(policy.allowedCategories),
     allowGlobalAds: validBoolean(policy.allowGlobalAds, false),
-    allowChannelTargetedAds: validBoolean(
-      policy.allowChannelTargetedAds,
-      true,
-    ),
+    allowChannelTargetedAds: validBoolean(policy.allowChannelTargetedAds, true),
     allowHouseAds: validBoolean(policy.allowHouseAds, true),
   };
 }
@@ -444,22 +434,19 @@ function sanitizeMediaItem(value: unknown): MediaItem | null {
 
   const isCommercial = type === "commercial" || type === "bumper";
   const slotLengthSeconds = validPositiveInteger(value.slotLengthSeconds);
-  const category = validCommercialCategory(value.commercialCategory) ?? "general";
+  const category =
+    validCommercialCategory(value.commercialCategory) ?? "general";
   const adCategories = validAdCategories(value.adCategories);
   const adPlacements = validAdPlacements(value.adPlacements);
 
-  
   const breakpoints = isCommercial
     ? []
     : validBreakpoints(value.breakpoints, duration);
 
   const breakDurations = isCommercial
     ? []
-    : validDurationList(
-        value.breakDurations,
-        breakpoints.length,
-      );
-return {
+    : validDurationList(value.breakDurations, breakpoints.length);
+  return {
     id,
     title,
     type,
@@ -486,14 +473,18 @@ return {
     commercialStrategy: validCommercialStrategy(value.commercialStrategy),
 
     airDays: isCommercial ? [] : validWeekdays(value.airDays),
-    airStartTime: isCommercial ? undefined : validAirStartTime(value.airStartTime),
+    airStartTime: isCommercial
+      ? undefined
+      : validAirStartTime(value.airStartTime),
 
     allowCommercialSlicing: isCommercial
       ? validBoolean(value.allowCommercialSlicing, true)
       : false,
     commercialCategory: isCommercial ? category : undefined,
 
-    adChannelIds: isCommercial ? validAdChannelTargets(value.adChannelIds) : undefined,
+    adChannelIds: isCommercial
+      ? validAdChannelTargets(value.adChannelIds)
+      : undefined,
     adPlacements: isCommercial ? adPlacements : undefined,
     adCategories: isCommercial
       ? adCategories.length > 0
@@ -510,7 +501,9 @@ return {
       ? validPositiveInteger(value.adMinSecondsBetweenPlays)
       : undefined,
     adDays: isCommercial ? validWeekdays(value.adDays) : undefined,
-    adStartTime: isCommercial ? validAirStartTime(value.adStartTime) : undefined,
+    adStartTime: isCommercial
+      ? validAirStartTime(value.adStartTime)
+      : undefined,
     adEndTime: isCommercial ? validAirStartTime(value.adEndTime) : undefined,
     isHouseAd: isCommercial ? validBoolean(value.isHouseAd, false) : undefined,
     advertiserName: isCommercial
@@ -522,7 +515,10 @@ return {
   };
 }
 
-function sanitizeBranding(value: unknown, fallbackName: string): ChannelBranding {
+function sanitizeBranding(
+  value: unknown,
+  fallbackName: string,
+): ChannelBranding {
   const branding = isObject(value) ? value : {};
 
   return {
@@ -554,12 +550,15 @@ function sanitizeChannel(value: unknown): Channel | null {
     number,
     name,
     mediaIds: validStringArray(value.mediaIds),
+    programmeBlocks: sanitizeProgrammeBlocks(value.programmeBlocks),
     branding: sanitizeBranding(value.branding, name),
     isEnabled: validBoolean(value.isEnabled, true),
     scheduleMode: validScheduleMode(value.scheduleMode),
     commercialBreakMode: validCommercialBreakMode(value.commercialBreakMode),
     randomSeed: validString(value.randomSeed, `channel-${id}`),
-    defaultSlotLengthSeconds: validPositiveInteger(value.defaultSlotLengthSeconds),
+    defaultSlotLengthSeconds: validPositiveInteger(
+      value.defaultSlotLengthSeconds,
+    ),
     commercialStrategy: validCommercialStrategy(value.commercialStrategy),
     adPolicy: sanitizeAdPolicy(value.adPolicy),
   };
@@ -594,7 +593,9 @@ function sanitizeChannelList(value: unknown, media: MediaItem[]): Channel[] {
     .filter((item): item is Channel => Boolean(item))
     .map((channel) => ({
       ...channel,
-      mediaIds: channel.mediaIds.filter((mediaId) => validMediaIds.has(mediaId)),
+      mediaIds: channel.mediaIds.filter((mediaId) =>
+        validMediaIds.has(mediaId),
+      ),
     }));
 
   const map = new Map<string, Channel>();
@@ -633,7 +634,7 @@ export function sanitizeProgrammingSnapshot(
     typeof value.currentChannelId === "string" &&
     channels.some((channel) => channel.id === value.currentChannelId)
       ? value.currentChannelId
-      : channels[0]?.id ?? "1";
+      : (channels[0]?.id ?? "1");
 
   return {
     media,

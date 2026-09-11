@@ -105,7 +105,10 @@ function getSafePreviewTime(window: PreviewWindow): number {
   return Math.max(0, window.start);
 }
 
-function shouldLoopPreview(video: HTMLVideoElement, window: PreviewWindow): boolean {
+function shouldLoopPreview(
+  video: HTMLVideoElement,
+  window: PreviewWindow,
+): boolean {
   if (!window.end) {
     return false;
   }
@@ -407,11 +410,10 @@ export default function PreviewPlayer({
   }, [endAt, item, startAt, status]);
 
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
       clearTimer(retryTimerRef);
       clearTimer(loadingTimerRef);
-
-      const video = videoRef.current;
 
       if (!video) {
         return;
@@ -560,7 +562,8 @@ export default function PreviewPlayer({
 
         {hasSource && status === "error" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70 px-4 text-center text-xs leading-5 text-red-200">
-            {errorMessage || "Preview failed. Test the Cloudflare/R2 media URL."}
+            {errorMessage ||
+              "Preview failed. Test the Cloudflare/R2 media URL."}
           </div>
         ) : null}
       </div>
@@ -570,7 +573,10 @@ export default function PreviewPlayer({
           {item.title}
         </div>
 
-        <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+        <div
+          className="mt-1 text-[11px]"
+          style={{ color: "var(--text-muted)" }}
+        >
           {previewMeta}
         </div>
       </div>

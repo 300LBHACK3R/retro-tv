@@ -79,6 +79,7 @@ export function getSecondsSinceBroadcastEpoch(nowMs = Date.now()): number {
 export function getOffsetInLoop(
   totalDuration: number,
   nowMs = Date.now(),
+  anchorMs = BROADCAST_EPOCH_MS,
 ): number {
   const safeTotalDuration = normalizePositiveSecond(totalDuration);
 
@@ -86,7 +87,7 @@ export function getOffsetInLoop(
     return 0;
   }
 
-  const secondsSinceEpoch = getSecondsSinceBroadcastEpoch(nowMs);
+  const secondsSinceEpoch = Math.floor((nowMs - anchorMs) / 1000);
 
   return (
     ((secondsSinceEpoch % safeTotalDuration) + safeTotalDuration) %
@@ -259,7 +260,11 @@ export function getLiveState(
 
   return getLiveStateAtOffsetWithDuration({
     schedule,
-    offsetInLoop: getOffsetInLoop(totalDuration, nowMs),
+    offsetInLoop: getOffsetInLoop(
+      totalDuration,
+      nowMs,
+      schedule[0]?.scheduleAnchorMs,
+    ),
     totalDuration,
   });
 }
@@ -290,7 +295,9 @@ export function getPreviousLiveItem(
   return schedule[previousIndex] ?? null;
 }
 
-export function isVirtualSlice(item: BroadcastItem | null | undefined): boolean {
+export function isVirtualSlice(
+  item: BroadcastItem | null | undefined,
+): boolean {
   if (!item?.isVirtualSegment) {
     return false;
   }

@@ -1,0 +1,514 @@
+.ttv-section-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ttv-section-action[aria-pressed="true"] {
+  background: var(--button-bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.ttv-save-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.ttv-save-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.ttv-save-button[aria-pressed="true"] {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.ttv-save-button[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+.ttv-save-button:hover {
+  background: var(--button-hover);
+  color: var(--text);
+}
+.ttv-channel-tile {
+  position: relative;
+  flex: 0 0 11rem;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+.ttv-channel-tile > .ttv-channel-rail-card {
+  width: 100%;
+  height: 100%;
+  padding-top: 2.5rem;
+}
+.ttv-channel-tile > .ttv-save-button {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  border: 0;
+  background: transparent;
+}
+.ttv-directory-tile {
+  position: relative;
+  min-width: 0;
+}
+.ttv-directory-tile > .ttv-channel-browser-card {
+  width: 100%;
+  height: 100%;
+  padding-right: 3.5rem;
+}
+.ttv-directory-tile > .ttv-save-button {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  border: 0;
+}
+.ttv-directory-tile .ttv-channel-browser-action {
+  display: none;
+}
+.ttv-directory-filter {
+  padding: 0 1.25rem 1rem;
+}
+.ttv-discovery-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 0.75rem 0;
+}
+.ttv-library-save-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.ttv-library-save-row > span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.ttv-programme-art {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--panel-alt-bg);
+}
+.ttv-programme-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ttv-programme-art__type {
+  display: flex;
+  height: 100%;
+  min-height: 8rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 1.3rem;
+  color: #f8fafc;
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      hsl(var(--art-hue) 60% 36% / 0.7),
+      transparent 70%
+    ),
+    #101627;
+}
+.ttv-programme-art__type > span {
+  font:
+    0.75rem ui-monospace,
+    monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cad7e5;
+}
+.ttv-programme-art__type > strong {
+  color: #fff !important;
+  font-size: clamp(1.05rem, 1.8vw, 1.5rem);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ttv-programme-art__type > small {
+  color: #b5c1d3 !important;
+  font:
+    0.75rem ui-monospace,
+    monospace;
+  letter-spacing: 0.15em;
+  margin-top: auto;
+}
+.ttv-discovery {
+  min-width: 0;
+}
+.ttv-discovery-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.ttv-discovery-heading h2 {
+  margin: 0.35rem 0;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+.ttv-discovery-heading p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.ttv-discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.ttv-programme-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: var(--panel-bg);
+}
+.ttv-programme-card__body {
+  padding: 1rem;
+}
+.ttv-programme-card__body > span {
+  display: block;
+  color: var(--primary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.ttv-programme-card h3 {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.ttv-programme-card p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ttv-programme-card__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.ttv-programme-card__actions .ttv-section-action {
+  white-space: normal;
+  text-align: center;
+  text-decoration: none;
+}
+.ttv-player-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 1rem;
+  background: #07111fee;
+  color: #f8fafc;
+  font-size: 0.875rem;
+  border-radius: 0.6rem;
+}
+.ttv-player-notice button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #718096;
+  border-radius: 0.5rem;
+}
+.ttv-station-panel {
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  color: var(--text);
+}
+.ttv-station-panel h2 {
+  font-size: 1.5rem;
+  font-weight: 750;
+  margin-bottom: 0.5rem;
+}
+.ttv-station-panel p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.ttv-station-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-block: 1.25rem;
+}
+.ttv-station-stat {
+  background: var(--panel-alt-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 1rem;
+}
+.ttv-station-stat strong {
+  display: block;
+  font-size: 1.6rem;
+  margin-top: 0.4rem;
+}
+.ttv-station-stat span {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.ttv-station-table-wrap {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+.ttv-station-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+.ttv-station-table th,
+.ttv-station-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.ttv-station-table th {
+  color: var(--text-muted);
+  font-weight: 550;
+}
+.ttv-station-panel input,
+.ttv-station-panel select {
+  min-height: 44px;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--panel-alt-bg);
+  border-radius: 0.5rem;
+  color: var(--text);
+}
+.ttv-station-form {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.ttv-station-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.ttv-station-days {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.ttv-station-block {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.ttv-station-block h3 {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+@media (max-width: 1000px) {
+  .ttv-discovery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .ttv-channel-tile {
+    flex-basis: 9.5rem;
+  }
+  .ttv-section-heading {
+    flex-wrap: wrap;
+  }
+  .ttv-station-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 440px) {
+  .ttv-discovery-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1000px) {
+  .ttv-discovery {
+    display: none;
+  }
+}
+
+.ttv-channel-favourite {
+  padding: 0.75rem 1.25rem 0;
+}
+.ttv-block-time-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.ttv-block-programmes {
+  max-height: 20rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  border-radius: 0.65rem;
+}
+.ttv-block-programmes label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem;
+}
+.ttv-block-programmes input {
+  width: 1.1rem;
+  min-height: 1.1rem;
+  flex-shrink: 0;
+}
+@media (max-width: 400px) {
+  .ttv-block-time-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ttv-guide-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ttv-guide-workspace > .ttv-mobile-guide {
+  flex: 1;
+  min-height: 0;
+}
+.ttv-guide-tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+.ttv-guide-tools label {
+  flex: 1 1 12rem;
+}
+.ttv-guide-tools input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  padding: 0.65rem 0.85rem;
+  background: var(--panel-alt-bg);
+  border-radius: 0.6rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.ttv-guide-tools > span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+[data-ttv-guide-scroll] {
+  scroll-padding: 64px 1rem 1rem 180px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+.ttv-guide-cell {
+  border-radius: 0.35rem;
+  padding-block: 0.75rem;
+}
+.ttv-guide-cell > div:first-child {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.ttv-guide-cell > div:last-child {
+  font-size: 0.75rem;
+}
+.ttv-guide-cell:focus-visible {
+  z-index: 35;
+  outline-offset: -3px;
+  outline-width: 3px;
+}
+.ttv-guide-dialog :where(button, a, input, select):focus-visible {
+  outline-color: var(--primary);
+}
+.ttv-tv-mode :where(button, a, input, select):focus-visible {
+  outline: 4px solid var(--primary);
+  outline-offset: 5px;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--primary) 32%, transparent);
+}
+.ttv-tv-mode .ttv-premium-nav > :where(button, a) {
+  font-size: 1rem;
+  min-height: 52px;
+}
+@media (max-width: 600px) {
+  .ttv-guide-tools {
+    gap: 0.5rem;
+    padding: 0.65rem;
+  }
+  .ttv-guide-tools label {
+    flex-basis: 100%;
+  }
+  .ttv-guide-tools > span {
+    margin-left: auto;
+  }
+}
+
+.ttv-policy-page {
+  max-width: 50rem;
+  margin: auto;
+  padding: 3rem 1.25rem;
+  color: var(--text);
+}
+.ttv-policy-page h1 {
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  font-weight: 750;
+  margin: 2rem 0 1rem;
+}
+.ttv-policy-page h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 2rem 0 0.75rem;
+}
+.ttv-policy-page p {
+  color: var(--text-muted);
+  line-height: 1.8;
+  margin: 1rem 0;
+}
+.ttv-policy-page a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.ttv-station-message {
+  padding: 1rem;
+  background: var(--panel-alt-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  margin-top: 1rem;
+}
+
+.ttv-guide-workspace[data-density="compact"] .ttv-mobile-program-card {
+  min-height: 58px;
+  padding-block: 0.55rem;
+  gap: 0.6rem;
+}
+.ttv-guide-workspace[data-density="compact"] .ttv-mobile-program-list {
+  gap: 0.35rem;
+}

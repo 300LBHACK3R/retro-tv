@@ -10,6 +10,9 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSpatialNavigation } from "@/components/viewer/useSpatialNavigation";
+import DailyDiscovery from "@/components/viewer/DailyDiscovery";
+import SaveButton from "@/components/viewer/SaveButton";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import MediaPreloader from "@/components/MediaPreloader";
@@ -70,6 +73,7 @@ export interface TatesTvHomeProps {
 }
 
 export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
+  useSpatialNavigation(tvMode);
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -87,9 +91,7 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
-  const isMoreOpen = useStore(
-    (state) => state.viewerSettings.isSettingsOpen,
-  );
+  const isMoreOpen = useStore((state) => state.viewerSettings.isSettingsOpen);
   const setMoreOpen = useStore((state) => state.setSettingsOpen);
 
   const [isChannelBrowserOpen, setChannelBrowserOpen] = useState(false);
@@ -157,8 +159,7 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
     }));
   }, [availableAds, enabledChannels, isGuideOpen, mediaById]);
 
-  const isAnyOverlayOpen =
-    isGuideOpen || isChannelBrowserOpen || isMoreOpen;
+  const isAnyOverlayOpen = isGuideOpen || isChannelBrowserOpen || isMoreOpen;
 
   const scrollToLive = useCallback(() => {
     liveSectionRef.current?.scrollIntoView({
@@ -306,11 +307,10 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
         color: "var(--text)",
       }}
     >
-      <a className="ttv-skip-link" href="#ttv-live-player">Skip to player</a>
-      <GlobalProgrammingSync
-        isAdminAuthorized={false}
-        visibility="problems"
-      />
+      <a className="ttv-skip-link" href="#ttv-live-player">
+        Skip to player
+      </a>
+      <GlobalProgrammingSync isAdminAuthorized={false} visibility="problems" />
       <MediaPreloader
         activeSchedule={activeSchedule}
         activeChannel={activeChannel}
@@ -377,6 +377,18 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
                   aria-label="Current channel and upcoming programming"
                 >
                   <ViewerHeader channel={activeChannel} variant="compact" />
+                  {activeChannel && (
+                    <div className="ttv-channel-favourite">
+                      <SaveButton
+                        kind="channel"
+                        id={activeChannel.id}
+                        title={
+                          activeChannel.branding?.displayName ||
+                          activeChannel.name
+                        }
+                      />
+                    </div>
+                  )}
                   <NowNextBar
                     channel={activeChannel}
                     schedule={activeSchedule}
@@ -397,15 +409,19 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
           </>
         )}
 
+        {!tvMode ? <DailyDiscovery onTune={selectChannel} /> : null}
         {!tvMode ? <ViewerFooter /> : null}
       </div>
 
       <ViewerGuideDialog open={isGuideOpen} onClose={closeGuide}>
         <MultiGuide
           data={channelGuideData}
-          onProgramSelect={(
-            { channel }: { channel: Channel; media?: MediaItem },
-          ) => {
+          onProgramSelect={({
+            channel,
+          }: {
+            channel: Channel;
+            media?: MediaItem;
+          }) => {
             selectChannel(channel.id);
             closeGuide();
           }}

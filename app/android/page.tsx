@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/metadata";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-  title: "Android Preparation | Tate's TV",
-  description:
-    "Preparation checklist for packaging Tate's TV as an Android Trusted Web Activity and publishing to Google Play.",
-};
+export const metadata = pageMetadata(
+  "Tate’s TV on Android",
+  "Watch Tate’s TV on Android and learn about installation and television options.",
+  "/android",
+  true,
+);
 
 const PACKAGE_NAME = "ca.tatestv.app";
 

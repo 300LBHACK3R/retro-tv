@@ -14,7 +14,8 @@
     "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
     "audit:prod": "npm audit --omit=dev",
     "test:unit": "playwright test --config tests/unit.config.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:http": "node tests/http.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.0",

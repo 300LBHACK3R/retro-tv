@@ -1,6 +1,7 @@
 # Tate's TV Launch Checklist
 
 ## Core playback
+
 - [ ] Home page loads
 - [ ] First channel plays
 - [ ] Channel up works
@@ -11,6 +12,7 @@
 - [ ] Mobile scroll works
 
 ## Admin
+
 - [ ] Admin login works
 - [ ] Upload panel opens
 - [ ] Media saves
@@ -18,6 +20,7 @@
 - [ ] Refresh does not wipe schedule unexpectedly
 
 ## Themes
+
 - [ ] Theme picker opens
 - [ ] Classic/default theme works
 - [ ] Electric Blue appears
@@ -25,6 +28,7 @@
 - [ ] Mobile still scrolls after theme change
 
 ## Production
+
 - [ ] /api/health returns healthy
 - [ ] /health loads
 - [ ] /recovery loads
@@ -38,5 +42,5 @@
 Run:
 
 ```powershell
-.\scripts\smoke-test.ps1
+npm run check
 ```

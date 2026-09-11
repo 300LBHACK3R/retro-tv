@@ -2,29 +2,13 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-const supabaseUrl = process.env.SUPABASE_URL ?? "";
-const supabaseHost = supabaseUrl ? new URL(supabaseUrl).origin : "";
+// HTTPS media hosts are configured by the station editor; no service key is
+// interpolated into browser headers.
+const allowedConnectSources = ["'self'", "https:"];
 
-const allowedConnectSources = [
-  "'self'",
-  "https:",
-  supabaseHost,
-].filter(Boolean);
+const allowedMediaSources = ["'self'", "blob:", "data:", "https:"];
 
-const allowedMediaSources = [
-  "'self'",
-  "blob:",
-  "data:",
-  "https:",
-];
-
-const allowedImageSources = [
-  "'self'",
-  "data:",
-  "blob:",
-  "https:",
-];
+const allowedImageSources = ["'self'", "data:", "blob:", "https:"];
 
 const cspDirectives = [
   "default-src 'self'",
@@ -100,7 +84,7 @@ const securityHeaders = [
 const cacheHeaders = [
   {
     key: "Cache-Control",
-    value: "public, max-age=31536000, immutable",
+    value: "public, max-age=3600, stale-while-revalidate=86400",
   },
 ];
 
@@ -111,6 +95,20 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
+        source: "/:path(admin|backup|recovery|readiness|health|launch)",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: securityHeaders,
       },
@@ -119,28 +117,6 @@ const nextConfig: NextConfig = {
         headers: cacheHeaders,
       },
     ];
-  },
-
-  async redirects() {
-    if (isDev) {
-      return [];
-    }
-
-    return siteUrl.startsWith("https://www.")
-      ? []
-      : [
-          {
-            source: "/:path*",
-            has: [
-              {
-                type: "host",
-                value: "www.retrotv.ca",
-              },
-            ],
-            destination: "https://retrotv.ca/:path*",
-            permanent: true,
-          },
-        ];
   },
 };
 

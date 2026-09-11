@@ -61,146 +61,90 @@ export default function ReadinessPage() {
   return (
     <main className="ttv-ops-screen">
       <section className="ttv-ops-card ttv-readiness-card">
-        <div
-          className="ttv-ops-logo"
-          aria-hidden="true"
-        >
+        <div className="ttv-ops-logo" aria-hidden="true">
           TTV
         </div>
 
         <div>
-          <p className="ttv-ops-kicker">
-            Production Readiness
-          </p>
+          <p className="ttv-ops-kicker">Production Readiness</p>
 
-          <h1>
-            Tate&apos;s TV Launch Report
-          </h1>
+          <h1>Tate&apos;s TV Launch Report</h1>
 
           <p>
-            Overview of launch readiness,
-            operational tooling, verification
-            systems, platform assets, and
-            production safeguards currently
+            Overview of launch readiness, operational tooling, verification
+            systems, platform assets, and production safeguards currently
             protecting Tate&apos;s TV.
           </p>
         </div>
 
         <div className="ttv-readiness-score">
           <div>
-            <span>
-              Launch Status
-            </span>
+            <span>Launch Status</span>
 
-            <strong>
-              Pre-Launch Hardened
-            </strong>
+            <strong>Pre-Launch Hardened</strong>
           </div>
 
           <div>
-            <span>
-              Verification Suite
-            </span>
+            <span>Verification Suite</span>
 
-            <strong>
-              Smoke Test V2
-            </strong>
+            <strong>Smoke Test V2</strong>
           </div>
 
           <div>
-            <span>
-              Recommended Next Step
-            </span>
+            <span>Recommended Next Step</span>
 
-            <strong>
-              Real Device Testing
-            </strong>
+            <strong>Real Device Testing</strong>
           </div>
         </div>
 
         <div className="ttv-readiness-grid">
-          {readinessSections.map(
-            (section) => (
-              <article
-                key={section.title}
-                className="ttv-readiness-section"
-              >
-                <h2>
-                  {section.title}
-                </h2>
+          {readinessSections.map((section) => (
+            <article key={section.title} className="ttv-readiness-section">
+              <h2>{section.title}</h2>
 
-                <ul>
-                  {section.items.map(
-                    (item) => (
-                      <li key={item}>
-                        <span aria-hidden="true">
-                          ✓
-                        </span>
+              <ul>
+                {section.items.map((item) => (
+                  <li key={item}>
+                    <span aria-hidden="true">✓</span>
 
-                        {item}
-                      </li>
-                    ),
-                  )}
-                </ul>
-              </article>
-            ),
-          )}
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
         </div>
 
         <div className="ttv-ops-list">
-          <strong>
-            Final Launch Validation
-          </strong>
+          <strong>Final Launch Validation</strong>
 
           <ul>
-            {finalChecks.map(
-              (item) => (
-                <li key={item}>
-                  {item}
-                </li>
-              ),
-            )}
+            {finalChecks.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </div>
 
         <div className="ttv-ops-list">
-          <strong>
-            Final Command Before Sharing
-          </strong>
+          <strong>Final Command Before Sharing</strong>
 
-          <code>
-            .\scripts\smoke-test.ps1
-          </code>
+          <code>npm run check</code>
         </div>
 
         <div className="ttv-ops-actions">
-          <Link href="/">
-            Open App
-          </Link>
+          <Link href="/">Open App</Link>
 
-          <Link href="/launch">
-            Launch Hub
-          </Link>
+          <Link href="/launch">Launch Hub</Link>
 
-          <Link href="/compat">
-            Compatibility
-          </Link>
+          <Link href="/compat">Compatibility</Link>
 
-          <Link href="/install">
-            Install
-          </Link>
+          <Link href="/install">Install</Link>
 
-          <Link href="/health">
-            Health
-          </Link>
+          <Link href="/health">Health</Link>
 
-          <Link href="/backup">
-            Backup
-          </Link>
+          <Link href="/backup">Backup</Link>
 
-          <Link href="/recovery">
-            Recovery
-          </Link>
+          <Link href="/recovery">Recovery</Link>
         </div>
       </section>
     </main>

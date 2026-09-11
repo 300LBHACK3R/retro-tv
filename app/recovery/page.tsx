@@ -3,10 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type RecoveryAction =
-  | "idle"
-  | "cleared"
-  | "failed";
+type RecoveryAction = "idle" | "cleared" | "failed";
 
 function getStorageKeys(): string[] {
   if (typeof window === "undefined") {
@@ -15,13 +12,8 @@ function getStorageKeys(): string[] {
 
   const keys: string[] = [];
 
-  for (
-    let index = 0;
-    index < window.localStorage.length;
-    index += 1
-  ) {
-    const key =
-      window.localStorage.key(index);
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
 
     if (key) {
       keys.push(key);
@@ -31,11 +23,8 @@ function getStorageKeys(): string[] {
   return keys.sort();
 }
 
-function isTatesTvKey(
-  key: string,
-): boolean {
-  const normalized =
-    key.toLowerCase();
+function isTatesTvKey(key: string): boolean {
+  const normalized = key.toLowerCase();
 
   return (
     normalized.includes("tv") ||
@@ -49,42 +38,32 @@ function isTatesTvKey(
 }
 
 export default function RecoveryPage() {
-  const [status, setStatus] =
-    useState<RecoveryAction>("idle");
+  const [status, setStatus] = useState<RecoveryAction>("idle");
 
-  const [clearedKeys, setClearedKeys] =
-    useState<string[]>([]);
+  const [clearedKeys, setClearedKeys] = useState<string[]>([]);
 
-  const [storageKeys, setStorageKeys] =
-    useState<string[]>([]);
+  const [storageKeys, setStorageKeys] = useState<string[]>([]);
 
   useEffect(() => {
     setStorageKeys(getStorageKeys());
   }, []);
 
-  const likelyAppKeys =
-    storageKeys.filter(isTatesTvKey);
+  const likelyAppKeys = storageKeys.filter(isTatesTvKey);
 
   async function clearLikelyAppStorage() {
-    const confirmed =
-      window.confirm(
-        "This will clear local Tate's TV settings and cached browser state on this device. Continue?",
-      );
+    const confirmed = window.confirm(
+      "This will clear local Tate's TV settings and cached browser state on this device. Continue?",
+    );
 
     if (!confirmed) {
       return;
     }
 
     try {
-      const keysToClear =
-        getStorageKeys().filter(
-          isTatesTvKey,
-        );
+      const keysToClear = getStorageKeys().filter(isTatesTvKey);
 
       for (const key of keysToClear) {
-        window.localStorage.removeItem(
-          key,
-        );
+        window.localStorage.removeItem(key);
       }
 
       try {
@@ -92,107 +71,61 @@ export default function RecoveryPage() {
       } catch {}
 
       try {
-        if (
-          "caches" in window
-        ) {
-          const cacheNames =
-            await caches.keys();
+        if ("caches" in window) {
+          const cacheNames = await caches.keys();
 
-          await Promise.all(
-            cacheNames.map((name) =>
-              caches.delete(name),
-            ),
-          );
+          await Promise.all(cacheNames.map((name) => caches.delete(name)));
         }
       } catch {}
 
       setClearedKeys(keysToClear);
-      setStorageKeys(
-        getStorageKeys(),
-      );
+      setStorageKeys(getStorageKeys());
       setStatus("cleared");
     } catch {
       setStatus("failed");
     }
   }
 
-  function hardReload() {
-    window.location.assign("/");
-  }
-
   return (
     <main className="ttv-ops-screen">
       <section className="ttv-ops-card">
-        <div
-          className="ttv-ops-logo"
-          aria-hidden="true"
-        >
+        <div className="ttv-ops-logo" aria-hidden="true">
           TTV
         </div>
 
         <div>
-          <p className="ttv-ops-kicker">
-            Device Recovery
-          </p>
+          <p className="ttv-ops-kicker">Device Recovery</p>
 
-          <h1>
-            Repair Tate&apos;s TV
-          </h1>
+          <h1>Repair Tate&apos;s TV</h1>
 
           <p>
-            Use this tool if old
-            layouts appear, playback
-            behaves incorrectly,
-            themes become stuck,
-            cached data causes
-            issues, or the app acts
-            unexpectedly after an
-            update.
+            Use this tool if old layouts appear, playback behaves incorrectly,
+            themes become stuck, cached data causes issues, or the app acts
+            unexpectedly after an update.
           </p>
         </div>
 
         <div className="ttv-ops-actions">
-          <button
-            type="button"
-            onClick={
-              clearLikelyAppStorage
-            }
-          >
+          <button type="button" onClick={clearLikelyAppStorage}>
             Clear Local App State
           </button>
 
-          <button
-            type="button"
-            onClick={hardReload}
-          >
-            Reload App
-          </button>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Full navigation reinitializes recovered client state. */}
+          <a href="/">Reload App</a>
 
-          <Link href="/">
-            Back to App
-          </Link>
+          <Link href="/">Back to App</Link>
 
-          <Link href="/health">
-            Health Check
-          </Link>
+          <Link href="/health">Health Check</Link>
 
-          <Link href="/backup">
-            Backup
-          </Link>
+          <Link href="/backup">Backup</Link>
         </div>
 
         {status === "cleared" && (
-          <div
-            className="ttv-ops-status"
-            data-status="healthy"
-          >
-            <strong>
-              Recovery Complete
-            </strong>
+          <div className="ttv-ops-status" data-status="healthy">
+            <strong>Recovery Complete</strong>
 
             <span>
-              {clearedKeys.length >
-              0
+              {clearedKeys.length > 0
                 ? `${clearedKeys.length} key(s) removed. Browser cache and session state were also refreshed when supported.`
                 : "No matching Tate's TV storage keys were found."}
             </span>
@@ -200,56 +133,31 @@ export default function RecoveryPage() {
         )}
 
         {status === "failed" && (
-          <div
-            className="ttv-ops-status"
-            data-status="failed"
-          >
-            <strong>
-              Recovery Failed
-            </strong>
+          <div className="ttv-ops-status" data-status="failed">
+            <strong>Recovery Failed</strong>
 
             <span>
-              Browser storage could
-              not be cleared. Try
-              clearing site data
-              manually from browser
-              settings.
+              Browser storage could not be cleared. Try clearing site data
+              manually from browser settings.
             </span>
           </div>
         )}
 
         <div className="ttv-ops-list">
-          <strong>
-            Detected App Keys
-          </strong>
+          <strong>Detected App Keys</strong>
 
-          {likelyAppKeys.length >
-          0 ? (
+          {likelyAppKeys.length > 0 ? (
             <>
-              <p>
-                {
-                  likelyAppKeys.length
-                }{" "}
-                Tate&apos;s TV key(s)
-                detected.
-              </p>
+              <p>{likelyAppKeys.length} Tate&apos;s TV key(s) detected.</p>
 
               <ul>
-                {likelyAppKeys
-                  .slice(0, 20)
-                  .map((key) => (
-                    <li key={key}>
-                      {key}
-                    </li>
-                  ))}
+                {likelyAppKeys.slice(0, 20).map((key) => (
+                  <li key={key}>{key}</li>
+                ))}
               </ul>
             </>
           ) : (
-            <p>
-              No obvious Tate&apos;s
-              TV browser storage
-              keys detected.
-            </p>
+            <p>No obvious Tate&apos;s TV browser storage keys detected.</p>
           )}
         </div>
       </section>

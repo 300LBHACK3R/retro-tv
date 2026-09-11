@@ -94,5 +94,18 @@ export default function ThemeRuntime() {
     return () => window.removeEventListener("storage", handleStorage);
   }, [setTheme, themeId]);
 
+  useEffect(() => {
+    const update = () => {
+      document.documentElement.dataset.ttvPageVisible =
+        document.visibilityState === "visible" ? "true" : "false";
+    };
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      document.removeEventListener("visibilitychange", update);
+      delete document.documentElement.dataset.ttvPageVisible;
+    };
+  }, []);
+
   return null;
 }

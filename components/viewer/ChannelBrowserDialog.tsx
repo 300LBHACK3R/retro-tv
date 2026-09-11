@@ -16,6 +16,8 @@ import {
   getChannelLabel,
   getChannelNumber,
 } from "@/lib/viewer";
+import { useDeviceLibrary } from "@/lib/deviceLibrary";
+import SaveButton from "./SaveButton";
 import ChannelLogo from "./ChannelLogo";
 import type { Channel } from "@/lib/types";
 
@@ -55,6 +57,8 @@ export default function ChannelBrowserDialog({
   onClose,
   onSelectChannel,
 }: ChannelBrowserDialogProps) {
+  const favourites = useDeviceLibrary((state) => state.favouriteChannels);
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -75,10 +79,12 @@ export default function ChannelBrowserDialog({
   const filteredChannels = useMemo(() => {
     const normalizedQuery = normalizeQuery(query);
 
-    return channels.filter((channel) =>
-      channelMatches(channel, normalizedQuery),
+    return channels.filter(
+      (channel) =>
+        channelMatches(channel, normalizedQuery) &&
+        (!favouritesOnly || favourites.includes(channel.id)),
     );
-  }, [channels, query]);
+  }, [channels, query, favourites, favouritesOnly]);
 
   if (!mounted || !open) {
     return null;
@@ -143,39 +149,62 @@ export default function ChannelBrowserDialog({
           </div>
         </div>
 
-        <div className="ttv-channel-browser-grid" aria-label="Available channels">
+        <div className="ttv-directory-filter">
+          <button
+            type="button"
+            className="ttv-section-action"
+            aria-pressed={favouritesOnly}
+            onClick={() => setFavouritesOnly(!favouritesOnly)}
+          >
+            Favourites only
+          </button>
+        </div>
+        <div
+          className="ttv-channel-browser-grid"
+          aria-label="Available channels"
+        >
           {filteredChannels.map((channel) => {
             const selected = channel.id === currentChannelId;
             const accent = getChannelAccent(channel);
 
             return (
-              <button
-                key={channel.id}
-                type="button"
-                className="ttv-channel-browser-card"
-                data-selected={selected ? "true" : "false"}
-                style={{ "--channel-accent": accent } as CSSProperties}
-                onClick={() => {
-                  onSelectChannel(channel.id);
-                  onClose();
-                }}
-                aria-pressed={selected}
-                aria-label={`${selected ? "Currently watching" : "Tune to"} ${getChannelLabel(channel)} ${getChannelDisplayName(channel)}`}
-              >
-                <ChannelLogo channel={channel} className="ttv-channel-browser-logo" />
+              <div key={channel.id} className="ttv-directory-tile">
+                <button
+                  type="button"
+                  className="ttv-channel-browser-card"
+                  data-selected={selected ? "true" : "false"}
+                  style={{ "--channel-accent": accent } as CSSProperties}
+                  onClick={() => {
+                    onSelectChannel(channel.id);
+                    onClose();
+                  }}
+                  aria-pressed={selected}
+                  aria-label={`${selected ? "Currently watching" : "Tune to"} ${getChannelLabel(channel)} ${getChannelDisplayName(channel)}`}
+                >
+                  <ChannelLogo
+                    channel={channel}
+                    className="ttv-channel-browser-logo"
+                  />
 
-                <span className="ttv-channel-browser-copy">
-                  <span className="ttv-channel-browser-number">
-                    {getChannelLabel(channel)}
+                  <span className="ttv-channel-browser-copy">
+                    <span className="ttv-channel-browser-number">
+                      {getChannelLabel(channel)}
+                    </span>
+                    <strong>{getChannelDisplayName(channel)}</strong>
+                    <small>{getChannelCallsign(channel)}</small>
                   </span>
-                  <strong>{getChannelDisplayName(channel)}</strong>
-                  <small>{getChannelCallsign(channel)}</small>
-                </span>
 
-                <span className="ttv-channel-browser-action">
-                  {selected ? "Watching" : "Tune"}
-                </span>
-              </button>
+                  <span className="ttv-channel-browser-action">
+                    {selected ? "Watching" : "Tune"}
+                  </span>
+                </button>
+                <SaveButton
+                  kind="channel"
+                  id={channel.id}
+                  title={getChannelDisplayName(channel)}
+                  compact
+                />
+              </div>
             );
           })}
         </div>
@@ -183,7 +212,7 @@ export default function ChannelBrowserDialog({
         {filteredChannels.length === 0 ? (
           <div className="ttv-premium-empty-state" role="status">
             <strong>No channels match that search.</strong>
-            <span>Try a channel number, callsign, or a shorter title.</span>
+            <span>Try another search, or turn off the favourites filter.</span>
           </div>
         ) : null}
       </section>

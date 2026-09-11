@@ -7,10 +7,11 @@ import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { GoogleCastProvider } from "@/components/GoogleCastProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ThemeBootstrapScript from "@/components/ThemeBootstrapScript";
+import DeviceLibraryRuntime from "@/components/viewer/DeviceLibraryRuntime";
 import ThemeRuntime from "@/components/ThemeRuntime";
 import { getDefaultTheme } from "@/lib/themes";
 
-const FALLBACK_SITE_URL = "https://www.tatestv.ca";
+import { getSiteUrl } from "@/lib/metadata";
 const DEFAULT_OG_IMAGE = "/opengraph-image.png";
 
 const APP_NAME = "Tate's TV";
@@ -23,17 +24,6 @@ const DEFAULT_THEME = getDefaultTheme();
 
 const APP_DESCRIPTION =
   "Tate's TV is a Calgary-born Canadian streaming network. Watch free live channels, explore the TV guide, and discover creators on demand.";
-
-function getSiteUrl(): string {
-  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || FALLBACK_SITE_URL;
-
-  try {
-    const url = new URL(rawUrl);
-    return url.origin.replace(/\/$/, "");
-  } catch {
-    return FALLBACK_SITE_URL;
-  }
-}
 
 function createAbsoluteUrl(path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -207,7 +197,8 @@ function JsonLd() {
         description: APP_DESCRIPTION,
         applicationCategory: "EntertainmentApplication",
         operatingSystem: "Web browser",
-        browserRequirements: "Requires a modern browser with HTML5 video support.",
+        browserRequirements:
+          "Requires a modern browser with HTML5 video support.",
         inLanguage: "en-CA",
         offers: {
           "@type": "Offer",
@@ -244,6 +235,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <JsonLd />
         <ServiceWorkerRegister />
         <ThemeRuntime />
+        <DeviceLibraryRuntime />
         <InstallPromptBanner />
         <GoogleCastProvider>{children}</GoogleCastProvider>
         <Analytics />

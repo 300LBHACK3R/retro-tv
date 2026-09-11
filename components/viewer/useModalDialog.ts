@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -82,7 +77,18 @@ export function useModalDialog({
     }, 20);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      const activeDialog =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement.closest('[role="dialog"]')
+          : null;
+      if (activeDialog && activeDialog !== dialogRef.current) return;
+      if (
+        event.key === "Escape" ||
+        event.key === "BrowserBack" ||
+        event.key === "GoBack" ||
+        event.keyCode === 10009 ||
+        event.keyCode === 461
+      ) {
         event.preventDefault();
         onCloseRef.current();
         return;

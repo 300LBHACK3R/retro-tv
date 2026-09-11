@@ -21,3 +21,6 @@
 @import "./styles/themes/ttv-neon-crt.css";
 
 @import "./styles/premium-viewer.css";
+
+@import "./styles/themes/refinements.css";
+@import "./styles/viewer/discovery.css";

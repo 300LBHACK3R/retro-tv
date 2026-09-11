@@ -20,7 +20,10 @@ function getRateStore(): Map<string, RateBucket> {
 }
 
 export function getClientAddress(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")[0]
+    ?.trim();
   return forwarded || request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
@@ -35,6 +38,12 @@ export function consumeRateLimit({
 }): { allowed: boolean; retryAfterSeconds: number } {
   const now = Date.now();
   const store = getRateStore();
+  if (store.size >= 5000) {
+    for (const [bucketKey, bucket] of store)
+      if (bucket.resetAt <= now) store.delete(bucketKey);
+    if (store.size >= 5000 && !store.has(key))
+      return { allowed: false, retryAfterSeconds: 60 };
+  }
   const current = store.get(key);
 
   if (!current || current.resetAt <= now) {
@@ -74,7 +83,6 @@ export function isSameOriginRequest(request: Request): boolean {
     return (
       process.env.NODE_ENV !== "production" ||
       fetchSite === "same-origin" ||
-      fetchSite === "same-site" ||
       fetchSite === "none"
     );
   }
@@ -82,7 +90,15 @@ export function isSameOriginRequest(request: Request): boolean {
   try {
     const requestUrl = new URL(request.url);
     const originUrl = new URL(origin);
-    return requestUrl.host === originUrl.host && requestUrl.protocol === originUrl.protocol;
+    // NextRequest normalizes loopback URLs to localhost. The HTTP Host
+    // preserves the actual authority used by the browser (including its port).
+    // Do not trust client-supplied X-Forwarded-Host overrides here.
+    const requestHost =
+      request.headers.get("host")?.toLowerCase() || requestUrl.host;
+    return (
+      requestHost === originUrl.host &&
+      requestUrl.protocol === originUrl.protocol
+    );
   } catch {
     return false;
   }

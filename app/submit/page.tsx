@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/metadata";
 import Image from "next/image";
 import Link from "next/link";
 import ThemeButton from "@/components/ThemeButton";
 
 import SubmitClipForm from "./SubmitClipForm";
 
-export const metadata: Metadata = {
-  title: "Submit a FailZone Clip | Tate's TV",
-  description:
-    "Submit your own funny fail, blooper, wipeout, or harmless chaos clip to Tate's TV for possible FailZone feature consideration.",
-};
+export const metadata = pageMetadata(
+  "Submit a clip",
+  "Share your original Fail Zone clip or creator submission with Tate’s TV.",
+  "/submit",
+  true,
+);
 
 const prohibitedItems = [
   "Clips you do not own or cannot legally submit",
@@ -44,7 +45,10 @@ export default function SubmitClipPage() {
           />
         </Link>
 
-        <nav className="ttv-submit-nav__actions" aria-label="Submission page navigation">
+        <nav
+          className="ttv-submit-nav__actions"
+          aria-label="Submission page navigation"
+        >
           <ThemeButton />
           <Link href="/library">Library</Link>
           <Link href="/">Live TV</Link>
@@ -57,8 +61,8 @@ export default function SubmitClipPage() {
           <h1>Submit Your Clip to FailZone</h1>
           <p>
             Got a funny fail, unexpected blooper, pet moment, sports wipeout,
-            work fail, or harmless chaos caught on camera? Send it to Tate&apos;s
-            TV for a chance to be featured on FailZone.
+            work fail, or harmless chaos caught on camera? Send it to
+            Tate&apos;s TV for a chance to be featured on FailZone.
           </p>
           <div className="ttv-submit-hero-actions">
             <a href="#submit-clip">Start Submission</a>
@@ -67,7 +71,10 @@ export default function SubmitClipPage() {
           </div>
         </div>
 
-        <div className="ttv-submit-hero-card" aria-label="FailZone clip review process">
+        <div
+          className="ttv-submit-hero-card"
+          aria-label="FailZone clip review process"
+        >
           <span>Clip Review</span>
           <strong>Owned clips only.</strong>
           <p>
@@ -78,7 +85,10 @@ export default function SubmitClipPage() {
         </div>
       </section>
 
-      <section className="ttv-submit-grid" aria-label="Submission rules and process">
+      <section
+        className="ttv-submit-grid"
+        aria-label="Submission rules and process"
+      >
         <article>
           <span>01</span>
           <h2>What to submit</h2>
@@ -115,8 +125,8 @@ export default function SubmitClipPage() {
           <p className="ttv-submit-kicker">Content rules</p>
           <h2>Do not submit these clips</h2>
           <p>
-            These rules protect Tate&apos;s TV, FailZone, submitters, viewers, and
-            future app-store release plans.
+            These rules protect Tate&apos;s TV, FailZone, submitters, viewers,
+            and future app-store release plans.
           </p>
         </div>
 
@@ -145,9 +155,9 @@ export default function SubmitClipPage() {
           <p className="ttv-submit-kicker">Official submission form</p>
           <h2>Send your FailZone clip for review</h2>
           <p>
-            Upload the video directly to Tate&apos;s TV or use a shareable cloud link.
-            You will see live upload progress and receive a reference code when the
-            clip has entered the protected moderation queue.
+            Upload the video directly to Tate&apos;s TV or use a shareable cloud
+            link. You will see live upload progress and receive a reference code
+            when the clip has entered the protected moderation queue.
           </p>
         </div>
 

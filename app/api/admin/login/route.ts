@@ -1,3 +1,9 @@
+import {
+  consumeRateLimit,
+  getClientAddress,
+  isSameOriginRequest,
+} from "@/lib/server/requestSecurity";
+import { readBoundedJson } from "@/lib/server/http";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
@@ -46,13 +52,9 @@ async function readLoginBody(
   }
 
   try {
-    const body = (await request.json()) as unknown;
+    const body = await readBoundedJson(request, 2048);
 
-    if (
-      body === null ||
-      typeof body !== "object" ||
-      Array.isArray(body)
-    ) {
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
       return null;
     }
 
@@ -71,6 +73,24 @@ function getPasswordFromBody(body: LoginRequestBody | null): string {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request))
+    return jsonResponse(
+      { ok: false, error: "Request not allowed." },
+      { status: 403 },
+    );
+  const limit = consumeRateLimit({
+    key: `admin-login:${getClientAddress(request)}`,
+    limit: 8,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!limit.allowed)
+    return jsonResponse(
+      { ok: false, error: "Too many attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      },
+    );
   const adminPassword = getAdminPassword();
 
   if (!adminPassword) {
@@ -87,10 +107,7 @@ export async function POST(request: Request) {
   const body = await readLoginBody(request);
   const password = getPasswordFromBody(body);
 
-  if (
-    password.length === 0 ||
-    password.length > MAX_PASSWORD_LENGTH
-  ) {
+  if (password.length === 0 || password.length > MAX_PASSWORD_LENGTH) {
     return jsonResponse(
       {
         ok: false,

@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 export default function OpenAdminWindowButton() {
+  const router = useRouter();
   const openAdminWindow = () => {
     const adminWindow = window.open(
       "/admin",
@@ -9,7 +12,7 @@ export default function OpenAdminWindowButton() {
     );
 
     if (!adminWindow) {
-      window.location.assign("/admin");
+      router.push("/admin");
       return;
     }
 

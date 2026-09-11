@@ -1,355 +1,85 @@
-# Tate’s TV / Retro TV
+# Tate’s TV
 
-A browser-based retro cable TV simulation built with **Next.js App Router**, **TypeScript**, and **Tailwind CSS**.
+A Canadian streaming station with a nostalgic live guide, scheduled channels and an on-demand library. Next.js App Router, React, TypeScript and Zustand run the viewer; Supabase stores station programming and Cloudflare R2 serves media. GitHub and Vercel remain the production deployment path.
 
-The project is designed to feel like an old-school live cable television experience, with scheduled channels, themed guides, live playback, commercial breaks, admin tools, and Cloudflare R2-hosted media.
+## Develop
 
-The long-term goal is to launch the web version first, then package the experience into installable app formats such as a PWA, desktop app, Android app, and eventually iOS app.
+Use Node.js 22 LTS. From the project folder:
 
----
-
-## Project Vision
-
-Tate’s TV / Retro TV is a custom retro cable simulator where viewers can open the site and watch live-style channels that are always running on a synchronized broadcast clock.
-
-Instead of clicking individual videos like a normal media library, users experience channels as if they are watching real cable television.
-
-Core goals:
-
-* Live channel playback
-* Retro TV guide experience
-* Scheduled shows, movies, cartoons, and commercials
-* 30-minute and 60-minute broadcast block support
-* Commercial filler engine
-* Hidden admin tools
-* Premium themes
-* Mobile-friendly viewing
-* Future app packaging
-
----
-
-## Current Architecture
-
-```txt
-Vercel / GitHub
-- Next.js application code
-- UI components
-- Player, guide, schedule, admin, and theme logic
-- API routes
-- No production video files stored in the repo
-
-Cloudflare R2
-- MP4 shows
-- MP4 movies
-- MP4 commercials
-- Bumpers/promos
-- Future thumbnails/trailers
-
-Supabase
-- Global programming state
-- Channel data
-- Media metadata
-- Theme/state information
-- Schedule/admin configuration
-
-Browser / Client
-- Live playback
-- Channel switching
-- Guide rendering
-- Admin quick edits
-- Theme selection
-- Local UI preferences
-```
-
----
-
-## Tech Stack
-
-* **Next.js App Router**
-* **React**
-* **TypeScript**
-* **Tailwind CSS**
-* **Zustand**
-* **Supabase**
-* **Cloudflare R2**
-* **Vercel**
-* **GitHub**
-
----
-
-## Core Features
-
-### Viewer Experience
-
-* Retro-style live TV layout
-* Channel-based playback
-* Synchronized broadcast schedule
-* Now/Next display
-* Multi-channel guide
-* Custom remote control
-* Retro visual themes
-* Fullscreen/theater-style viewing
-* Future mini-player mode
-* Mobile-friendly layout
-
-### Admin Experience
-
-* Password-protected admin access
-* Add media by URL
-* Edit loaded shows without deleting/re-uploading
-* Move media between channels
-* Edit title, runtime, type, breakpoints, ad durations, and air days
-* Set channel branding
-* Configure channel schedule mode
-* Sync global programming state
-
-### Broadcast Engine
-
-* Ordered channel playback
-* Daily random channel playback
-* Air-day filtering
-* Manual breakpoints
-* Commercial slot filler support
-* 30-minute and 60-minute block planning
-* Hidden commercials in guide display
-* Real playback schedule separate from clean viewer guide schedule
-
----
-
-## Media Standards
-
-For best cross-browser playback, production media should use:
-
-```txt
-Container: MP4
-Video: H.264 / AVC
-Audio: AAC
-Fast Start: Enabled
-Resolution: 720p or 1080p
-```
-
-Recommended FFmpeg conversion command:
-
-```bash
-ffmpeg -i "input.mkv" -c:v libx264 -preset medium -crf 22 -c:a aac -b:a 160k -movflags +faststart "output-browser-ready.mp4"
-```
-
-Smaller 720p streaming version:
-
-```bash
-ffmpeg -i "input.mkv" -vf "scale=-2:720" -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k -movflags +faststart "output-720p-browser-ready.mp4"
-```
-
-MKV may work in some browsers, but MP4/H.264/AAC is the safer production standard.
-
----
-
-## Commercial Slot Logic
-
-The project is moving toward a real broadcast-style ad system.
-
-Example 30-minute show block:
-
-```txt
-Show runtime: 21:56
-Slot length: 30:00
-Breakpoints: 7:30, 15:00
-Ad blocks: 2:00, 2:00
-End filler: auto-fill remaining slot time
-```
-
-Viewer guide should show:
-
-```txt
-Martin Mystery S01E01 — 30 min
-```
-
-Playback should actually run:
-
-```txt
-Show Part 1
-Commercial Block
-Show Part 2
-Commercial Block
-Show Part 3
-End Filler Commercials
-```
-
-Commercials and bumpers should be hidden from the public guide while still playing during the real playback schedule.
-
----
-
-## Environment Variables
-
-Required local environment variables should be stored in `.env.local`.
-
-```env
-ADMIN_PASSWORD=your-admin-password
-SUPABASE_URL=your-supabase-url
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
-
-Production values should be configured in Vercel Environment Variables.
-
-Important:
-
-* Never expose `SUPABASE_SERVICE_ROLE_KEY` to the frontend.
-* Never commit `.env.local`.
-* Admin-only actions should stay protected by server-side API routes.
-* Public routes should only expose safe schedule/viewer data.
-
----
-
-## Development
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run local dev server:
-
-```bash
+```powershell
+npm ci
 npm run dev
 ```
 
-Typecheck:
+Keep the existing environment configuration private in `.env.local`. Required server values are `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD` and a separate random `ADMIN_SESSION_SECRET` (at least 32 characters recommended). Set `NEXT_PUBLIC_SITE_URL=https://www.tatestv.ca` for the production canonical address. Upload configuration is documented in [uploads and submissions setup](docs/PREMIUM_UPLOADS_AND_SUBMISSIONS_SETUP.md).
 
-```bash
+Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A source checkout without environment values still builds; cloud programming and protected services require the configured environment.
+
+## Viewer features
+
+- Live playback with bounded connection retries, offline recovery, autoplay prompts and programme reporting.
+- A 72-hour desktop guide and 24-hour mobile guide, using the same schedule as the player. Search channels, filter favourites, choose row density, or navigate with directional keys. Future listings tune the channel’s **current** broadcast.
+- “Tonight on Tate’s TV” and “On now” selections from actual station schedules.
+- Favourite channels, a programme watchlist and on-demand resume saved on the current browser. They are separate from cloud programming updates. Storage being blocked must not prevent playback.
+- Nine themes, all unlocked. Electric Blue Live adds slow ambient lighting, a moving broadcast highlight and a live beacon. System/app reduced-motion preferences suppress effects, and hidden tabs pause them. Accounts, payments and theme entitlements are deferred.
+- Poster artwork with a title-based fallback when artwork is absent or cannot load.
+
+## Schedule recurring blocks
+
+Open **Admin → Blocks**, select a channel, title, weekdays, local start time, duration and programmes. Presets provide starting points for cartoons, movie nights and late-night programming. Save the station to the cloud using the existing admin control.
+
+Programmes play in the chosen order, repeat if the window is longer, and may be clipped at the window boundary. Durations are elapsed minutes. Blocks cannot overlap or be configured past local midnight. Imported invalid overlaps are ignored. Unconfigured channels retain their existing broadcast clock and commercials. The shared guide/player clock supports 23-hour and 25-hour local days.
+
+Schedules currently use each viewer’s local timezone, matching the existing station scheduler. They are not a single Calgary-time broadcast feed worldwide.
+
+## Station insights setup
+
+Apply [the station insights migration](supabase/migrations/20260911_station_insights.sql) once in the existing Supabase project’s SQL editor. It creates a separate, private playback table and three service-role-only functions. It does not modify programming or submissions. Reapplying it is safe.
+
+Set `ADMIN_SESSION_SECRET` in Vercel if it is not already configured. **Admin → Insights** shows seven-day watch time, returning-device estimates, starts, buffering, errors, reports and content issues. Records older than 30 days are pruned during collection and report refresh. DNT/GPC clients are excluded; casting sessions are excluded. Counts represent participating browser installations, not unique people, and should not be used for billing.
+
+Media link checks only probe the exact HTTPS origins configured in `R2_MEDIA_PUBLIC_BASE_URL` or `R2_PUBLIC_BASE_URL`; they do not follow redirects. Other media URLs remain playable but are marked unverified by the checker. A successful HEAD response is not proof of codec/device playback.
+
+Missing metrics configuration disables collection without interrupting viewing. No migration is executed by a build, viewer request or release helper.
+
+## Source map
+
+| Location                                                          | Responsibility                                                   |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `components/viewer/`                                              | Viewer controls, discovery, saved items, recovery and navigation |
+| `components/MultiGuide.tsx`                                       | Responsive guide presentation and visible timeline rendering     |
+| `lib/guideTimeline.ts`                                            | Guide projection from broadcast schedules                        |
+| `lib/liveEngine.ts`, `lib/scheduler.ts`, `lib/programmeBlocks.ts` | Shared clock, commercials and recurring windows                  |
+| `lib/themes.ts`, `app/styles/themes/`                             | Theme tokens and visual effects                                  |
+| `lib/deviceLibrary.ts`, `lib/libraryCatalog.ts`                   | Device saves, grouping and validated resume records              |
+| `app/api/`, `lib/server/`                                         | Authentication, input limits, storage access and metrics         |
+| `supabase/migrations/`                                            | Reviewed database migrations                                     |
+| `tests/`                                                          | Unit, production HTTP and browser regression checks              |
+| `scripts/dev.mjs`                                                 | Required portable Next.js development launcher                   |
+
+Obsolete release notes, an old programming backup, the unused PowerShell smoke script, unused Next.js starter artwork and a duplicate manifest have been removed. Git history retains them. Public icons, channel logos, recovery routes, upload tooling and the development launcher remain in use.
+
+## Quality gates
+
+```powershell
 npm run typecheck
-```
-
-Build:
-
-```bash
+npm run lint
+npm run test:unit
+npm run audit:prod
 npm run build
+npm run test:http
+npx playwright install chromium firefox webkit
+npm run test:browser
 ```
 
-Push changes:
+`Viewer quality` runs these gates in GitHub for pull requests, master and the release branches. Its seven browser profiles cover desktop Chromium, Firefox and WebKit, Android/iPhone/tablet emulation and a 1920×1080 TV viewport. Browser fixtures do not access production programming, analytics or Cast devices.
 
-```bash
-git status
-git add .
-git commit -m "Describe the change"
-git push origin master
-```
+Automated browser profiles do not certify physical TVs or every historical browser. Before production promotion, verify real iPhone/Safari, Android/Chrome, supported desktop browsers and the target TV/remote: video start, channel changes, extended playback, offline/reconnect, scrolling, focus, fullscreen, AirPlay/Cast and reduced motion. Use the station’s real media encodings as well as the synthetic test clip.
 
----
+## Security and SEO
 
-## Production Checklist
+Public pages have route-specific canonical, Open Graph and Twitter metadata. The sitemap contains public discovery pages; admin and recovery tools are marked noindex. API responses and private tools use no-store rules, and the service worker excludes APIs, live HTML, media and private pages.
 
-Before public launch:
+Authenticated mutations require same-origin requests, sensitive bodies are size-bounded, login attempts are throttled and metrics have signed HttpOnly browser identifiers plus database-side collection limits. The in-memory login limiter is per process; configure a shared Vercel Firewall limit for distributed abuse protection. The CSP retains the existing inline hydration allowance and HTTPS media access for station-configured sources. This is not a claim of a full security audit.
 
-* [ ] No TypeScript errors
-* [ ] No build errors
-* [ ] No `.backup.ts` or `.backup.tsx` files inside the project
-* [ ] No secrets committed to Git
-* [ ] Admin access hidden from normal viewer UI
-* [ ] Viewer layout polished on desktop
-* [ ] Viewer layout polished on mobile
-* [ ] Player works on Chrome
-* [ ] Player works on Firefox
-* [ ] Player works on mobile browsers
-* [ ] Channel switching does not black-screen
-* [ ] Commercials play correctly
-* [ ] Commercials are hidden from guide/Now Next
-* [ ] Global sync works
-* [ ] SEO metadata is complete
-* [ ] Manifest/icons are complete
-* [ ] Security headers are configured
-* [ ] R2 media URLs are stable
-* [ ] Supabase state is stable
-
----
-
-## Launch Roadmap
-
-### Phase 1 — Stable Website
-
-* Finalize viewer layout
-* Finalize player reliability
-* Finalize hidden admin access
-* Finalize quick edit tools
-* Finalize commercial slot filler logic
-* Finalize guide display
-* Add real channel content
-* Test on desktop and mobile
-
-### Phase 2 — PWA
-
-* Add install support
-* Add proper manifest
-* Add icons and splash visuals
-* Add offline fallback
-* Add polished mobile app-like layout
-
-### Phase 3 — Desktop App
-
-* Package with Electron or similar wrapper
-* Add fullscreen/kiosk-style viewing
-* Add desktop installer
-* Test Windows first
-
-### Phase 4 — Android App
-
-* Package as a Trusted Web Activity or native shell
-* Add Play Store assets
-* Add privacy policy
-* Submit to Google Play
-
-### Phase 5 — iOS App
-
-* Package with Capacitor or native shell
-* Add iOS-safe UI polish
-* Add Apple App Store assets
-* Submit after web/PWA version is stable
-
----
-
-## Branding Direction
-
-The public-facing brand should feel:
-
-* Retro
-* Premium
-* Nostalgic
-* Cable-TV inspired
-* Smooth and modern enough for launch
-
-Avoid directly copying real network names, logos, or copyrighted branding. Themes and channels should be original while still capturing the general feeling of old-school cable TV.
-
-Potential premium theme concepts:
-
-* Neon Arcade 2005
-* Saturday Morning Max
-* Obsidian Gold
-* Original Console
-* Classic Cable
-
----
-
-## Long-Term Ideas
-
-* Bulk R2 importer
-* Media health checker
-* Duplicate detector
-* Channel packs
-* Premium themes
-* Watch-party links
-* Mini-player
-* Theater mode
-* User profiles
-* Viewer favourites
-* Public channel schedule page
-* App-store versions
-* Optional paid theme/channel marketplace
-
----
-
-## Project Rule
-
-The website must be stable before app wrapping.
-
-If playback, scheduling, mobile layout, or admin editing is broken on the website, the app version will only package those same problems. The web version is the source of truth.
+See [launch checklist](docs/LAUNCH_CHECKLIST.md) and [privacy page](app/privacy/page.tsx).

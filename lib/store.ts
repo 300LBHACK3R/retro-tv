@@ -1,3 +1,4 @@
+import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_THEME_ID, isThemeId, THEME_STORAGE_KEY } from "./themes";
@@ -14,6 +15,7 @@ import type {
   MediaItem,
   MediaType,
   PlayerViewMode,
+  ProgrammeBlock,
   ScheduleMode,
   ThemeId,
   ViewerSettings,
@@ -50,6 +52,7 @@ interface AppState {
   updateChannelSettings: (
     channelId: string,
     patch: Partial<{
+      programmeBlocks: ProgrammeBlock[];
       scheduleMode: ScheduleMode;
       commercialBreakMode: CommercialBreakMode;
       randomSeed: string;
@@ -84,7 +87,10 @@ interface AppState {
   toggleGuide: () => void;
   closeGuide: () => void;
   resetProgramming: () => void;
-  replaceProgramming: (snapshot: ProgrammingSnapshot, options?: { preserveViewer?: boolean }) => void;
+  replaceProgramming: (
+    snapshot: ProgrammingSnapshot,
+    options?: { preserveViewer?: boolean },
+  ) => void;
   exportProgrammingSnapshot: () => ProgrammingSnapshot;
 }
 
@@ -128,10 +134,7 @@ const VALID_MEDIA_TYPES: MediaType[] = [
   "bumper",
 ];
 
-const DEFAULT_AD_PLACEMENTS: AdPlacement[] = [
-  "between-programs",
-  "filler",
-];
+const DEFAULT_AD_PLACEMENTS: AdPlacement[] = ["between-programs", "filler"];
 
 const VALID_AD_PLACEMENTS: AdPlacement[] = [
   "pre-roll",
@@ -647,10 +650,7 @@ function isCommercialMediaType(type: MediaType): boolean {
   return type === "commercial" || type === "bumper";
 }
 
-function normalizePositiveInteger(
-  value: unknown,
-  fallback = 0,
-): number {
+function normalizePositiveInteger(value: unknown, fallback = 0): number {
   const numeric = Math.floor(Number(value));
 
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
@@ -667,9 +667,7 @@ function normalizeBreakpoints(value: unknown, duration: number): number[] {
         .map((point) => Math.floor(Number(point)))
         .filter(
           (point) =>
-            Number.isFinite(point) &&
-            point > 0 &&
-            point < safeDuration,
+            Number.isFinite(point) && point > 0 && point < safeDuration,
         ),
     ),
   ).sort((a, b) => a - b);
@@ -815,9 +813,7 @@ function normalizeAdChannelTargets(value: unknown): AdChannelTarget[] {
   if (!Array.isArray(value)) return [];
 
   return dedupeStrings(
-    value
-      .map((item) => normalizeText(item, ""))
-      .filter(Boolean),
+    value.map((item) => normalizeText(item, "")).filter(Boolean),
   ) as AdChannelTarget[];
 }
 
@@ -846,9 +842,15 @@ function normalizeAdPolicy(value: unknown): ChannelAdPolicy | undefined {
     ...createDefaultAdPolicy(),
     ...policy,
     placements: normalizeAdPlacements(policy.placements),
-    strategy: isCommercialStrategy(policy.strategy) ? policy.strategy : "best-fit",
+    strategy: isCommercialStrategy(policy.strategy)
+      ? policy.strategy
+      : "best-fit",
     maxAdsPerBreak: clamp(Number(policy.maxAdsPerBreak ?? 1), 1, 10),
-    targetBreakSeconds: clamp(Number(policy.targetBreakSeconds ?? 120), 15, 1800),
+    targetBreakSeconds: clamp(
+      Number(policy.targetBreakSeconds ?? 120),
+      15,
+      1800,
+    ),
     minSecondsBetweenSameAd: clamp(
       Number(policy.minSecondsBetweenSameAd ?? 900),
       0,
@@ -889,7 +891,9 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
   const breakDurations = isProgramMediaType(type)
     ? normalizeDurationList(item.breakDurations, breakpoints.length)
     : [];
-  const commercialCategory = normalizeCommercialCategory(item.commercialCategory);
+  const commercialCategory = normalizeCommercialCategory(
+    item.commercialCategory,
+  );
 
   return {
     ...item,
@@ -967,7 +971,9 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
 }
 
 function addAdTargetToMediaItem(item: MediaItem, channelId: string): MediaItem {
-  const commercialCategory = normalizeCommercialCategory(item.commercialCategory);
+  const commercialCategory = normalizeCommercialCategory(
+    item.commercialCategory,
+  );
 
   return normalizeMediaItem({
     ...item,
@@ -1016,10 +1022,7 @@ function extractAdsFromChannelLineups(
       }
 
       const previousTargets = targetsByMediaId.get(mediaId) ?? [];
-      targetsByMediaId.set(mediaId, [
-        ...previousTargets,
-        String(channel.id),
-      ]);
+      targetsByMediaId.set(mediaId, [...previousTargets, String(channel.id)]);
     }
 
     return ensureChannelAdPolicy({
@@ -1035,7 +1038,10 @@ function extractAdsFromChannelLineups(
 
     const extractedTargets = targetsByMediaId.get(item.id) ?? [];
     const existingTargets = normalizeAdChannelTargets(item.adChannelIds);
-    const nextTargets = dedupeStrings([...existingTargets, ...extractedTargets]);
+    const nextTargets = dedupeStrings([
+      ...existingTargets,
+      ...extractedTargets,
+    ]);
 
     return normalizeMediaItem({
       ...item,
@@ -1175,7 +1181,10 @@ function normalizeChannel(channel: Channel): Channel {
     ...channel,
     id: normalizeText(channel.id, String(resolvedChannelNumber || 1)),
     name: normalizeText(channel.name, fallbackChannelName),
-    mediaIds: dedupeStrings(Array.isArray(channel.mediaIds) ? channel.mediaIds : []),
+    mediaIds: dedupeStrings(
+      Array.isArray(channel.mediaIds) ? channel.mediaIds : [],
+    ),
+    programmeBlocks: sanitizeProgrammeBlocks(channel.programmeBlocks),
     number: resolvedChannelNumber,
     isEnabled: channel.isEnabled ?? true,
     scheduleMode: isValidScheduleMode(channel.scheduleMode)
@@ -1345,7 +1354,9 @@ function normalizeChannelsWithDefaults(
   channels: Channel[],
   media: MediaItem[],
 ): Channel[] {
-  const mergedChannels = mergeById(defaultChannels, channels).map(normalizeChannel);
+  const mergedChannels = mergeById(defaultChannels, channels).map(
+    normalizeChannel,
+  );
 
   return migrateLegacyPulseMusicToChannel20(mergedChannels, media).map(
     ensureChannelAdPolicy,
@@ -1467,7 +1478,8 @@ export const useStore = create<AppState>()(
       moveChannel: (channelId, direction) =>
         set((state) => {
           const orderedChannels = [...state.channels].sort((a, b) => {
-            const numberSort = getChannelSortNumber(a) - getChannelSortNumber(b);
+            const numberSort =
+              getChannelSortNumber(a) - getChannelSortNumber(b);
 
             if (numberSort !== 0) return numberSort;
 
@@ -1523,7 +1535,9 @@ export const useStore = create<AppState>()(
 
             const fallbackBranding =
               channel.branding ??
-              createDefaultChannelBranding(Number(channel.number ?? channel.id));
+              createDefaultChannelBranding(
+                Number(channel.number ?? channel.id),
+              );
 
             return {
               ...channel,
@@ -1534,9 +1548,13 @@ export const useStore = create<AppState>()(
                 description: fallbackBranding.description ?? "",
                 accentColor:
                   fallbackBranding.accentColor ?? DEFAULT_ACCENT_COLOR,
-                logoText: fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
+                logoText:
+                  fallbackBranding.logoText ?? channel.name ?? "CHANNEL",
                 ...brandingPatch,
-                logoUrl: Object.prototype.hasOwnProperty.call(brandingPatch, "logoUrl")
+                logoUrl: Object.prototype.hasOwnProperty.call(
+                  brandingPatch,
+                  "logoUrl",
+                )
                   ? normalizeBrandingUrl(brandingPatch.logoUrl)
                   : normalizeBrandingUrl(fallbackBranding.logoUrl),
               },
@@ -1556,6 +1574,7 @@ export const useStore = create<AppState>()(
 
             return normalizeChannel({
               ...channel,
+              programmeBlocks: patch.programmeBlocks ?? channel.programmeBlocks,
               scheduleMode:
                 patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
                   ? patch.scheduleMode
@@ -1793,7 +1812,9 @@ export const useStore = create<AppState>()(
             media: normalized.media,
             channels: normalized.channels,
             currentChannelId: getSafeCurrentChannelId(
-              options?.preserveViewer ? state.currentChannelId : snapshot.currentChannelId,
+              options?.preserveViewer
+                ? state.currentChannelId
+                : snapshot.currentChannelId,
               normalized.channels,
             ),
             sidebarWidth: clamp(
@@ -1808,10 +1829,16 @@ export const useStore = create<AppState>()(
             ),
             appMode: "viewer",
             isSettingsOpen: false,
-            themeId: options?.preserveViewer ? state.themeId : getValidThemeId(snapshot.themeId),
-            ownedPremiumThemes: getValidOwnedThemes(snapshot.ownedPremiumThemes),
+            themeId: options?.preserveViewer
+              ? state.themeId
+              : getValidThemeId(snapshot.themeId),
+            ownedPremiumThemes: getValidOwnedThemes(
+              snapshot.ownedPremiumThemes,
+            ),
             deletedMediaIds: [],
-            viewerSettings: options?.preserveViewer ? state.viewerSettings : defaultViewerSettings,
+            viewerSettings: options?.preserveViewer
+              ? state.viewerSettings
+              : defaultViewerSettings,
           };
         }),
 

@@ -124,12 +124,17 @@ function ThemeCard({
     <button
       type="button"
       className="theme-card"
+      data-theme-id={theme.id}
       aria-pressed={isActive}
       aria-label={`${isActive ? "Current theme" : isAvailable ? "Apply theme" : "Locked theme"}: ${theme.name}`}
       disabled={!isAvailable}
       onClick={() => onSelect(theme)}
     >
-      <span className="theme-card__preview" style={previewStyle} aria-hidden="true">
+      <span
+        className="theme-card__preview"
+        style={previewStyle}
+        aria-hidden="true"
+      >
         <span className="theme-card__preview-ui">
           <span />
           <span />
@@ -193,8 +198,7 @@ function ThemeCard({
 export default function ThemeButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] =
-    useState<CategoryFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [portalReady, setPortalReady] = useState(false);
 
@@ -329,8 +333,10 @@ export default function ThemeButton() {
         const visibleMoreTrigger = Array.from(
           document.querySelectorAll<HTMLElement>("[data-viewer-more-trigger]"),
         ).find((element) => element.offsetParent !== null);
-        const canRestoreFocus = previouslyFocused?.isConnected &&
-          previouslyFocused !== document.body && previouslyFocused.offsetParent !== null;
+        const canRestoreFocus =
+          previouslyFocused?.isConnected &&
+          previouslyFocused !== document.body &&
+          previouslyFocused.offsetParent !== null;
         const focusTarget = canRestoreFocus
           ? previouslyFocused
           : canUseFallback
@@ -407,18 +413,20 @@ export default function ThemeButton() {
                 <header className="theme-dialog__header">
                   <div>
                     <div className="theme-dialog__eyebrow">Tate&apos;s TV</div>
-                    <h2 id={`${DIALOG_ID}-title`} className="theme-dialog__title">
+                    <h2
+                      id={`${DIALOG_ID}-title`}
+                      className="theme-dialog__title"
+                    >
                       Theme Library
                     </h2>
                     <p
                       id={`${DIALOG_ID}-description`}
                       className="theme-dialog__description"
                     >
-                      Every theme shares one responsive design system while
-                      keeping its own cable, cinema, console, arcade, cartoon,
-                      or Neon CRT personality.
+                      Choose your atmosphere. Your theme follows you from live
+                      TV to the library.
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
-                        ? " Premium themes are unlocked during launch."
+                        ? " All themes are free to use during launch."
                         : ""}
                     </p>
                   </div>
@@ -506,8 +514,8 @@ export default function ThemeButton() {
                     </div>
                   ) : (
                     <div className="theme-empty-state">
-                      No themes match those filters. Clear the search or choose a
-                      different category.
+                      No themes match those filters. Clear the search or choose
+                      a different category.
                     </div>
                   )}
                 </div>
