@@ -163,7 +163,11 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
 
   const scrollToLive = useCallback(() => {
     liveSectionRef.current?.scrollIntoView({
-      behavior: preferReducedMotion ? "auto" : "smooth",
+      behavior:
+        preferReducedMotion ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
       block: "start",
     });
   }, [preferReducedMotion]);

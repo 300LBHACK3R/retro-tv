@@ -149,6 +149,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [channelQuery, setChannelQuery] = useState("");
+  const channelSearchRef = useRef<HTMLInputElement | null>(null);
   const [visibleWindow, setVisibleWindow] = useState({ left: 0, width: 1600 });
   const reduceMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
@@ -448,13 +449,22 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     };
   }, []);
 
+  const clearGuideFilters = () => {
+    setChannelQuery("");
+    setFavouritesOnly(false);
+    window.requestAnimationFrame(() =>
+      channelSearchRef.current?.focus({ preventScroll: true }),
+    );
+  };
+
   const guideTools = (
     <div className="ttv-guide-tools">
       <label>
         <span className="sr-only">Find a channel in the guide</span>
         <input
+          ref={channelSearchRef}
           type="search"
-          placeholder="Find a channel…"
+          placeholder="Channel name or number…"
           value={channelQuery}
           maxLength={80}
           onChange={(event) => setChannelQuery(event.target.value)}
@@ -478,6 +488,15 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       >
         Compact rows
       </button>
+      {(channelQuery || favouritesOnly) && (
+        <button
+          type="button"
+          className="ttv-section-action"
+          onClick={clearGuideFilters}
+        >
+          Show all channels
+        </button>
+      )}
       <span>
         {sortedRows.length} {sortedRows.length === 1 ? "channel" : "channels"} ·
         Local time
@@ -493,9 +512,10 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     return (
       <div className="ttv-guide-workspace">
         {guideTools}
-        <p className="ttv-discovery-empty" role="status">
-          No channels match. Clear the search or switch off the favourites
-          filter.
+        <p className="ttv-guide-empty" role="status">
+          {favouritesOnly && !favourites.length
+            ? "No favourites yet. Use the star beside a channel to save it here."
+            : "No channels match your search. Try another name or channel number."}
         </p>
       </div>
     );
@@ -1084,6 +1104,8 @@ function GuideRow({
 
   const firstCell = cells[0];
   const channelColor = isActive ? "var(--on-primary)" : "var(--text)";
+  // Keep nearby cells ready without tripling the DOM on television screens.
+  const overscan = Math.min(360, visibleWindow.width / 2);
 
   return (
     <>
@@ -1168,8 +1190,8 @@ function GuideRow({
           const rawWidth = getCellWidth(cell.startSec, cell.endSec);
           const width = Math.max(1, rawWidth - 1);
           if (
-            left + width < visibleWindow.left - visibleWindow.width ||
-            left > visibleWindow.left + visibleWindow.width * 2
+            left + width < visibleWindow.left - overscan ||
+            left > visibleWindow.left + visibleWindow.width + overscan
           )
             return null;
           const isCurrent =

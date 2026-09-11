@@ -79,6 +79,7 @@ export default function PublicLibrary() {
   const watchlist = useDeviceLibrary((state) => state.watchlist);
   const [savedOnly, setSavedOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [selectedGroupKey, setSelectedGroupKey] = useState("");
   const [selectedSeason, setSelectedSeason] = useState(1);
@@ -274,6 +275,15 @@ export default function PublicLibrary() {
     setSelectedSeason(item.season);
     setSelectedMediaId(id);
   }, [allItems]);
+
+  function showAllTitles() {
+    setQuery("");
+    setFilter("all");
+    setSavedOnly(false);
+    window.requestAnimationFrame(() =>
+      searchRef.current?.focus({ preventScroll: true }),
+    );
+  }
 
   function persistProgress(value: ProgressMap): void {
     const next = sanitizeProgress(value);
@@ -490,6 +500,8 @@ export default function PublicLibrary() {
             <label className="block">
               <span className="sr-only">Search the Tate&apos;s TV library</span>
               <input
+                ref={searchRef}
+                maxLength={160}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search titles, episodes, movies, or music..."
@@ -532,18 +544,34 @@ export default function PublicLibrary() {
           <section className="mt-6 rounded-2xl border border-dashed border-cyan-300/25 bg-white/[0.03] p-10 text-center">
             <div className="text-xl font-semibold">The library is syncing</div>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/55">
-              Playable shows, movies, and music will appear here as soon as the
-              public programming snapshot finishes loading.
+              We’re loading your shows, movies and music. You can watch live TV
+              while you wait.
             </p>
+            <Link href="/" className="ttv-section-action ttv-empty-action">
+              Watch live TV
+            </Link>
           </section>
         ) : filteredGroups.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
             <div className="text-xl font-semibold">
-              No matching library titles
+              {savedOnly && !watchlist.length
+                ? "Your watchlist is empty"
+                : "No matching library titles"}
             </div>
             <p className="mt-2 text-sm text-white/50">
-              Try a different search or content filter.
+              {savedOnly && !watchlist.length
+                ? "Find something you like and select Watchlist to save it on this device."
+                : savedOnly
+                  ? "No saved titles match these filters. Browse all titles to find something to watch."
+                  : "Try a different title, or browse everything below."}
             </p>
+            <button
+              type="button"
+              className="ttv-section-action ttv-empty-action"
+              onClick={showAllTitles}
+            >
+              Browse all titles
+            </button>
           </section>
         ) : (
           <div className="mt-6 grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
@@ -609,7 +637,7 @@ export default function PublicLibrary() {
                       </h2>
                       <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
                         {selectedItem.media.description ||
-                          "Select an item below to watch it on demand. Library playback stays separate from the live Tate's TV broadcast."}
+                          "Choose an episode or press play to watch from the beginning, whenever you like."}
                       </p>
                     </div>
 

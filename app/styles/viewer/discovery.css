@@ -512,3 +512,16 @@
 .ttv-guide-workspace[data-density="compact"] .ttv-mobile-program-list {
   gap: 0.35rem;
 }
+
+.ttv-guide-empty {
+  padding: 1.25rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.ttv-empty-action {
+  display: inline-flex;
+  margin-top: 1rem;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+}

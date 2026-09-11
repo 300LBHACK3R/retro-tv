@@ -57,7 +57,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({ contentType: "application/javascript", body: "" }),
   );
   await page.route("**/api/engagement", (route) =>
-    route.fulfill({ status: 503, json: { ok: false } }),
+    route.fulfill({ json: { ok: true } }),
   );
   await page.route("**/_vercel/**", (route) => route.fulfill({ status: 204 }));
   await page.route("**/qa-media.webm", (route) =>
@@ -104,6 +104,47 @@ test("load programming, search channels, tune, and retain an uncluttered player"
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
   });
+});
+
+test("unavailable station insights do not interrupt tuning", async ({
+  page,
+}) => {
+  // This failure is deliberate. WebKit also reports failed network loads through
+  // pageerror; assert real unhandled rejections and viewer behavior separately.
+  await page.addInitScript(() => {
+    const errors: string[] = [];
+    Object.assign(window, { telemetryRejections: errors });
+    window.addEventListener("unhandledrejection", (event) =>
+      errors.push(String(event.reason)),
+    );
+  });
+  await page.route("**/api/engagement", (route) =>
+    route.fulfill({ status: 503, json: { ok: false } }),
+  );
+  await page.goto("/?ch=24");
+  await page.locator("video").first().dispatchEvent("playing");
+  const directory = await openDirectory(page);
+  const unavailable = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/engagement") && response.status() === 503,
+  );
+  await directory
+    .getByRole("button", { name: "Tune to CH 25 Local Cinema", exact: true })
+    .click();
+  await unavailable;
+  await expect(
+    currentChannel(page).getByRole("heading", {
+      name: "Local Cinema",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { telemetryRejections?: string[] })
+          .telemetryRejections,
+    ),
+  ).toEqual([]);
 });
 
 test("guide stays readable and keyboard input stays inside the dialog", async ({
@@ -294,7 +335,7 @@ test("favourite channels and guide filtering persist without accounts", async ({
     .getByRole("button", { name: "Save Studio TV to favourites", exact: true })
     .click();
   await directory
-    .getByRole("button", { name: "Favourites", exact: true })
+    .getByRole("button", { name: "Favourites only", exact: true })
     .click();
   await expect(
     directory.getByRole("button", {
@@ -334,6 +375,14 @@ test("favourite channels and guide filtering persist without accounts", async ({
   });
   await compact.click();
   await expect(compact).toHaveAttribute("aria-pressed", "true");
+  await dialog
+    .getByRole("button", { name: "Show all channels", exact: true })
+    .click();
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
+  await expect(
+    dialog.getByText("2 channels · Local time", { exact: true }),
+  ).toBeVisible();
   await noPageOverflow(page);
 });
 
@@ -372,8 +421,18 @@ test("watchlist groups episodes, persists and opens linked titles", async ({
     })
     .click();
   await expect(
-    page.getByText("No matching library titles", { exact: true }),
+    page.getByText("Your watchlist is empty", { exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Browse all titles", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "My watchlist (0)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    page.getByRole("textbox", { name: "Search the Tate's TV library" }),
+  ).toBeFocused();
+  await expect(page.getByText("Browse Titles", { exact: true })).toBeVisible();
 });
 
 test("guide renders a bounded window after a long schedule scroll", async ({

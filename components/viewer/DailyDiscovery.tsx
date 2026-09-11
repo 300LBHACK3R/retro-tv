@@ -25,7 +25,7 @@ export default function DailyDiscovery({
   const media = useStore((state) => state.media);
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
   const [nowMs, setNowMs] = useState<number | null>(null);
-  const [view, setView] = useState<"now" | "tonight">("tonight");
+  const [view, setView] = useState<"now" | "tonight">("now");
   useEffect(() => {
     const update = () => {
       if (document.visibilityState === "visible") setNowMs(Date.now());
@@ -70,7 +70,12 @@ export default function DailyDiscovery({
           now,
         );
         const cell =
-          cells.find((candidate) => candidate.item.programmeBlock) ?? cells[0];
+          view === "now"
+            ? cells.find(
+                (candidate) => candidate.startSec <= 0 && candidate.endSec > 0,
+              )
+            : (cells.find((candidate) => candidate.item.programmeBlock) ??
+              cells[0]);
         if (!cell) return null;
         const sourceId = cell.item.parentMediaId ?? cell.item.id;
         const source = mediaById.get(sourceId) ?? cell.item;
@@ -105,12 +110,12 @@ export default function DailyDiscovery({
           <h2 id="ttv-discovery-title">
             {view === "tonight"
               ? "Tonight on Tate’s TV"
-              : "Find something good"}
+              : "On now at Tate’s TV"}
           </h2>
           <p>
             {view === "tonight"
               ? "From the live schedule · Times shown in your local time"
-              : "On now and coming up on your channels"}
+              : "Pick a programme and jump straight into live TV."}
           </p>
         </div>
         <div className="ttv-section-actions" aria-label="Discover programmes">
