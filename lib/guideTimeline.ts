@@ -12,7 +12,6 @@ export const MOBILE_GUIDE_BREAKPOINT_PX = 1024;
 export const TOUCH_GUIDE_BREAKPOINT_PX = 1366;
 export const MOBILE_USER_AGENT_PATTERN =
   /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i;
-export const MOBILE_PROGRAM_LIMIT = 14;
 export const SLOT_MINUTES = 30;
 export const SLOT_COUNT = GUIDE_HOURS * 2;
 

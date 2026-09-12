@@ -504,15 +504,6 @@
   margin-top: 1rem;
 }
 
-.ttv-guide-workspace[data-density="compact"] .ttv-mobile-program-card {
-  min-height: 58px;
-  padding-block: 0.55rem;
-  gap: 0.6rem;
-}
-.ttv-guide-workspace[data-density="compact"] .ttv-mobile-program-list {
-  gap: 0.35rem;
-}
-
 .ttv-guide-empty {
   padding: 1.25rem;
   color: var(--text-muted);

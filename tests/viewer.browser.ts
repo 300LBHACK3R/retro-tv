@@ -392,8 +392,12 @@ test("favourite channels and guide filtering persist without accounts", async ({
     name: "Compact rows",
     exact: true,
   });
-  await compact.click();
-  await expect(compact).toHaveAttribute("aria-pressed", "true");
+  if (await dialog.locator('[data-mobile="true"]').count()) {
+    await expect(compact).toHaveCount(0);
+  } else {
+    await compact.click();
+    await expect(compact).toHaveAttribute("aria-pressed", "true");
+  }
   await dialog
     .getByRole("button", { name: "Show all channels", exact: true })
     .click();
@@ -485,4 +489,206 @@ test("guide renders a bounded window after a long schedule scroll", async ({
     .toBeGreaterThan(0);
   expect(await guide.locator(".ttv-guide-cell").count()).toBeLessThan(1500);
   await noPageOverflow(page);
+});
+
+test("mobile guide compares channels, browses without tuning and restores your place", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "television");
+  if ((page.viewportSize()?.width ?? 1440) > 1024)
+    await page.setViewportSize({ width: 390, height: 844 });
+  const fixedNow = new Date("2026-09-12T05:58:25Z");
+  await page.clock.setFixedTime(fixedNow);
+  await page.goto("/?ch=24");
+  const open = page
+    .getByRole("button", { name: "Open live guide", exact: true })
+    .or(
+      page
+        .getByRole("navigation", { name: "Mobile viewer navigation" })
+        .getByRole("button", { name: "Guide", exact: true }),
+    );
+  await open.filter({ visible: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  const list = dialog.getByRole("list", { name: "Channels on now" });
+  await expect(
+    list.getByRole("button", { name: "Watch Studio TV live", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    list.getByRole("button", { name: "Watch Local Cinema live", exact: true }),
+  ).toBeEnabled();
+  const schedule = list.getByRole("button", {
+    name: "Schedule for Studio TV",
+    exact: true,
+  });
+  await schedule.scrollIntoViewIfNeeded();
+  const beforeScroll = await dialog
+    .locator(".ttv-mobile-guide-scroll")
+    .first()
+    .evaluate((element) => element.scrollTop);
+  await testInfo.attach("mobile-guide-on-now", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await schedule.click();
+  const back = dialog.getByRole("button", { name: "On now", exact: true });
+  await expect(back).toBeFocused();
+  const listings = dialog.getByRole("list", { name: "Upcoming on Studio TV" });
+  await expect(listings.locator(":scope > li")).toHaveCount(12);
+  await expect(
+    listings.getByRole("heading", { name: "Tomorrow", exact: true }),
+  ).toBeVisible();
+  await expect(listings.locator("li").first()).toHaveAttribute(
+    "data-live",
+    "true",
+  );
+  // Upcoming programmes are information, not misleading live-tuning buttons.
+  await listings.locator(".ttv-mobile-listing").nth(1).click();
+  await expect(dialog).toBeVisible();
+  await expect(
+    currentChannel(page).getByRole("heading", {
+      name: "Studio TV",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(listings.getByRole("button")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "+3 hr", exact: true }).click();
+  const start = await listings.locator("time").first().getAttribute("datetime");
+  const delta = fixedNow.getTime() + 3 * 3600_000 - Date.parse(start!);
+  expect(delta).toBeGreaterThanOrEqual(0);
+  expect(delta).toBeLessThan(60_000);
+  await dialog.getByRole("button", { name: "Now", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "Show more programmes", exact: true })
+    .click();
+  await expect(listings.locator(":scope > li")).toHaveCount(24);
+  await expect(
+    listings.getByRole("heading", { level: 4 }).nth(12),
+  ).toBeFocused();
+  await dialog
+    .getByRole("combobox", { name: "Browse channel schedule" })
+    .selectOption("25");
+  await expect(
+    dialog
+      .getByRole("list", { name: "Upcoming on Local Cinema" })
+      .locator(":scope > li"),
+  ).toHaveCount(12);
+  await testInfo.attach("mobile-guide-schedule", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await back.click();
+  await expect(schedule).toBeFocused();
+  const afterScroll = await dialog
+    .locator(".ttv-mobile-guide-scroll")
+    .first()
+    .evaluate((element) => element.scrollTop);
+  expect(Math.abs(afterScroll - beforeScroll)).toBeLessThan(4);
+  await list
+    .getByRole("button", { name: "Save Studio TV to favourites", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Favourites", exact: true }).click();
+  await schedule.click();
+  await dialog
+    .getByRole("button", {
+      name: "Remove Studio TV from favourites",
+      exact: true,
+    })
+    .click();
+  await expect(
+    dialog.getByRole("heading", { name: "On now", exact: true }),
+  ).toBeFocused();
+  await expect(dialog.getByRole("status")).toContainText("No favourites yet");
+  await dialog
+    .getByRole("button", { name: "Show all channels", exact: true })
+    .click();
+  await list
+    .getByRole("button", { name: "Watch Local Cinema live", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    currentChannel(page).getByRole("heading", {
+      name: "Local Cinema",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await noPageOverflow(page);
+});
+
+test("mobile guide fits narrow screens, landscape and larger text with reachable controls", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["chromium-desktop", "firefox-desktop", "webkit-desktop"].includes(
+      testInfo.project.name,
+    ),
+  );
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/?ch=24");
+  await page
+    .getByRole("navigation", { name: "Mobile viewer navigation" })
+    .getByRole("button", { name: "Guide", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  const search = dialog.getByRole("searchbox", {
+    name: "Find a channel in the guide",
+  });
+  await search.fill("Studio");
+  await expect(search).toBeFocused();
+  await expect(
+    dialog.getByRole("button", { name: "Watch Studio TV live", exact: true }),
+  ).toBeEnabled();
+  await noPageOverflow(page);
+  const smallTargets = await dialog.locator("button").evaluateAll((buttons) =>
+    buttons
+      .filter((button) => {
+        const rect = button.getBoundingClientRect();
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          (rect.width < 44 || rect.height < 44)
+        );
+      })
+      .map((button) => button.textContent),
+  );
+  expect(smallTargets).toEqual([]);
+  expect(
+    await search.evaluate((element) =>
+      parseFloat(getComputedStyle(element).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(16);
+  await search.fill("missing-channel-123");
+  await expect(search).toBeFocused();
+  await expect(dialog.getByRole("status")).toContainText("No channels match");
+  await search.fill("Studio");
+  await dialog
+    .getByRole("button", { name: "Schedule for Studio TV", exact: true })
+    .click();
+  await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth + 1,
+    ),
+  ).toBe(true);
+  expect(
+    await dialog
+      .locator(".ttv-mobile-schedule")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+  ).toBe(true);
+  await page.evaluate(() =>
+    document.documentElement.style.removeProperty("font-size"),
+  );
+  await page.setViewportSize({ width: 568, height: 320 });
+  const watch = dialog.getByRole("button", { name: "Watch live", exact: true });
+  await watch.scrollIntoViewIfNeeded();
+  await expect(watch).toBeInViewport();
+  await expect(
+    dialog.getByRole("button", { name: "Close live guide" }),
+  ).toBeInViewport();
+  await noPageOverflow(page);
+  await testInfo.attach("mobile-guide-landscape", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await watch.click();
+  await expect(dialog).toHaveCount(0);
 });

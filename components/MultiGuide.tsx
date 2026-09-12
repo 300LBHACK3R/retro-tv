@@ -8,21 +8,18 @@ import {
   useState,
   type UIEvent,
 } from "react";
-import Image from "next/image";
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
-import SaveButton from "@/components/viewer/SaveButton";
+import MobileGuide from "@/components/viewer/MobileGuide";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { useStore } from "@/lib/store";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
 import {
   GUIDE_HOURS,
-  MOBILE_GUIDE_HOURS,
   MOBILE_GUIDE_MEDIA_QUERY,
   MOBILE_GUIDE_BREAKPOINT_PX,
   TOUCH_GUIDE_BREAKPOINT_PX,
   MOBILE_USER_AGENT_PATTERN,
-  MOBILE_PROGRAM_LIMIT,
   SLOT_COUNT,
   CHANNEL_COLUMN_WIDTH,
   SLOT_WIDTH,
@@ -170,7 +167,6 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   );
   const [mobileSelectedChannelId, setMobileSelectedChannelId] =
     useState(currentChannelId);
-  const [mobileOffsetSec, setMobileOffsetSec] = useState(0);
 
   useEffect(() => {
     if (!mounted || isMobileGuide) return;
@@ -261,57 +257,71 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     setActiveMarkerIndex(0);
   }, [windowStartMs]);
 
+  const allRows = useMemo(() => sortRows(data), [data]);
   const sortedRows = useMemo(
     () =>
-      sortRows(data).filter(
+      allRows.filter(
         (row) =>
           (!favouritesOnly || favourites.includes(row.channel.id)) &&
           `${getChannelLabel(row.channel)} ${getChannelName(row.channel)} ${getChannelCallsign(row.channel)}`
             .toLowerCase()
             .includes(channelQuery.trim().toLowerCase()),
       ),
-    [data, favourites, favouritesOnly, channelQuery],
+    [allRows, favourites, favouritesOnly, channelQuery],
   );
 
   useEffect(() => {
-    if (sortedRows.some((row) => row.channel.id === currentChannelId)) {
-      setMobileSelectedChannelId(currentChannelId);
-      return;
-    }
-
-    const firstChannelId = sortedRows[0]?.channel.id;
-
-    if (firstChannelId) {
-      setMobileSelectedChannelId(firstChannelId);
-    }
+    setMobileSelectedChannelId((selected) =>
+      sortedRows.some((row) => row.channel.id === selected)
+        ? selected
+        : (sortedRows.find((row) => row.channel.id === currentChannelId)
+            ?.channel.id ??
+          sortedRows[0]?.channel.id ??
+          currentChannelId),
+    );
   }, [currentChannelId, sortedRows]);
 
-  const [preparedRows, setPreparedRows] = useState<PreparedGuideRow[]>([]);
-  const [preparedCount, setPreparedCount] = useState(0);
+  const [allPreparedRows, setAllPreparedRows] = useState<PreparedGuideRow[]>(
+    [],
+  );
+  // Filtering and starring channels reuse prepared schedules instead of
+  // blanking every row and rebuilding a day of listings on each keystroke.
+  const preparedById = useMemo(
+    () => new Map(allPreparedRows.map((row) => [row.channel.id, row])),
+    [allPreparedRows],
+  );
+  const preparedRows = sortedRows.map(
+    (row) =>
+      preparedById.get(row.channel.id) ?? {
+        ...row,
+        cells: [],
+        isPrepared: false,
+      },
+  );
+  const preparedCount = preparedRows.filter((row) => row.isPrepared).length;
 
   useEffect(() => {
     let cancelled = false;
     let cancelScheduledWork = () => {};
 
-    const placeholders: PreparedGuideRow[] = sortedRows.map((row) => ({
+    const placeholders: PreparedGuideRow[] = allRows.map((row) => ({
       ...row,
       cells: [],
       isPrepared: false,
     }));
 
-    setPreparedRows(placeholders);
-    setPreparedCount(0);
+    setAllPreparedRows(placeholders);
 
-    if (sortedRows.length === 0) {
+    if (allRows.length === 0) {
       return () => {
         cancelled = true;
       };
     }
 
-    const activeRowIndex = sortedRows.findIndex(
+    const activeRowIndex = allRows.findIndex(
       (row) => row.channel.id === currentChannelId,
     );
-    const queue = sortedRows.map((_, index) => index);
+    const queue = allRows.map((_, index) => index);
 
     if (activeRowIndex > 0) {
       queue.splice(activeRowIndex, 1);
@@ -331,7 +341,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
 
       while (queueIndex < batchEnd) {
         const rowIndex = queue[queueIndex];
-        const row = rowIndex === undefined ? undefined : sortedRows[rowIndex];
+        const row = rowIndex === undefined ? undefined : allRows[rowIndex];
         queueIndex += 1;
 
         if (!row) continue;
@@ -349,10 +359,9 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       }
 
       if (updates.size > 0) {
-        setPreparedRows((current) =>
+        setAllPreparedRows((current) =>
           current.map((row) => updates.get(row.channel.id) ?? row),
         );
-        setPreparedCount(queueIndex);
       }
 
       if (queueIndex < queue.length && !cancelled) {
@@ -370,7 +379,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     currentChannelId,
     currentDayReference,
     guideWindowSeconds,
-    sortedRows,
+    allRows,
     windowStart,
   ]);
 
@@ -464,6 +473,11 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
         <input
           ref={channelSearchRef}
           type="search"
+          autoComplete="off"
+          enterKeyHint="search"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
           placeholder="Channel name or number…"
           value={channelQuery}
           maxLength={80}
@@ -478,16 +492,18 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       >
         Favourites
       </button>
-      <button
-        type="button"
-        className="ttv-section-action"
-        aria-pressed={guideDensity === "compact"}
-        onClick={() =>
-          setDensity(guideDensity === "compact" ? "comfortable" : "compact")
-        }
-      >
-        Compact rows
-      </button>
+      {!isMobileGuide && (
+        <button
+          type="button"
+          className="ttv-section-action"
+          aria-pressed={guideDensity === "compact"}
+          onClick={() =>
+            setDensity(guideDensity === "compact" ? "comfortable" : "compact")
+          }
+        >
+          Compact rows
+        </button>
+      )}
       {(channelQuery || favouritesOnly) && (
         <button
           type="button"
@@ -508,14 +524,17 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     return null;
   }
 
-  if (!sortedRows.length)
+  const emptyMessage =
+    favouritesOnly && !favourites.length
+      ? "No favourites yet. Use the star beside a channel to save it here."
+      : "No channels match your search. Try another name or channel number.";
+
+  if (!sortedRows.length && !isMobileGuide)
     return (
       <div className="ttv-guide-workspace">
         {guideTools}
         <p className="ttv-guide-empty" role="status">
-          {favouritesOnly && !favourites.length
-            ? "No favourites yet. Use the star beside a channel to save it here."
-            : "No channels match your search. Try another name or channel number."}
+          {emptyMessage}
         </p>
       </div>
     );
@@ -537,19 +556,15 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       preparedRows[0];
 
     return (
-      <div className="ttv-guide-workspace" data-density={guideDensity}>
-        {guideTools}
-        <MobileGuideView
+      <div className="ttv-guide-workspace" data-mobile="true">
+        <MobileGuide
           rows={preparedRows}
           selectedRow={selectedRow}
           currentChannelId={currentChannelId}
-          preparedCount={preparedCount}
-          totalCount={sortedRows.length}
-          now={now}
+          tools={guideTools}
+          emptyMessage={emptyMessage}
           nowOffsetSec={secondsSinceWindowStart}
-          selectedOffsetSec={mobileOffsetSec}
           windowStartMs={windowStartMs}
-          onOffsetChange={setMobileOffsetSec}
           onChannelBrowse={setMobileSelectedChannelId}
           onTune={({ channel, item }) => {
             setChannel(channel.id);
@@ -764,303 +779,6 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
             })
           )}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function getMobileProgramTime(
-  cell: GuideCell,
-  windowStartMs: number,
-  nowOffsetSec: number,
-): string {
-  if (cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec) {
-    return "LIVE NOW";
-  }
-
-  return formatTime(new Date(windowStartMs + cell.startSec * 1000));
-}
-
-function getChannelLogoUrl(channel: Channel): string | undefined {
-  const value = channel.branding?.logoUrl?.trim();
-  return value || undefined;
-}
-
-function MobileGuideView({
-  rows,
-  selectedRow,
-  currentChannelId,
-  preparedCount,
-  totalCount,
-  now,
-  nowOffsetSec,
-  selectedOffsetSec,
-  windowStartMs,
-  onOffsetChange,
-  onChannelBrowse,
-  onTune,
-}: {
-  rows: PreparedGuideRow[];
-  selectedRow: PreparedGuideRow | undefined;
-  currentChannelId: string;
-  preparedCount: number;
-  totalCount: number;
-  now: Date;
-  nowOffsetSec: number;
-  selectedOffsetSec: number;
-  windowStartMs: number;
-  onOffsetChange: (offsetSec: number) => void;
-  onChannelBrowse: (channelId: string) => void;
-  onTune: (payload: { channel: Channel; item: BroadcastItem }) => void;
-}) {
-  if (!selectedRow) {
-    return (
-      <section className="ttv-mobile-guide" aria-label="Mobile live TV guide">
-        <EmptyGuideState />
-      </section>
-    );
-  }
-
-  const selectedIndex = Math.max(
-    0,
-    rows.findIndex((row) => row.channel.id === selectedRow.channel.id),
-  );
-  const previousRow = rows[(selectedIndex - 1 + rows.length) % rows.length];
-  const nextRow = rows[(selectedIndex + 1) % rows.length];
-  const liveCell = selectedRow.cells.find(
-    (cell) => cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec,
-  );
-  const firstAvailableCell =
-    liveCell ?? selectedRow.cells.find((cell) => cell.endSec > nowOffsetSec);
-  const visibleCells = selectedRow.cells
-    .filter((cell) => cell.endSec > selectedOffsetSec)
-    .slice(0, MOBILE_PROGRAM_LIMIT);
-  const logoUrl = getChannelLogoUrl(selectedRow.channel);
-  const jumpOptions = [
-    { label: "Now", offsetSec: 0 },
-    { label: "+3 hr", offsetSec: 3 * 60 * 60 },
-    { label: "+6 hr", offsetSec: 6 * 60 * 60 },
-    { label: "+12 hr", offsetSec: 12 * 60 * 60 },
-  ];
-
-  return (
-    <section className="ttv-mobile-guide" aria-label="Mobile live TV guide">
-      <div className="ttv-mobile-guide-meta" aria-live="polite">
-        <span>{formatTime(now)}</span>
-        <span>
-          {preparedCount < totalCount
-            ? `Preparing channels ${preparedCount}/${totalCount}`
-            : `${totalCount} channels ready`}
-        </span>
-      </div>
-
-      <div className="ttv-mobile-guide-scroll">
-        <div className="ttv-mobile-channel-picker" aria-label="Choose channel">
-          <button
-            type="button"
-            onClick={() =>
-              previousRow && onChannelBrowse(previousRow.channel.id)
-            }
-            aria-label="Previous channel"
-            disabled={!previousRow}
-          >
-            CH −
-          </button>
-
-          <label>
-            <span>Browse channel</span>
-            <select
-              value={selectedRow.channel.id}
-              onChange={(event) => onChannelBrowse(event.target.value)}
-            >
-              {rows.map((row) => (
-                <option key={row.channel.id} value={row.channel.id}>
-                  {getChannelLabel(row.channel)} · {getChannelName(row.channel)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            onClick={() => nextRow && onChannelBrowse(nextRow.channel.id)}
-            aria-label="Next channel"
-            disabled={!nextRow}
-          >
-            CH +
-          </button>
-        </div>
-
-        <article
-          className="ttv-mobile-live-card"
-          data-current-channel={selectedRow.channel.id === currentChannelId}
-        >
-          <div className="ttv-mobile-live-brand">
-            {logoUrl ? (
-              <Image
-                unoptimized
-                width={64}
-                height={64}
-                src={logoUrl}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className="ttv-mobile-live-logo-fallback" aria-hidden="true">
-                {selectedRow.channel.branding?.logoText ||
-                  getChannelLabel(selectedRow.channel)}
-              </div>
-            )}
-
-            <div>
-              <div className="ttv-mobile-live-channel-number">
-                {getChannelLabel(selectedRow.channel)}
-              </div>
-              <h3>{getChannelName(selectedRow.channel)}</h3>
-              <p>
-                {selectedRow.channel.branding?.description ||
-                  "Live Tate's TV programming."}
-              </p>
-            </div>
-          </div>
-
-          <SaveButton
-            kind="channel"
-            id={selectedRow.channel.id}
-            title={getChannelName(selectedRow.channel)}
-          />
-          <div className="ttv-mobile-live-program">
-            <span>{liveCell ? "Live now" : "Next available"}</span>
-            <strong>
-              {firstAvailableCell
-                ? getDisplayTitle(firstAvailableCell.item)
-                : "Off Air"}
-            </strong>
-            {firstAvailableCell ? (
-              <small>
-                {getDisplayType(firstAvailableCell.item)} ·{" "}
-                {formatDuration(
-                  firstAvailableCell.endSec - firstAvailableCell.startSec,
-                )}
-              </small>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            className="ttv-mobile-watch-live"
-            disabled={!firstAvailableCell}
-            onClick={() => {
-              if (firstAvailableCell) {
-                onTune({
-                  channel: selectedRow.channel,
-                  item: firstAvailableCell.item,
-                });
-              }
-            }}
-          >
-            {selectedRow.channel.id === currentChannelId
-              ? "Return to Live TV"
-              : "Watch This Channel"}
-          </button>
-        </article>
-
-        <nav className="ttv-mobile-time-jumps" aria-label="Schedule time">
-          {jumpOptions.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              data-active={selectedOffsetSec === option.offsetSec}
-              onClick={() => onOffsetChange(option.offsetSec)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="ttv-mobile-program-heading">
-          <div>
-            <span>Schedule</span>
-            <strong>
-              {selectedOffsetSec === 0
-                ? "Starting now"
-                : `From ${formatTime(
-                    new Date(windowStartMs + selectedOffsetSec * 1000),
-                  )}`}
-            </strong>
-          </div>
-          <small>{MOBILE_GUIDE_HOURS}-hour mobile guide</small>
-        </div>
-
-        <div className="ttv-mobile-program-list">
-          {!selectedRow.isPrepared ? (
-            Array.from({ length: 5 }, (_, index) => (
-              <div className="ttv-mobile-program-skeleton" key={index}>
-                <span />
-                <div>
-                  <span />
-                  <span />
-                </div>
-              </div>
-            ))
-          ) : visibleCells.length === 0 ? (
-            <div className="ttv-mobile-guide-empty">
-              No scheduled programs are available in this window.
-            </div>
-          ) : (
-            visibleCells.map((cell, index) => {
-              const isLive =
-                cell.startSec <= nowOffsetSec && cell.endSec > nowOffsetSec;
-              const title = getDisplayTitle(cell.item);
-              const duration = cell.endSec - cell.startSec;
-
-              return (
-                <button
-                  key={`${selectedRow.channel.id}-${cell.stableKey}-${cell.startSec}-${index}`}
-                  type="button"
-                  className="ttv-mobile-program-card"
-                  data-live={isLive}
-                  onClick={() =>
-                    onTune({
-                      channel: selectedRow.channel,
-                      item: cell.item,
-                    })
-                  }
-                  aria-label={`${getMobileProgramTime(
-                    cell,
-                    windowStartMs,
-                    nowOffsetSec,
-                  )}, ${title}, tune ${getChannelName(selectedRow.channel)}`}
-                >
-                  <div className="ttv-mobile-program-time">
-                    <strong>
-                      {getMobileProgramTime(cell, windowStartMs, nowOffsetSec)}
-                    </strong>
-                    <span>{formatDuration(duration)}</span>
-                  </div>
-
-                  <div className="ttv-mobile-program-copy">
-                    <strong>{title}</strong>
-                    <span>
-                      {getDisplayType(cell.item)} ·{" "}
-                      {getChannelLabel(selectedRow.channel)}
-                    </span>
-                  </div>
-
-                  <span className="ttv-mobile-program-action">
-                    {isLive ? "Watch" : "Tune"}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        <p className="ttv-mobile-guide-note">
-          Tate&apos;s TV is a live channel service. Selecting a future listing
-          tunes that channel&apos;s current broadcast.
-        </p>
       </div>
     </section>
   );

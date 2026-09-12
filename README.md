@@ -18,7 +18,7 @@ Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A s
 ## Viewer features
 
 - Live playback with bounded connection retries, offline recovery, autoplay prompts and programme reporting.
-- A 72-hour desktop guide and 24-hour mobile guide, using the same schedule as the player. Search channels, filter favourites, choose row density, or navigate with directional keys. Future listings tune the channel’s **current** broadcast.
+- A 72-hour desktop guide and a mobile **On now** list, using the same schedule as the player. On mobile, compare live and next programmes, search or star channels, and use **Watch** to tune. **Schedule** opens that channel’s upcoming day of listings; time jumps, local day labels and **Show more programmes** make longer schedules readable. Returning to On now restores your place. Upcoming mobile listings never change playback. Desktop listings tune the channel’s current broadcast and support row density and directional keys.
 - “Tonight on Tate’s TV” and “On now” selections from actual station schedules.
 - Favourite channels, a programme watchlist and on-demand resume saved on the current browser. They are separate from cloud programming updates. Storage being blocked must not prevent playback.
 - Nine themes, all unlocked. Electric Blue Live adds slow ambient lighting, a moving broadcast highlight and a live beacon. System/app reduced-motion preferences suppress effects, and hidden tabs pause them. Accounts, payments and theme entitlements are deferred.
@@ -48,6 +48,7 @@ Missing metrics configuration disables collection without interrupting viewing. 
 | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `components/viewer/`                                              | Viewer controls, discovery, saved items, recovery and navigation |
 | `components/MultiGuide.tsx`                                       | Responsive guide presentation and visible timeline rendering     |
+| `components/viewer/MobileGuide.tsx`                               | Mobile channel comparison and paged channel schedules            |
 | `lib/guideTimeline.ts`                                            | Guide projection from broadcast schedules                        |
 | `lib/liveEngine.ts`, `lib/scheduler.ts`, `lib/programmeBlocks.ts` | Shared clock, commercials and recurring windows                  |
 | `lib/themes.ts`, `app/styles/themes/`                             | Theme tokens and visual effects                                  |

@@ -1,0 +1,397 @@
+/* One scrolling surface per view; no horizontal timeline on touch screens. */
+.ttv-mobile-guide {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel-bg);
+  color: var(--text);
+}
+.ttv-mobile-guide [hidden] {
+  display: none;
+}
+.ttv-mobile-guide-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+}
+.ttv-mobile-guide :where(button, select) {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+.ttv-mobile-guide :where(button, select, input):focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+.ttv-mobile-guide button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.ttv-mobile-guide .ttv-guide-tools {
+  gap: 0.35rem 0.65rem;
+  padding: 0.65rem 0.85rem 0.35rem;
+  border: 0;
+}
+.ttv-mobile-guide .ttv-guide-tools label {
+  flex-basis: 100%;
+}
+.ttv-mobile-guide .ttv-guide-tools input {
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.ttv-mobile-guide .ttv-guide-tools > span {
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+.ttv-mobile-now-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+}
+.ttv-mobile-now-heading h2 {
+  font-size: 1.1rem;
+  font-weight: 750;
+}
+.ttv-mobile-now-heading time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.ttv-mobile-channel-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0 0.75rem 1rem;
+  margin: 0;
+  list-style: none;
+}
+.ttv-mobile-channel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  padding: 0.4rem 0.7rem 0.7rem;
+  background: var(--panel-alt-bg);
+}
+.ttv-mobile-channel[data-current="true"] {
+  border-color: var(--primary);
+}
+.ttv-mobile-channel-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 0.35rem;
+  align-items: center;
+}
+.ttv-mobile-channel-top .ttv-save-button {
+  width: 44px;
+  min-width: 44px;
+}
+.ttv-mobile-open-schedule {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.ttv-mobile-channel-number {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ttv-mobile-channel-name {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.ttv-mobile-schedule-link {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ttv-mobile-channel-broadcast,
+.ttv-mobile-schedule-live {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding-block: 0.4rem;
+}
+.ttv-mobile-channel-broadcast h3 {
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ttv-mobile-channel-broadcast p,
+.ttv-mobile-next {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.ttv-mobile-channel-broadcast p {
+  margin-top: 0.25rem;
+}
+.ttv-mobile-watch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 5rem;
+  border: 1px solid var(--primary);
+  border-radius: var(--ttv-radius-control);
+  padding: 0.6rem 0.75rem;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ttv-mobile-watch > span {
+  font-size: 0.65rem;
+}
+.ttv-mobile-progress {
+  height: 2px;
+  margin-block: 0.4rem;
+  background: var(--border);
+}
+.ttv-mobile-progress span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.ttv-mobile-next {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ttv-mobile-next > span {
+  font-weight: 650;
+  margin-right: 0.3rem;
+}
+.ttv-mobile-schedule-toolbar {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+.ttv-mobile-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  border-radius: var(--ttv-radius-control);
+  padding: 0.5rem 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text);
+}
+.ttv-mobile-back > span {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.ttv-mobile-schedule-toolbar label {
+  flex: 1;
+  min-width: 0;
+}
+.ttv-mobile-schedule-toolbar select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  padding: 0.5rem;
+  background: var(--panel-alt-bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+.ttv-mobile-schedule {
+  max-width: 48rem;
+  margin: auto;
+  padding: 1rem 0.85rem;
+}
+.ttv-mobile-schedule-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ttv-mobile-schedule-heading > div {
+  min-width: 0;
+}
+.ttv-mobile-schedule-heading h2 {
+  font-size: 1.25rem;
+  font-weight: 750;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ttv-mobile-schedule-heading p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.ttv-mobile-schedule-live {
+  margin-block: 0.8rem;
+}
+.ttv-mobile-schedule-live span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.ttv-mobile-schedule-live strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ttv-mobile-time-jumps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4rem, 1fr));
+  gap: 0.35rem;
+}
+.ttv-mobile-time-jumps button {
+  padding: 0.55rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  background: var(--panel-alt-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.ttv-mobile-time-jumps button[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.ttv-mobile-schedule-note {
+  margin-block: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.ttv-mobile-schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ttv-mobile-schedule-day {
+  padding-block: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+.ttv-mobile-listing {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding: 0.95rem 0.25rem;
+  line-height: 1.5;
+}
+.ttv-mobile-listing-time time,
+.ttv-mobile-listing-time strong {
+  display: block;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.ttv-mobile-listing-time span,
+.ttv-mobile-listing-copy p {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.ttv-mobile-listing-copy h4 {
+  font-size: 0.95rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ttv-mobile-schedule-list [data-live="true"] .ttv-mobile-listing {
+  border-left: 3px solid var(--primary);
+  padding-left: 0.5rem;
+}
+.ttv-mobile-load-more {
+  width: 100%;
+  margin-block: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ttv-radius-control);
+  background: var(--panel-alt-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+@media (min-width: 700px) {
+  .ttv-mobile-channel-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 359px) {
+  .ttv-mobile-open-schedule {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+  .ttv-mobile-schedule-link {
+    grid-column: 2;
+  }
+  .ttv-mobile-channel-name {
+    font-size: 0.85rem;
+  }
+}
+@media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
+  .ttv-guide-dialog {
+    /* Insets belong to the shell only; children must not apply them twice. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: var(--panel-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ttv-guide-dialog-header {
+    min-height: 3.5rem;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    padding: 0.3rem 0.85rem;
+    background: var(--panel-bg);
+    box-shadow: none;
+  }
+  .ttv-guide-dialog-title strong {
+    margin: 0;
+    font-size: 1.05rem;
+    white-space: normal;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .ttv-guide-dialog-title > span {
+    display: none;
+  }
+  .ttv-guide-dialog-title > small {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .ttv-guide-close {
+    letter-spacing: normal;
+    text-transform: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .ttv-guide-dialog-body {
+    padding: 0;
+  }
+}
