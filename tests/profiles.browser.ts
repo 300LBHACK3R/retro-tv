@@ -243,3 +243,166 @@ test("profile switching isolates watchlists and cancelling a PIN change preserve
     page.getByRole("button", { name: /Remove Studio Sessions/ }).first(),
   ).toBeVisible();
 });
+
+test("the chooser adds profiles directly, restores focus, and makes deletion reversible until confirmed", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const add = page.getByRole("button", { name: "Add profile", exact: true });
+  await add.click();
+  await page.getByLabel("Profile name", { exact: true }).fill("Unfinished");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(add).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Watch as Unfinished", exact: true }),
+  ).toHaveCount(0);
+  await add.click();
+  await page.getByLabel("Profile name", { exact: true }).fill("   ");
+  await expect(
+    page.getByRole("button", { name: "Save profile", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Profile name", { exact: true }).fill("Morgan");
+  await page.getByRole("button", { name: "bolt avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Watch as Morgan", exact: true }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "Manage profiles", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit Morgan", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "bolt avatar", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "Delete profile", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Keep profile", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Delete profile", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Edit Morgan", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Edit Morgan", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Delete profile", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Yes, delete profile", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Watch as Morgan", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("video")).toHaveCount(0);
+});
+
+test("PIN setup can be corrected or cancelled and the direct Add shortcut cannot bypass the parent lock", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Watch as Kids", exact: true })
+    .click();
+  const pin = page.getByLabel("Parent PIN", { exact: true });
+  const confirmation = page.getByLabel("Confirm PIN", { exact: true });
+  await pin.fill("4826");
+  await confirmation.fill("4827");
+  await page
+    .getByRole("button", { name: "Save PIN & continue", exact: true })
+    .click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "don't match",
+  );
+  await expect(confirmation).toBeFocused();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Watch as Kids", exact: true }),
+  ).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).pin,
+    ),
+  ).toBeNull();
+  await chooseKids(page);
+  await switchProfile(page);
+  const add = page.getByRole("button", { name: "Add profile", exact: true });
+  await add.click();
+  await expect(page.getByLabel("Profile name", { exact: true })).toHaveCount(0);
+  await pin.fill("1111");
+  await page.getByRole("button", { name: "Show PIN", exact: true }).click();
+  await expect(pin).toHaveAttribute("type", "text");
+  await expect(pin).toHaveValue("1111");
+  await page.getByRole("button", { name: "Hide PIN", exact: true }).click();
+  await expect(pin).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "wasn't right",
+  );
+  await expect(pin).toBeFocused();
+  await expect(page.locator("video")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(add).toBeFocused();
+  await add.click();
+  await pin.fill("4826");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Profile name", { exact: true }).fill("Taylor");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Watch as Taylor", exact: true })
+    .click();
+  await expect(pin).toBeVisible();
+  await expect(page.locator("video")).toHaveCount(0);
+});
+
+test("five profiles and the editor fit a narrow phone and remain reachable with large text", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "ttv-profiles-v1",
+      JSON.stringify({
+        profiles: [
+          {
+            id: "main",
+            name: "A long household name",
+            avatar: "sun",
+            kids: false,
+          },
+          { id: "kids", name: "Kids", avatar: "star", kids: true },
+          { id: "one", name: "Morgan", avatar: "moon", kids: false },
+          { id: "two", name: "Taylor", avatar: "bolt", kids: false },
+          { id: "three", name: "Alex", avatar: "flower", kids: false },
+        ],
+      }),
+    );
+  });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /^Watch as / })).toHaveCount(5);
+  await expect(
+    page.getByRole("button", { name: "Add profile", exact: true }),
+  ).toHaveCount(0);
+  await page.addStyleTag({ content: "html { font-size: 24px !important; }" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "Manage profiles", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit Taylor", exact: true }).click();
+  await page.getByLabel("Profile name", { exact: true }).fill("Taylor updated");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Edit Taylor updated", exact: true }),
+  ).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+});

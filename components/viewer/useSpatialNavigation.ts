@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 const FOCUSABLE =
-  'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),[tabindex="0"]';
+  'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),summary,[tabindex="0"]';
 
 /** Directional keys navigate the visible TV controls and guide. PageUp/PageDown
  * remain channel shortcuts. Native text fields and selects retain their keys. */

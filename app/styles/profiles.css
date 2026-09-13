@@ -1,93 +1,115 @@
 .ttv-profile-screen {
   min-height: 100vh;
   min-height: 100svh;
-  display: grid;
-  place-items: center;
-  padding: max(2rem, env(safe-area-inset-top))
+  display: flex;
+  flex-direction: column;
+  padding: max(1.25rem, env(safe-area-inset-top))
     max(1.25rem, env(safe-area-inset-right))
-    max(2rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-bottom))
     max(1.25rem, env(safe-area-inset-left));
   color: var(--text);
   background:
-    radial-gradient(ellipse at 50% 0, var(--panel-alt-bg), transparent 65%),
+    radial-gradient(ellipse at 50% 0, var(--panel-alt-bg), transparent 70%),
     var(--app-bg);
 }
-.ttv-profile-content {
-  width: min(68rem, 100%);
-  text-align: center;
+.ttv-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: min(80rem, 100%);
+  margin: 0 auto;
+  min-height: 2.5rem;
 }
 .ttv-profile-wordmark {
   display: inline-flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: clamp(2rem, 7vh, 5rem);
-  font-size: 1.1rem;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-decoration: none;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
   color: var(--text);
 }
 .ttv-profile-wordmark span {
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.15em 0.35em;
+  color: var(--primary);
+}
+.ttv-profile-device {
   color: var(--text-muted);
-  font-size: 0.6rem;
-  letter-spacing: 0.22em;
+  font-size: 0.8rem;
+}
+.ttv-profile-content {
+  width: min(64rem, 100%);
+  margin: auto;
+  padding: clamp(2rem, 6vh, 5rem) 0;
+  text-align: center;
 }
 .ttv-profile-screen h1 {
-  margin: 0.65rem 0;
-  font-size: clamp(2.3rem, 5vw, 4.5rem);
-  line-height: 1.08;
+  margin: 0;
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  line-height: 1.12;
   font-weight: 750;
   letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
   text-wrap: balance;
 }
 .ttv-profile-intro {
-  max-width: 36rem;
-  margin: 1rem auto 2.5rem;
+  max-width: 32rem;
+  margin: 0.85rem auto 2.5rem;
   color: var(--text-muted);
-  line-height: 1.7;
+  font-size: 0.95rem;
+  line-height: 1.6;
   text-wrap: pretty;
 }
 .ttv-profile-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(1rem, 3vw, 2.5rem);
-  margin: 0 auto 2.5rem;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin: 0 auto 2.25rem;
 }
 .ttv-profile-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  width: clamp(8rem, 15vw, 10rem);
+  gap: 0.4rem;
+  width: clamp(7.5rem, 14vw, 10rem);
   min-width: 0;
-  padding: 0.5rem;
+  padding: 0.375rem;
   color: var(--text);
   background: transparent;
   border: 0;
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   cursor: pointer;
+  touch-action: manipulation;
+}
+.ttv-profile-art {
+  position: relative;
+  width: 100%;
+  margin-bottom: 0.5rem;
 }
 .ttv-profile-avatar {
   display: grid;
   place-items: center;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 23%;
+  border-radius: 24%;
   background: #f7ca78;
   color: #342615;
-  font-size: clamp(3.25rem, 7vw, 5.5rem);
   line-height: 1;
   box-shadow:
-    inset 0 1px 0 #ffffff60,
-    inset 0 -12px 30px #00000012;
+    inset 0 1px 0 #ffffff70,
+    inset 0 -18px 36px #00000012;
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease;
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 .ttv-profile-avatar svg {
-  width: 55%;
-  height: 55%;
+  width: 48%;
+  height: 48%;
 }
 .ttv-profile-avatar[data-avatar="moon"] {
   background: #a8b8ff;
@@ -106,14 +128,24 @@
   color: #53233c;
 }
 .ttv-profile-card strong {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
+  font-weight: 650;
   max-width: 100%;
   overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 .ttv-profile-card small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
   color: var(--text-muted);
   font-size: 0.75rem;
   line-height: 1.5;
+}
+.ttv-profile-card small svg {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 .ttv-profile-add {
   color: var(--text-muted);
@@ -121,17 +153,42 @@
   border: 1px dashed var(--border);
   box-shadow: none;
 }
+.ttv-profile-add svg {
+  width: 32%;
+  height: 32%;
+}
+.ttv-profile-edit-badge {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  bottom: -0.25rem;
+  right: -0.25rem;
+  width: 2rem;
+  height: 2rem;
+  background: var(--text);
+  color: var(--app-bg);
+  border: 3px solid var(--app-bg);
+  border-radius: 50%;
+}
+.ttv-profile-edit-badge svg {
+  width: 1rem;
+  height: 1rem;
+}
 @media (hover: hover) {
   .ttv-profile-card:hover .ttv-profile-avatar {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 32px #00000022;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px #00000022;
+  }
+  .ttv-profile-actions button:hover:not(:disabled),
+  .ttv-profile-back:hover {
+    filter: brightness(1.1);
   }
 }
-.ttv-profile-screen :where(button, a, input, select):focus-visible,
+.ttv-profile-screen :where(button, a, input, select, summary):focus-visible,
 .ttv-profile-switch:focus-visible,
 .ttv-audience-panel :where(button, a, input, select):focus-visible {
   outline: 3px solid var(--primary);
-  outline-offset: 5px;
+  outline-offset: 4px;
 }
 .ttv-profile-screen h1:focus,
 #audience-media-title:focus {
@@ -142,47 +199,104 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin: 1.5rem 0;
+  margin: 1.5rem 0 0;
 }
 .ttv-profile-actions button,
 .ttv-profile-form > button,
 .ttv-audience-panel button,
 .ttv-audience-media a {
-  min-height: 2.75rem;
+  min-height: 2.875rem;
   padding: 0.7rem 1.2rem;
   color: var(--text);
   background: var(--button-bg);
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
+  border-radius: 0.75rem;
   font-weight: 650;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .ttv-profile-actions .ttv-profile-primary {
   background: var(--primary);
   color: var(--on-primary);
   border-color: transparent;
 }
-.ttv-profile-actions button:disabled {
+.ttv-profile-screen button:disabled {
   opacity: 0.55;
-  cursor: wait;
+  cursor: default;
 }
-.ttv-profile-note {
-  margin: 1.5rem auto 0;
-  max-width: 43rem;
+.ttv-profile-management button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 8rem;
+}
+.ttv-profile-management svg {
+  width: 1rem;
+  height: 1rem;
+}
+.ttv-profile-feedback {
+  min-height: 1.5rem;
+  margin-top: 1rem;
   font-size: 0.8rem;
   color: var(--text-muted);
-  line-height: 1.75;
+}
+.ttv-profile-panel {
+  width: min(28rem, 100%);
+  margin: 0 auto;
+  text-align: left;
+  padding: 1.75rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  box-shadow: 0 16px 64px #0000000a;
+}
+.ttv-profile-panel h1 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+.ttv-profile-panel .ttv-profile-intro {
+  font-size: 0.875rem;
+  margin: 0.75rem 0 1.5rem;
+}
+.ttv-profile-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  margin: -0.5rem 0 1rem -0.5rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.ttv-profile-back svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.ttv-profile-panel-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: 1rem;
+  color: var(--primary);
+}
+.ttv-profile-panel-icon > svg {
+  width: 2rem;
+  height: 2rem;
+  margin: 0.75rem;
 }
 .ttv-profile-form {
-  width: min(26rem, 100%);
-  margin: auto;
+  width: 100%;
   text-align: left;
 }
 .ttv-profile-form > label,
 .ttv-audience-panel label:not(.ttv-profile-check) {
   display: grid;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   font-size: 0.875rem;
   font-weight: 650;
 }
@@ -191,21 +305,97 @@
 .ttv-category-select select {
   width: 100%;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 3rem;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.75rem 0.85rem;
   font-size: 1rem;
   color: var(--text);
   background: var(--panel-alt-bg);
 }
+.ttv-pin-input {
+  position: relative;
+}
+.ttv-profile-form .ttv-pin-input input {
+  padding-right: 4rem;
+  letter-spacing: 0.2em;
+}
+.ttv-pin-input button {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  bottom: 0.15rem;
+  min-width: 3.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
 .ttv-profile-form input[type="password"] {
-  letter-spacing: 0.25em;
+  letter-spacing: 0.2em;
+}
+.ttv-profile-field-hint {
+  margin: 0.5rem 0 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.ttv-profile-form .ttv-profile-actions > .ttv-profile-primary {
+  flex: 1;
+}
+.ttv-profile-help {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.ttv-profile-help summary {
+  min-height: 2.75rem;
+  padding-block: 0.75rem;
+  cursor: pointer;
+}
+.ttv-profile-help p {
+  margin-top: 0.5rem;
+}
+.ttv-profile-error {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  background: var(--panel-alt-bg);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.ttv-profile-editor-preview {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  overflow-wrap: anywhere;
+}
+.ttv-profile-editor-preview .ttv-profile-avatar {
+  width: 3.5rem;
+  flex-shrink: 0;
+}
+.ttv-profile-editor-preview > span:last-child {
+  min-width: 0;
+  font-weight: 650;
+}
+.ttv-profile-editor-preview small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-top: 0.25rem;
 }
 .ttv-profile-form fieldset {
   border: 0;
   padding: 0;
   margin: 1.5rem 0;
+  min-width: 0;
 }
 .ttv-profile-form legend {
   margin-bottom: 0.75rem;
@@ -215,22 +405,20 @@
 .ttv-avatar-options {
   display: flex;
   justify-content: space-between;
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 .ttv-avatar-options button {
   flex: 1;
-  padding: 0.25rem;
+  min-width: 0;
   min-height: 2.75rem;
+  padding: 0.2rem;
   border: 2px solid transparent;
-  border-radius: 1rem;
+  border-radius: 0.9rem;
   background: transparent;
   cursor: pointer;
 }
 .ttv-avatar-options button[aria-pressed="true"] {
   border-color: var(--primary);
-}
-.ttv-avatar-options .ttv-profile-avatar {
-  font-size: 1.8rem;
 }
 .ttv-profile-check {
   display: flex;
@@ -249,8 +437,108 @@
   display: block;
   margin-top: 0.25rem;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 0.75rem;
   font-weight: 400;
+}
+.ttv-profile-form > .ttv-profile-kids-option {
+  display: flex;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.ttv-profile-form > .ttv-profile-delete {
+  display: block;
+  margin: 1rem auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.ttv-profile-stacked-actions {
+  flex-direction: column;
+}
+.ttv-profile-footer {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  width: min(32rem, 100%);
+  margin: 0 auto;
+}
+@media (max-width: 600px) {
+  .ttv-profile-device {
+    display: none;
+  }
+  .ttv-profile-grid {
+    gap: 1rem;
+  }
+  .ttv-profile-card {
+    width: calc(50% - 0.5rem);
+    max-width: 9rem;
+  }
+  .ttv-profile-card[data-profile-focus="add"] {
+    flex-direction: row;
+    justify-content: center;
+    flex-basis: 70%;
+    max-width: 100%;
+    gap: 0.65rem;
+    min-height: 2.875rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+  }
+  .ttv-profile-card[data-profile-focus="add"] .ttv-profile-art {
+    width: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .ttv-profile-card[data-profile-focus="add"] .ttv-profile-avatar {
+    border: 0;
+    background: transparent;
+  }
+  .ttv-profile-card[data-profile-focus="add"] svg {
+    width: 100%;
+    height: 100%;
+  }
+  .ttv-profile-card[data-profile-focus="add"] small {
+    display: none;
+  }
+  .ttv-profile-intro {
+    margin-bottom: 1.75rem;
+  }
+  .ttv-profile-panel {
+    padding: 1.25rem;
+  }
+  .ttv-profile-screen[data-view="form"] .ttv-profile-content {
+    padding-block: 1.25rem;
+  }
+}
+@media (max-width: 359px) {
+  .ttv-profile-screen {
+    padding-inline: max(0.875rem, env(safe-area-inset-left))
+      max(0.875rem, env(safe-area-inset-right));
+  }
+  .ttv-profile-panel {
+    padding: 1rem;
+  }
+  .ttv-avatar-options {
+    gap: 0.25rem;
+  }
+  .ttv-avatar-options button {
+    padding: 0.1rem;
+  }
+}
+@media (max-height: 600px) and (min-width: 601px) {
+  .ttv-profile-content {
+    padding-block: 1.25rem;
+  }
+  .ttv-profile-grid {
+    margin-bottom: 1rem;
+  }
+  .ttv-profile-card {
+    width: 7.5rem;
+  }
 }
 .ttv-profile-switch {
   display: flex;
@@ -416,12 +704,6 @@
   }
   .ttv-profile-switch small {
     display: none;
-  }
-  .ttv-profile-grid {
-    gap: 1rem;
-  }
-  .ttv-profile-card {
-    width: min(9rem, 40vw);
   }
 }
 @media (max-width: 380px) {
