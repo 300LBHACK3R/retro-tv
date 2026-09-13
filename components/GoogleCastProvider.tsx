@@ -146,7 +146,7 @@ interface GoogleCastWindow extends Window {
   chrome?: {
     cast?: {
       AutoJoinPolicy: {
-        ORIGIN_SCOPED: string;
+        PAGE_SCOPED: string;
       };
       Image?: new (url: string) => { url: string };
       media: {
@@ -327,7 +327,8 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
       context.setOptions({
         receiverApplicationId:
           chromeCast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-        autoJoinPolicy: chromeCast.AutoJoinPolicy.ORIGIN_SCOPED,
+        // New profiles must not automatically rejoin a different viewer's queue.
+        autoJoinPolicy: chromeCast.AutoJoinPolicy.PAGE_SCOPED,
       });
 
       const remotePlayer = new framework.RemotePlayer();
@@ -463,7 +464,8 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
   }, [refreshSessionState]);
 
   const disconnect = useCallback(() => {
-    castContextRef.current?.endCurrentSession(true);
+    try { castContextRef.current?.endCurrentSession(true); }
+    catch (error) { setErrorMessage(getErrorText(error)); }
     refreshSessionState();
   }, [refreshSessionState]);
 

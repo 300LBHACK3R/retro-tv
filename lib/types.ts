@@ -1,3 +1,4 @@
+import type { ChannelCategory } from "./audience";
 export type MediaType =
   "show" | "movie" | "music" | "music-video" | "commercial" | "bumper";
 
@@ -167,6 +168,7 @@ export interface ChannelBranding {
 }
 
 export interface MediaItem {
+  kidsApproved?: boolean;
   id: string;
   title: string;
   type: MediaType;
@@ -334,6 +336,8 @@ export interface ProgrammeBlock {
 }
 
 export interface Channel {
+  kidsApproved?: boolean;
+  category?: ChannelCategory;
   programmeBlocks?: ProgrammeBlock[];
   id: string;
   number?: number;

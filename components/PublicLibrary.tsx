@@ -1,5 +1,7 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,14 +12,14 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
+import ProfileGate, { ProfileButton } from "@/components/viewer/ProfileGate";
+import { profileProgressKey, useProfiles } from "@/lib/deviceProfiles";
 import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import {
   FILTERS,
-  PROGRESS_STORAGE_KEY,
   sanitizeProgress,
   buildLibrary,
   formatClock,
@@ -34,11 +36,11 @@ import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import SaveButton from "@/components/viewer/SaveButton";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 
-function loadProgress(): ProgressMap {
+function loadProgress(key: string): ProgressMap {
   if (typeof window === "undefined") return {};
 
   try {
-    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     const parsed = raw ? (JSON.parse(raw) as ProgressMap) : {};
     return sanitizeProgress(parsed);
   } catch {
@@ -62,8 +64,20 @@ function Poster({ group }: { group: LibraryGroup }) {
 }
 
 export default function PublicLibrary() {
-  const media = useStore((state) => state.media);
-  const channels = useStore((state) => state.channels);
+  return (
+    <ProfileGate>
+      <ProfileLibrary />
+    </ProfileGate>
+  );
+}
+function ProfileLibrary() {
+  const [progressKey] = useState(profileProgressKey);
+  const kids = useProfiles(
+    (state) =>
+      state.profiles.find((profile) => profile.id === state.activeId)?.kids ===
+      true,
+  );
+  const { channels, media } = useViewerCatalog();
   const themeId = useStore((state) => state.themeId);
 
   const theme = useMemo(() => getThemeById(themeId), [themeId]);
@@ -221,9 +235,9 @@ export default function PublicLibrary() {
   }, [channels, selectedItem]);
 
   useEffect(() => {
-    progressRef.current = loadProgress();
+    progressRef.current = loadProgress(progressKey);
     setProgress(progressRef.current);
-  }, []);
+  }, [progressKey]);
 
   useEffect(() => {
     if (!selectedGroupKey && filteredGroups[0]) {
@@ -291,7 +305,7 @@ export default function PublicLibrary() {
     setProgress(next);
 
     try {
-      window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(progressKey, JSON.stringify(next));
     } catch {
       // Local progress is optional. Playback must continue if storage is blocked.
     }
@@ -321,7 +335,7 @@ export default function PublicLibrary() {
 
     persistProgress({
       ...progressRef.current,
-      ...loadProgress(),
+      ...loadProgress(progressKey),
       [item.media.id]: {
         position,
         duration: Math.max(1, Math.floor(duration)),
@@ -364,7 +378,10 @@ export default function PublicLibrary() {
   function handleEnded(): void {
     if (!selectedItem) return;
 
-    const nextProgress = { ...progressRef.current, ...loadProgress() };
+    const nextProgress = {
+      ...progressRef.current,
+      ...loadProgress(progressKey),
+    };
     delete nextProgress[selectedItem.media.id];
     persistProgress(nextProgress);
 
@@ -384,8 +401,6 @@ export default function PublicLibrary() {
       className={`ttv-library-shell ${themeLayoutClass} min-h-screen`}
       style={pageStyle}
     >
-      <GlobalProgrammingSync isAdminAuthorized={false} visibility="problems" />
-
       <div
         className="ttv-library-ambient pointer-events-none fixed inset-0 overflow-hidden"
         aria-hidden="true"
@@ -408,6 +423,7 @@ export default function PublicLibrary() {
           </Link>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <ProfileButton />
             <ThemeButton />
             <span className="hidden rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 sm:inline-flex">
               Watch free
@@ -542,10 +558,15 @@ export default function PublicLibrary() {
 
         {library.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-dashed border-cyan-300/25 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-semibold">The library is syncing</div>
+            <div className="text-xl font-semibold">
+              {kids
+                ? "Your Kids library is being prepared"
+                : "The library is syncing"}
+            </div>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/55">
-              We’re loading your shows, movies and music. You can watch live TV
-              while you wait.
+              {kids
+                ? "Approved shows will appear here after the station reviews them. You can browse your Kids channels in the meantime."
+                : "We’re loading your shows, movies and music. You can watch live TV while you wait."}
             </p>
             <Link href="/" className="ttv-section-action ttv-empty-action">
               Watch live TV

@@ -24,6 +24,13 @@ function toggle(ids: string[], id: string): string[] {
 }
 
 interface DeviceLibrary {
+  profileId: string;
+  profiles: Record<
+    string,
+    { favouriteChannels: string[]; watchlist: string[] }
+  >;
+  selectProfile: (id: string) => void;
+  removeProfile: (id: string) => void;
   favouriteChannels: string[];
   watchlist: string[];
   toggleChannel: (id: string) => void;
@@ -35,14 +42,50 @@ interface DeviceLibrary {
 export const useDeviceLibrary = create<DeviceLibrary>()(
   persist(
     (set) => ({
+      profileId: "main",
+      profiles: {},
+      selectProfile: (id) =>
+        set((state) => ({
+          profileId: id,
+          favouriteChannels: state.profiles[id]?.favouriteChannels ?? [],
+          watchlist: state.profiles[id]?.watchlist ?? [],
+        })),
+      removeProfile: (id) =>
+        set((state) => ({
+          profiles: Object.fromEntries(
+            Object.entries(state.profiles).filter(([key]) => key !== id),
+          ),
+        })),
       favouriteChannels: [],
       watchlist: [],
       toggleChannel: (id) =>
-        set((state) => ({
-          favouriteChannels: toggle(state.favouriteChannels, id),
-        })),
+        set((state) => {
+          const favouriteChannels = toggle(state.favouriteChannels, id);
+          return {
+            favouriteChannels,
+            profiles: {
+              ...state.profiles,
+              [state.profileId]: {
+                favouriteChannels,
+                watchlist: state.watchlist,
+              },
+            },
+          };
+        }),
       toggleWatchlist: (id) =>
-        set((state) => ({ watchlist: toggle(state.watchlist, id) })),
+        set((state) => {
+          const watchlist = toggle(state.watchlist, id);
+          return {
+            watchlist,
+            profiles: {
+              ...state.profiles,
+              [state.profileId]: {
+                favouriteChannels: state.favouriteChannels,
+                watchlist,
+              },
+            },
+          };
+        }),
     }),
     {
       name: DEVICE_LIBRARY_KEY,
@@ -71,18 +114,35 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
       })),
       skipHydration: true,
       partialize: (state) => ({
-        favouriteChannels: state.favouriteChannels,
-        watchlist: state.watchlist,
+        profiles: state.profiles,
       }),
       merge: (saved, current) => {
         const value =
           saved && typeof saved === "object"
             ? (saved as Partial<DeviceLibrary>)
             : {};
+        const profiles: DeviceLibrary["profiles"] = {};
+        for (const [id, data] of Object.entries(value.profiles ?? {}).slice(
+          0,
+          5,
+        )) {
+          if (/^[a-z0-9-]{1,60}$/.test(id) && data && typeof data === "object")
+            profiles[id] = {
+              favouriteChannels: sanitizeSavedIds(data.favouriteChannels),
+              watchlist: sanitizeSavedIds(data.watchlist),
+            };
+        }
+        if (!profiles.main)
+          profiles.main = {
+            favouriteChannels: sanitizeSavedIds(value.favouriteChannels),
+            watchlist: sanitizeSavedIds(value.watchlist),
+          };
         return {
           ...current,
-          favouriteChannels: sanitizeSavedIds(value.favouriteChannels),
-          watchlist: sanitizeSavedIds(value.watchlist),
+          profiles,
+          favouriteChannels:
+            profiles[current.profileId]?.favouriteChannels ?? [],
+          watchlist: profiles[current.profileId]?.watchlist ?? [],
         };
       },
     },

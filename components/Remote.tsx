@@ -1,5 +1,7 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
@@ -200,7 +202,7 @@ function RemoteButton({
 }
 
 export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
-  const channels = useStore((state) => state.channels);
+  const { channels } = useViewerCatalog();
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const isGuideOpen = useStore((state) => state.isGuideOpen);

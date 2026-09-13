@@ -1,3 +1,4 @@
+import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -52,6 +53,8 @@ interface AppState {
   updateChannelSettings: (
     channelId: string,
     patch: Partial<{
+      kidsApproved: boolean;
+      category: Channel["category"];
       programmeBlocks: ProgrammeBlock[];
       scheduleMode: ScheduleMode;
       commercialBreakMode: CommercialBreakMode;
@@ -897,6 +900,7 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
 
   return {
     ...item,
+    kidsApproved: item.kidsApproved === true,
     id: normalizeText(item.id, createFallbackId()),
     title: normalizeText(item.title, "Untitled Media"),
     type,
@@ -1179,6 +1183,8 @@ function normalizeChannel(channel: Channel): Channel {
 
   return ensureChannelAdPolicy({
     ...channel,
+    kidsApproved: channel.kidsApproved === true,
+    category: validChannelCategory(channel.category),
     id: normalizeText(channel.id, String(resolvedChannelNumber || 1)),
     name: normalizeText(channel.name, fallbackChannelName),
     mediaIds: dedupeStrings(
@@ -1425,6 +1431,7 @@ export const useStore = create<AppState>()(
               ? normalizeMediaItem({
                   ...item,
                   ...patch,
+                  kidsApproved: (["file", "poster", "title", "description", "duration"] as const).some(key => key in patch && patch[key] !== item[key]) ? false : patch.kidsApproved ?? item.kidsApproved,
                   id: item.id,
                   updatedAt: new Date().toISOString(),
                 })
@@ -1574,6 +1581,8 @@ export const useStore = create<AppState>()(
 
             return normalizeChannel({
               ...channel,
+              kidsApproved: patch.kidsApproved ?? channel.kidsApproved,
+              category: patch.category ?? channel.category,
               programmeBlocks: patch.programmeBlocks ?? channel.programmeBlocks,
               scheduleMode:
                 patch.scheduleMode && isValidScheduleMode(patch.scheduleMode)
@@ -1899,7 +1908,7 @@ export const useStore = create<AppState>()(
           media: normalized.media,
           channels: normalized.channels,
           currentChannelId: getSafeCurrentChannelId(
-            saved?.currentChannelId,
+            normalized.channels.find(channel => Number(channel.number ?? channel.id) === 1)?.id,
             normalized.channels,
           ),
           isGuideOpen: false,

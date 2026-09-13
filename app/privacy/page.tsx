@@ -13,11 +13,14 @@ export default function PrivacyPage() {
       <Link href="/">← Back to live TV</Link>
       <h1>Privacy & saved preferences</h1>
       <p>
-        Your favourites, watchlist, theme and library playback progress are
+        Your profile names and avatars, favourites, watchlist, theme and library playback progress are
         saved in your browser. They do not require an account and do not follow
         you to another device. Clearing this site’s browser storage removes
         them.
       </p>
+      <h2>Profiles & Kids mode</h2>
+      <p>Each profile has separate saved items on this browser. The parent PIN is stored as a salted hash. Kids mode uses programming explicitly approved by the station, including eligible ads. Opening full-lineup profiles and managing profiles requires the PIN once it is set.</p>
+      <p>Profiles are device preferences, not accounts or age verification. Clearing browser data resets the profiles and PIN. Public video links remain public. Profile names and PINs are not sent to station insights.</p>
       <h2>Understanding playback</h2>
       <p>
         When station insights are enabled, Tate’s TV uses a random, signed

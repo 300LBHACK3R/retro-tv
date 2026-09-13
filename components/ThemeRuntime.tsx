@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { useProfiles } from "@/lib/deviceProfiles";
 import { useStore } from "@/lib/store";
 import {
   createThemeCssVars,
@@ -72,6 +73,7 @@ export default function ThemeRuntime() {
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
+      if (useProfiles.getState().activeId) return;
       if (event.key !== THEME_STORAGE_KEY || !event.newValue) {
         return;
       }

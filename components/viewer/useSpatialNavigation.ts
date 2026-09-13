@@ -18,7 +18,7 @@ export function useSpatialNavigation(tvMode: boolean) {
       const dialog = target?.closest<HTMLElement>('[role="dialog"]');
       if (!tvMode && !dialog?.classList.contains("ttv-guide-dialog")) return;
       const container =
-        dialog ?? document.querySelector<HTMLElement>(".ttv-tv-mode");
+        dialog ?? document.querySelector<HTMLElement>(".ttv-profile-screen, .ttv-tv-mode");
       if (
         !container ||
         !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)

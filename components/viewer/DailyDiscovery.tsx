@@ -1,8 +1,9 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useStore } from "@/lib/store";
 import { buildForwardGuideCells } from "@/lib/guideTimeline";
 import { parseLibraryItem } from "@/lib/libraryCatalog";
 import {
@@ -21,8 +22,7 @@ export default function DailyDiscovery({
 }: {
   onTune: (id: string) => void;
 }) {
-  const channels = useStore((state) => state.channels);
-  const media = useStore((state) => state.media);
+  const { channels, media } = useViewerCatalog();
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
   const [nowMs, setNowMs] = useState<number | null>(null);
   const [view, setView] = useState<"now" | "tonight">("now");

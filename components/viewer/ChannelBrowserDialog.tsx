@@ -19,6 +19,7 @@ import {
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import SaveButton from "./SaveButton";
 import ChannelLogo from "./ChannelLogo";
+import { CHANNEL_CATEGORIES, channelCategory } from "@/lib/audience";
 import type { Channel } from "@/lib/types";
 
 interface ChannelBrowserDialogProps {
@@ -59,6 +60,7 @@ export default function ChannelBrowserDialog({
 }: ChannelBrowserDialogProps) {
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
   const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -81,10 +83,11 @@ export default function ChannelBrowserDialog({
 
     return channels.filter(
       (channel) =>
+        (!category || channelCategory(channel) === category) &&
         channelMatches(channel, normalizedQuery) &&
         (!favouritesOnly || favourites.includes(channel.id)),
     );
-  }, [channels, query, favourites, favouritesOnly]);
+  }, [channels, query, favourites, favouritesOnly, category]);
 
   if (!mounted || !open) {
     return null;
@@ -150,6 +153,22 @@ export default function ChannelBrowserDialog({
         </div>
 
         <div className="ttv-directory-filter">
+          <label className="ttv-category-select">
+            Browse category
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              <option value="">All categories</option>
+              {CHANNEL_CATEGORIES.filter((category) =>
+                channels.some(
+                  (channel) => channelCategory(channel) === category,
+                ),
+              ).map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="ttv-section-action"
@@ -191,7 +210,9 @@ export default function ChannelBrowserDialog({
                       {getChannelLabel(channel)}
                     </span>
                     <strong>{getChannelDisplayName(channel)}</strong>
-                    <small>{getChannelCallsign(channel)}</small>
+                    <small>
+                      {channelCategory(channel)} · {getChannelCallsign(channel)}
+                    </small>
                   </span>
 
                   <span className="ttv-channel-browser-action">
@@ -212,7 +233,19 @@ export default function ChannelBrowserDialog({
         {filteredChannels.length === 0 ? (
           <div className="ttv-premium-empty-state" role="status">
             <strong>No channels match that search.</strong>
-            <span>Try another search, or turn off the favourites filter.</span>
+            <span>
+              Try another search or category, or turn off the favourites filter.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setCategory("");
+                setFavouritesOnly(false);
+              }}
+            >
+              Show all channels
+            </button>
           </div>
         ) : null}
       </section>

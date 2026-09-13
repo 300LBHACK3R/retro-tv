@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AudiencePanel from "@/components/AudiencePanel";
 import StationInsightsPanel from "@/components/StationInsightsPanel";
 import ProgrammeBlocksPanel from "@/components/ProgrammeBlocksPanel";
 import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
@@ -14,6 +15,7 @@ import { useStore } from "@/lib/store";
 import type { Channel, MediaItem } from "@/lib/types";
 
 type AdminTab =
+  | "audience"
   | "insights"
   | "blocks"
   | "quick-edit"
@@ -49,6 +51,7 @@ const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
 const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
+  { id: "audience", label: "Audience & Channels", shortLabel: "Audience", description: "Review Kids programming and organize channel categories." },
   {
     id: "insights",
     label: "Station Insights",
@@ -850,6 +853,7 @@ export default function AdminDashboard() {
       </section>
 
       <div className="min-w-0">
+        {activeTab === "audience" ? <AudiencePanel /> : null}
         {activeTab === "insights" ? <StationInsightsPanel /> : null}
         {activeTab === "blocks" ? <ProgrammeBlocksPanel /> : null}
         {activeTab === "add" ? <UploadPanel /> : null}

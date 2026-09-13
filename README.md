@@ -24,6 +24,18 @@ Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A s
 - Nine themes, all unlocked. Electric Blue Live adds slow ambient lighting, a moving broadcast highlight and a live beacon. System/app reduced-motion preferences suppress effects, and hidden tabs pause them. Accounts, payments and theme entitlements are deferred.
 - Poster artwork with a title-based fallback when artwork is absent or cannot load.
 
+## Profiles, Kids mode & channel categories
+
+The viewer supports up to five profiles per browser/device. Main retains existing favourites, watchlist, progress and theme; other profiles have separate saved items, progress and themes. The selected profile lasts for the tab session. Normal Live TV visits start on **Channel 1**; explicit allowed `?ch=` tune links still work.
+
+Use the profile button to switch or manage names and avatars. Kids profiles require a 4–8 digit parent PIN. Once set, opening a full-lineup profile or profile management requires that PIN. Changing it requires access to management; cancelling preserves the old PIN. Switching removes the viewer, pauses local media, and stops casting. New pages do not automatically rejoin another profile's Cast queue. Directional keys work on the profile picker.
+
+**Admin → Audience & Channels** provides categories and explicit Kids approvals. Review programmes and ads before approving them. A Kids channel must be approved and contain only approved media across its regular lineup and recurring blocks, plus all ads eligible for that channel, including future campaigns. Unreviewed or missing items hold the whole channel out of Kids mode; removing individual programmes would shift the live broadcast clock. Changes to files, posters, titles, descriptions or runtimes clear media approval. Save reviewed programming to the cloud using the existing admin controls.
+
+**No existing programming is automatically approved.** Until Channel 1 qualifies, Kids sees a welcome slate with no media or ads. Faith and cartoon categories are browsing labels, not age ratings. Categories filter the guide and directory without changing channel numbers or playlists.
+
+Profiles require no signup or database migration and do not sync across devices. The parent PIN is salted and hashed with PBKDF2, with a delay after repeated wrong attempts. These are household convenience controls: clearing browser data resets them, and public video/programming URLs remain public. There is no email recovery. Accounts and server-enforced media authorization remain future work.
+
 ## Schedule recurring blocks
 
 Open **Admin → Blocks**, select a channel, title, weekdays, local start time, duration and programmes. Presets provide starting points for cartoons, movie nights and late-night programming. Save the station to the cloud using the existing admin control.

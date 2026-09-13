@@ -1,5 +1,7 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import {
   useCallback,
   useEffect,
@@ -14,7 +16,9 @@ import { useSpatialNavigation } from "@/components/viewer/useSpatialNavigation";
 import DailyDiscovery from "@/components/viewer/DailyDiscovery";
 import SaveButton from "@/components/viewer/SaveButton";
 import ChannelOverlay from "@/components/ChannelOverlay";
-import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
+import ProfileGate from "@/components/viewer/ProfileGate";
+import { useProfiles } from "@/lib/deviceProfiles";
+import { useGoogleCast } from "@/components/GoogleCastProvider";
 import MediaPreloader from "@/components/MediaPreloader";
 import NowNextBar from "@/components/NowNextBar";
 import Player from "@/components/Player";
@@ -72,10 +76,22 @@ export interface TatesTvHomeProps {
   tvMode?: boolean;
 }
 
-export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
+export default function TatesTvHome(props: TatesTvHomeProps) {
+  return (
+    <ProfileGate>
+      <ProfileHome {...props} />
+    </ProfileGate>
+  );
+}
+function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
+  const kids = useProfiles(
+    (state) =>
+      state.profiles.find((profile) => profile.id === state.activeId)?.kids ===
+      true,
+  );
+  const { disconnect } = useGoogleCast();
   useSpatialNavigation(tvMode);
-  const channels = useStore((state) => state.channels);
-  const media = useStore((state) => state.media);
+  const { channels, media } = useViewerCatalog();
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const setAppMode = useStore((state) => state.setAppMode);
@@ -147,6 +163,14 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
     [activeChannel, activeChannelMedia, availableAds, scheduleAnchor],
   );
 
+  useEffect(() => {
+    if (
+      kids &&
+      (activeSchedule.length === 0 ||
+        !enabledChannels.some((channel) => channel.id === currentChannelId))
+    )
+      disconnect();
+  }, [kids, enabledChannels, currentChannelId, activeSchedule, disconnect]);
   const channelGuideData = useMemo(() => {
     if (!isGuideOpen) {
       return [];
@@ -314,7 +338,6 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
       <a className="ttv-skip-link" href="#ttv-live-player">
         Skip to player
       </a>
-      <GlobalProgrammingSync isAdminAuthorized={false} visibility="problems" />
       <MediaPreloader
         activeSchedule={activeSchedule}
         activeChannel={activeChannel}
@@ -365,7 +388,28 @@ export default function TatesTvHome({ tvMode = false }: TatesTvHomeProps) {
                     className={playerFrameClass}
                     style={{ borderColor: "var(--border)" }}
                   >
-                    <Player schedule={activeSchedule} />
+                    {kids && activeSchedule.length === 0 ? (
+                      <div className="ttv-kids-welcome">
+                        <span className="ttv-section-kicker">
+                          Channel 1 · Kids
+                        </span>
+                        <h1>Welcome to your TV</h1>
+                        <p>
+                          {enabledChannels.length > 1
+                            ? "Choose one of your approved channels below, or open the guide."
+                            : "Your Kids lineup is being prepared. Check back after the station has reviewed its programmes."}
+                        </p>
+                        <button
+                          type="button"
+                          className="ttv-section-action"
+                          onClick={openChannelBrowser}
+                        >
+                          Browse Kids channels
+                        </button>
+                      </div>
+                    ) : (
+                      <Player schedule={activeSchedule} />
+                    )}
                     <ChannelOverlay
                       compact={!tvMode && playerViewMode === "mini"}
                     />

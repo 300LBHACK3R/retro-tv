@@ -1,5 +1,7 @@
 "use client";
 
+import { CHANNEL_CATEGORIES, channelCategory } from "@/lib/audience";
+
 import {
   useCallback,
   useEffect,
@@ -144,6 +146,7 @@ function EmptyGuideState() {
 
 export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
+  const [category, setCategory] = useState("");
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [channelQuery, setChannelQuery] = useState("");
   const channelSearchRef = useRef<HTMLInputElement | null>(null);
@@ -262,12 +265,13 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     () =>
       allRows.filter(
         (row) =>
+          (!category || channelCategory(row.channel) === category) &&
           (!favouritesOnly || favourites.includes(row.channel.id)) &&
           `${getChannelLabel(row.channel)} ${getChannelName(row.channel)} ${getChannelCallsign(row.channel)}`
             .toLowerCase()
             .includes(channelQuery.trim().toLowerCase()),
       ),
-    [allRows, favourites, favouritesOnly, channelQuery],
+    [allRows, favourites, favouritesOnly, channelQuery, category],
   );
 
   useEffect(() => {
@@ -459,6 +463,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   }, []);
 
   const clearGuideFilters = () => {
+    setCategory("");
     setChannelQuery("");
     setFavouritesOnly(false);
     window.requestAnimationFrame(() =>
@@ -484,6 +489,21 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           onChange={(event) => setChannelQuery(event.target.value)}
         />
       </label>
+      <label className="ttv-category-select">
+        <span className="sr-only">Guide category</span>
+        <select
+          aria-label="Guide category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+        >
+          <option value="">All categories</option>
+          {CHANNEL_CATEGORIES.filter((category) =>
+            allRows.some((row) => channelCategory(row.channel) === category),
+          ).map((category) => (
+            <option key={category}>{category}</option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         className="ttv-section-action"
@@ -504,7 +524,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           Compact rows
         </button>
       )}
-      {(channelQuery || favouritesOnly) && (
+      {(channelQuery || favouritesOnly || category) && (
         <button
           type="button"
           className="ttv-section-action"

@@ -1,5 +1,7 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
@@ -602,7 +604,7 @@ export default function Player({ schedule }: PlayerProps) {
     (state) => state.fullscreenRequestId,
   );
 
-  const channels = useStore((state) => state.channels);
+  const { channels } = useViewerCatalog();
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
   const toggleGuide = useStore((state) => state.toggleGuide);

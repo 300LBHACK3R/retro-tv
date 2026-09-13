@@ -1,5 +1,6 @@
 "use client";
 
+import { ProfileButton } from "./ProfileGate";
 import Image from "next/image";
 import Link from "next/link";
 import ThemeButton from "@/components/ThemeButton";
@@ -148,6 +149,7 @@ export default function ViewerTopBar({
           <span>More</span>
         </button>
       </nav>
+      <ProfileButton />
     </header>
   );
 }

@@ -416,6 +416,11 @@ function isAdCategoryAllowed(item: MediaItem, channel?: Channel): boolean {
   return getAdCategories(item).some((category) => allowedSet.has(category));
 }
 
+// Includes future campaigns: date/time windows never bypass Kids review.
+export function couldAdvertiseOnChannel(item: MediaItem, channel: Channel): boolean {
+  return isAd(item) && isAdTargetAllowed(item, channel) && isAdCategoryAllowed(item, channel);
+}
+
 function canAdRunInContext(
   item: MediaItem,
   context: CommercialPickContext,

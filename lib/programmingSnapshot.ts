@@ -1,3 +1,4 @@
+import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import type {
   AdCategory,
@@ -449,6 +450,7 @@ function sanitizeMediaItem(value: unknown): MediaItem | null {
   return {
     id,
     title,
+    kidsApproved: value.kidsApproved === true,
     type,
     duration,
     file,
@@ -549,6 +551,8 @@ function sanitizeChannel(value: unknown): Channel | null {
     id,
     number,
     name,
+    kidsApproved: value.kidsApproved === true,
+    category: validChannelCategory(value.category),
     mediaIds: validStringArray(value.mediaIds),
     programmeBlocks: sanitizeProgrammeBlocks(value.programmeBlocks),
     branding: sanitizeBranding(value.branding, name),

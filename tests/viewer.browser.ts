@@ -49,6 +49,8 @@ async function noPageOverflow(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // Existing viewer checks start with a normal selected Main profile; profile flows have a separate suite.
+  await page.addInitScript(() => sessionStorage.setItem("ttv-profile-session-v1", JSON.stringify({ id: "main", pinHash: null })));
   // Isolate viewer behavior from live Supabase, tracking, and physical Cast devices.
   await page.route("**/api/programming", (route) =>
     route.fulfill({ json: { ok: true, programming, source: "database" } }),

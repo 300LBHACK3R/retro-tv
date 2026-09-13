@@ -1,5 +1,7 @@
 "use client";
 
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useStore } from "@/lib/store";
 import type { Channel } from "@/lib/types";
@@ -224,7 +226,7 @@ export default function ChannelOverlay({
   compact = false,
   autoHideMs = DEFAULT_AUTO_HIDE_MS,
 }: ChannelOverlayProps) {
-  const channels = useStore((state) => state.channels);
+  const { channels } = useViewerCatalog();
   const currentChannelId = useStore((state) => state.currentChannelId);
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
