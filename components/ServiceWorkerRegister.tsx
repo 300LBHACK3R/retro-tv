@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { migrateProductionCache } from "@/lib/serviceWorkerCache";
 
 type ServiceWorkerMessage = {
   type: "SKIP_WAITING";
@@ -9,8 +10,6 @@ type ServiceWorkerMessage = {
 const SERVICE_WORKER_PATH = "/sw.js";
 const SERVICE_WORKER_SCOPE = "/";
 const UPDATE_CHECK_DELAY_MS = 1500;
-const CACHE_SCHEMA_VERSION = "20260909-premium-viewer-v3";
-const CACHE_SCHEMA_STORAGE_KEY = "ttv-cache-schema-version";
 const CACHE_SCHEMA_RELOAD_KEY = "ttv-cache-schema-reloaded";
 
 function canUseServiceWorker(): boolean {
@@ -23,23 +22,6 @@ function canUseServiceWorker(): boolean {
 
 function isProductionBuild(): boolean {
   return process.env.NODE_ENV === "production";
-}
-
-async function clearLegacyProductionCacheOnce(): Promise<boolean> {
-  try {
-    const currentVersion = window.localStorage.getItem(CACHE_SCHEMA_STORAGE_KEY);
-    if (currentVersion === CACHE_SCHEMA_VERSION) return false;
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-    if (typeof caches !== "undefined") {
-      const cacheKeys = await caches.keys();
-      await Promise.all(cacheKeys.filter((key) => key.startsWith("tates-tv-")).map((key) => caches.delete(key)));
-    }
-    window.localStorage.setItem(CACHE_SCHEMA_STORAGE_KEY, CACHE_SCHEMA_VERSION);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function clearDevelopmentServiceWorkerState(): Promise<void> {
@@ -126,7 +108,11 @@ export default function ServiceWorkerRegister() {
     let mounted = true;
 
     const migrateLegacyCache = async () => {
-      const migrated = await clearLegacyProductionCacheOnce();
+      const migrated = await migrateProductionCache({
+        storage: window.localStorage,
+        serviceWorker: navigator.serviceWorker,
+        cacheStorage: typeof caches === "undefined" ? undefined : caches,
+      });
       if (!migrated || !mounted) return false;
       const alreadyReloaded = window.sessionStorage.getItem(CACHE_SCHEMA_RELOAD_KEY);
       if (!alreadyReloaded) {

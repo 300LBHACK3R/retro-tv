@@ -156,6 +156,7 @@ export default function ChannelBrowserDialog({
           <label className="ttv-category-select">
             Browse category
             <select
+              aria-label="Browse category"
               value={category}
               onChange={(event) => setCategory(event.target.value)}
             >

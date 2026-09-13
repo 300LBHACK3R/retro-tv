@@ -54,6 +54,9 @@ async function switchProfile(page: Page) {
     page.getByRole("heading", { name: "Who’s watching?" }),
   ).toBeVisible();
   await expect(page.locator("video")).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Install Tate's TV", exact: true }),
+  ).toHaveCount(0);
 }
 async function chooseKids(page: Page) {
   await page
@@ -70,6 +73,11 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
   page,
 }) => {
   const errors: string[] = [];
+  let documentLoads = 0;
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+      documentLoads += 1;
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
@@ -106,6 +114,13 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
   await expect(
     current.getByRole("heading", { name: "Local Cinema", exact: true }),
   ).toBeVisible();
+  // Cache migration finishes without a second navigation on a fresh device.
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("ttv-cache-schema-version")),
+    )
+    .toBe("20260909-premium-viewer-v3");
+  expect(documentLoads).toBe(1);
   await page.reload();
   await expect(
     current.getByRole("heading", { name: "Welcome TV", exact: true }),
@@ -172,7 +187,9 @@ test("Kids blocks unapproved deep links, directory and library titles, and requi
     .click();
   await page.getByLabel("Parent PIN", { exact: true }).fill("1111");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("wasn't right");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "wasn't right",
+  );
   await expect(page.locator("video")).toHaveCount(0);
   await page.reload();
   await expect(

@@ -211,6 +211,10 @@ function getPromptMessage(mode: InstallPromptMode, profile: BrowserProfile): str
 }
 
 const SUPPRESSED_INSTALL_PROMPT_PREFIXES = [
+  // Viewing and profile/PIN flows must stay clear of unsolicited overlays.
+  // Installation remains available through the viewer's More menu.
+  "/",
+  "/library",
   "/install",
   "/admin",
   "/tv",
