@@ -70,7 +70,13 @@ Missing metrics configuration disables collection without interrupting viewing. 
 | `tests/`                                                          | Unit, production HTTP and browser regression checks              |
 | `scripts/dev.mjs`                                                 | Required portable Next.js development launcher                   |
 
-Obsolete release notes, an old programming backup, the unused PowerShell smoke script, unused Next.js starter artwork and a duplicate manifest have been removed. Git history retains them. Public icons, channel logos, recovery routes, upload tooling and the development launcher remain in use.
+## Keep one clean working folder
+
+Use `C:\Users\techn\retro-tv` as the main Windows checkout. Apply updates there instead of creating new review folders. Keep the source directories, public assets, dependency lockfile, configuration, migrations and tests together; each has a separate purpose in the build or station maintenance.
+
+Stop any running development or test server, then use `npm run clean` to remove generated Next.js output, build folders, TypeScript cache, coverage and browser reports. `npm ci` recreates dependencies when needed. These generated files do not belong in source archives. Keep private environment settings and local media outside shared archives.
+
+Unused legacy admin access, bulk-import and preview components, unused broadcast presets, an unused media helper and the old IndexedDB media module have been removed after checking their references. Historical review notes, the old programming backup, unused smoke script, starter artwork and duplicate manifest are also removed. Git history retains deleted source. The current admin uploader, player, guide, themes, profile storage, public assets and recovery tools remain in use.
 
 ## Quality gates
 

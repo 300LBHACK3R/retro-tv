@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run build",
-    "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
+    "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo','playwright-report','test-results','coverage'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
     "audit:prod": "npm audit --omit=dev",
     "test:unit": "playwright test --config tests/unit.config.ts",
     "test:browser": "playwright test",
