@@ -68,15 +68,20 @@ async function switchProfile(page: Page) {
     page.getByRole("region", { name: "Install Tate's TV", exact: true }),
   ).toHaveCount(0);
 }
+function parentPinInput(page: Page) {
+  // The PIN screen's landmarks share the input's name; target the labelled
+  // input so this also works when Show PIN changes its type to text.
+  return page
+    .locator("input")
+    .and(page.getByLabel("Parent PIN", { exact: true }));
+}
 async function chooseKids(page: Page) {
   await page
     .getByRole("button", { name: "Watch as Kids", exact: true })
     .click();
-  await page.getByLabel("Parent PIN", { exact: true }).fill("4826");
+  await parentPinInput(page).fill("4826");
   await page.getByLabel("Confirm PIN", { exact: true }).fill("4826");
-  const pinBounds = await page
-    .getByLabel("Parent PIN", { exact: true })
-    .boundingBox();
+  const pinBounds = await parentPinInput(page).boundingBox();
   const continueBounds = await page
     .getByRole("button", { name: "Save PIN & continue" })
     .boundingBox();
@@ -203,7 +208,7 @@ test("Kids blocks unapproved deep links, directory and library titles, and requi
   await page
     .getByRole("button", { name: "Watch as Main", exact: true })
     .click();
-  await page.getByLabel("Parent PIN", { exact: true }).fill("1111");
+  await parentPinInput(page).fill("1111");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "wasn't right",
@@ -216,7 +221,7 @@ test("Kids blocks unapproved deep links, directory and library titles, and requi
   await page
     .getByRole("button", { name: "Watch as Main", exact: true })
     .click();
-  await page.getByLabel("Parent PIN", { exact: true }).fill("4826");
+  await parentPinInput(page).fill("4826");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Your time. Your TV.", exact: true }),
@@ -239,7 +244,7 @@ test("profile switching isolates watchlists and cancelling a PIN change preserve
   await page
     .getByRole("button", { name: "Manage profiles", exact: true })
     .click();
-  await page.getByLabel("Parent PIN", { exact: true }).fill("4826");
+  await parentPinInput(page).fill("4826");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .getByRole("button", { name: "Change parent PIN", exact: true })
@@ -249,8 +254,8 @@ test("profile switching isolates watchlists and cancelling a PIN change preserve
   await page
     .getByRole("button", { name: "Watch as Main", exact: true })
     .click();
-  await expect(page.getByLabel("Parent PIN", { exact: true })).toBeVisible();
-  await page.getByLabel("Parent PIN", { exact: true }).fill("4826");
+  await expect(parentPinInput(page)).toBeVisible();
+  await parentPinInput(page).fill("4826");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(save).toBeVisible();
   await switchProfile(page);
@@ -324,7 +329,7 @@ test("PIN setup can be corrected or cancelled and the direct Add shortcut cannot
   await page
     .getByRole("button", { name: "Watch as Kids", exact: true })
     .click();
-  const pin = page.getByLabel("Parent PIN", { exact: true });
+  const pin = parentPinInput(page);
   const confirmation = page.getByLabel("Confirm PIN", { exact: true });
   await pin.fill("4826");
   await confirmation.fill("4827");
