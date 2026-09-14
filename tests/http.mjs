@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { request } from "node:https";
 import { setTimeout as delay } from "node:timers/promises";
+import { assertProfileStyles, stylesheetPaths } from "./styles.mjs";
 
 const origin = "https://127.0.0.1:3100";
 function get(path, method = "GET", headers = {}) {
@@ -51,6 +52,7 @@ try {
     await delay(500);
   }
   assert.ok(ready, "Production server starts");
+  const stylesheetResponses = new Map();
   for (const path of ["/", "/library", "/tv", "/help", "/privacy"]) {
     const response = await get(path);
     assert.equal(response.status, 200, path);
@@ -68,6 +70,26 @@ try {
     );
     assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.ok(!response.headers["x-powered-by"]);
+    if (["/", "/library", "/tv"].includes(path)) {
+      const styles = [];
+      for (const asset of stylesheetPaths(response.body)) {
+        if (!stylesheetResponses.has(asset))
+          stylesheetResponses.set(asset, await get(asset));
+        const stylesheet = stylesheetResponses.get(asset);
+        assert.equal(
+          stylesheet.status,
+          200,
+          `${path}: stylesheet is available`,
+        );
+        assert.match(
+          stylesheet.headers["content-type"],
+          /^text\/css\b/,
+          `${path}: correct stylesheet MIME type`,
+        );
+        styles.push(stylesheet.body);
+      }
+      assertProfileStyles(styles.join("\n"), `HTTP ${path}`);
+    }
   }
   for (const path of [
     "/admin",

@@ -54,6 +54,16 @@ async function switchProfile(page: Page) {
     page.getByRole("heading", { name: "Who’s watching?" }),
   ).toBeVisible();
   await expect(page.locator("video")).toHaveCount(0);
+  await expect(page.locator(".ttv-profile-screen")).toHaveCSS(
+    "display",
+    "flex",
+  );
+  await expect(page.locator(".ttv-profile-grid")).toHaveCSS("display", "flex");
+  const avatar = page.locator(".ttv-profile-card [data-avatar]").first();
+  await expect(avatar).toHaveCSS("display", "grid");
+  const avatarBounds = await avatar.boundingBox();
+  expect(avatarBounds!.width).toBeGreaterThanOrEqual(64);
+  expect(avatarBounds!.width).toBeLessThanOrEqual(180);
   await expect(
     page.getByRole("region", { name: "Install Tate's TV", exact: true }),
   ).toHaveCount(0);
@@ -64,6 +74,14 @@ async function chooseKids(page: Page) {
     .click();
   await page.getByLabel("Parent PIN", { exact: true }).fill("4826");
   await page.getByLabel("Confirm PIN", { exact: true }).fill("4826");
+  const pinBounds = await page
+    .getByLabel("Parent PIN", { exact: true })
+    .boundingBox();
+  const continueBounds = await page
+    .getByRole("button", { name: "Save PIN & continue" })
+    .boundingBox();
+  expect(pinBounds!.height).toBeGreaterThanOrEqual(44);
+  expect(continueBounds!.height).toBeGreaterThanOrEqual(44);
   await page.getByRole("button", { name: "Save PIN & continue" }).click();
   await expect(
     page.getByRole("heading", { name: "Welcome to your TV", exact: true }),

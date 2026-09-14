@@ -87,6 +87,8 @@ npm run test:browser
 
 `Viewer quality` runs these gates in GitHub for pull requests, master and the release branches. Its seven browser profiles cover desktop Chromium, Firefox and WebKit, Android/iPhone/tablet emulation and a 1920×1080 TV viewport. Browser fixtures do not access production programming, analytics or Cast devices.
 
+Profile styles are imported directly by the root layout. The build and HTTP checks verify that the CSS linked by `/`, `/library` and `/tv` actually contains the profile layout rules. Vercel uses the same build command, so an asset missing those styles fails the deployment build. Browser checks also assert styled cards and usable PIN controls; a successful click alone does not establish that the layout loaded.
+
 Automated browser profiles do not certify physical TVs or every historical browser. Before production promotion, verify real iPhone/Safari, Android/Chrome, supported desktop browsers and the target TV/remote: video start, channel changes, extended playback, offline/reconnect, scrolling, focus, fullscreen, AirPlay/Cast and reduced motion. Use the station’s real media encodings as well as the synthetic test clip.
 
 ## Security and SEO

@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// Validate the assets referenced by each built page, rather than scanning all
+// chunks: a leftover CSS file on disk is no help to a visitor who never gets it.
+export function stylesheetPaths(html) {
+  const paths = new Set();
+  for (const [tag] of html.matchAll(/<link\b[^>]*>/gi)) {
+    const attributes = Object.fromEntries(
+      [...tag.matchAll(/([\w-]+)=["']([^"']*)["']/g)].map((match) => [
+        match[1].toLowerCase(),
+        match[2].replaceAll("&amp;", "&"),
+      ]),
+    );
+    if (!attributes.rel?.split(/\s+/).includes("stylesheet")) continue;
+    const url = new URL(attributes.href, "https://styles.test");
+    assert.equal(
+      url.origin,
+      "https://styles.test",
+      "Styles must be served by this app",
+    );
+    assert.ok(
+      url.pathname.startsWith("/_next/static/"),
+      "Expected a built CSS asset",
+    );
+    paths.add(url.pathname);
+  }
+  assert.ok(paths.size, "The page must link its stylesheets");
+  return [...paths];
+}
+
+export function assertProfileStyles(css, context = "Profile entry") {
+  for (const name of [
+    "screen",
+    "header",
+    "grid",
+    "card",
+    "avatar",
+    "panel",
+    "form",
+    "actions",
+    "primary",
+    "back",
+  ]) {
+    assert.ok(
+      new RegExp(`\\.ttv-profile-${name}(?=[\\s,.:#\\[{])`).test(css),
+      `${context}: missing .ttv-profile-${name} in the delivered CSS`,
+    );
+  }
+}
+
+function verifyBuild() {
+  for (const route of ["index", "library", "tv"]) {
+    const html = readFileSync(`.next/server/app/${route}.html`, "utf8");
+    const css = stylesheetPaths(html)
+      .map((path) =>
+        readFileSync(resolve(".next", path.slice("/_next/".length)), "utf8"),
+      )
+      .join("\n");
+    assertProfileStyles(css, `Built ${route} page`);
+  }
+  console.log("PASS: built viewer pages link complete profile styles.");
+}
+
+async function verifySite(origin) {
+  const site = new URL(origin);
+  assert.equal(site.protocol, "https:", "Use the HTTPS site address");
+  assert.ok(
+    !site.username && !site.password,
+    "Do not put credentials in the site address",
+  );
+  const assets = new Map();
+  async function get(path, contentType) {
+    const response = await fetch(new URL(path, site.origin), {
+      headers: { "Cache-Control": "no-cache" },
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(response.status, 200, `${path}: asset request failed`);
+    assert.ok(
+      response.headers.get("content-type")?.startsWith(contentType),
+      `${path}: unexpected content type`,
+    );
+    return response.text();
+  }
+  for (const route of ["/", "/library", "/tv"]) {
+    const html = await get(route, "text/html");
+    const styles = [];
+    for (const path of stylesheetPaths(html)) {
+      if (!assets.has(path)) assets.set(path, await get(path, "text/css"));
+      styles.push(assets.get(path));
+    }
+    assertProfileStyles(styles.join("\n"), `Published ${route}`);
+  }
+  console.log("PASS: the live viewer pages serve complete profile styles.");
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  try {
+    if (process.argv[2] === "--url") await verifySite(process.argv[3]);
+    else verifyBuild();
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+}
