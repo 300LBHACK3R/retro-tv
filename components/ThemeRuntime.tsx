@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useProfiles } from "@/lib/deviceProfiles";
 import { useStore } from "@/lib/store";
 import {
   createThemeCssVars,
   getThemeById,
-  isThemeId,
-  THEME_STORAGE_KEY,
 } from "@/lib/themes";
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
@@ -16,11 +13,10 @@ const THEME_CHANGE_EVENT = "ttv:theme-change";
 /**
  * Keeps the active Tate's TV theme synchronized across every route. The
  * pre-hydration bootstrap handles first paint; this runtime handles live theme
- * changes, metadata, and persisted state updates after React mounts.
+ * changes and metadata after React mounts. Theme choices stay in memory.
  */
 export default function ThemeRuntime() {
   const themeId = useStore((state) => state.themeId);
-  const setTheme = useStore((state) => state.setTheme);
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
@@ -70,31 +66,6 @@ export default function ThemeRuntime() {
       delete root.dataset.ttvReducedMotion;
     };
   }, [preferReducedMotion]);
-
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (useProfiles.getState().activeId) return;
-      if (event.key !== THEME_STORAGE_KEY || !event.newValue) {
-        return;
-      }
-
-      try {
-        const storedState = JSON.parse(event.newValue) as {
-          state?: { themeId?: unknown };
-        };
-        const nextThemeId = storedState.state?.themeId;
-
-        if (isThemeId(nextThemeId) && nextThemeId !== themeId) {
-          setTheme(nextThemeId);
-        }
-      } catch {
-        // Ignore malformed external storage events and keep the current theme.
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [setTheme, themeId]);
 
   useEffect(() => {
     const update = () => {

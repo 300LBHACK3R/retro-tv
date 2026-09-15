@@ -56,6 +56,8 @@ export function assertHalloweenStyles(css, context = "Halloween") {
   for (const name of ["scene", "pumpkins", "sky", "copy", "witch", "bats", "lantern"])
     assert.ok(css.includes(`.ttv-halloween-${name}`), `${context}: missing ${name} styling`);
   assert.ok(css.includes("prefers-reduced-motion"), `${context}: missing reduced motion support`);
+  for (const name of ["ttv-haunted-world", "ttv-haunted-mist", "ttv-haunted-preview-art"])
+    assert.ok(css.includes(name), `${context}: missing ${name}`);
   assert.ok(css.includes("halloween-haunted-arcade"), `${context}: missing second Halloween theme`);
   assert.ok(css.includes("ttv-ghost-float"), `${context}: missing ghost animation`);
   assert.ok(css.includes(".theme-dialog__scroll"), `${context}: missing scrollable theme picker`);
@@ -72,7 +74,7 @@ function verifyBuild() {
       .join("\n");
     assertProfileStyles(css, `Built ${route} page`);
     assertHalloweenStyles(css, `Built ${route} page`);
-    assert.ok(html.includes('data-ttv-theme="halloween-night"'), `${route}: seasonal first paint`);
+    assert.ok(html.includes('data-ttv-theme="halloween-haunted-arcade"'), `${route}: seasonal first paint`);
   }
   console.log("PASS: built viewer pages link profile portrait and Halloween styles with the seasonal first paint.");
 }
@@ -114,7 +116,15 @@ async function verifySite(origin) {
     assert.equal(response.status, 200, `${name}: published portrait is available`);
     assert.ok(response.headers.get("content-type")?.startsWith("image/png"), `${name}: portrait MIME type`);
   }
-  console.log("PASS: the live viewer pages serve complete profile and Halloween styles, with all five portraits.");
+  for (const path of ["/themes/haunted-arcade-world.webp", "/_next/image?url=%2Fthemes%2Fhaunted-arcade-world.webp&w=640&q=75"]) {
+    const response = await fetch(new URL(path, site.origin), {
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(response.status, 200, `${path}: published Haunted Arcade artwork is available`);
+    assert.ok(response.headers.get("content-type")?.startsWith("image/"), `${path}: artwork MIME type`);
+    assert.ok((await response.arrayBuffer()).byteLength > 0, `${path}: artwork is not empty`);
+  }
+  console.log("PASS: live viewer pages serve complete profile and Halloween styles, all five portraits and optimized Haunted Arcade artwork.");
 }
 
 if (

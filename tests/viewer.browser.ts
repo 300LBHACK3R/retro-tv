@@ -206,7 +206,7 @@ test("guide stays readable and keyboard input stays inside the dialog", async ({
   await noPageOverflow(page);
 });
 
-test("theme changes preserve layout and survive reloading cloud programming", async ({
+test("theme changes follow navigation during a visit, are not saved, and reset on reload", async ({
   page,
 }) => {
   await page.goto("/?ch=24");
@@ -234,16 +234,19 @@ test("theme changes preserve layout and survive reloading cloud programming", as
     page.getByRole("region", { name: "Live Tate's TV player" }),
   ).toBeVisible();
   await noPageOverflow(page);
+  // Client navigation keeps the in-memory selection without writing it to profiles.
+  await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
+  await expect(page).toHaveURL(/\/library$/);
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("retro-tv-programming-v1")!).state);
+  expect(stored.themeId).toBeUndefined();
+  expect(stored.themeRevision).toBeUndefined();
+  await page.getByRole("link", { name: "Back to Live TV", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await page.reload();
-  await expect(
-    currentChannel(page).getByRole("heading", {
-      name: "Studio TV",
-      exact: true,
-    }),
-  ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "obsidian-gold",
+    "halloween-haunted-arcade",
   );
 });
 
@@ -332,7 +335,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "electric-blue-live",
+    "halloween-haunted-arcade",
   );
 });
 
@@ -711,7 +714,7 @@ test("mobile guide fits narrow screens, landscape and larger text with reachable
   await expect(dialog).toHaveCount(0);
 });
 
-test("mobile themes are free, open without the keyboard, and save Haunted Arcade with motion off", async ({ page }, testInfo) => {
+test("mobile themes are free, open without the keyboard, and remember reduced motion without saving a theme", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "television");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/library");
@@ -722,7 +725,7 @@ test("mobile themes are free, open without the keyboard, and save Haunted Arcade
   const search = dialog.getByRole("searchbox", { name: "Search Tate's TV themes" });
   await expect(close).toBeFocused();
   await expect(search).not.toBeFocused();
-  await expect(dialog.getByText("All themes are free. Pick a look for this profile.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("All themes are free. Pick a look for this visit.", { exact: true })).toBeVisible();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(dialog.locator(".theme-card:disabled")).toHaveCount(0);
   await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);
@@ -740,7 +743,7 @@ test("mobile themes are free, open without the keyboard, and save Haunted Arcade
   await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(close).toBeInViewport();
-  await dialog.getByRole("button", { name: "Apply theme: Haunted Arcade", exact: true }).click();
+  await dialog.getByRole("button", { name: "Current theme: Haunted Arcade", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");

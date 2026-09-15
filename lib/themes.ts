@@ -72,15 +72,8 @@ export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
 
-export const DEFAULT_THEME_ID: ThemeId = "halloween-night";
-// Introduce the seasonal default once. Later theme choices remain personal.
-export const DEFAULT_THEME_REVISION = "halloween-2026";
-
-export function resolveSavedTheme(id: unknown, revision: unknown): ThemeId {
-  return revision === DEFAULT_THEME_REVISION && isThemeId(id)
-    ? id
-    : DEFAULT_THEME_ID;
-}
+// Theme selection lasts for the current page visit only. Every new visit starts here.
+export const DEFAULT_THEME_ID: ThemeId = "halloween-haunted-arcade";
 
 /** Zustand persistence key used by the pre-hydration theme bootstrap. */
 export const THEME_STORAGE_KEY = "retro-tv-programming-v1";
@@ -158,7 +151,7 @@ export const THEMES = [
     name: "Haunted Arcade",
     shortName: "Haunted Arcade",
     description:
-      "A playful Halloween after hours: pixel pumpkins, friendly floating ghosts, violet skies, and a soft green glow.",
+      "Step into a moonlit pixel arcade: glowing cabinets, a pumpkin courtyard, wandering ghosts, drifting mist, and violet-green cabinet lighting.",
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",
@@ -716,22 +709,4 @@ export function createThemeCssVars(theme: ThemeDefinition): ThemeCssVariables {
     "--ttv-guide-active-bg": vars["--guide-active-bg"],
     "--ttv-guide-current-bg": vars["--guide-current-bg"],
   };
-}
-
-export type ThemeBootstrapEntry = {
-  id: ThemeId;
-  category: ThemeCategory;
-  layout: ThemeLayoutMode;
-  appearance: ThemeAppearance;
-  cssVars: ThemeCssVariables;
-};
-
-export function getThemeBootstrapEntries(): ThemeBootstrapEntry[] {
-  return THEMES.map((theme) => ({
-    id: theme.id,
-    category: theme.category,
-    layout: theme.layout,
-    appearance: theme.appearance,
-    cssVars: createThemeCssVars(theme),
-  }));
 }

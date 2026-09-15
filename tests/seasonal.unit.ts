@@ -1,30 +1,38 @@
 import { test, expect } from "@playwright/test";
 import { runInNewContext } from "node:vm";
 import { createThemeBootstrapScript } from "../components/ThemeBootstrapScript";
-import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme, THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
+import { DEFAULT_THEME_ID, THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
 import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 
-test("first paint uses the seasonal default once and keeps later personal choices", () => {
-  const script = createThemeBootstrapScript();
+test("every first paint starts in Haunted Arcade and ignores legacy theme choices", () => {
   for (const saved of [
     undefined,
     { themeId: "obsidian-gold" },
-    { themeId: "shaw-2006", themeRevision: DEFAULT_THEME_REVISION },
-    { themeId: "halloween-haunted-arcade", themeRevision: DEFAULT_THEME_REVISION },
-    { themeId: "unknown", themeRevision: DEFAULT_THEME_REVISION },
+    { themeId: "shaw-2006", themeRevision: "halloween-2026" },
+    { themeId: "unknown", viewerSettings: { preferReducedMotion: true } },
   ]) {
-    const expected = resolveSavedTheme(saved?.themeId, saved?.themeRevision);
     const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
-    runInNewContext(script, {
+    runInNewContext(createThemeBootstrapScript(), {
       window: { localStorage: { getItem: () => JSON.stringify({ state: saved }) } },
       document: { documentElement: root },
     });
-    expect(root.dataset.ttvTheme).toBe(expected);
+    expect(root.dataset.ttvTheme).toBe("halloween-haunted-arcade");
+    expect(root.dataset.ttvReducedMotion === "true").toBe(!!saved?.viewerSettings?.preferReducedMotion);
   }
-  expect(DEFAULT_THEME_ID).toBe("halloween-night");
-  expect(resolveSavedTheme("obsidian-gold", DEFAULT_THEME_REVISION)).toBe("obsidian-gold");
+  expect(DEFAULT_THEME_ID).toBe("halloween-haunted-arcade");
+});
+
+test("the default first paint works when browser storage is blocked or malformed", () => {
+  for (const getItem of [() => { throw new Error("Storage blocked"); }, () => "bad-json"]) {
+    const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
+    runInNewContext(createThemeBootstrapScript(), {
+      window: { localStorage: { getItem } }, document: { documentElement: root },
+    });
+    expect(root.dataset.ttvTheme).toBe("halloween-haunted-arcade");
+    expect(root.style.colorScheme).toBe("dark");
+  }
 });
 
 const kids: Channel = { ...programming.channels[0]!, adPolicy: { enabled: true, allowGlobalAds: true }, kidsApproved: false };

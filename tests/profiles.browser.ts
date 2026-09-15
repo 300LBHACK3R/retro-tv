@@ -1,7 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
-import { DEFAULT_THEME_REVISION } from "../lib/themes";
 const video = Buffer.from(
   readFileSync("tests/fixtures/test-video.webm.base64", "utf8"),
   "base64",
@@ -433,7 +432,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   ).toBe(true);
 });
 
-test("Halloween entrance loads portraits, respects motion controls and keeps a later personal theme", async ({ page }) => {
+test("Haunted Arcade entrance loads portraits, remembers accessibility and resets temporary themes", async ({ page }) => {
   await page.addInitScript(() => {
     if (localStorage.getItem("ttv-profiles-v1")) return;
     // A returning household from before the seasonal release.
@@ -446,27 +445,42 @@ test("Halloween entrance loads portraits, respects motion controls and keeps a l
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
   const scene = page.getByRole("complementary", { name: "Halloween on Tate’s TV" });
   await expect(scene).toBeVisible();
-  const witch = scene.locator(".ttv-halloween-witch");
-  await expect(witch).toHaveCSS("animation-name", "ttv-witch-flight");
+  await expect(scene).toHaveAttribute("data-entrance", "true");
+  const backdrop = scene.locator(".ttv-haunted-backdrop");
+  await expect.poll(() => backdrop.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
+  const entranceBounds = await scene.boundingBox();
+  const chooserBounds = await page.locator(".ttv-profile-chooser").boundingBox();
+  // The artwork joins the profile panel without covering any profile controls.
+  expect(Math.abs(entranceBounds!.y + entranceBounds!.height - chooserBounds!.y)).toBeLessThanOrEqual(2);
+  if (page.viewportSize()!.width <= 760) expect(entranceBounds!.height).toBeLessThanOrEqual(200);
+  const ghost = scene.locator(".ttv-haunted-ghost").first();
+  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
+  await page.locator(".ttv-profile-footer").scrollIntoViewIfNeeded();
+  // On short viewports the scene is offscreen while choosing a profile.
+  if ((await scene.boundingBox())!.y + (await scene.boundingBox())!.height <= 0) {
+    await expect(scene).toHaveAttribute("data-scene-visible", "false");
+    await expect(ghost).toHaveCSS("animation-play-state", "paused");
+  }
+  await scene.scrollIntoViewIfNeeded();
   await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
   // The shared accessibility rule is `animation: none !important`, which
   // removes the animation and resets animation-play-state to its initial value.
   // Verify that motion is absent rather than expecting a paused animation.
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(ghost).toHaveCSS("animation-name", "none");
   await page.reload();
   await expect(scene.getByRole("button", { name: "Effects paused" })).toHaveAttribute("aria-pressed", "true");
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(ghost).toHaveCSS("animation-name", "none");
   await scene.getByRole("button", { name: "Effects paused" }).click();
-  await expect(witch).toHaveCSS("animation-name", "ttv-witch-flight");
+  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(ghost).toHaveCSS("animation-name", "none");
   await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
   await scene.getByRole("button", { name: "Effects paused" }).click();
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(ghost).toHaveCSS("animation-name", "none");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
   await expect.poll(() => portraits.evaluateAll((items: HTMLImageElement[]) => items.every((item) => item.complete && item.naturalWidth > 0))).toBe(true);
@@ -478,6 +492,14 @@ test("Halloween entrance loads portraits, respects motion controls and keeps a l
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).themeRevision)).toBe(DEFAULT_THEME_REVISION);
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  const savedProfiles = await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles);
+  expect(savedProfiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
+  await switchProfile(page);
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(scene).toHaveAttribute("data-entrance", "true");
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
 });

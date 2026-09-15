@@ -2,7 +2,7 @@ import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme, isThemeId, THEME_STORAGE_KEY } from "./themes";
+import { DEFAULT_THEME_ID, isThemeId, THEME_STORAGE_KEY } from "./themes";
 import type {
   AdCategory,
   AdChannelTarget,
@@ -1876,7 +1876,7 @@ export const useStore = create<AppState>()(
       version: programmingStoreVersion,
 
       merge: (persistedState, currentState) => {
-        const saved = persistedState as (Partial<AppState> & { themeRevision?: string }) | undefined;
+        const saved = persistedState as (Partial<AppState>) | undefined;
 
         const deletedMediaIds = Array.isArray(saved?.deletedMediaIds)
           ? dedupeStrings(saved.deletedMediaIds)
@@ -1929,7 +1929,7 @@ export const useStore = create<AppState>()(
            */
           appMode: "viewer",
           isSettingsOpen: false,
-          themeId: resolveSavedTheme(saved?.themeId, saved?.themeRevision),
+          themeId: DEFAULT_THEME_ID,
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
           deletedMediaIds,
           viewerSettings: normalizeViewerSettings(saved?.viewerSettings),
@@ -1943,7 +1943,6 @@ export const useStore = create<AppState>()(
         );
 
         return {
-          themeRevision: DEFAULT_THEME_REVISION,
           media: normalized.media,
           channels: normalized.channels,
           currentChannelId: state.currentChannelId,
@@ -1951,7 +1950,6 @@ export const useStore = create<AppState>()(
           sidebarWidth: state.sidebarWidth,
           guideHeight: state.guideHeight,
           appMode: "viewer" as AppMode,
-          themeId: state.themeId,
           ownedPremiumThemes: state.ownedPremiumThemes,
           deletedMediaIds: state.deletedMediaIds,
           viewerSettings: {

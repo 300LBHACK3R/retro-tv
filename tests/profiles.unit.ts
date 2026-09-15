@@ -21,7 +21,7 @@ import {
   saveProfile,
   PROFILE_STORAGE_KEY,
 } from "../lib/deviceProfiles";
-import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION } from "../lib/themes";
+import { DEFAULT_THEME_ID } from "../lib/themes";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 const programme: MediaItem = { ...programming.media[0]!, kidsApproved: true };
@@ -215,7 +215,7 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
     ),
   ).toHaveLength(5);
 });
-test("the seasonal profile migration runs once, preserves profiles and PIN, and keeps later theme choices", () => {
+test("legacy theme preferences are removed without losing profiles or PIN; every profile starts with the default", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const session = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
   function memory() {
@@ -246,24 +246,28 @@ test("the seasonal profile migration runs once, preserves profiles and PIN, and 
     }));
     useProfiles.setState({ ready: false });
     initializeProfiles();
-    expect(
-      useProfiles.getState().profiles.find((profile) => profile.id === "main")
-        ?.theme,
-    ).toBe(DEFAULT_THEME_ID);
+    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
+    expect(useProfiles.getState().profiles.every((profile) => !("theme" in profile))).toBe(true);
     expect(useProfiles.getState().pin).toEqual(pin);
     expect(useProfiles.getState().failures).toBe(2);
     expect(useProfiles.getState().profiles[0]).toMatchObject({ name: "Tate", avatar: "moon" });
-    expect(useProfiles.getState().profiles[1]).toMatchObject({ kids: true, theme: DEFAULT_THEME_ID });
-    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).themeRevision).toBe(DEFAULT_THEME_REVISION);
+    expect(useProfiles.getState().profiles[1]).toMatchObject({ kids: true });
+    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).themeRevision).toBeUndefined();
     activateProfile("main");
     expect(useStore.getState().currentChannelId).toBe("1");
-    saveProfile({ ...useProfiles.getState().profiles[0]!, theme: "obsidian-gold" });
+    useStore.getState().setTheme("obsidian-gold");
+    saveProfile({ ...useProfiles.getState().profiles[0]!, name: "Tate updated" });
+    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).profiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
     useProfiles.setState({ ready: false });
     initializeProfiles();
     lockProfiles();
     useStore.getState().setTheme("electric-blue-live");
     activateProfile("main");
-    expect(useStore.getState().themeId).toBe("obsidian-gold");
+    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
+    expect(useProfiles.getState().profiles[0]!.name).toBe("Tate updated");
+    useStore.getState().setTheme("shaw-2006");
+    activateProfile("kids");
+    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
     const revision = useProfiles.getState().revision;
     refreshProfiles();
     expect(useProfiles.getState().activeId).toBeNull();

@@ -100,6 +100,12 @@ try {
     assert.equal(thumbnail.status, 200, `${name}: optimized portrait is available`);
     assert.match(thumbnail.headers["content-type"], /^image\//);
   }
+  const backdrop = await get("/themes/haunted-arcade-world.webp", "HEAD");
+  assert.equal(backdrop.status, 200, "Haunted Arcade backdrop is available");
+  assert.match(backdrop.headers["content-type"], /^image\/webp\b/);
+  const mobileBackdrop = await get("/_next/image?url=%2Fthemes%2Fhaunted-arcade-world.webp&w=640&q=75");
+  assert.equal(mobileBackdrop.status, 200, "Haunted Arcade mobile optimization works");
+  assert.match(mobileBackdrop.headers["content-type"], /^image\//);
   for (const path of [
     "/admin",
     "/backup",

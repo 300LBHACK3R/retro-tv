@@ -2,9 +2,8 @@
 import { create } from "zustand";
 import { useDeviceLibrary } from "./deviceLibrary";
 import { useStore } from "./store";
-import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme, isThemeId } from "./themes";
+import { DEFAULT_THEME_ID } from "./themes";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
-import type { ThemeId } from "./types";
 
 export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
 export const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
@@ -14,11 +13,9 @@ export type Profile = {
   name: string;
   kids: boolean;
   avatar: (typeof AVATARS)[number];
-  theme?: ThemeId;
 };
 type Pin = { salt: string; hash: string };
 type Data = {
-  themeRevision?: string;
   profiles: Profile[];
   pin: Pin | null;
   failures: number;
@@ -47,7 +44,6 @@ export function sanitizeProfiles(value: unknown): Profile[] {
       name,
       kids: entry.id === "main" ? false : entry.kids === true,
       avatar: AVATARS.includes(entry.avatar) ? entry.avatar : "sun",
-      theme: isThemeId(entry.theme) ? entry.theme : undefined,
     });
   }
   if (!unique.has("main")) unique.set("main", { ...defaults[0]! });
@@ -72,11 +68,8 @@ function readData(): Data {
       ? data.pin
       : null;
   return {
-    themeRevision: DEFAULT_THEME_REVISION,
-    profiles: sanitizeProfiles(data.profiles).map((profile) => ({
-      ...profile,
-      theme: resolveSavedTheme(profile.theme, data.themeRevision),
-    })),
+    // Drop legacy theme fields while preserving household profiles and PINs.
+    profiles: sanitizeProfiles(data.profiles),
     pin,
     failures: Number.isInteger(data.failures)
       ? Math.min(5, Math.max(0, data.failures!))
@@ -108,7 +101,7 @@ function saveData() {
   try {
     localStorage.setItem(
       PROFILE_STORAGE_KEY,
-      JSON.stringify({ profiles, pin, failures, lockedUntil, themeRevision: DEFAULT_THEME_REVISION }),
+      JSON.stringify({ profiles, pin, failures, lockedUntil }),
     );
   } catch {
     useProfiles.setState({ storageAvailable: false });
@@ -149,15 +142,13 @@ export function initializeProfiles() {
     useProfiles.setState({ storageAvailable: false });
   }
   useProfiles.setState({ ...data, activeId, ready: true });
+  useStore.getState().setTheme(DEFAULT_THEME_ID);
   if (activeId) {
     useDeviceLibrary.getState().selectProfile(activeId);
-    const theme = data.profiles.find(
-      (profile) => profile.id === activeId,
-    )?.theme;
-    if (theme) useStore.getState().setTheme(theme);
   }
 }
 export function lockProfiles() {
+  useStore.getState().setTheme(DEFAULT_THEME_ID);
   useProfiles.setState({ activeId: null });
   saveSession(null);
 }
@@ -175,9 +166,7 @@ export function activateProfile(id: string) {
   if (!profile || (profile.kids && !useProfiles.getState().pin)) return;
   useDeviceLibrary.getState().selectProfile(id);
   const state = useStore.getState();
-  state.setTheme(
-    profile.theme ?? (id === "main" ? state.themeId : DEFAULT_THEME_ID),
-  );
+  state.setTheme(DEFAULT_THEME_ID);
   state.setChannel(
     state.channels.find((channel) => Number(channel.number ?? channel.id) === 1)
       ?.id ?? "1",

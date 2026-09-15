@@ -5,10 +5,7 @@ import {
   initializeProfiles,
   PROFILE_STORAGE_KEY,
   refreshProfiles,
-  saveProfile,
-  useProfiles,
 } from "@/lib/deviceProfiles";
-import { useStore } from "@/lib/store";
 export default function DeviceLibraryRuntime() {
   useEffect(() => {
     void useDeviceLibrary.persist.rehydrate();
@@ -20,16 +17,8 @@ export default function DeviceLibraryRuntime() {
         void useDeviceLibrary.persist.rehydrate();
     };
     window.addEventListener("storage", sync);
-    const unsubscribe = useStore.subscribe((state, previous) => {
-      if (state.themeId === previous.themeId) return;
-      const profile = useProfiles
-        .getState()
-        .profiles.find((item) => item.id === useProfiles.getState().activeId);
-      if (profile) saveProfile({ ...profile, theme: state.themeId });
-    });
     return () => {
       window.removeEventListener("storage", sync);
-      unsubscribe();
     };
   }, []);
   return null;

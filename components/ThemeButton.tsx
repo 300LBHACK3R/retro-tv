@@ -11,6 +11,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
+import hauntedWorld from "@/public/themes/haunted-arcade-world.webp";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
@@ -120,11 +122,15 @@ function ThemeCard({
         style={previewStyle}
         aria-hidden="true"
       >
+        {theme.id === "halloween-haunted-arcade" ? (
+          <Image src={hauntedWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-haunted-preview-art" />
+        ) : (
         <span className="theme-card__preview-ui">
           <span />
           <span />
           <span />
         </span>
+        )}
         <span className="theme-card__status">
           {isActive ? "Active" : accessLabel}
         </span>
@@ -422,8 +428,8 @@ export default function ThemeButton() {
                       className="theme-dialog__description"
                     >
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
-                        ? "All themes are free. Pick a look for this profile."
-                        : "Pick a look for this profile."}
+                        ? "All themes are free. Pick a look for this visit."
+                        : "Pick a look for this visit."}
                     </p>
                   </div>
 
