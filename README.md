@@ -81,7 +81,7 @@ Missing metrics configuration disables collection without interrupting viewing. 
 
 Phones use their hardware volume. The local video ignores saved desktop volume/mute settings; a tap-to-start prompt still handles browser autoplay restrictions. TV volume remains available when controlling a Cast receiver, since it is a different device.
 
-Rotate to landscape to fill the web viewport; portrait restores the page. Native browser chrome is controlled by the browser, so the app does not depend on a fullscreen API gesture. Opening the guide keeps the same video mounted above the listings. Mini mode remains floating through rotation and returns after closing the guide. No phone volume slider or fullscreen-entry button is shown. Desktop controls remain available.
+Rotate to landscape to fill the web viewport; portrait restores the page. Native browser chrome is controlled by the browser, so the app does not depend on a fullscreen API gesture. Opening the guide keeps the same video mounted above the listings. Choose **More > Mini** for the floating player; it remains floating through rotation and returns after closing the guide. No phone remote, volume slider or fullscreen-entry button is shown. The on-screen remote remains available on desktop and in TV mode.
 
 ## Keep one clean working folder
 

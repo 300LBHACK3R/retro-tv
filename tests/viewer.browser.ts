@@ -845,7 +845,7 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
 test("phones use hardware volume, expand on rotation and preserve the floating mini player", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "television");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => localStorage.setItem("retro-tv-player-controls-v1", JSON.stringify({ version: 3, state: { volume: 0, muted: true } })));
+  await page.addInitScript(() => localStorage.setItem("retro-tv-player-controls-v1", JSON.stringify({ version: 3, state: { volume: 0, muted: true, remoteMinimized: false } })));
   await page.goto("/?ch=24");
   await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   const root = page.locator(".ttv-premium-viewer-shell");
@@ -858,17 +858,17 @@ test("phones use hardware volume, expand on rotation and preserve the floating m
   await expect(video).toHaveJSProperty("volume", 1);
   await video.evaluate((element) => element.setAttribute("data-test-player-identity", "original"));
   await page.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
-  await page.getByRole("button", { name: "Remote", exact: true }).click();
-  const remote = page.getByRole("region", { name: "On-screen remote", exact: true });
-  await expect(remote).toBeVisible();
-  await expect(remote.getByRole("slider", { name: "Volume", exact: true })).toHaveCount(0);
-  await expect(remote.getByRole("button", { name: /^(Mute|Muted|Full)$/ })).toHaveCount(0);
+  await expect(page.locator(".ttv-remote-launcher, .ttv-remote-panel")).toHaveCount(0);
+  await expect(frame.getByRole("slider", { name: "Volume", exact: true })).toHaveCount(0);
   await expect(frame.locator(".ttv-player-controls").getByRole("button", { name: "Full", exact: true })).toHaveCount(0);
-  await remote.getByRole("button", { name: "Mini", exact: true }).click();
-  await remote.getByRole("button", { name: "Minimize remote", exact: true }).click();
+  await openMore(page);
+  const more = page.getByRole("dialog", { name: "More from Tate's TV", exact: true });
+  await more.getByRole("button", { name: /^Mini\b/ }).click();
+  await more.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await expect(root).toHaveAttribute("data-player-mode", "mini");
   await page.setViewportSize({ width: 568, height: 320 });
   await expect(root).toHaveAttribute("data-mobile-landscape", "true");
+  await expect(page.locator(".ttv-remote-launcher, .ttv-remote-panel")).toHaveCount(0);
   await expect(frame).toHaveCSS("position", "fixed");
   expect((await frame.boundingBox())!.width).toBeLessThan(568);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -889,10 +889,9 @@ test("phones use hardware volume, expand on rotation and preserve the floating m
   await expect(frame).toHaveCSS("position", "fixed");
   await expect(root).toHaveAttribute("data-player-mode", "mini");
   await page.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
-  await page.getByRole("button", { name: "Remote", exact: true }).click();
-  await expect(remote).toBeVisible();
-  await remote.getByRole("button", { name: "Normal", exact: true }).click();
-  await remote.getByRole("button", { name: "Minimize remote", exact: true }).click();
+  await openMore(page);
+  await more.getByRole("button", { name: /^Normal\b/ }).click();
+  await more.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await page.setViewportSize({ width: 568, height: 320 });
   await expect(root).toHaveAttribute("data-mobile-landscape", "true");
   await expect(stage).toBeVisible();

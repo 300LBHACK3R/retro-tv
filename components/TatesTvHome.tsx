@@ -451,7 +451,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
                       compact={!tvMode && playerViewMode === "mini"}
                     />
                     <StaticTransition trigger={activeChannel?.id ?? ""} />
-                    <Remote tvMode={tvMode} />
+                    {tvMode || !mobileLayout ? <Remote tvMode={tvMode} /> : null}
                   </div>
                 </section>
               </div>
