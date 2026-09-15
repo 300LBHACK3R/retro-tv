@@ -430,7 +430,7 @@
 .ttv-premium-viewer-shell[data-mobile-guide-open="true"] > .ttv-premium-frame { flex: 0 0 auto; min-height: 0; width: 100%; max-width: none; padding: 0; gap: 0; }
 .ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-premium-stage-grid { display: block; margin: 0; padding: 0; }
 .ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-live-stage { margin: 0; }
-.ttv-premium-viewer-shell[data-mobile-guide-open="true"] :is(.ttv-premium-topbar, .ttv-halloween-scene, .ttv-premium-stage-sidebar, .ttv-mini-player-placeholder, .ttv-channel-rail-section, .ttv-discovery, .ttv-premium-footer, .ttv-skip-link, .ttv-mobile-viewer-nav, .ttv-remote-launcher, .ttv-remote-panel) { display: none !important; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] :is(.ttv-premium-topbar, .ttv-halloween-scene, .ttv-premium-stage-sidebar, .ttv-mini-player-placeholder, .ttv-channel-rail-section, .ttv-premium-footer, .ttv-skip-link, .ttv-mobile-viewer-nav, .ttv-remote-launcher, .ttv-remote-panel) { display: none !important; }
 .ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-premium-player-frame {
   position: relative !important;
   inset: auto !important;

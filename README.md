@@ -19,10 +19,10 @@ Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A s
 
 - Live playback with bounded connection retries, offline recovery, autoplay prompts and programme reporting.
 - A 72-hour desktop guide and a mobile **On now** list, using the same schedule as the player. On mobile, the same live player stays visible above a compact cable-style list: station logos on the left, current and next programmes on the right, with category tabs, search and favourites. Tap a live programme to tune while keeping the guide open. **Schedule** opens that channel’s upcoming day of listings; time jumps, local day labels and **Show more programmes** make longer schedules readable. Returning to On now restores your place. Upcoming mobile listings never change playback. Desktop listings tune the channel’s current broadcast and support row density and directional keys.
-- “Tonight on Tate’s TV” and “On now” selections from actual station schedules.
+- The live page stays focused on playback and channel controls; browse programmes in the Guide or the on-demand Library.
 - Favourite channels, a programme watchlist and on-demand resume saved on the current browser. They are separate from cloud programming updates. Storage being blocked must not prevent playback.
 - Eleven themes, all free. **Halloween After Dark** is the starting theme on every fresh page load and profile selection. Its full-page moonlit manor, friendly skeletons, pumpkins, flying witch and fog render with the initial HTML, including behind the profile chooser. **Haunted Arcade** is a separate full-page pixel world with glowing cabinets, pumpkin lanterns, a haunted tower, friendly ghosts, mist and violet-green light. Both have desktop and portrait compositions and coordinated guide/menu surfaces. Theme changes stay in memory across client-side navigation; a refresh, new visit or profile switch returns to After Dark. Old saved theme choices are discarded without touching profiles, PINs, favourites or progress. There is no pause-effects button. More > Reduce motion and the device accessibility preference still remove motion, and the app setting is remembered. Hidden tabs pause animations. Accounts, payments and saved theme preferences are deferred.
-- Mobile theme selection opens without focusing search, uses one scrollable library and keeps Close/Done above the keyboard. The mobile guide has a sticky On now bar with Find/Your channel shortcuts, a sticky schedule Back bar and compact filters. Seasonal banners shrink on phones and step aside during landscape viewing.
+- Mobile theme selection opens without focusing search, uses one scrollable library and keeps Close/Done above the keyboard. The mobile guide has a sticky On now bar with Find/Your channel shortcuts, a sticky schedule Back bar and compact filters. Full-page seasonal artwork adapts to phones and stays behind the viewer controls.
 - Poster artwork with a title-based fallback when artwork is absent or cannot load.
 
 ## Profiles, Kids mode & channel categories
@@ -65,7 +65,7 @@ Missing metrics configuration disables collection without interrupting viewing. 
 
 | Location                                                          | Responsibility                                                   |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `components/viewer/`                                              | Viewer controls, discovery, saved items, recovery and navigation |
+| `components/viewer/`                                              | Viewer controls, guide, saved items, recovery and navigation |
 | `components/MultiGuide.tsx`                                       | Responsive guide presentation and visible timeline rendering     |
 | `components/viewer/MobileGuide.tsx`                               | Mobile channel comparison and paged channel schedules            |
 | `lib/guideTimeline.ts`                                            | Guide projection from broadcast schedules                        |

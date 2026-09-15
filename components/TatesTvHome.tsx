@@ -14,7 +14,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { useSpatialNavigation } from "@/components/viewer/useSpatialNavigation";
-import DailyDiscovery from "@/components/viewer/DailyDiscovery";
 import SaveButton from "@/components/viewer/SaveButton";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import ProfileGate from "@/components/viewer/ProfileGate";
@@ -495,7 +494,6 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
           </>
         )}
 
-        {!tvMode ? <DailyDiscovery onTune={selectChannel} /> : null}
         {!tvMode ? <ViewerFooter /> : null}
       </div>
 

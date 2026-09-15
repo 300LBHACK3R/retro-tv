@@ -154,74 +154,6 @@
   letter-spacing: 0.15em;
   margin-top: auto;
 }
-.ttv-discovery {
-  min-width: 0;
-}
-.ttv-discovery-heading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: end;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-.ttv-discovery-heading h2 {
-  margin: 0.35rem 0;
-  font-size: clamp(1.35rem, 2vw, 1.8rem);
-  font-weight: 750;
-  letter-spacing: -0.04em;
-}
-.ttv-discovery-heading p {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-.ttv-discovery-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-}
-.ttv-programme-card {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  overflow: hidden;
-  background: var(--panel-bg);
-}
-.ttv-programme-card__body {
-  padding: 1rem;
-}
-.ttv-programme-card__body > span {
-  display: block;
-  color: var(--primary);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-.ttv-programme-card h3 {
-  margin: 0.5rem 0 0.35rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.ttv-programme-card p {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.ttv-programme-card__actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-.ttv-programme-card__actions .ttv-section-action {
-  white-space: normal;
-  text-align: center;
-  text-decoration: none;
-}
 .ttv-player-notice {
   display: flex;
   align-items: center;
@@ -329,11 +261,6 @@
   font-weight: 700;
   margin-bottom: 0.3rem;
 }
-@media (max-width: 1000px) {
-  .ttv-discovery-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 760px) {
   .ttv-channel-tile {
     flex-basis: 9.5rem;
@@ -343,16 +270,6 @@
   }
   .ttv-station-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 440px) {
-  .ttv-discovery-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-@media (orientation: landscape) and (max-height: 560px) and (max-width: 1000px) {
-  .ttv-discovery {
-    display: none;
   }
 }
 
