@@ -14,8 +14,10 @@ const helpSections = [
     items: [
       "Open the main app and let the current channel load.",
       "Use the channel controls to move between channels.",
-      "Open the guide to see what is currently playing.",
-      "Use fullscreen for the best retro TV experience.",
+      "Open the guide to see what is currently playing. On a phone, tap a live programme to tune while you keep browsing.",
+      "Use your phone's volume buttons. Turn it sideways to fill the screen, then upright to return.",
+      "Choose More, then Mini, to keep a floating player while browsing. Mini stays floating when you rotate your phone.",
+      "On a laptop or desktop, use Full to enter fullscreen.",
     ],
   },
   {

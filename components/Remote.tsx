@@ -3,6 +3,7 @@
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
 import type { Channel, PlayerViewMode } from "@/lib/types";
@@ -202,6 +203,7 @@ function RemoteButton({
 }
 
 export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
+  const mobileLayout = useMobileGuideLayout();
   const { channels } = useViewerCatalog();
   const currentChannelId = useStore((state) => state.currentChannelId);
   const setChannel = useStore((state) => state.setChannel);
@@ -664,6 +666,7 @@ export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
         </RemoteButton>
       </div>
 
+      {!mobileLayout ? (
       <div className="mt-2 grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
         <RemoteButton onClick={toggleMuteMode} danger={muted}>
           {muted ? "Muted" : "Mute"}
@@ -690,8 +693,14 @@ export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
 
         <RemoteButton onClick={toggleFullscreenWithStatus}>Full</RemoteButton>
       </div>
+      ) : (
+        <div className="mt-2">
+          <RemoteButton onClick={toggleFitModeWithStatus}>{getFitModeLabel(fitMode)}</RemoteButton>
+        </div>
+      )}
 
       <div
+        hidden={mobileLayout}
         className="mt-2 text-[10px] leading-4"
         style={{ color: "var(--text-muted)" }}
       >

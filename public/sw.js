@@ -1,4 +1,4 @@
-const CACHE_NAME = "tates-tv-app-shell-v6-daily-tv";
+const CACHE_NAME = "tates-tv-app-shell-v7-assets";
 const APP_SHELL_URLS = [
   "/offline",
   "/help",
@@ -7,7 +7,7 @@ const APP_SHELL_URLS = [
   "/manifest.webmanifest",
   "/favicon.ico",
   "/favicon.svg",
-  "/retro-logo.png",
+  "/tatestv-logo.png",
   "/apple-icon-180.png",
   "/favicon-512.png",
   "/maskable-icon.svg",

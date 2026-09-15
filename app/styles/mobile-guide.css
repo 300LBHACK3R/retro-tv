@@ -1,4 +1,4 @@
-/* One scrolling surface per view; no horizontal timeline on touch screens. */
+/* A compact cable-style guide: station rail, live programme strips and one vertical scroll. */
 .ttv-mobile-guide {
   display: flex;
   flex: 1;
@@ -95,82 +95,83 @@
 .ttv-mobile-channel-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.65rem;
-  padding: 0 0.75rem 1rem;
+  gap: 1px;
+  padding: 0 0 .75rem;
   margin: 0;
   list-style: none;
+  background: var(--border);
 }
 .ttv-mobile-channel {
+  display: grid;
+  grid-template-columns: clamp(76px, 22vw, 112px) minmax(0, 1fr);
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--ttv-radius-control);
-  padding: 0.4rem 0.7rem 0.7rem;
+  border-left: 3px solid transparent;
+  background: var(--panel-bg);
+}
+.ttv-mobile-channel[data-current="true"] { border-left-color: var(--primary); }
+.ttv-mobile-channel-station {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: .35rem .25rem;
+  border-right: 1px solid var(--border);
   background: var(--panel-alt-bg);
 }
-.ttv-mobile-channel[data-current="true"] {
-  border-color: var(--primary);
-}
-.ttv-mobile-channel-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  gap: 0.35rem;
+.ttv-mobile-station-tune {
+  display: flex;
   align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: .2rem;
+  width: 100%;
+  padding: .35rem 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
 }
-.ttv-mobile-channel-top .ttv-save-button {
-  width: 44px;
-  min-width: 44px;
-}
-.ttv-mobile-open-schedule {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: center;
+.ttv-mobile-channel-logo { display: grid; place-items: center; width: 100%; height: 2.5rem; font: 800 .75rem ui-monospace, monospace; }
+.ttv-mobile-channel-logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.ttv-mobile-channel-number { color: var(--primary); font: 700 .65rem ui-monospace, monospace; }
+.ttv-mobile-channel-name { font-size: .65rem; font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; }
+.ttv-mobile-channel-station .ttv-save-button { min-width: 44px; width: 44px; min-height: 44px; padding: .35rem; }
+.ttv-mobile-channel-programmes { min-width: 0; }
+.ttv-mobile-airing {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
   width: 100%;
   min-width: 0;
-  padding: 0;
+  padding: .75rem .85rem .45rem;
   border: 0;
   background: transparent;
+  color: var(--text);
   text-align: left;
 }
-.ttv-mobile-channel-number {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.ttv-mobile-channel-name {
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-.ttv-mobile-schedule-link {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.ttv-mobile-channel-broadcast,
-.ttv-mobile-schedule-live {
+.ttv-mobile-airing[aria-pressed="true"] { background: var(--button-bg); box-shadow: inset 0 0 0 1px var(--primary); }
+.ttv-mobile-airing-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .2rem .65rem; color: var(--text-muted); font: .65rem ui-monospace, monospace; }
+.ttv-mobile-airing-meta > span:first-child { color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.ttv-mobile-airing strong { font-size: .95rem; line-height: 1.35; font-weight: 750; overflow-wrap: anywhere; }
+.ttv-mobile-airing-time { font: .65rem ui-monospace, monospace; color: var(--text-muted); }
+.ttv-mobile-airing .ttv-mobile-progress { display: block; width: 100%; height: 3px; margin-top: .25rem; background: var(--border); }
+.ttv-mobile-progress > span { display: block; height: 100%; background: var(--primary); }
+.ttv-mobile-open-schedule {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
-  padding-block: 0.4rem;
-}
-.ttv-mobile-channel-broadcast h3 {
-  font-size: 1rem;
-  line-height: 1.4;
-  font-weight: 650;
-  overflow-wrap: anywhere;
-}
-.ttv-mobile-channel-broadcast p,
-.ttv-mobile-next {
-  font-size: 0.75rem;
-  line-height: 1.5;
+  grid-template-columns: minmax(0, 1fr) 1rem;
+  gap: .15rem .5rem;
+  width: 100%;
+  min-width: 0;
+  padding: .5rem .85rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
   color: var(--text-muted);
+  text-align: left;
 }
-.ttv-mobile-channel-broadcast p {
-  margin-top: 0.25rem;
-}
+.ttv-mobile-next-time { font: .6rem ui-monospace, monospace; }
+.ttv-mobile-open-schedule strong { grid-column: 1; font-size: .75rem; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+.ttv-mobile-schedule-link { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--primary); font-size: 1.3rem; }
+.ttv-mobile-schedule-live { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; align-items: center; padding-block: .4rem; }
 .ttv-mobile-watch {
   display: inline-flex;
   align-items: center;
@@ -188,23 +189,6 @@
 }
 .ttv-mobile-watch > span {
   font-size: 0.65rem;
-}
-.ttv-mobile-progress {
-  height: 2px;
-  margin-block: 0.4rem;
-  background: var(--border);
-}
-.ttv-mobile-progress span {
-  display: block;
-  height: 100%;
-  background: var(--primary);
-}
-.ttv-mobile-next {
-  overflow-wrap: anywhere;
-}
-.ttv-mobile-next > span {
-  font-weight: 650;
-  margin-right: 0.3rem;
 }
 .ttv-mobile-schedule-toolbar {
   position: sticky;
@@ -359,23 +343,6 @@
   font-size: 0.9rem;
   font-weight: 650;
 }
-@media (min-width: 700px) {
-  .ttv-mobile-channel-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 359px) {
-  .ttv-mobile-open-schedule {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.25rem;
-  }
-  .ttv-mobile-schedule-link {
-    grid-column: 2;
-  }
-  .ttv-mobile-channel-name {
-    font-size: 0.85rem;
-  }
-}
 @media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
   .ttv-guide-dialog {
     /* Insets belong to the shell only; children must not apply them twice. */
@@ -434,3 +401,85 @@
   /* The schedule remains scrollable even with large text in a short viewport. */
   .ttv-mobile-schedule-toolbar { padding-block: .25rem; }
 }
+
+/* Category tabs mirror the quick channel browsing of a modern live TV app. */
+.ttv-mobile-guide .ttv-guide-tools { display: block; padding: 0; }
+.ttv-mobile-guide .ttv-guide-tools > label:not([hidden]) { display: block; margin: .5rem .75rem; }
+.ttv-mobile-guide .ttv-guide-tools > label input { width: 100%; padding: .65rem; }
+.ttv-mobile-guide .ttv-guide-tools > span { display: none; }
+.ttv-mobile-category-tabs { display: flex; gap: .35rem; overflow-x: auto; padding: .35rem .65rem; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.ttv-mobile-category-tabs button { flex: 0 0 auto; padding: .55rem .8rem; border: 1px solid transparent; border-radius: 4px; white-space: nowrap; font-size: .75rem; color: var(--text-muted); background: var(--panel-alt-bg); }
+.ttv-mobile-category-tabs button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); font-weight: 750; }
+.ttv-mobile-now-heading { margin: 0; gap: .25rem; padding: 0 .65rem; border-top: 1px solid var(--border); }
+.ttv-mobile-now-heading h2 { font: 800 .8rem ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+.ttv-mobile-now-heading time { font: .65rem ui-monospace, monospace; }
+/* Keep the original video mounted. The entire mobile viewer is the dialog. */
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] {
+  position: fixed;
+  inset: var(--ttv-dialog-top, 0px) 0 auto;
+  z-index: 2147482500;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: var(--ttv-dialog-height, 100dvh);
+  min-height: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow: hidden;
+  background: var(--panel-bg) !important;
+}
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] > .ttv-premium-frame { flex: 0 0 auto; min-height: 0; width: 100%; max-width: none; padding: 0; gap: 0; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-premium-stage-grid { display: block; margin: 0; padding: 0; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-live-stage { margin: 0; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] :is(.ttv-premium-topbar, .ttv-halloween-scene, .ttv-premium-stage-sidebar, .ttv-mini-player-placeholder, .ttv-channel-rail-section, .ttv-discovery, .ttv-premium-footer, .ttv-skip-link, .ttv-mobile-viewer-nav, .ttv-remote-launcher, .ttv-remote-panel) { display: none !important; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-premium-player-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: min(56.25vw, calc(var(--ttv-dialog-height, 100dvh) * .28), 15rem) !important;
+  max-height: none !important;
+  min-height: 0;
+  aspect-ratio: auto !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+.ttv-guide-inline { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; }
+.ttv-guide-inline .ttv-guide-dialog-header { flex: 0 0 auto; min-height: 3rem; padding: .25rem .75rem; border-radius: 0; border-width: 0 0 1px; background: var(--panel-bg); box-shadow: none; }
+.ttv-guide-inline .ttv-guide-dialog-title > :is(span, small) { display: none; }
+.ttv-guide-inline .ttv-guide-dialog-title strong { margin: 0; font: 800 1rem ui-monospace, monospace; letter-spacing: .025em; }
+.ttv-guide-inline .ttv-guide-dialog-body { padding: 0; }
+
+/* Rotation fills the web viewport without requiring a fullscreen API gesture.
+   Mini remains floating. Opening Guide restores the compact inline preview. */
+.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) .ttv-premium-player-frame {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147482000;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #000;
+  box-shadow: none !important;
+}
+.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) .ttv-player-controls {
+  bottom: max(.75rem, env(safe-area-inset-bottom));
+  max-width: calc(100% - max(1rem, env(safe-area-inset-left)) - max(1rem, env(safe-area-inset-right)));
+}
+
+.ttv-player-cast-short { display: none; }
+.ttv-premium-viewer-shell[data-mobile-layout="true"] .ttv-player-controls { gap: .2rem; padding: .3rem; }
+.ttv-premium-viewer-shell[data-mobile-layout="true"] .ttv-player-controls > button { min-width: 44px; min-height: 44px; padding-inline: .5rem; }
+.ttv-premium-viewer-shell[data-mobile-layout="true"] .ttv-player-controls > div,
+.ttv-premium-viewer-shell[data-mobile-layout="true"] .ttv-player-cast-label { display: none; }
+.ttv-premium-viewer-shell[data-mobile-layout="true"] .ttv-player-cast-short { display: inline; }
+.ttv-premium-viewer-shell[data-mobile-landscape="true"] .ttv-premium-player-mini {
+  width: min(45vw, calc((100dvh - 7rem) * 16 / 9), 25rem);
+  bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) { z-index: 2147482000; }

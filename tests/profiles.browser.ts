@@ -465,22 +465,14 @@ test("Haunted Arcade entrance loads portraits, remembers accessibility and reset
     await expect(ghost).toHaveCSS("animation-play-state", "paused");
   }
   await scene.scrollIntoViewIfNeeded();
-  await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
-  // The shared accessibility rule is `animation: none !important`, which
-  // removes the animation and resets animation-play-state to its initial value.
-  // Verify that motion is absent rather than expecting a paused animation.
-  await expect(ghost).toHaveCSS("animation-name", "none");
-  await page.reload();
-  await expect(scene.getByRole("button", { name: "Effects paused" })).toHaveAttribute("aria-pressed", "true");
-  await expect(ghost).toHaveCSS("animation-name", "none");
-  await scene.getByRole("button", { name: "Effects paused" }).click();
-  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
+  await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(ghost).toHaveCSS("animation-name", "none");
-  await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
-  await scene.getByRole("button", { name: "Effects paused" }).click();
+  await page.reload();
   await expect(ghost).toHaveCSS("animation-name", "none");
+  await expect(scene.getByRole("button")).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
   await expect.poll(() => portraits.evaluateAll((items: HTMLImageElement[]) => items.every((item) => item.complete && item.naturalWidth > 0))).toBe(true);

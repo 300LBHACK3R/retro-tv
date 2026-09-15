@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { request } from "node:https";
 import { setTimeout as delay } from "node:timers/promises";
@@ -91,6 +92,23 @@ try {
       assertProfileStyles(styles.join("\n"), `HTTP ${path}`);
       assertHalloweenStyles(styles.join("\n"), `HTTP ${path}`);
     }
+  }
+  const favicon = await get("/favicon.ico", "HEAD");
+  assert.equal(favicon.status, 200, "Station favicon is available");
+  assert.equal(Number(favicon.headers["content-length"]), statSync("public/favicon.ico").size, "The retained station icon replaces the starter icon");
+  const svg = await get("/favicon.svg");
+  const legacyIcon = await get("/icon.svg");
+  for (const icon of [svg, legacyIcon]) {
+    assert.equal(icon.status, 200);
+    assert.match(icon.headers["content-type"], /^image\/svg\+xml/);
+  }
+  assert.equal(legacyIcon.body, svg.body, "Installed manifests keep their icon through the alias");
+  const manifest = JSON.parse((await get("/manifest.webmanifest")).body);
+  for (const icon of manifest.icons) assert.equal((await get(icon.src, "HEAD")).status, 200, `Manifest icon ${icon.src}`);
+  const worker = await get("/sw.js");
+  const shellArray = worker.body.match(/const APP_SHELL_URLS = (\[[\s\S]*?\]);/)[1];
+  for (const [, path] of shellArray.matchAll(/"([^"\n]+)"/g)) {
+    assert.equal((await get(path, "HEAD")).status, 200, `Offline precache asset ${path}`);
   }
   for (const name of ["fox", "explorer", "dinosaur", "robot", "cat"]) {
     const portrait = await get(`/avatars/${name}.png`, "HEAD");

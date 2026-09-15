@@ -20,9 +20,6 @@
 .ttv-halloween-copy { padding: 1rem .25rem; text-align: center; position: relative; z-index: 1; }
 .ttv-halloween-eyebrow { display: block; color: #ffd39c; font-size: .65rem; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; line-height: 1.6; }
 .ttv-halloween-copy p { color: #fff5e9; font-size: clamp(1rem, 2.5vw, 1.45rem); font-weight: 650; line-height: 1.35; margin: .25rem 0; text-wrap: balance; }
-.ttv-halloween-copy button { min-height: 44px; padding: .5rem .75rem; color: #cdbad4; font-size: .75rem; border-radius: .5rem; text-decoration: underline; text-underline-offset: 4px; }
-.ttv-halloween-copy button:hover { color: #fff5e9; background: #ffffff0a; }
-.ttv-halloween-copy button:focus-visible { outline: 3px solid #ffcc8a; outline-offset: 2px; }
 .ttv-profile-content > .ttv-halloween-scene { max-width: 46rem; margin: 0 auto clamp(1.5rem, 4vh, 2.5rem); }
 .ttv-library-shell .ttv-halloween-scene { margin-bottom: 2rem; }
 :root[data-ttv-theme="halloween-night"] .ttv-profile-screen {
@@ -63,7 +60,7 @@
 @media (forced-colors: active) {
   .ttv-halloween-pumpkins, .ttv-halloween-sky { display: none; }
   :root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) .ttv-halloween-scene { grid-template-columns: 1fr; }
-  .ttv-halloween-copy :where(p, span, button) { color: CanvasText; }
+  .ttv-halloween-copy :where(p, span) { color: CanvasText; }
 }
 
 /* Keep the picture and controls within reach on phones. Entry remains festive. */

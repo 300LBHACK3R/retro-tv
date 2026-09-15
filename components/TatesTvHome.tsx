@@ -12,6 +12,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { useSpatialNavigation } from "@/components/viewer/useSpatialNavigation";
 import DailyDiscovery from "@/components/viewer/DailyDiscovery";
 import SaveButton from "@/components/viewer/SaveButton";
@@ -98,6 +99,10 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   const setAppMode = useStore((state) => state.setAppMode);
 
   const isGuideOpen = useStore((state) => state.isGuideOpen);
+  const mobileLayout = useMobileGuideLayout();
+  const mobileGuideOpen = mobileLayout && isGuideOpen;
+  const [mobileLandscape, setMobileLandscape] = useState(false);
+  const viewerRootRef = useRef<HTMLElement | null>(null);
   const toggleGuide = useStore((state) => state.toggleGuide);
   const closeGuide = useStore((state) => state.closeGuide);
 
@@ -112,6 +117,31 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   const setMoreOpen = useStore((state) => state.setSettingsOpen);
 
   const [isChannelBrowserOpen, setChannelBrowserOpen] = useState(false);
+  // Use layout dimensions, not the shrinking visual viewport caused by a
+  // phone keyboard. Do not change player mode, so Mini survives rotation.
+  useEffect(() => {
+    if (!mobileLayout || tvMode) { setMobileLandscape(false); return; }
+    let previousLandscape = false;
+    const updateOrientation = () => {
+      if (document.activeElement?.matches("input, textarea, [contenteditable=true]")) return;
+      const landscape = window.innerWidth > window.innerHeight;
+      setMobileLandscape(landscape);
+      if (landscape && !previousLandscape && useStore.getState().viewerSettings.playerViewMode !== "mini") {
+        closeGuide();
+        setMoreOpen(false);
+        setChannelBrowserOpen(false);
+      }
+      previousLandscape = landscape;
+    };
+    updateOrientation();
+    window.addEventListener("resize", updateOrientation, { passive: true });
+    window.addEventListener("orientationchange", updateOrientation);
+    return () => {
+      window.removeEventListener("resize", updateOrientation);
+      window.removeEventListener("orientationchange", updateOrientation);
+    };
+  }, [mobileLayout, tvMode, closeGuide, setMoreOpen]);
+
   const channelFromUrlApplied = useRef(false);
   const liveSectionRef = useRef<HTMLElement | null>(null);
 
@@ -185,6 +215,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   }, [availableAds, enabledChannels, isGuideOpen, mediaById]);
 
   const isAnyOverlayOpen = isGuideOpen || isChannelBrowserOpen || isMoreOpen;
+  const landscapePlayback = mobileLandscape && !mobileGuideOpen && playerViewMode !== "mini";
 
   const scrollToLive = useCallback(() => {
     liveSectionRef.current?.scrollIntoView({
@@ -276,11 +307,11 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
     const previousOverlayState = document.body.dataset.ttvOverlayOpen;
     const previousGuideState = document.body.dataset.ttvGuideOpen;
 
-    if (isAnyOverlayOpen) {
+    if (isAnyOverlayOpen || landscapePlayback) {
       document.body.style.overflow = "hidden";
       document.body.style.overscrollBehavior = "none";
-      document.body.dataset.ttvOverlayOpen = "true";
     }
+    if (isAnyOverlayOpen) document.body.dataset.ttvOverlayOpen = "true";
 
     if (isGuideOpen) {
       document.body.dataset.ttvGuideOpen = "true";
@@ -302,7 +333,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
         delete document.body.dataset.ttvGuideOpen;
       }
     };
-  }, [isAnyOverlayOpen, isGuideOpen]);
+  }, [isAnyOverlayOpen, isGuideOpen, landscapePlayback]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -325,6 +356,13 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
 
   return (
     <main
+      ref={viewerRootRef}
+      role={mobileGuideOpen ? "dialog" : undefined}
+      aria-modal={mobileGuideOpen ? true : undefined}
+      aria-labelledby={mobileGuideOpen ? "ttv-live-guide-title" : undefined}
+      data-mobile-layout={mobileLayout}
+      data-mobile-landscape={mobileLandscape}
+      data-mobile-guide-open={mobileGuideOpen}
       className={`ttv-app-shell ttv-premium-viewer-shell ${themeLayoutClass} ${
         tvMode ? "ttv-tv-mode" : ""
       } min-h-screen overflow-x-hidden`}
@@ -410,7 +448,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
                         </button>
                       </div>
                     ) : (
-                      <Player schedule={activeSchedule} />
+                      <Player schedule={activeSchedule} viewportFullscreen={landscapePlayback} />
                     )}
                     <ChannelOverlay
                       compact={!tvMode && playerViewMode === "mini"}
@@ -463,7 +501,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
         {!tvMode ? <ViewerFooter /> : null}
       </div>
 
-      <ViewerGuideDialog open={isGuideOpen} onClose={closeGuide}>
+      <ViewerGuideDialog open={isGuideOpen} onClose={closeGuide} inlineDialogRef={mobileGuideOpen ? viewerRootRef : undefined}>
         <MultiGuide
           data={channelGuideData}
           onProgramSelect={({
@@ -472,8 +510,8 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
             channel: Channel;
             media?: MediaItem;
           }) => {
-            selectChannel(channel.id);
-            closeGuide();
+            selectChannel(channel.id, !mobileGuideOpen);
+            if (!mobileGuideOpen) closeGuide();
           }}
         />
       </ViewerGuideDialog>

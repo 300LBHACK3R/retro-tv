@@ -90,28 +90,7 @@
 .ttv-haunted-title span { color: #c7fb95; text-shadow: 3px 3px 0 #1a3028, 0 0 25px #baf77b26; }
 .ttv-haunted-caption { color: #e5dceb; font-size: .85rem; line-height: 1.6; }
 .ttv-haunted-mobile-title { display: none; }
-.ttv-haunted-world .ttv-haunted-copy button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .5rem;
-  min-height: 44px;
-  margin-top: .65rem;
-  border: 1px solid #bcb0d15e;
-  border-radius: 999px;
-  padding: .6rem .85rem;
-  color: #f4fff1;
-  background: #100e20db;
-  font-size: .75rem;
-  font-weight: 650;
-  line-height: 1.4;
-  text-decoration: none;
-  touch-action: manipulation;
-}
-.ttv-haunted-world .ttv-haunted-copy button:hover { border-color: #baf77b; background: #202c2a; }
-.ttv-haunted-world .ttv-haunted-copy button[aria-pressed="true"] { border-color: #c7a6ff; }
-.ttv-haunted-world .ttv-haunted-copy button:focus-visible { outline: 3px solid #d9ffae; outline-offset: 3px; }
-.ttv-haunted-copy button svg { flex-shrink: 0; }
+
 .ttv-haunted-edition {
   position: absolute;
   inset: auto 1.1rem .7rem;
@@ -234,20 +213,17 @@
   .ttv-haunted-world[data-entrance="true"] + .ttv-profile-chooser { padding: 1.25rem .875rem .75rem; border-radius: 0 0 18px 18px; }
   .theme-card[data-theme-id="halloween-haunted-arcade"] .theme-card__preview { min-height: 6.5rem; }
   /* Live TV keeps a compact seasonal strip, with the picture immediately below. */
-  :root[data-ttv-theme="halloween-haunted-arcade"] .ttv-premium-viewer-shell .ttv-haunted-world { min-height: 104px; }
+  :root[data-ttv-theme="halloween-haunted-arcade"] .ttv-premium-viewer-shell .ttv-haunted-world { min-height: 76px; align-items: center; }
   .ttv-premium-viewer-shell .ttv-haunted-world .ttv-haunted-copy { padding: .7rem 1rem; max-width: 75%; }
   .ttv-premium-viewer-shell .ttv-haunted-world .ttv-halloween-eyebrow,
   .ttv-premium-viewer-shell .ttv-haunted-world .ttv-haunted-caption,
   .ttv-premium-viewer-shell .ttv-haunted-world .ttv-haunted-ghost--violet { display: none; }
   .ttv-premium-viewer-shell .ttv-haunted-mobile-title { display: block; font: 800 1.1rem ui-monospace, monospace; color: #e7f5d9; }
-  .ttv-premium-viewer-shell .ttv-haunted-world .ttv-haunted-copy button { margin-top: .25rem; padding-block: .4rem; }
   .ttv-premium-viewer-shell .ttv-haunted-scrim { background: linear-gradient(90deg, #0c0b18ed, #0c0b18b0 55%, #0c0b1830); }
   .ttv-premium-viewer-shell .ttv-haunted-ghost--mint { top: 10%; width: 68px; }
 }
 @media (forced-colors: active) {
   .ttv-haunted-art, .ttv-haunted-world::after, .ttv-haunted-edition { display: none; }
   :root[data-ttv-theme="halloween-haunted-arcade"] .ttv-haunted-world { background: Canvas; border-color: CanvasText; box-shadow: none; }
-  .ttv-haunted-world :where(span, strong), .ttv-haunted-world .ttv-haunted-title,
-  .ttv-haunted-world .ttv-haunted-copy button { color: CanvasText; text-shadow: none; }
-  .ttv-haunted-world .ttv-haunted-copy button { border-color: ButtonText; background: ButtonFace; color: ButtonText; }
+  .ttv-haunted-world :where(span, strong), .ttv-haunted-world .ttv-haunted-title { color: CanvasText; text-shadow: none; }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import ChannelLogo from "./ChannelLogo";
 import SaveButton from "./SaveButton";
 import {
   formatDuration,
@@ -93,7 +94,7 @@ export default function MobileGuide({
                 onClick={() => {
                   const card = currentCardRef.current;
                   card?.scrollIntoView({ block: "nearest" });
-                  card?.querySelector<HTMLButtonElement>(".ttv-mobile-open-schedule")
+                  card?.querySelector<HTMLButtonElement>(".ttv-mobile-airing")
                     ?.focus({ preventScroll: true });
                 }}
               >
@@ -107,7 +108,7 @@ export default function MobileGuide({
               Find
             </button>
           </div>
-          <time className="sr-only" dateTime={now.toISOString()}>{formatTime(now)}</time>
+          <time dateTime={now.toISOString()}>{formatTime(now)}</time>
         </div>
         {rows.length === 0 ? (
           <p className="ttv-guide-empty" role="status">
@@ -138,86 +139,45 @@ export default function MobileGuide({
                   className="ttv-mobile-channel"
                   data-current={current}
                 >
-                  <div className="ttv-mobile-channel-top">
-                    <button
-                      type="button"
-                      className="ttv-mobile-open-schedule"
+                  <div className="ttv-mobile-channel-station">
+                    <button type="button" className="ttv-mobile-station-tune" disabled={!live}
+                      aria-label={`Tune to ${getChannelLabel(channel)} ${name}`}
+                      aria-pressed={current}
+                      onClick={() => live && onTune({ channel, item: live.item })}>
+                      <ChannelLogo channel={channel} className="ttv-mobile-channel-logo" />
+                      <span className="ttv-mobile-channel-number">{getChannelLabel(channel)}</span>
+                      <span className="ttv-mobile-channel-name">{name}</span>
+                    </button>
+                    <SaveButton compact kind="channel" id={channel.id} title={name} />
+                  </div>
+                  <div className="ttv-mobile-channel-programmes">
+                    <button type="button" className="ttv-mobile-airing" disabled={!live}
+                      aria-label={`Watch ${name} live`} aria-pressed={current}
+                      onClick={() => live && onTune({ channel, item: live.item })}>
+                      <span className="ttv-mobile-airing-meta">
+                        <span>{current && live ? "Watching" : live ? "On now" : "Live TV"}</span>
+                        {live && <span>{formatDuration(live.endSec - nowOffsetSec)} left</span>}
+                      </span>
+                      <strong>{!isPrepared ? "Loading schedule…" : live ? getDisplayTitle(live.item) : "Off air"}</strong>
+                      <span className="ttv-mobile-airing-time">
+                        {live ? `${formatTime(new Date(windowStartMs + live.startSec * 1000))} – ${formatTime(new Date(windowStartMs + live.endSec * 1000))}` : "See upcoming listings below"}
+                      </span>
+                      {live && <span className="ttv-mobile-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></span>}
+                    </button>
+                    <button type="button" className="ttv-mobile-open-schedule"
                       aria-label={`Schedule for ${name}`}
                       onClick={(event) => {
                         returnFocusRef.current = event.currentTarget;
-                        channelListScroll.current =
-                          channelListRef.current?.scrollTop ?? 0;
+                        channelListScroll.current = channelListRef.current?.scrollTop ?? 0;
                         pendingFocus.current = true;
                         onChannelBrowse(channel.id);
                         setView("schedule");
-                      }}
-                    >
-                      <span className="ttv-mobile-channel-number">
-                        {getChannelLabel(channel)}
-                      </span>
-                      <span className="ttv-mobile-channel-name">{name}</span>
-                      <span className="ttv-mobile-schedule-link">
-                        Schedule <span aria-hidden="true">›</span>
-                      </span>
-                    </button>
-                    <SaveButton
-                      compact
-                      kind="channel"
-                      id={channel.id}
-                      title={name}
-                    />
-                  </div>
-                  <div className="ttv-mobile-channel-broadcast">
-                    <div>
-                      <h3>
-                        {!isPrepared
-                          ? "Loading schedule…"
-                          : live
-                            ? getDisplayTitle(live.item)
-                            : "Off air"}
-                      </h3>
-                      <p>
-                        {live
-                          ? `${current ? "Your channel" : "Live"} · ${formatDuration(live.endSec - nowOffsetSec)} left`
-                          : isPrepared
-                            ? "Check the schedule for upcoming shows"
-                            : "Just a moment"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="ttv-mobile-watch"
-                      disabled={!live}
-                      aria-label={`Watch ${name} live`}
-                      onClick={() =>
-                        live && onTune({ channel, item: live.item })
-                      }
-                    >
-                      <span aria-hidden="true">▶</span> Watch
+                      }}>
+                      <span className="ttv-mobile-next-time">{next ? `Next · ${formatTime(new Date(windowStartMs + next.startSec * 1000))}` : "Channel schedule"}</span>
+                      <strong>{next ? getDisplayTitle(next.item) : isPrepared ? "See upcoming shows" : "Preparing listings…"}</strong>
+                      <span className="ttv-mobile-schedule-link" aria-hidden="true">›</span>
                     </button>
                   </div>
-                  {live && (
-                    <div className="ttv-mobile-progress" aria-hidden="true">
-                      <span style={{ width: `${progress}%` }} />
-                    </div>
-                  )}
-                  <p className="ttv-mobile-next">
-                    {next ? (
-                      <>
-                        <span>
-                          Next ·{" "}
-                          {formatTime(
-                            new Date(windowStartMs + next.startSec * 1000),
-                          )}
-                        </span>{" "}
-                        {getDisplayTitle(next.item)}
-                      </>
-                    ) : isPrepared ? (
-                      "No more listings available"
-                    ) : (
-                      "Preparing listings…"
-                    )}
-                  </p>
                 </li>
               );
             })}

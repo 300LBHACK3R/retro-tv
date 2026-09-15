@@ -11,6 +11,7 @@ import {
   type UIEvent,
 } from "react";
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
+import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import MobileGuide from "@/components/viewer/MobileGuide";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { useStore } from "@/lib/store";
@@ -18,10 +19,6 @@ import type { BroadcastItem, Channel } from "@/lib/types";
 
 import {
   GUIDE_HOURS,
-  MOBILE_GUIDE_MEDIA_QUERY,
-  MOBILE_GUIDE_BREAKPOINT_PX,
-  TOUCH_GUIDE_BREAKPOINT_PX,
-  MOBILE_USER_AGENT_PATTERN,
   SLOT_COUNT,
   CHANNEL_COLUMN_WIDTH,
   SLOT_WIDTH,
@@ -56,48 +53,6 @@ import {
   getCellLeft,
   getCellWidth,
 } from "@/lib/guideTimeline";
-
-function getSmallestViewportWidth(): number {
-  if (typeof window === "undefined") {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const candidateWidths = [
-    window.innerWidth,
-    document.documentElement.clientWidth,
-    window.visualViewport?.width,
-  ].filter(
-    (value): value is number =>
-      typeof value === "number" && Number.isFinite(value) && value > 0,
-  );
-
-  return candidateWidths.length > 0
-    ? Math.min(...candidateWidths)
-    : Number.POSITIVE_INFINITY;
-}
-
-function shouldUseMobileGuide(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const viewportWidth = getSmallestViewportWidth();
-  const mediaQueryMatches = window.matchMedia(MOBILE_GUIDE_MEDIA_QUERY).matches;
-  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const touchCapable = navigator.maxTouchPoints > 0;
-  const mobileUserAgent = MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent);
-  const screenWidth = window.screen?.width ?? Number.POSITIVE_INFINITY;
-  const screenHeight = window.screen?.height ?? Number.POSITIVE_INFINITY;
-  const screenShortSide = Math.min(screenWidth, screenHeight);
-
-  return (
-    viewportWidth <= MOBILE_GUIDE_BREAKPOINT_PX ||
-    mediaQueryMatches ||
-    mobileUserAgent ||
-    ((coarsePointer || touchCapable) &&
-      screenShortSide <= TOUCH_GUIDE_BREAKPOINT_PX)
-  );
-}
 
 interface MultiGuideProps {
   data: GuideRowInput[];
@@ -166,9 +121,8 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
   const [activeMarkerIndex, setActiveMarkerIndex] = useState(0);
-  const [isMobileGuide, setIsMobileGuide] = useState(() =>
-    shouldUseMobileGuide(),
-  );
+  const isMobileGuide = useMobileGuideLayout();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileSelectedChannelId, setMobileSelectedChannelId] =
     useState(currentChannelId);
 
@@ -206,41 +160,6 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     };
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(MOBILE_GUIDE_MEDIA_QUERY);
-    const visualViewport = window.visualViewport;
-    let animationFrame: number | null = null;
-
-    const updateMobileMode = () => {
-      if (animationFrame !== null) {
-        window.cancelAnimationFrame(animationFrame);
-      }
-
-      animationFrame = window.requestAnimationFrame(() => {
-        animationFrame = null;
-        setIsMobileGuide(shouldUseMobileGuide());
-      });
-    };
-
-    updateMobileMode();
-    mediaQuery.addEventListener?.("change", updateMobileMode);
-    window.addEventListener("resize", updateMobileMode, { passive: true });
-    window.addEventListener("orientationchange", updateMobileMode);
-    visualViewport?.addEventListener("resize", updateMobileMode, {
-      passive: true,
-    });
-
-    return () => {
-      if (animationFrame !== null) {
-        window.cancelAnimationFrame(animationFrame);
-      }
-
-      mediaQuery.removeEventListener?.("change", updateMobileMode);
-      window.removeEventListener("resize", updateMobileMode);
-      window.removeEventListener("orientationchange", updateMobileMode);
-      visualViewport?.removeEventListener("resize", updateMobileMode);
-    };
-  }, []);
 
   const now = useMemo(() => new Date(nowMs), [nowMs]);
 
@@ -463,13 +382,19 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (mobileSearchOpen) channelSearchRef.current?.focus({ preventScroll: true });
+  }, [mobileSearchOpen]);
+
+  const mobileAllChannelsRef = useRef<HTMLButtonElement | null>(null);
+
   const clearGuideFilters = () => {
     setCategory("");
     setChannelQuery("");
     setFavouritesOnly(false);
     window.requestAnimationFrame(() => {
       if (isMobileGuide) {
-        favouritesFilterRef.current?.focus({ preventScroll: true });
+        mobileAllChannelsRef.current?.focus({ preventScroll: true });
       } else {
         channelSearchRef.current?.focus({ preventScroll: true });
       }
@@ -478,7 +403,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
 
   const guideTools = (
     <div className="ttv-guide-tools">
-      <label>
+      <label hidden={isMobileGuide && !mobileSearchOpen}>
         <span className="sr-only">Find a channel in the guide</span>
         <input
           ref={channelSearchRef}
@@ -494,7 +419,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           onChange={(event) => setChannelQuery(event.target.value)}
         />
       </label>
-      <label className="ttv-category-select">
+      <label className="ttv-category-select" hidden={isMobileGuide}>
         <span className="sr-only">Guide category</span>
         <select
           aria-label="Guide category"
@@ -509,7 +434,16 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           ))}
         </select>
       </label>
-      <button
+      {isMobileGuide && (
+        <nav className="ttv-mobile-category-tabs" aria-label="Channel categories">
+          <button ref={mobileAllChannelsRef} type="button" aria-pressed={!category && !favouritesOnly} onClick={() => { setCategory(""); setFavouritesOnly(false); }}>All channels</button>
+          <button type="button" aria-pressed={favouritesOnly} onClick={() => { setFavouritesOnly(!favouritesOnly); setCategory(""); }}>Favourites</button>
+          {CHANNEL_CATEGORIES.filter((entry) => allRows.some((row) => channelCategory(row.channel) === entry)).map((entry) => (
+            <button type="button" key={entry} aria-pressed={category === entry && !favouritesOnly} onClick={() => { setCategory(entry); setFavouritesOnly(false); }}>{entry}</button>
+          ))}
+        </nav>
+      )}
+      <button hidden={isMobileGuide}
         ref={favouritesFilterRef}
         type="button"
         className="ttv-section-action"
@@ -592,7 +526,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           nowOffsetSec={secondsSinceWindowStart}
           windowStartMs={windowStartMs}
           onChannelBrowse={setMobileSelectedChannelId}
-          onFindChannel={() => channelSearchRef.current?.focus({ preventScroll: true })}
+          onFindChannel={() => setMobileSearchOpen((value) => !value)}
           onTune={({ channel, item }) => {
             setChannel(channel.id);
             onProgramSelect?.({ channel, item });

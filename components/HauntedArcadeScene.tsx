@@ -40,12 +40,8 @@ function ArcadeGhost({ variant }: { variant: "mint" | "violet" | "amber" }) {
 /** One bounded illustrated scene. Motion never occupies the playback surface. */
 export default function HauntedArcadeScene({
   entrance,
-  reduced,
-  onToggleMotion,
 }: {
   entrance: boolean;
-  reduced: boolean;
-  onToggleMotion: () => void;
 }) {
   const sceneRef = useRef<HTMLElement | null>(null);
 
@@ -93,12 +89,6 @@ export default function HauntedArcadeScene({
         <p className="ttv-haunted-title">Stay a little <span>spooky.</span></p>
         <strong className="ttv-haunted-mobile-title">Haunted Arcade</strong>
         <span className="ttv-haunted-caption">{entrance ? "Your favourite seat. A stranger kind of night." : "Good TV. Strange company."}</span>
-        <button type="button" aria-pressed={reduced} onClick={onToggleMotion}>
-          <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor" aria-hidden="true" focusable="false">
-            {reduced ? <path d="m6 3 11 7-11 7Z" /> : <path d="M5 3h4v14H5Zm7 0h4v14h-4Z" />}
-          </svg>
-          {reduced ? "Effects paused" : "Pause effects"}
-        </button>
       </div>
       <div className="ttv-haunted-edition" aria-hidden="true"><span>AFTER HOURS</span><span>HALLOWEEN ’26</span></div>
     </aside>

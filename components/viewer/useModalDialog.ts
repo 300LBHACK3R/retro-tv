@@ -146,7 +146,10 @@ export function useModalDialog({
         const anotherOverlayIsOpen =
           document.body.dataset.ttvOverlayOpen === "true";
 
-        if (!anotherOverlayIsOpen && previouslyFocused?.isConnected) {
+        // A nested dialog (for example Cast above the mobile guide) returns
+        // focus to its still-open parent rather than leaving it on the body.
+        const returningToParent = previouslyFocused?.closest('[role="dialog"]');
+        if (previouslyFocused?.isConnected && (!anotherOverlayIsOpen || returningToParent)) {
           previouslyFocused.focus({ preventScroll: true });
         }
       }, 0);

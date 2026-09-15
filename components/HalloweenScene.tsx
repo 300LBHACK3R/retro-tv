@@ -7,11 +7,9 @@ import HauntedArcadeScene from "@/components/HauntedArcadeScene";
 /** Decorative, bounded scenery: never overlays playback or intercepts a remote. */
 export default function HalloweenScene({ entrance = false }: { entrance?: boolean }) {
   const theme = useStore((state) => state.themeId);
-  const reduced = useStore((state) => state.viewerSettings.preferReducedMotion);
-  const setReduced = useStore((state) => state.setPreferReducedMotion);
   const id = useId().replace(/:/g, "");
   if (theme === "halloween-haunted-arcade") {
-    return <HauntedArcadeScene entrance={entrance} reduced={reduced} onToggleMotion={() => setReduced(!reduced)} />;
+    return <HauntedArcadeScene entrance={entrance} />;
   }
   if (theme !== "halloween-night") return null;
 
@@ -52,9 +50,6 @@ export default function HalloweenScene({ entrance = false }: { entrance?: boolea
       <div className="ttv-halloween-copy">
         <span className="ttv-halloween-eyebrow">Halloween on Tate’s TV</span>
         <p>{entrance ? "A little magic. A lot of TV." : "Your moonlit movie night."}</p>
-        <button type="button" aria-pressed={reduced} onClick={() => setReduced(!reduced)}>
-          {reduced ? "Effects paused" : "Pause effects"}
-        </button>
       </div>
       <svg className="ttv-halloween-sky" viewBox="0 0 270 160" aria-hidden="true" focusable="false">
         <circle cx="194" cy="70" r="64" fill="#c4a0ff" opacity=".07" />

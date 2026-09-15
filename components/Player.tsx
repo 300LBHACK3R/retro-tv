@@ -3,6 +3,7 @@
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import {
@@ -17,6 +18,7 @@ import type { BroadcastItem, Channel } from "@/lib/types";
 
 interface PlayerProps {
   schedule: BroadcastItem[];
+  viewportFullscreen?: boolean;
 }
 
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
@@ -573,7 +575,8 @@ function buildCastQueueEntries(
   return entries;
 }
 
-export default function Player({ schedule }: PlayerProps) {
+export default function Player({ schedule, viewportFullscreen = false }: PlayerProps) {
+  const mobileLayout = useMobileGuideLayout();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastPlaybackKeyRef = useRef("");
@@ -718,9 +721,11 @@ export default function Player({ schedule }: PlayerProps) {
       return;
     }
 
-    video.volume = Math.min(Math.max(volume, 0), 1);
-    video.muted = muted || volume <= 0;
-  }, [muted, volume]);
+    // Phone hardware controls loudness; an old desktop mute must not leave
+    // the mobile player silent after its volume controls have been removed.
+    video.volume = mobileLayout ? 1 : Math.min(Math.max(volume, 0), 1);
+    video.muted = mobileLayout ? false : muted || volume <= 0;
+  }, [mobileLayout, muted, volume]);
 
   const requestWakeLock = useCallback(async () => {
     if (typeof navigator === "undefined") {
@@ -1282,7 +1287,7 @@ export default function Player({ schedule }: PlayerProps) {
         hardSyncPosition({ force: true });
         void tryPlay();
 
-        if (fullscreenActive && status === "playing") {
+        if ((fullscreenActive || viewportFullscreen) && status === "playing") {
           void requestWakeLock();
         }
       }
@@ -1293,7 +1298,7 @@ export default function Player({ schedule }: PlayerProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fullscreenActive, hardSyncPosition, requestWakeLock, status, tryPlay]);
+  }, [fullscreenActive, viewportFullscreen, hardSyncPosition, requestWakeLock, status, tryPlay]);
 
   useEffect(() => {
     if (fullscreenRequestId === 0) {
@@ -1397,13 +1402,13 @@ export default function Player({ schedule }: PlayerProps) {
   }, [hardSyncPosition, tryPlay]);
 
   useEffect(() => {
-    if (fullscreenActive && status === "playing") {
+    if ((fullscreenActive || viewportFullscreen) && status === "playing") {
       void requestWakeLock();
       return;
     }
 
     void releaseWakeLock();
-  }, [fullscreenActive, releaseWakeLock, requestWakeLock, status]);
+  }, [fullscreenActive, viewportFullscreen, releaseWakeLock, requestWakeLock, status]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1478,7 +1483,7 @@ export default function Player({ schedule }: PlayerProps) {
         autoPlay
         preload="auto"
         controls={false}
-        muted={muted || volume <= 0}
+        muted={!mobileLayout && (muted || volume <= 0)}
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -1511,7 +1516,7 @@ export default function Player({ schedule }: PlayerProps) {
       </div>
 
       <div
-        className={`absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white shadow-2xl backdrop-blur-md transition-[opacity,transform] duration-300 md:group-hover:pointer-events-auto md:group-hover:translate-y-0 md:group-hover:opacity-100 ${
+        className={`ttv-player-controls absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/10 bg-black/75 px-2 py-2 text-white shadow-2xl backdrop-blur-md transition-[opacity,transform] duration-300 md:group-hover:pointer-events-auto md:group-hover:translate-y-0 md:group-hover:opacity-100 ${
           controlsVisible
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0"
@@ -1554,6 +1559,7 @@ export default function Player({ schedule }: PlayerProps) {
           Guide
         </button>
 
+        {!mobileLayout && (
         <button
           type="button"
           onClick={(event) => {
@@ -1564,6 +1570,7 @@ export default function Player({ schedule }: PlayerProps) {
         >
           Full
         </button>
+        )}
 
         <button
           type="button"
@@ -1571,9 +1578,11 @@ export default function Player({ schedule }: PlayerProps) {
             event.stopPropagation();
             setWatchOnTvOpen(true);
           }}
+          aria-label="Watch on TV"
           className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
         >
-          Watch on TV
+          <span className="ttv-player-cast-label">Watch on TV</span>
+          <span className="ttv-player-cast-short" aria-hidden="true">TV</span>
         </button>
 
         {fullscreenActive ? (

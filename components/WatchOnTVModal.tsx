@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useModalDialog } from "@/components/viewer/useModalDialog";
 import { useGoogleCast } from "@/components/GoogleCastProvider";
 
 interface WatchOnTVModalProps {
@@ -101,30 +102,13 @@ export default function WatchOnTVModal({
   const tvUrl = useMemo(() => getTvUrl(channelId), [channelId]);
   const appleDevice = useMemo(() => isAppleDevice(), []);
 
+  const mounted = useModalDialog({ open, onClose, dialogRef });
   useEffect(() => {
-    if (!open) {
-      setNotice("");
-      return;
-    }
-
+    if (!open) { setNotice(""); return; }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.setTimeout(() => dialogRef.current?.focus(), 0);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose, open]);
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [open]);
 
   const startGoogleCast = useCallback(async () => {
     if (!isCastSecureContext()) {
@@ -186,7 +170,7 @@ export default function WatchOnTVModal({
     window.open(tvUrl, "_blank", "noopener,noreferrer");
   }, [tvUrl]);
 
-  if (!open || typeof document === "undefined") {
+  if (!mounted || !open) {
     return null;
   }
 
@@ -197,7 +181,7 @@ export default function WatchOnTVModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/85 p-0 backdrop-blur-md sm:items-center sm:p-4"
+      className="fixed inset-0 z-[2147483200] flex items-end justify-center bg-black/85 p-0 backdrop-blur-md sm:items-center sm:p-4"
       role="presentation"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import { useModalDialog } from "@/components/viewer/useModalDialog";
@@ -9,12 +9,14 @@ interface ViewerGuideDialogProps {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  inlineDialogRef?: RefObject<HTMLElement | null>;
 }
 
 export default function ViewerGuideDialog({
   open,
   onClose,
   children,
+  inlineDialogRef,
 }: ViewerGuideDialogProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -22,22 +24,22 @@ export default function ViewerGuideDialog({
   const mounted = useModalDialog({
     open,
     onClose,
-    dialogRef,
+    dialogRef: inlineDialogRef ?? dialogRef,
     initialFocusRef: closeButtonRef,
   });
 
-  useDialogViewport(dialogRef, mounted && open);
+  useDialogViewport(inlineDialogRef ?? dialogRef, mounted && open);
 
   if (!mounted || !open) {
     return null;
   }
 
-  return createPortal(
+  const content = (
     <section
       ref={dialogRef}
-      className="ttv-guide-dialog"
-      role="dialog"
-      aria-modal="true"
+      className={inlineDialogRef ? "ttv-guide-inline" : "ttv-guide-dialog"}
+      role={inlineDialogRef ? undefined : "dialog"}
+      aria-modal={inlineDialogRef ? undefined : true}
       aria-labelledby="ttv-live-guide-title"
       aria-describedby="ttv-live-guide-description"
       tabIndex={-1}
@@ -64,7 +66,7 @@ export default function ViewerGuideDialog({
       </header>
 
       <div className="ttv-guide-dialog-body">{children}</div>
-    </section>,
-    document.body,
+    </section>
   );
+  return inlineDialogRef ? content : createPortal(content, document.body);
 }

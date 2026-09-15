@@ -92,6 +92,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
 
+  // Preserve icon URLs in previously installed manifests using one SVG asset.
+  async rewrites() {
+    return [{ source: "/icon.svg", destination: "/favicon.svg" }];
+  },
+
   async headers() {
     return [
       {
