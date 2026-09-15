@@ -78,11 +78,11 @@ export default function ViewerTopBar({
           alt="Tate's TV"
           width={1536}
           height={1024}
+          sizes="(max-width: 760px) 176px, 224px"
           className="ttv-premium-brand-logo"
           priority
           draggable={false}
         />
-        <span className="ttv-brand-wordmark">TATE’S TV<small>FREE TV. REAL CHANNELS.</small></span>
       </button>
 
       <div className="ttv-premium-live-chip" aria-label={`Live on ${channelLabel}`}>

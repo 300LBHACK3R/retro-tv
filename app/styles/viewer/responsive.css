@@ -15,9 +15,7 @@
   .ttv-premium-viewer-shell:not(.ttv-tv-mode) { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
   .ttv-premium-frame { padding-inline: max(1rem, env(safe-area-inset-left)); gap: 1.25rem; }
   .ttv-premium-topbar { min-height: 4.75rem; padding-top: env(safe-area-inset-top); }
-  .ttv-premium-brand-logo { width: 3.6rem; height: 2.4rem; }
-  .ttv-brand-wordmark { font-size: 1.05rem; }
-  .ttv-brand-wordmark small { font-size: .65rem; }
+  .ttv-premium-brand-logo { width: clamp(8.5rem, 40vw, 11rem); }
   .ttv-premium-live-chip { display: flex; }
   .ttv-premium-live-copy small { display: none; }
   .ttv-premium-nav { display: none; }

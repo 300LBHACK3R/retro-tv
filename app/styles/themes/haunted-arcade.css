@@ -117,7 +117,7 @@
   border-color: #756192;
   box-shadow: inset 0 1px 0 #c7a6ff26, 0 14px 36px #08061366;
 }
-:root[data-ttv-theme="halloween-haunted-arcade"] :is(.ttv-brand-wordmark, .ttv-profile-wordmark, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
+:root[data-ttv-theme="halloween-haunted-arcade"] :is(.ttv-profile-wordmark, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
   text-shadow: 0 2px 16px #080613, 0 0 24px #c7a6ff20;
 }
 :root[data-ttv-theme="halloween-haunted-arcade"] .ttv-library-header a:last-child { color: #d9f9b5; background: #18282c; border-color: #baf77b80; }

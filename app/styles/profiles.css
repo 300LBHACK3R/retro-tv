@@ -718,7 +718,6 @@
   }
 }
 @media (max-width: 380px) {
-  .ttv-premium-topbar .ttv-brand-wordmark small,
   .ttv-premium-topbar .ttv-profile-switch > span:last-child {
     display: none;
   }
