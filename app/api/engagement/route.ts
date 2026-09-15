@@ -6,6 +6,10 @@ import {
   isSameOriginRequest,
 } from "@/lib/server/requestSecurity";
 import { createSupabaseAdminClient } from "@/lib/server/supabaseAdmin";
+import {
+  analyticsEnvironment,
+  parseAnalyticsEvent,
+} from "@/lib/analyticsEvents";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -45,10 +49,40 @@ export async function POST(request: Request) {
     windowMs: 60000,
   });
   if (!allowed.allowed) return privateJson({ ok: false }, 429);
-  const raw = await readBoundedJson(request, 2048);
+  const raw = await readBoundedJson(request, 8192);
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     return privateJson({ ok: false }, 400);
   const body = raw as Record<string, unknown>;
+  if (body.type === "events") {
+    if (
+      !Array.isArray(body.events) ||
+      !body.events.length ||
+      body.events.length > 10
+    )
+      return privateJson({ ok: false }, 400);
+    const events = body.events.map(parseAnalyticsEvent);
+    if (events.some((event) => !event)) return privateJson({ ok: false }, 400);
+    const environment = analyticsEnvironment(
+      request.headers.get("user-agent") || "",
+    );
+    try {
+      const { error } = await createSupabaseAdminClient().rpc(
+        "ttv_record_events",
+        {
+          viewer_id: viewer.id,
+          returning_viewer: viewer.returning,
+          event_batch: events,
+          browser_name: environment.browser,
+          device_type: environment.device,
+        },
+      );
+      return error
+        ? privateJson({ ok: false }, 503)
+        : privateJson({ ok: true });
+    } catch {
+      return privateJson({ ok: false }, 503);
+    }
+  }
   if (
     typeof body.id !== "string" ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

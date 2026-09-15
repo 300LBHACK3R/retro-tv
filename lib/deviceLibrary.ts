@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { browserStorage } from "./browserStorage";
 
 export const DEVICE_LIBRARY_KEY = "ttv-device-library-v1";
 const MAX_SAVED_ITEMS = 500;
@@ -89,29 +90,7 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
     }),
     {
       name: DEVICE_LIBRARY_KEY,
-      storage: createJSONStorage(() => ({
-        getItem: (key) => {
-          try {
-            return localStorage.getItem(key);
-          } catch {
-            return null;
-          }
-        },
-        setItem: (key, value) => {
-          try {
-            localStorage.setItem(key, value);
-          } catch {
-            /* Preferences remain usable in memory. */
-          }
-        },
-        removeItem: (key) => {
-          try {
-            localStorage.removeItem(key);
-          } catch {
-            /* Storage may be disabled. */
-          }
-        },
-      })),
+      storage: createJSONStorage(() => browserStorage),
       skipHydration: true,
       partialize: (state) => ({
         profiles: state.profiles,

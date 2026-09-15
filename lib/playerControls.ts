@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { browserStorage } from "./browserStorage";
 
 export type PlayerFitMode = "contain" | "cover";
 export type PlaybackQualityPreference = "auto" | "data-saver" | "high-quality";
@@ -227,6 +228,7 @@ export const usePlayerControls = create<PlayerControlsState>()(
     {
       name: playerControlsStoreName,
       version: playerControlsStoreVersion,
+      storage: createJSONStorage(() => browserStorage),
 
       partialize: (state) => ({
         volume: state.volume,

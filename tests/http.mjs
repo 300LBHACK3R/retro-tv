@@ -66,6 +66,11 @@ try {
       path,
       `${path}: correct canonical`,
     );
+    assert.match(response.body, /<meta name="description" content="[^"]+"/, `${path}: description`);
+    assert.match(response.body, /<meta property="og:image" content="https:\/\/[^"]+"/, `${path}: share image`);
+    assert.match(response.body, /<meta name="twitter:card" content="summary_large_image"/, `${path}: share card`);
+    const structured = JSON.parse(response.body.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+    assert.ok(structured["@graph"].some(node => node["@type"] === "WebSite" && node.isAccessibleForFree === true), `${path}: valid website structured data`);
     assert.ok(
       response.headers["content-security-policy"].includes("object-src 'none'"),
     );
@@ -95,6 +100,7 @@ try {
     }
   }
   const favicon = await get("/favicon.ico", "HEAD");
+  assert.equal((await get("/opengraph-image.png", "HEAD")).status, 200, "Search/share preview is available");
   assert.equal(favicon.status, 200, "Station favicon is available");
   assert.equal(Number(favicon.headers["content-length"]), statSync("public/favicon.ico").size, "The retained station icon replaces the starter icon");
   const svg = await get("/favicon.svg");

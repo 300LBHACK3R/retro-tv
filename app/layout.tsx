@@ -6,7 +6,7 @@ import "./styles/themes/halloween-after-dark.css";
 
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
-import { Analytics } from "@vercel/analytics/next";
+import AnalyticsRuntime from "@/components/viewer/AnalyticsRuntime";
 import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { GoogleCastProvider } from "@/components/GoogleCastProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
@@ -69,6 +69,15 @@ export const metadata: Metadata = {
   creator: APP_AUTHOR,
   publisher: APP_NAME,
   category: "entertainment",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+  },
   referrer: "origin-when-cross-origin",
 
   alternates: {
@@ -173,6 +182,7 @@ function JsonLd() {
         url: siteUrl,
         description: APP_DESCRIPTION,
         inLanguage: "en-CA",
+        isAccessibleForFree: true,
         publisher: {
           "@id": `${siteUrl}/#organization`,
         },
@@ -243,7 +253,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <DeviceLibraryRuntime />
         <InstallPromptBanner />
         <GoogleCastProvider>{children}</GoogleCastProvider>
-        <Analytics />
+        <AnalyticsRuntime />
       </body>
     </html>
   );

@@ -11,6 +11,7 @@ import {
   sendPlaybackSample,
   type PlaybackSample,
 } from "@/lib/playbackTelemetry";
+import { trackAnalytics } from "@/lib/analyticsClient";
 
 export function usePlaybackMonitor(
   videoRef: RefObject<HTMLVideoElement | null>,
@@ -128,6 +129,8 @@ export function usePlaybackMonitor(
           Math.round(performance.now() - startupAt),
         );
         hasStarted = true;
+        trackAnalytics("playback_start", mode);
+        trackAnalytics("startup_time", mode, totals.startupMs);
       }
       stalledAt = 0;
       stableSince = performance.now();
@@ -145,6 +148,7 @@ export function usePlaybackMonitor(
     };
     const error = () => {
       totals.errors += 1;
+      trackAnalytics("playback_error", mode);
       if (video.error?.code === 2) retry();
       else if (video.error?.code === 3 || video.error?.code === 4) {
         setNeedsHelp(true);

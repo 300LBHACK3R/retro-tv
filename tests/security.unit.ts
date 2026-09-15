@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import vm from "node:vm";
 import ts from "typescript";
+import * as analyticsEvents from "../lib/analyticsEvents";
 
 // Execute server-only modules in Node with controlled framework boundaries.
 // Their actual request parsing and signature code runs unchanged.
@@ -36,6 +37,79 @@ function serverModule(file: string, imports: Record<string, unknown> = {}) {
   });
   return exports;
 }
+
+test("analytics ingestion requires a same-origin signed session and stores only allowlisted dimensions", async () => {
+  const writes: unknown[] = [];
+  let signed = true;
+  const http = serverModule("lib/server/http.ts");
+  const security = serverModule("lib/server/requestSecurity.ts");
+  const route = serverModule("app/api/engagement/route.ts", {
+    "@/lib/server/http": http,
+    "@/lib/server/requestSecurity": security,
+    "@/lib/analyticsEvents": analyticsEvents,
+    "@/lib/server/viewerSession": {
+      getViewerSession: async () =>
+        signed
+          ? { id: "6406ea15-c50f-4b79-bec0-538adcc52f11", returning: true }
+          : null,
+    },
+    "@/lib/server/supabaseAdmin": {
+      createSupabaseAdminClient: () => ({
+        rpc: async (_name: string, values: unknown) => {
+          writes.push(values);
+          return { error: null };
+        },
+      }),
+    },
+  });
+  const event = {
+    id: "7406ea15-c50f-4b79-bec0-538adcc52f11",
+    name: "page_view",
+    path: "/",
+    detail: "",
+    source: "direct",
+    value: 0,
+  };
+  const request = (events: unknown[], headers: Record<string, string> = {}) =>
+    new Request("https://tatestv.ca/api/engagement", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://tatestv.ca",
+        "user-agent": "Mozilla/5.0 (iPhone) Mobile Safari/604.1",
+        ...headers,
+      },
+      body: JSON.stringify({ type: "events", events }),
+    });
+  const privacyHeaders: Record<string, string>[] = [
+    { origin: "https://evil.test" },
+    { dnt: "1" },
+    { "sec-gpc": "1" },
+  ];
+  for (const headers of privacyHeaders)
+    expect((await route.POST!(request([event], headers))).status).toBe(403);
+  signed = false;
+  expect((await route.POST!(request([event]))).status).toBe(401);
+  signed = true;
+  for (const events of [
+    [],
+    Array(11).fill(event),
+    [{ ...event, profileName: "private" }],
+    [{ ...event, path: "/admin" }],
+  ])
+    expect((await route.POST!(request(events))).status).toBe(400);
+  expect(writes).toHaveLength(0);
+  expect((await route.POST!(request([event]))).status).toBe(200);
+  expect(writes).toEqual([
+    {
+      viewer_id: "6406ea15-c50f-4b79-bec0-538adcc52f11",
+      returning_viewer: true,
+      event_batch: [event],
+      browser_name: "Safari",
+      device_type: "Phone",
+    },
+  ]);
+});
 
 test("JSON input limits actual bytes, rejects invalid UTF-8 and handles chunked requests", async () => {
   const { readBoundedJson } = serverModule("lib/server/http.ts");

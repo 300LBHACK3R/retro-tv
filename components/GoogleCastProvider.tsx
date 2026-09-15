@@ -477,7 +477,12 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     loadGenerationRef.current += 1;
     setErrorMessage("");
-    try { castContextRef.current?.endCurrentSession(true); }
+    try {
+      const context = castContextRef.current;
+      // Profile startup/switching can call this before there is a session.
+      // Ending a nonexistent session needlessly calls the receiver API twice.
+      if (context?.getCurrentSession()) context.endCurrentSession(true);
+    }
     catch (error) { setErrorMessage(getErrorText(error)); }
     refreshSessionState();
   }, [refreshSessionState]);

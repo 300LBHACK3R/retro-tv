@@ -1,7 +1,8 @@
 import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { browserStorage } from "./browserStorage";
 import { DEFAULT_THEME_ID, isThemeId, THEME_STORAGE_KEY } from "./themes";
 import type {
   AdCategory,
@@ -1874,6 +1875,7 @@ export const useStore = create<AppState>()(
     {
       name: programmingStoreName,
       version: programmingStoreVersion,
+      storage: createJSONStorage(() => browserStorage),
 
       merge: (persistedState, currentState) => {
         const saved = persistedState as (Partial<AppState>) | undefined;

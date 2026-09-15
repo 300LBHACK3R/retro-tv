@@ -12,6 +12,7 @@ import {
   type CastQueueEntry,
 } from "@/components/GoogleCastProvider";
 import WatchOnTVModal from "@/components/WatchOnTVModal";
+import { trackAnalytics } from "@/lib/analyticsClient";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
@@ -578,6 +579,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     loadQueue: loadCastQueue,
     sdkState: castSdkState,
     requestSession: requestCastSession,
+    errorMessage: castErrorMessage,
   } = useGoogleCast();
 
   isCastingRef.current = castRemote.isConnected;
@@ -1015,20 +1017,35 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     setTvConnectionNotice("");
     tvPickerPendingRef.current = true;
     setTvPickerPending(true);
+    const method = nativeTv.kind === "airplay" ? "airplay" : castSdkState === "ready" ? "google-cast" : nativeTv.kind === "remote" ? "remote" : "help";
+    trackAnalytics("cast_attempt", method);
     try {
       // Call the native API in this tap's stack; effects/timers lose activation.
       if (nativeTv.kind === "airplay") {
-        setTvConnectionNotice(await nativeTv.request());
+        const notice = await nativeTv.request();
+        setTvConnectionNotice(notice);
+        if (notice) trackAnalytics("cast_error", method);
       } else if (castSdkState === "ready") {
         await requestCastSession();
       } else if (nativeTv.kind === "remote" && castSdkState !== "loading") {
-        setTvConnectionNotice(await nativeTv.request());
+        const notice = await nativeTv.request();
+        setTvConnectionNotice(notice);
+        if (notice) trackAnalytics("cast_error", method);
       }
     } finally {
       tvPickerPendingRef.current = false;
       setTvPickerPending(false);
     }
   }, [castRemote.isConnected, nativeTv, castSdkState, requestCastSession]);
+
+  useEffect(() => {
+    if (nativeTv.connected) trackAnalytics("cast_connected", nativeTv.kind || "remote");
+    else if (castRemote.isConnected) trackAnalytics("cast_connected", "google-cast");
+  }, [nativeTv.connected, nativeTv.kind, castRemote.isConnected]);
+
+  useEffect(() => {
+    if (castErrorMessage) trackAnalytics("cast_error", "google-cast");
+  }, [castErrorMessage]);
 
   const requestCastLiveSync = useCallback(() => {
     lastCastQueueKeyRef.current = "";

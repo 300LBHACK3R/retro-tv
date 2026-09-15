@@ -70,6 +70,29 @@ async function switchProfile(page: Page) {
     page.getByRole("region", { name: "Install Tate's TV", exact: true }),
   ).toHaveCount(0);
 }
+
+for (const storageFailure of ["quota", "blocked"] as const) {
+  test(`viewing starts when browser storage is ${storageFailure}`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.addInitScript((failure) => {
+      if (failure === "blocked") {
+        for (const key of ["localStorage", "sessionStorage"]) Object.defineProperty(window, key, {
+          configurable: true, get() { throw new DOMException("Unavailable", "SecurityError"); },
+        });
+      } else {
+        Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); };
+      }
+    }, storageFailure);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+    await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+    const current = page.getByRole("region", { name: "Current Tate's TV channel", exact: true });
+    await expect(current.getByRole("heading", { name: "Welcome TV", exact: true })).toBeVisible();
+    await switchProfile(page);
+    expect(errors).toEqual([]);
+  });
+}
 function parentPinInput(page: Page) {
   // The PIN screen's landmarks share the input's name; target the labelled
   // input so this also works when Show PIN changes its type to text.

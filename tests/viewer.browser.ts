@@ -1012,6 +1012,7 @@ test("TV picker survives delayed Cast startup, opens on the first tap and treats
   await expect(dialog.getByRole("button", { name: /AirPlay/ })).toHaveCount(0);
   await page.evaluate(() => window.dispatchEvent(new Event("ttv-test-cast-ready")));
   await expect(dialog.getByRole("button", { name: "Choose TV — Google Cast", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as typeof window & { ttvCastTest: { stop: number } }).ttvCastTest.stop)).toBe(0);
   await dialog.getByRole("button", { name: "Close Watch on TV", exact: true }).click();
   await revealAndOpen();
   const readState = () => page.evaluate(() => (window as typeof window & { ttvCastTest: { requests: number; loads: number; stop: number; options: { autoJoinPolicy?: string } } }).ttvCastTest);

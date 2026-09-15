@@ -16,7 +16,10 @@ export async function GET() {
     return privateJson({ ok: false }, 401);
   try {
     const client = createSupabaseAdminClient();
-    const { data, error } = await client.rpc("ttv_station_insights");
+    const [{ data, error }, growthResult] = await Promise.all([
+      client.rpc("ttv_station_insights"),
+      client.rpc("ttv_growth_insights"),
+    ]);
     if (error)
       return privateJson(
         {
@@ -30,6 +33,10 @@ export async function GET() {
     return privateJson({
       ok: true,
       insights: data,
+      growth: growthResult.error ? null : growthResult.data,
+      growthError: growthResult.error
+        ? "Traffic analytics need supabase/migrations/20260916_growth_analytics.sql applied in Supabase."
+        : null,
       retentionOk: !pruneError,
       checkedAt: new Date().toISOString(),
     });
@@ -83,13 +90,11 @@ export async function POST(request: Request) {
     for (let offset = 0; offset < items.length; offset += 4)
       results.push(
         ...(await Promise.all(
-          items
-            .slice(offset, offset + 4)
-            .map(async (item) => ({
-              id: item.id,
-              title: item.title,
-              ...(await probeMedia(item.file)),
-            })),
+          items.slice(offset, offset + 4).map(async (item) => ({
+            id: item.id,
+            title: item.title,
+            ...(await probeMedia(item.file)),
+          })),
         )),
       );
     return privateJson({ ok: true, results });

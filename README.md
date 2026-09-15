@@ -61,6 +61,22 @@ Media link checks only probe the exact HTTPS origins configured in `R2_MEDIA_PUB
 
 Missing metrics configuration disables collection without interrupting viewing. No migration is executed by a build, viewer request or release helper.
 
+### Traffic, retention and reliability
+
+After the station migration, apply [growth analytics](supabase/migrations/20260916_growth_analytics.sql) in the same Supabase SQL editor. **Admin → Insights** adds public page views, returning-device estimates, devices starting playback, a seven-day UTC trend, traffic-source categories, theme/guide use, TV connections and browser/device error breakdowns. The existing watch-time and channel reports remain available. `ADMIN_SESSION_SECRET` and the existing server-only Supabase configuration are required. Missing setup produces an explicit message in Insights, not invented zero counts.
+
+Only selected full-lineup profiles participate. Kids profiles, private routes, DNT/GPC and viewers who opt out on `/privacy` are excluded. Profile names, profile IDs, PINs, search text, raw user agents, IPs and raw referrer URLs are not stored in the event tables. Pageview URLs sent to Vercel have queries and fragments removed. Existing data collected before this release is not retroactively classified by profile type. The signed random device cookie expires after 30 days; returning counts mean a browser identifier created on an earlier UTC day, not registered users. Blockers, shared devices and storage clearing affect counts. Events are best-effort, rate limited, deduplicated by UUID and retained for at most 30 days during active collection/report refresh. They are not suitable for ad billing. Cast receiver watch time and failures before JavaScript/profile startup are outside this report.
+
+Enable **Web Analytics** in the Vercel project's Analytics tab for its traffic dashboard; first-party Insights does not require Vercel custom-event billing or a new tracking vendor. This update does not change a hosting plan. Raw event tables and RPCs are accessible only to the server service role, and the report endpoint requires admin authentication.
+
+### Search and sharing
+
+Public routes include canonical URLs, descriptions, Open Graph/Twitter previews, structured Website/Organization/WebApplication data and a sitemap at `https://www.tatestv.ca/sitemap.xml`. Private/admin routes stay excluded from indexing. To verify search ownership, set the actual token supplied by Google Search Console as `GOOGLE_SITE_VERIFICATION`, or Bing Webmaster Tools as `BING_SITE_VERIFICATION`, in Vercel, redeploy, then submit the sitemap. Verification and search traffic cannot be confirmed until those services are connected. No fabricated ratings or video metadata are published.
+
+### Safari startup
+
+Programming, player preferences and saved-library storage tolerate blocked reads and quota failures without clearing existing data. Unsupported storage falls back to the current tab's memory. Profile startup and controls are covered by Node regression checks plus browser tests for denied storage and full quota. The Next.js/Tailwind versions used here target Safari 16.4 or newer. Audible autoplay may require tapping Play; physical iPhone/iPad/macOS Safari and TV handoff still need device testing.
+
 ## Source map
 
 | Location                                                          | Responsibility                                                   |

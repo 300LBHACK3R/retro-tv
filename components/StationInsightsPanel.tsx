@@ -29,6 +29,36 @@ interface Probe {
   status: string;
   detail: string;
 }
+interface Growth {
+  totals: {
+    page_views: number;
+    devices: number;
+    returning_devices: number;
+    playing_devices: number;
+    guide_opens: number;
+    cast_attempts: number;
+    cast_connections: number;
+    client_errors: number;
+    average_page_load_ms: number;
+  };
+  days: {
+    day: string;
+    page_views: number;
+    devices: number;
+    playing_devices: number;
+  }[];
+  browsers: {
+    browser: string;
+    device: string;
+    devices: number;
+    playback_errors: number;
+    client_errors: number;
+    average_startup_ms: number;
+  }[];
+  sources: { source: string; page_views: number; devices: number }[];
+  pages: { path: string; page_views: number }[];
+  events: { name: string; detail: string; count: number }[];
+}
 
 export default function StationInsightsPanel() {
   const media = useStore((state) => state.media);
@@ -38,6 +68,8 @@ export default function StationInsightsPanel() {
     [media, channels],
   );
   const [insights, setInsights] = useState<Insights | null>(null);
+  const [growth, setGrowth] = useState<Growth | null>(null);
+  const [growthMessage, setGrowthMessage] = useState("");
   const [message, setMessage] = useState("");
   const [checking, setChecking] = useState(false);
   const [results, setResults] = useState<Probe[]>([]);
@@ -52,8 +84,11 @@ export default function StationInsightsPanel() {
     })
       .then((response) => response.json())
       .then((body) => {
-        if (body.ok) setInsights(body.insights);
-        else
+        if (body.ok) {
+          setInsights(body.insights);
+          setGrowth(body.growth ?? null);
+          setGrowthMessage(body.growthError || "");
+        } else
           setMessage(body.error || "Sign in again to view station insights.");
       })
       .catch(() => {
@@ -111,14 +146,168 @@ export default function StationInsightsPanel() {
       <span className="ttv-section-kicker">Keep the station running</span>
       <h2>Station insights</h2>
       <p>
-        Anonymous viewing activity over the last seven days. Device counts are
-        estimates, not individual people; browsers that opt out are excluded.
-        Casting sessions are not counted.
+        Participating full-lineup profiles over the last seven days. Device
+        counts are estimates, not individual people; browsers that opt out are
+        excluded. Kids profiles are excluded from new measurements. TV
+        connection attempts are measured separately; watch time on Cast
+        receivers is not counted.
       </p>
       {message && (
         <p role="status" className="ttv-station-message">
           {message}
         </p>
+      )}
+      {growthMessage && (
+        <p role="status" className="ttv-station-message">
+          {growthMessage}
+        </p>
+      )}
+      {growth && (
+        <>
+          <h3>Audience & discovery</h3>
+          <div className="ttv-station-stats">
+            {[
+              ["Page views", growth.totals.page_views],
+              ["Visiting devices", growth.totals.devices],
+              ["Returning visitors", growth.totals.returning_devices],
+              ["Devices starting playback", growth.totals.playing_devices],
+              ["Guide opens", growth.totals.guide_opens],
+              ["TV connection attempts", growth.totals.cast_attempts],
+              ["TV connections", growth.totals.cast_connections],
+              ["Page errors", growth.totals.client_errors],
+            ].map(([label, value]) => (
+              <div className="ttv-station-stat" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="ttv-station-table-wrap">
+            <table className="ttv-station-table">
+              <caption>Daily audience · UTC</caption>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Page views</th>
+                  <th>Devices</th>
+                  <th>Started playback</th>
+                </tr>
+              </thead>
+              <tbody>
+                {growth.days.map((row) => (
+                  <tr key={row.day}>
+                    <td>{row.day}</td>
+                    <td>{row.page_views}</td>
+                    <td>{row.devices}</td>
+                    <td>{row.playing_devices}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="ttv-station-table-wrap">
+            <table className="ttv-station-table">
+              <caption>Browser & device reliability</caption>
+              <thead>
+                <tr>
+                  <th>Browser / device</th>
+                  <th>Devices</th>
+                  <th>Playback errors</th>
+                  <th>Page errors</th>
+                  <th>Average playback start</th>
+                </tr>
+              </thead>
+              <tbody>
+                {growth.browsers.map((row) => (
+                  <tr key={`${row.browser}:${row.device}`}>
+                    <td>
+                      {row.browser} · {row.device}
+                    </td>
+                    <td>{row.devices}</td>
+                    <td>{row.playback_errors}</td>
+                    <td>{row.client_errors}</td>
+                    <td>
+                      {row.average_startup_ms
+                        ? `${(row.average_startup_ms / 1000).toFixed(1)}s`
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="ttv-station-table-wrap">
+            <table className="ttv-station-table">
+              <caption>Traffic sources</caption>
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Page views</th>
+                  <th>Devices</th>
+                </tr>
+              </thead>
+              <tbody>
+                {growth.sources.map((row) => (
+                  <tr key={row.source}>
+                    <td>{row.source}</td>
+                    <td>{row.page_views}</td>
+                    <td>{row.devices}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <details>
+            <summary>Pages, themes & feature activity</summary>
+            <div className="ttv-station-table-wrap">
+              <table className="ttv-station-table">
+                <caption>Page views</caption>
+                <thead>
+                  <tr>
+                    <th>Page</th>
+                    <th>Views</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {growth.pages.map((row) => (
+                    <tr key={row.path}>
+                      <td>{row.path}</td>
+                      <td>{row.page_views}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="ttv-station-table-wrap">
+              <table className="ttv-station-table">
+                <caption>Feature events</caption>
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Option</th>
+                    <th>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {growth.events.map((row) => (
+                    <tr key={`${row.name}:${row.detail}`}>
+                      <td>{row.name.replaceAll("_", " ")}</td>
+                      <td>{row.detail || "—"}</td>
+                      <td>{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <p>
+            Returning visitors used the same signed browser identifier on an
+            earlier UTC day. Counts exclude opt-outs, Kids profiles and visitors
+            who have not selected a full-lineup profile. Browser/device
+            categories are estimates. Reported events are directional
+            measurements, not ad billing records.
+          </p>
+        </>
       )}
       <div className="ttv-station-stats">
         {[
