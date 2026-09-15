@@ -404,7 +404,12 @@ test("favourite channels and guide filtering persist without accounts", async ({
     .getByRole("button", { name: "Show all channels", exact: true })
     .click();
   await expect(search).toHaveValue("");
-  await expect(search).toBeFocused();
+  if (await dialog.locator('[data-mobile="true"]').count()) {
+    await expect(search).not.toBeFocused();
+    await expect(dialog.getByRole("button", { name: "Favourites", exact: true })).toBeFocused();
+  } else {
+    await expect(search).toBeFocused();
+  }
   await expect(
     dialog.getByRole("button", { name: "Favourites", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
@@ -578,6 +583,7 @@ test("mobile guide compares channels, browses without tuning and restores your p
     body: await page.screenshot(),
     contentType: "image/png",
   });
+  await expect(back).toBeInViewport();
   await back.click();
   await expect(schedule).toBeFocused();
   const afterScroll = await dialog
@@ -585,6 +591,16 @@ test("mobile guide compares channels, browses without tuning and restores your p
     .first()
     .evaluate((element) => element.scrollTop);
   expect(Math.abs(afterScroll - beforeScroll)).toBeLessThan(4);
+  // Find and the current channel stay reachable after browsing down the list.
+  await dialog.locator(".ttv-mobile-guide-scroll").first().evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(dialog.getByRole("button", { name: "Your channel", exact: true })).toBeInViewport();
+  await dialog.getByRole("button", { name: "Your channel", exact: true }).click();
+  await expect(schedule).toBeFocused();
+  await expect(schedule).toBeInViewport();
+  await dialog.getByRole("button", { name: "Find", exact: true }).click();
+  await expect(dialog.getByRole("searchbox", { name: "Find a channel in the guide" })).toBeFocused();
   await list
     .getByRole("button", { name: "Save Studio TV to favourites", exact: true })
     .click();
@@ -693,4 +709,58 @@ test("mobile guide fits narrow screens, landscape and larger text with reachable
   });
   await watch.click();
   await expect(dialog).toHaveCount(0);
+});
+
+test("mobile themes are free, open without the keyboard, and save Haunted Arcade with motion off", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "television");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/library");
+  const trigger = page.getByRole("button", { name: "Open theme library", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Theme Library", exact: true });
+  const close = dialog.getByRole("button", { name: "Close Theme Library", exact: true });
+  const search = dialog.getByRole("searchbox", { name: "Search Tate's TV themes" });
+  await expect(close).toBeFocused();
+  await expect(search).not.toBeFocused();
+  await expect(dialog.getByText("All themes are free. Pick a look for this profile.", { exact: true })).toBeVisible();
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
+  await expect(dialog.locator(".theme-card:disabled")).toHaveCount(0);
+  await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);
+  await expect(dialog.getByRole("group", { name: "Theme access filters" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Seasonal", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  const cards = await dialog.locator(".theme-card").evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, top: rect.top, width: rect.width };
+  }));
+  expect(Math.abs(cards[0]!.top - cards[1]!.top)).toBeLessThan(2);
+  expect(cards[1]!.left).toBeGreaterThan(cards[0]!.left + cards[0]!.width);
+  await search.fill("no-such-theme");
+  await expect(dialog.getByRole("status")).toContainText("No themes match");
+  await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
+  await expect(close).toBeInViewport();
+  await dialog.getByRole("button", { name: "Apply theme: Haunted Arcade", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  const scene = page.getByRole("complementary", { name: "Halloween on Tate’s TV" });
+  await expect(scene).toHaveAttribute("data-variant", "arcade");
+  await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
+  await expect(scene.locator(".ttv-haunted-ghost").first()).toHaveCSS("animation-name", "none");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(scene.getByRole("button", { name: "Effects paused", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(scene.locator(".ttv-haunted-ghost").first()).toHaveCSS("animation-name", "none");
+  await trigger.click();
+  await page.setViewportSize({ width: 568, height: 320 });
+  await expect(close).toBeInViewport();
+  await expect(dialog.getByRole("button", { name: "Done", exact: true })).toBeInViewport();
+  await noPageOverflow(page);
+  await testInfo.attach("haunted-arcade-mobile-theme-picker", { body: await page.screenshot(), contentType: "image/png" });
+  await close.click();
+  await page.goto("/?ch=24");
+  await expect(page.getByRole("region", { name: "Live Tate's TV player", exact: true })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(page.locator(".ttv-premium-viewer-shell .ttv-halloween-scene")).toBeHidden();
 });

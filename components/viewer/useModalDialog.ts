@@ -71,9 +71,16 @@ export function useModalDialog({
       }
 
       const preferredTarget = initialFocusRef?.current;
-      const fallbackTarget = getFocusableElements(dialog)[0] ?? dialog;
+      const focusable = getFocusableElements(dialog);
+      const fallbackTarget = focusable[0] ?? dialog;
+      const avoidKeyboard =
+        preferredTarget?.matches("input, textarea") &&
+        window.matchMedia("(pointer: coarse), (max-width: 760px)").matches;
 
-      (preferredTarget ?? fallbackTarget).focus({ preventScroll: true });
+      const target = avoidKeyboard
+        ? focusable.find((element) => !element.matches("input, textarea")) ?? dialog
+        : preferredTarget ?? fallbackTarget;
+      target.focus({ preventScroll: true });
     }, 20);
 
     const handleKeyDown = (event: KeyboardEvent) => {

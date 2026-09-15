@@ -171,14 +171,14 @@
 
 .ttv-guide-dialog {
   position: fixed;
-  inset: var(--ttv-guide-top, 0px) 0 auto;
+  inset: var(--ttv-dialog-top, 0px) 0 auto;
   z-index: 2147482500;
   display: flex;
   min-width: 0;
   min-height: 0;
   height: 100vh;
   height: 100dvh;
-  height: var(--ttv-guide-height, 100dvh);
+  height: var(--ttv-dialog-height, 100dvh);
   flex-direction: column;
   overflow: hidden;
   padding:

@@ -9,10 +9,38 @@ export default function HalloweenScene({ entrance = false }: { entrance?: boolea
   const reduced = useStore((state) => state.viewerSettings.preferReducedMotion);
   const setReduced = useStore((state) => state.setPreferReducedMotion);
   const id = useId().replace(/:/g, "");
-  if (theme !== "halloween-night") return null;
+  const arcade = theme === "halloween-haunted-arcade";
+  if (theme !== "halloween-night" && !arcade) return null;
 
   return (
-    <aside className="ttv-halloween-scene" data-entrance={entrance} aria-label="Halloween on Tate’s TV">
+    <aside className="ttv-halloween-scene" data-entrance={entrance} data-variant={arcade ? "arcade" : "moonlit"} aria-label="Halloween on Tate’s TV">
+      {arcade ? (
+        <svg className="ttv-halloween-pumpkins" viewBox="0 0 220 160" aria-hidden="true" focusable="false">
+          <ellipse cx="110" cy="143" rx="102" ry="13" fill="#baf77b" opacity=".08" />
+          <g shapeRendering="crispEdges">
+            <path d="M58 14h88v12h8v53l12 21v45H45v-45l13-21Z" fill="#273344" stroke="#c7a6ff" strokeWidth="3" />
+            <path d="M69 22h64v13H69Z" fill="#baf77b" />
+            <path d="M67 43h72v47H67Z" fill="#0c0b18" stroke="#506278" strokeWidth="3" />
+            <g className="ttv-haunted-screen" fill="#baf77b">
+              <path d="M93 49h19v5h6v27l-7-5-8 5-8-5-8 5V54h6Z" />
+              <path d="M95 60h5v6h-5Zm13 0h5v6h-5Z" fill="#121724" />
+            </g>
+            <path d="m58 97-6 12h106l-7-12Z" fill="#475b70" />
+            <path d="M64 105h18v4H64Zm7-10h4v12h-4Z" fill="#f4fff1" />
+            <path d="M114 101h8v5h-8Zm16 0h8v5h-8Z" fill="#ffae64" />
+            <path d="M77 121h58v4H77Zm18 12h23v5H95Z" fill="#baf77b" opacity=".7" />
+            <g transform="translate(158 90)">
+              <path d="M20 7V0h8v12" fill="#baf77b" />
+              <path d="M10 12h31v6h8v31h-8v7H10v-7H3V18h7Z" fill="#f79a4b" />
+              <path d="M15 12v43m20-43v43" stroke="#c66b37" strokeWidth="3" />
+              <g className="ttv-halloween-lantern" fill="#fff1af">
+                <path d="M11 25h9v8h-9Zm22 0h9v8h-9ZM14 41h8v5h9v-5h8v9H14Z" />
+              </g>
+            </g>
+            <path d="M24 41v14m-7-7h14m148-22v12m-6-6h12" stroke="#c7a6ff" strokeWidth="3" />
+          </g>
+        </svg>
+      ) : (
       <svg className="ttv-halloween-pumpkins" viewBox="0 0 220 160" aria-hidden="true" focusable="false">
         <defs>
           <radialGradient id={`${id}-pumpkin`} cx="35%" cy="25%" r="80%">
@@ -45,13 +73,33 @@ export default function HalloweenScene({ entrance = false }: { entrance?: boolea
         </g>
         <path d="m14 137 12-10 1 10 12 5-14 3-4 10-3-12-11-3Zm183-93 7 3 10-5-4 9 5 8-10-2-7 8 1-11-8-5Z" fill="#c6834c" opacity=".75" />
       </svg>
+      )}
       <div className="ttv-halloween-copy">
-        <span className="ttv-halloween-eyebrow">Halloween on Tate’s TV</span>
-        <p>{entrance ? "A little magic. A lot of TV." : "Your moonlit movie night."}</p>
+        <span className="ttv-halloween-eyebrow">{arcade ? "Halloween · Haunted Arcade" : "Halloween on Tate’s TV"}</span>
+        <p>{arcade ? "Good company. Spooky channels." : entrance ? "A little magic. A lot of TV." : "Your moonlit movie night."}</p>
         <button type="button" aria-pressed={reduced} onClick={() => setReduced(!reduced)}>
           {reduced ? "Effects paused" : "Pause effects"}
         </button>
       </div>
+      {arcade ? (
+        <svg className="ttv-halloween-sky" viewBox="0 0 270 160" aria-hidden="true" focusable="false">
+          <circle cx="187" cy="72" r="65" fill="#c7a6ff" opacity=".06" />
+          <circle cx="187" cy="72" r="49" fill="#c7a6ff" opacity=".12" />
+          <path d="M186 18a43 43 0 1 0 43 43 37 37 0 0 1-43-43Z" fill="#c7a6ff" />
+          <g className="ttv-haunted-ghost" shapeRendering="crispEdges">
+            <path d="M93 51h39v8h11v12h8v58l-14-9-12 9-13-9-12 9-14-9-12 9V71h8V59h11Z" fill="#e5fbd1" />
+            <path d="M94 77h9v14h-9Zm29 0h9v14h-9Z" fill="#273344" />
+            <path d="M107 100h15v7h-15Z" fill="#829b80" />
+            <path d="M86 96h10v5H86Zm45 0h10v5h-10Z" fill="#c7a6ff" />
+          </g>
+          <g className="ttv-haunted-ghost ttv-haunted-ghost--small" shapeRendering="crispEdges">
+            <path d="M206 94h21v6h7v7h5v33l-9-6-8 6-8-6-9 6-8-6v-27h4v-7h5Z" fill="#c7a6ff" />
+            <path d="M207 111h5v8h-5Zm15 0h5v8h-5Z" fill="#273344" />
+          </g>
+          <path d="M54 49v12m-6-6h12m107 73v12m-6-6h12M243 45v10m-5-5h10" stroke="#baf77b" strokeWidth="3" />
+          <path d="m49 111 8-8 8 8 8-8 8 8" fill="none" stroke="#506278" strokeWidth="2" />
+        </svg>
+      ) : (
       <svg className="ttv-halloween-sky" viewBox="0 0 270 160" aria-hidden="true" focusable="false">
         <circle cx="194" cy="70" r="64" fill="#c4a0ff" opacity=".07" />
         <circle cx="194" cy="70" r="51" fill="#c4a0ff" opacity=".1" />
@@ -73,6 +121,7 @@ export default function HalloweenScene({ entrance = false }: { entrance?: boolea
         </g>
         <g fill="#ffd99e"><path d="m107 20 2 5 5 2-5 2-2 5-2-5-5-2 5-2Zm140 92 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" /><circle cx="69" cy="24" r="1.5" /><circle cx="126" cy="131" r="2" /><circle cx="242" cy="29" r="1.5" /></g>
       </svg>
+      )}
     </aside>
   );
 }

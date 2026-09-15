@@ -30,6 +30,7 @@ export default function MobileGuide({
   tools,
   emptyMessage,
   onChannelBrowse,
+  onFindChannel,
   onTune,
 }: {
   rows: PreparedGuideRow[];
@@ -40,6 +41,7 @@ export default function MobileGuide({
   tools: ReactNode;
   emptyMessage: string;
   onChannelBrowse: (channelId: string) => void;
+  onFindChannel: () => void;
   onTune: Tune;
 }) {
   const [view, setView] = useState<"now" | "schedule">("now");
@@ -48,6 +50,7 @@ export default function MobileGuide({
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const channelListRef = useRef<HTMLDivElement | null>(null);
   const channelListScroll = useRef(0);
+  const currentCardRef = useRef<HTMLLIElement | null>(null);
   const pendingFocus = useRef(false);
   const showSchedule = view === "schedule" && Boolean(selectedRow);
   const now = new Date(windowStartMs + nowOffsetSec * 1000);
@@ -83,7 +86,28 @@ export default function MobileGuide({
           <h2 ref={headingRef} tabIndex={-1}>
             On now
           </h2>
-          <time dateTime={now.toISOString()}>{formatTime(now)}</time>
+          <div className="ttv-mobile-now-actions">
+            {rows.some((row) => row.channel.id === currentChannelId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const card = currentCardRef.current;
+                  card?.scrollIntoView({ block: "nearest" });
+                  card?.querySelector<HTMLButtonElement>(".ttv-mobile-open-schedule")
+                    ?.focus({ preventScroll: true });
+                }}
+              >
+                Your channel
+              </button>
+            )}
+            <button type="button" onClick={() => {
+              if (channelListRef.current) channelListRef.current.scrollTop = 0;
+              onFindChannel();
+            }}>
+              Find
+            </button>
+          </div>
+          <time className="sr-only" dateTime={now.toISOString()}>{formatTime(now)}</time>
         </div>
         {rows.length === 0 ? (
           <p className="ttv-guide-empty" role="status">
@@ -110,6 +134,7 @@ export default function MobileGuide({
               return (
                 <li
                   key={channel.id}
+                  ref={current ? currentCardRef : undefined}
                   className="ttv-mobile-channel"
                   data-current={current}
                 >

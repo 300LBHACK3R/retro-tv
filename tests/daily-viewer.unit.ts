@@ -256,7 +256,7 @@ test("all themes use valid colour tokens and readable text pairs", async () => {
   const ratio = (a: string, b: string) =>
     (Math.max(luminance(a), luminance(b)) + 0.05) /
     (Math.min(luminance(a), luminance(b)) + 0.05);
-  expect(THEMES).toHaveLength(10);
+  expect(THEMES).toHaveLength(11);
   expect(THEME_ACCESS_MODE).toBe("all-unlocked");
   for (const theme of THEMES) {
     for (const key of [

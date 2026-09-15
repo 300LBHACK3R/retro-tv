@@ -22,7 +22,7 @@ export type ThemeColorToken =
 export type ThemeColors = Record<ThemeColorToken, string>;
 
 export type ThemeCategory =
-  "classic" | "console" | "premium" | "cartoon" | "arcade";
+  "classic" | "console" | "premium" | "cartoon" | "arcade" | "seasonal";
 
 export type ThemeLayoutMode =
   | "neon-crt-broadcast"
@@ -87,8 +87,13 @@ export const THEME_STORAGE_KEY = "retro-tv-programming-v1";
 
 export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
   {
+    id: "seasonal",
+    label: "Seasonal",
+    description: "Little celebrations for your daily television ritual.",
+  },
+  {
     id: "premium",
-    label: "TTV Premium",
+    label: "Cinematic",
     description: "Official, cinematic, gold, and modern broadcast interfaces.",
   },
   {
@@ -122,7 +127,7 @@ export const THEMES = [
       "Pumpkin lanterns, a moonlit witch, violet skies, and warm amber light. A little magic for your nightly TV ritual.",
     priceLabel: "Free",
     isPremium: false,
-    category: "premium",
+    category: "seasonal",
     layout: "cinematic-premium",
     appearance: "dark",
     previewGradient:
@@ -146,6 +151,40 @@ export const THEMES = [
       guideRowAltBg: "#251a2e",
       guideActiveBg: "#c4a0ff",
       guideCurrentBg: "#ffab5c",
+    },
+  },
+  {
+    id: "halloween-haunted-arcade",
+    name: "Haunted Arcade",
+    shortName: "Haunted Arcade",
+    description:
+      "A playful Halloween after hours: pixel pumpkins, friendly floating ghosts, violet skies, and a soft green glow.",
+    priceLabel: "Free",
+    isPremium: false,
+    category: "seasonal",
+    layout: "neon-arcade",
+    appearance: "dark",
+    previewGradient:
+      "radial-gradient(circle at 18% 85%, #467f4755, transparent 50%), radial-gradient(circle at 85% 10%, #9670cf77, transparent 55%), linear-gradient(135deg, #0c0b18, #192a30)",
+    recommendedFor: ["Halloween", "ghosts", "pixel art", "arcade"],
+    colors: {
+      appBg: "#0c0b18",
+      panelBg: "#121724",
+      panelAltBg: "#1c2335",
+      border: "#475b70",
+      text: "#f4fff1",
+      textMuted: "#b6c7b5",
+      buttonBg: "#253044",
+      buttonHover: "#344459",
+      primary: "#baf77b",
+      secondary: "#c7a6ff",
+      onPrimary: "#0c1720",
+      focusRing: "#d9ffae",
+      guideHeaderBg: "#1c2335",
+      guideRowBg: "#121724",
+      guideRowAltBg: "#192131",
+      guideActiveBg: "#c7a6ff",
+      guideCurrentBg: "#baf77b",
     },
   },
   {
@@ -532,7 +571,9 @@ export function getAllThemes(): ThemeDefinition[] {
 }
 
 export function getFreeThemes(): ThemeDefinition[] {
-  return sortThemesByCategory(THEMES.filter((theme) => !theme.isPremium));
+  return sortThemesByCategory(
+    THEMES.filter((theme) => PREMIUM_THEMES_TEMPORARILY_UNLOCKED || !theme.isPremium),
+  );
 }
 
 export function getPremiumThemes(): ThemeDefinition[] {
@@ -594,8 +635,7 @@ export function getThemeAccessLabel(
   ownedPremiumThemes: readonly ThemeId[],
   isAdmin: boolean,
 ): ThemeAccessLabel {
-  if (!theme.isPremium) return "Free";
-  if (PREMIUM_THEMES_TEMPORARILY_UNLOCKED) return "Unlocked";
+  if (!theme.isPremium || PREMIUM_THEMES_TEMPORARILY_UNLOCKED) return "Free";
   if (isAdmin) return "Preview";
   if (isOwnedTheme(theme.id, ownedPremiumThemes)) return "Owned";
   return "Premium";

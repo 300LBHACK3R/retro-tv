@@ -56,6 +56,9 @@ export function assertHalloweenStyles(css, context = "Halloween") {
   for (const name of ["scene", "pumpkins", "sky", "copy", "witch", "bats", "lantern"])
     assert.ok(css.includes(`.ttv-halloween-${name}`), `${context}: missing ${name} styling`);
   assert.ok(css.includes("prefers-reduced-motion"), `${context}: missing reduced motion support`);
+  assert.ok(css.includes("halloween-haunted-arcade"), `${context}: missing second Halloween theme`);
+  assert.ok(css.includes("ttv-ghost-float"), `${context}: missing ghost animation`);
+  assert.ok(css.includes(".theme-dialog__scroll"), `${context}: missing scrollable theme picker`);
   assert.ok(css.includes("ttv-witch-flight"), `${context}: missing seasonal animation`);
 }
 

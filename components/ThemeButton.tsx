@@ -11,6 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
   getAllThemes,
@@ -28,18 +29,11 @@ import { THEME_LIBRARY_OPEN_EVENT } from "@/lib/themeEvents";
 const DIALOG_ID = "ttv-theme-library";
 
 type CategoryFilter = "all" | ThemeCategory;
-type AccessFilter = "all" | "free" | "premium";
 
 type FilterOption<T extends string> = {
   id: T;
   label: string;
 };
-
-const ACCESS_FILTERS: readonly FilterOption<AccessFilter>[] = [
-  { id: "all", label: "All access" },
-  { id: "free", label: "Free" },
-  { id: "premium", label: "Premium" },
-];
 
 const CATEGORY_FILTERS: readonly FilterOption<CategoryFilter>[] = [
   { id: "all", label: "All styles" },
@@ -60,22 +54,13 @@ function themeMatchesQuery(theme: ThemeDefinition, query: string): boolean {
     theme.name,
     theme.shortName,
     theme.description,
-    theme.category,
+    getThemeCategoryMeta(theme.category).label,
     theme.layout,
     theme.recommendedFor.join(" "),
   ]
     .join(" ")
     .toLocaleLowerCase("en-CA")
     .includes(normalizedQuery);
-}
-
-function themeMatchesAccess(
-  theme: ThemeDefinition,
-  filter: AccessFilter,
-): boolean {
-  if (filter === "free") return !theme.isPremium;
-  if (filter === "premium") return theme.isPremium;
-  return true;
 }
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
@@ -199,12 +184,14 @@ export default function ThemeButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
-  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [portalReady, setPortalReady] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  useDialogViewport(dialogRef, portalReady && isOpen);
 
   const themeId = useStore((state) => state.themeId);
   const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
@@ -220,11 +207,10 @@ export default function ThemeButton() {
 
       return (
         categoryMatches &&
-        themeMatchesAccess(theme, accessFilter) &&
         themeMatchesQuery(theme, query)
       );
     });
-  }, [accessFilter, categoryFilter, query, themes]);
+  }, [categoryFilter, query, themes]);
 
   const closeDialog = useCallback(() => {
     setIsOpen(false);
@@ -235,7 +221,11 @@ export default function ThemeButton() {
   }, []);
 
   useEffect(() => {
-    const openThemeLibrary = () => setIsOpen(true);
+    const openThemeLibrary = () => {
+      setQuery("");
+      setCategoryFilter("all");
+      setIsOpen(true);
+    };
 
     window.addEventListener(THEME_LIBRARY_OPEN_EVENT, openThemeLibrary);
 
@@ -276,11 +266,12 @@ export default function ThemeButton() {
     body.dataset.ttvOverlayOpen = "true";
 
     const focusTimer = window.setTimeout(() => {
-      searchRef.current?.focus();
+      const touchLayout = window.matchMedia("(pointer: coarse), (max-width: 760px)").matches;
+      (touchLayout ? closeRef.current : searchRef.current)?.focus({ preventScroll: true });
     }, 40);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (["Escape", "BrowserBack", "GoBack"].includes(event.key) || event.keyCode === 10009 || event.keyCode === 461) {
         event.preventDefault();
         closeDialog();
         return;
@@ -302,7 +293,10 @@ export default function ThemeButton() {
       const lastElement = focusableElements[focusableElements.length - 1];
       const activeElement = document.activeElement;
 
-      if (event.shiftKey && activeElement === firstElement) {
+      if (!dialogRef.current.contains(activeElement)) {
+        event.preventDefault();
+        firstElement?.focus();
+      } else if (event.shiftKey && activeElement === firstElement) {
         event.preventDefault();
         lastElement?.focus();
       } else if (!event.shiftKey && activeElement === lastElement) {
@@ -368,7 +362,11 @@ export default function ThemeButton() {
         ref={triggerRef}
         type="button"
         className="theme-trigger ttv-touch-target"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setQuery("");
+          setCategoryFilter("all");
+          setIsOpen(true);
+        }}
         aria-label="Open theme library"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
@@ -423,16 +421,15 @@ export default function ThemeButton() {
                       id={`${DIALOG_ID}-description`}
                       className="theme-dialog__description"
                     >
-                      Choose your atmosphere. Your theme follows you from live
-                      TV to the library.
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
-                        ? " All themes are free to use during launch."
-                        : ""}
+                        ? "All themes are free. Pick a look for this profile."
+                        : "Pick a look for this profile."}
                     </p>
                   </div>
 
                   <button
                     type="button"
+                    ref={closeRef}
                     className="theme-dialog__close"
                     onClick={closeDialog}
                     aria-label="Close Theme Library"
@@ -442,20 +439,24 @@ export default function ThemeButton() {
                   </button>
                 </header>
 
-                <div className="theme-dialog__toolbar">
-                  <input
-                    ref={searchRef}
-                    className="theme-search"
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search themes, moods, or uses..."
-                    aria-label="Search Tate's TV themes"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
+                <div className="theme-dialog__scroll">
+                  <div className="theme-dialog__toolbar">
+                    <input
+                      ref={searchRef}
+                      className="theme-search"
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search themes…"
+                      enterKeyHint="search"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                      aria-label="Search Tate's TV themes"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
 
-                  <div className="grid gap-2">
                     <div
                       className="theme-filter-row"
                       role="group"
@@ -473,56 +474,50 @@ export default function ThemeButton() {
                         </button>
                       ))}
                     </div>
+                  </div>
 
-                    <div
-                      className="theme-filter-row"
-                      role="group"
-                      aria-label="Theme access filters"
-                    >
-                      {ACCESS_FILTERS.map((filter) => (
+                  <div className="theme-dialog__body">
+                    {visibleThemes.length > 0 ? (
+                      <div className="theme-grid">
+                        {visibleThemes.map((theme) => (
+                          <ThemeCard
+                            key={theme.id}
+                            theme={theme}
+                            isActive={theme.id === themeId}
+                            isAvailable={canUseTheme(
+                              theme.id,
+                              ownedPremiumThemes,
+                              false,
+                            )}
+                            accessLabel={getAccessCopy(theme, ownedPremiumThemes)}
+                            onSelect={applyTheme}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="theme-empty-state">
+                        <p role="status">No themes match. Try another style or start again.</p>
                         <button
-                          key={filter.id}
                           type="button"
-                          className="theme-filter"
-                          aria-pressed={accessFilter === filter.id}
-                          onClick={() => setAccessFilter(filter.id)}
+                          className="theme-dialog__done"
+                          onClick={() => {
+                            setQuery("");
+                            setCategoryFilter("all");
+                            window.requestAnimationFrame(() => {
+                              dialogRef.current?.querySelector<HTMLButtonElement>(".theme-card:not([disabled])")
+                                ?.focus();
+                            });
+                          }}
                         >
-                          {filter.label}
+                          Show all themes
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <div className="theme-dialog__body">
-                  {visibleThemes.length > 0 ? (
-                    <div className="theme-grid">
-                      {visibleThemes.map((theme) => (
-                        <ThemeCard
-                          key={theme.id}
-                          theme={theme}
-                          isActive={theme.id === themeId}
-                          isAvailable={canUseTheme(
-                            theme.id,
-                            ownedPremiumThemes,
-                            false,
-                          )}
-                          accessLabel={getAccessCopy(theme, ownedPremiumThemes)}
-                          onSelect={applyTheme}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="theme-empty-state">
-                      No themes match those filters. Clear the search or choose
-                      a different category.
-                    </div>
-                  )}
-                </div>
-
                 <footer className="theme-dialog__footer">
                   <div>
-                    <strong>{activeTheme.name}</strong> is currently active.
+                    <span>Current theme</span> <strong>{activeTheme.name}</strong>
                   </div>
                   <button
                     type="button"

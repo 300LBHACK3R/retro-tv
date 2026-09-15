@@ -150,6 +150,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [channelQuery, setChannelQuery] = useState("");
   const channelSearchRef = useRef<HTMLInputElement | null>(null);
+  const favouritesFilterRef = useRef<HTMLButtonElement | null>(null);
   const [visibleWindow, setVisibleWindow] = useState({ left: 0, width: 1600 });
   const reduceMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
@@ -466,9 +467,13 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     setCategory("");
     setChannelQuery("");
     setFavouritesOnly(false);
-    window.requestAnimationFrame(() =>
-      channelSearchRef.current?.focus({ preventScroll: true }),
-    );
+    window.requestAnimationFrame(() => {
+      if (isMobileGuide) {
+        favouritesFilterRef.current?.focus({ preventScroll: true });
+      } else {
+        channelSearchRef.current?.focus({ preventScroll: true });
+      }
+    });
   };
 
   const guideTools = (
@@ -505,6 +510,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
         </select>
       </label>
       <button
+        ref={favouritesFilterRef}
         type="button"
         className="ttv-section-action"
         aria-pressed={favouritesOnly}
@@ -586,6 +592,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           nowOffsetSec={secondsSinceWindowStart}
           windowStartMs={windowStartMs}
           onChannelBrowse={setMobileSelectedChannelId}
+          onFindChannel={() => channelSearchRef.current?.focus({ preventScroll: true })}
           onTune={({ channel, item }) => {
             setChannel(channel.id);
             onProgramSelect?.({ channel, item });

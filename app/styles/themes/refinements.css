@@ -19,10 +19,6 @@
   font-size: 0.9rem;
   line-height: 1.6;
 }
-.theme-dialog {
-  height: min(90vh, 58rem);
-  height: min(90dvh, 58rem);
-}
 .theme-card:focus-visible {
   outline-offset: -4px;
 }

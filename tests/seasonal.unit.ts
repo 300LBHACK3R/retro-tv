@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { runInNewContext } from "node:vm";
 import { createThemeBootstrapScript } from "../components/ThemeBootstrapScript";
-import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme } from "../lib/themes";
+import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme, THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
 import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
@@ -12,6 +12,7 @@ test("first paint uses the seasonal default once and keeps later personal choice
     undefined,
     { themeId: "obsidian-gold" },
     { themeId: "shaw-2006", themeRevision: DEFAULT_THEME_REVISION },
+    { themeId: "halloween-haunted-arcade", themeRevision: DEFAULT_THEME_REVISION },
     { themeId: "unknown", themeRevision: DEFAULT_THEME_REVISION },
   ]) {
     const expected = resolveSavedTheme(saved?.themeId, saved?.themeRevision);
@@ -76,5 +77,16 @@ test("Kids approval rejects a missing, empty or disabled lineup and a changed re
     const review = kidsLineupReview(invalid, media);
     expect(review.canApprove).toBe(false);
     expect(() => approveReviewedKidsLineup([invalid], media, invalid.id, review.signature)).toThrow();
+  }
+});
+
+test("every launch theme is free without purchases, including both Halloween looks", () => {
+  expect(THEMES.filter((theme) => theme.category === "seasonal").map((theme) => theme.id))
+    .toEqual(["halloween-night", "halloween-haunted-arcade"]);
+  expect(getFreeThemes()).toHaveLength(THEMES.length);
+  for (const theme of THEMES) {
+    expect(canUseTheme(theme.id, [], false), theme.name).toBe(true);
+    expect(getThemeAccessLabel(theme, [], false), theme.name).toBe("Free");
+    expect(getThemePriceLabel(theme), theme.name).toBe("Free");
   }
 });

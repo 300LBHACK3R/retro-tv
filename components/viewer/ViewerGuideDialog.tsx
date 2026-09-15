@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import { useModalDialog } from "@/components/viewer/useModalDialog";
 
 interface ViewerGuideDialogProps {
@@ -25,28 +26,7 @@ export default function ViewerGuideDialog({
     initialFocusRef: closeButtonRef,
   });
 
-  useEffect(() => {
-    if (!mounted || !open) return;
-    const viewport = window.visualViewport;
-    const dialog = dialogRef.current;
-    if (!viewport || !dialog) return;
-    // Mobile keyboards can shrink the visual viewport without changing dvh.
-    // Leave pinch zoom to the browser rather than fitting away the user's zoom.
-    const fitViewport = () => {
-      if (viewport.scale !== 1) return;
-      dialog.style.setProperty("--ttv-guide-height", `${viewport.height}px`);
-      dialog.style.setProperty("--ttv-guide-top", `${viewport.offsetTop}px`);
-    };
-    fitViewport();
-    viewport.addEventListener("resize", fitViewport);
-    viewport.addEventListener("scroll", fitViewport);
-    return () => {
-      viewport.removeEventListener("resize", fitViewport);
-      viewport.removeEventListener("scroll", fitViewport);
-      dialog.style.removeProperty("--ttv-guide-height");
-      dialog.style.removeProperty("--ttv-guide-top");
-    };
-  }, [mounted, open]);
+  useDialogViewport(dialogRef, mounted && open);
 
   if (!mounted || !open) {
     return null;
