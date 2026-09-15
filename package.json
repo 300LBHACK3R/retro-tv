@@ -9,7 +9,7 @@
     "build": "next build && node tests/styles.mjs",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run build",
     "clean": "node -e \"const fs=require('fs'); ['.next','out','dist','build','tsconfig.tsbuildinfo','playwright-report','test-results','coverage'].forEach((p)=>fs.rmSync(p,{recursive:true,force:true}))\"",
     "audit:prod": "npm audit --omit=dev",
