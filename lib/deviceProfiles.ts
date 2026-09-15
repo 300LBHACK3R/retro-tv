@@ -7,7 +7,7 @@ import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
 export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
 export const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
-export const AVATARS = ["sun", "moon", "star", "bolt", "flower"] as const;
+export const AVATARS = ["sun", "moon", "star", "bolt", "flower", "boycat", "jesus", "kidsjesus"] as const;
 export type Profile = {
   id: string;
   name: string;

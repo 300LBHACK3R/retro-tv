@@ -9,6 +9,7 @@ import { sanitizeProgrammingSnapshot } from "../lib/programmingSnapshot";
 import { useStore } from "../lib/store";
 import { useDeviceLibrary } from "../lib/deviceLibrary";
 import {
+  AVATARS,
   sanitizeProfiles,
   profileProgressKey,
   useProfiles,
@@ -214,6 +215,17 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
       Array.from({ length: 20 }, (_, i) => ({ id: `p-${i}`, name: `P${i}` })),
     ),
   ).toHaveLength(5);
+  // Preserve both the legacy Cat ID and newly uploaded portrait selections.
+  // An avatar never changes which programmes a profile may watch.
+  for (const avatar of AVATARS) {
+    expect(sanitizeProfiles([
+      { id: "main", name: "Parent", avatar, kids: false },
+      { id: "child", name: "Child", avatar, kids: true },
+    ])).toEqual([
+      { id: "main", name: "Parent", avatar, kids: false },
+      { id: "child", name: "Child", avatar, kids: true },
+    ]);
+  }
 });
 test("legacy theme preferences are removed without losing profiles or PIN; every profile starts with the default", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");

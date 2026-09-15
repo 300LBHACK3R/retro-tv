@@ -119,7 +119,7 @@ async function verifySite(origin) {
     assertProfileStyles(styles.join("\n"), `Published ${route}`);
     assertHalloweenStyles(styles.join("\n"), `Published ${route}`);
   }
-  for (const name of ["fox", "explorer", "dinosaur", "robot", "cat"]) {
+  for (const name of ["fox", "explorer", "dinosaur", "robot", "girlcat", "boycat", "jesus", "kidsjesus"]) {
     const response = await fetch(new URL(`/avatars/${name}.png`, site.origin), {
       method: "HEAD", signal: AbortSignal.timeout(15000),
     });
@@ -141,7 +141,7 @@ async function verifySite(origin) {
     assert.ok(response.headers.get("content-type")?.startsWith("image/"), `${path}: artwork MIME type`);
     assert.ok((await response.arrayBuffer()).byteLength > 0, `${path}: artwork is not empty`);
   }
-  console.log("PASS: live viewer pages serve complete profile and Halloween styles, all five portraits and optimized Halloween artwork.");
+  console.log("PASS: live viewer pages serve complete profile and Halloween styles, all eight portraits and optimized Halloween artwork.");
 }
 
 if (

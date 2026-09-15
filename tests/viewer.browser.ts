@@ -1003,7 +1003,12 @@ test("TV picker survives delayed Cast startup, opens on the first tap and treats
   const frame = page.locator(".ttv-premium-player-frame");
   const revealAndOpen = async () => {
     await frame.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
+    // Exercise a real pointer click with Firefox's native PiP enabled. A
+    // translucent bar allowed its browser overlay to swallow this click.
+    await expect(frame.locator(".ttv-player-controls")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await expect(frame.locator(".ttv-player-controls")).toHaveCSS("opacity", "1");
     await frame.getByRole("button", { name: "Watch on TV", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Watch on TV", exact: true })).toBeVisible();
   };
   await revealAndOpen();
   const dialog = page.getByRole("dialog", { name: "Watch on TV", exact: true });

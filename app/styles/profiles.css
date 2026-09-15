@@ -412,12 +412,11 @@
   font-weight: 650;
 }
 .ttv-avatar-options {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
 }
 .ttv-avatar-options button {
-  flex: 1;
   min-width: 0;
   min-height: 2.75rem;
   padding: 0.2rem;

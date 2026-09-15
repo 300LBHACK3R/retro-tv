@@ -444,10 +444,19 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
     .click();
   await page.getByRole("button", { name: "Edit Taylor", exact: true }).click();
   await page.getByLabel("Profile name", { exact: true }).fill("Taylor updated");
+  const avatarOptions = page.locator(".ttv-avatar-options");
+  await expect(avatarOptions.getByRole("button")).toHaveCount(8);
+  await expect(avatarOptions).toHaveCSS("display", "grid");
+  const newAvatar = avatarOptions.getByRole("button", { name: "Jesus for Kids avatar", exact: true });
+  await newAvatar.click();
+  await expect(newAvatar).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => newAvatar.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.getByRole("checkbox", { name: /Kids profile/ })).not.toBeChecked();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Edit Taylor updated", exact: true }),
   ).toBeFocused();
+  await expect(page.getByRole("button", { name: "Edit Taylor updated", exact: true }).locator("[data-avatar]")).toHaveAttribute("data-avatar", "kidsjesus");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,

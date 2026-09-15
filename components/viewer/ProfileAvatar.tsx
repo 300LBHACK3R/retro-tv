@@ -7,7 +7,10 @@ export const PROFILE_PORTRAITS = {
   moon: { name: "Space explorer", src: "/avatars/explorer.png" },
   star: { name: "Dinosaur", src: "/avatars/dinosaur.png" },
   bolt: { name: "Robot", src: "/avatars/robot.png" },
-  flower: { name: "Cat", src: "/avatars/cat.png" },
+  flower: { name: "Girl cat", src: "/avatars/girlcat.png" },
+  boycat: { name: "Boy cat", src: "/avatars/boycat.png" },
+  jesus: { name: "Jesus", src: "/avatars/jesus.png" },
+  kidsjesus: { name: "Jesus for Kids", src: "/avatars/kidsjesus.png" },
 } satisfies Record<Profile["avatar"], { name: string; src: string }>;
 
 export function ProfileAvatar({ profile }: { profile: Pick<Profile, "avatar"> }) {
