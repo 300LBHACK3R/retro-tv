@@ -2,6 +2,7 @@ import "./globals.css";
 import "./styles/profiles.css";
 import "./styles/themes/halloween.css";
 import "./styles/themes/haunted-arcade.css";
+import "./styles/themes/halloween-after-dark.css";
 
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";

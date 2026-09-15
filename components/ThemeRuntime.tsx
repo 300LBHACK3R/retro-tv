@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useStore } from "@/lib/store";
 import {
   createThemeCssVars,
   getThemeById,
 } from "@/lib/themes";
+
+const HalloweenAfterDark = dynamic(() => import("@/components/HalloweenAfterDark"), { ssr: false });
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
 const THEME_CHANGE_EVENT = "ttv:theme-change";
@@ -80,5 +83,5 @@ export default function ThemeRuntime() {
     };
   }, []);
 
-  return null;
+  return theme.id === "halloween-night" ? <HalloweenAfterDark /> : null;
 }

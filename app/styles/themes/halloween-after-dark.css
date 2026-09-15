@@ -1,0 +1,152 @@
+/* A full-page world, independent of the video, guide and scrolling containers. */
+.ttv-afterdark-world {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  contain: strict;
+  background: #100b16;
+}
+:root:not([data-ttv-theme="halloween-night"]) .ttv-afterdark-world { display: none; }
+.ttv-afterdark-world > picture, .ttv-afterdark-art, .ttv-afterdark-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ttv-afterdark-art { object-fit: cover; object-position: center bottom; }
+.ttv-afterdark-scrim {
+  background: linear-gradient(180deg, #100b164d, transparent 24%, #100b1622 76%, #100b1655),
+    radial-gradient(ellipse at 50% 43%, #100b167d, #100b1640 40%, transparent 74%);
+}
+.ttv-afterdark-moonlight {
+  position: absolute;
+  top: -8%; right: -6%; width: 52%; height: 62%;
+  background: radial-gradient(ellipse, #ffcf862b, #b483ff0c 45%, transparent 68%);
+  animation: ttv-afterdark-glow 12s ease-in-out infinite alternate;
+}
+.ttv-afterdark-lanterns {
+  position: absolute;
+  inset: 48% -5% -8%;
+  background: radial-gradient(ellipse at 8% 78%, #ff791c40, transparent 28%),
+    radial-gradient(ellipse at 94% 82%, #ffb34538, transparent 27%);
+  animation: ttv-afterdark-glow 8s ease-in-out infinite alternate-reverse;
+}
+.ttv-afterdark-fog {
+  position: absolute;
+  inset: auto -10% -5%;
+  height: 28%;
+  background: radial-gradient(ellipse at 30% 75%, #ad91ce22, transparent 60%),
+    radial-gradient(ellipse at 77% 67%, #e1bbd117, transparent 55%);
+  animation: ttv-afterdark-mist 32s ease-in-out infinite alternate;
+}
+.ttv-afterdark-fog-far { bottom: 17%; height: 18%; opacity: .55; animation-duration: 43s; animation-direction: alternate-reverse; }
+.ttv-afterdark-witch {
+  position: absolute; top: 12%; right: 13%; width: clamp(55px, 8vw, 140px);
+  height: auto; color: #140d23; opacity: .9;
+  animation: ttv-afterdark-flight 28s ease-in-out infinite alternate;
+}
+.ttv-afterdark-witch svg, .ttv-afterdark-bats svg { display: block; width: 100%; height: auto; }
+.ttv-afterdark-bats {
+  position: absolute; top: 8%; left: 12%; width: clamp(75px, 11vw, 160px);
+  height: auto; color: #1a1127;
+  animation: ttv-afterdark-bats 17s ease-in-out infinite alternate;
+}
+.ttv-afterdark-skeleton {
+  position: absolute; left: max(.4rem, calc((100vw - 110rem) / 2)); bottom: 10%;
+  width: clamp(54px, 5vw, 100px); height: auto;
+  color: #c3b394; opacity: .8;
+  transform: rotate(-7deg);
+}
+.ttv-afterdark-skeleton-wave { transform-origin: 84px 75px; animation: ttv-afterdark-wave 9s ease-in-out infinite; }
+.ttv-afterdark-embers { position: absolute; inset: 0; }
+.ttv-afterdark-embers i {
+  position: absolute; left: 5%; bottom: 8%; width: 3px; height: 5px;
+  border-radius: 60% 15%; background: #ffc075; box-shadow: 0 0 8px #ff8b49;
+  opacity: 0; animation: ttv-afterdark-ember 14s linear infinite;
+}
+.ttv-afterdark-embers i:nth-child(2) { left: 12%; animation-delay: -4s; animation-duration: 19s; }
+.ttv-afterdark-embers i:nth-child(3) { left: 20%; animation-delay: -8s; }
+.ttv-afterdark-embers i:nth-child(4) { left: 83%; animation-delay: -2s; animation-duration: 18s; }
+.ttv-afterdark-embers i:nth-child(5) { left: 91%; animation-delay: -11s; }
+.ttv-afterdark-embers i:nth-child(6) { left: 97%; animation-delay: -6s; animation-duration: 21s; }
+.ttv-afterdark-preview-art { object-fit: cover; object-position: center 68%; }
+
+/* Let the scenery reach the whole page, including its gutters and footer.
+   These shells have inline backgrounds; only their backdrop is overridden. */
+:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
+  background: transparent !important;
+}
+:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,
+:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after,
+:root[data-ttv-theme="halloween-night"] .ttv-library-ambient { display: none; }
+
+/* Warm lamplight along the station chrome; readable opaque programme surfaces. */
+:root[data-ttv-theme="halloween-night"] :is(.ttv-premium-topbar, .ttv-library-header, .ttv-mobile-viewer-nav) {
+  border-color: #b67c5266;
+  background: linear-gradient(100deg, #302034f5, #170f20f5 48%, #30203bf5);
+  box-shadow: 0 1px 0 #ffcb7d19, 0 10px 34px #07030b38;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-premium-topbar { background: linear-gradient(100deg, #30203480, #170f2080 48%, #30203b80); }
+:root[data-ttv-theme="halloween-night"] :is(.ttv-brand-wordmark, .ttv-profile-wordmark, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
+  color: #fff5e9;
+  text-shadow: 0 2px 14px #100b16, 0 0 28px #ffab5c20;
+}
+:root[data-ttv-theme="halloween-night"] :is(.ttv-section-kicker, .ttv-brand-wordmark small) { color: #ffd39c; }
+:root[data-ttv-theme="halloween-night"] :is(.ttv-premium-stage-sidebar, .ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-glass-panel, .ttv-glass-panel-strong, .ttv-surface, .ttv-profile-panel) {
+  border-color: #886084;
+  background: linear-gradient(140deg, #302039, #1c1224 68%);
+  box-shadow: inset 0 1px 0 #ffcf8120, 0 14px 36px #07030b55;
+}
+:root[data-ttv-theme="halloween-night"] :is(.ttv-premium-player-frame, .ttv-guide-shell) {
+  box-shadow: 0 0 0 1px #c48e5e66, 0 0 34px #c27c3020, 0 20px 55px #08041070;
+}
+:root[data-ttv-theme="halloween-night"] :is(.ttv-guide-dialog-header, .ttv-mobile-now-heading, .ttv-mobile-schedule-toolbar, .ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #352237, #22172e 65%, #392443);
+  border-color: #876386;
+}
+:root[data-ttv-theme="halloween-night"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  border-color: #9b7395;
+  box-shadow: inset 0 1px 0 #ffcc8a30, 0 0 0 1px #ffab5c15, 0 24px 100px #080410cc;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-mobile-channel { border-color: #65466c; }
+:root[data-ttv-theme="halloween-night"] .ttv-mobile-channel[data-current="true"] { box-shadow: inset 3px 0 var(--primary); }
+:root[data-ttv-theme="halloween-night"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)[data-selected="true"] {
+  border-color: var(--primary);
+  box-shadow: inset 0 -3px var(--primary), 0 0 24px #ffab5c17;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-profile-card:hover .ttv-profile-avatar {
+  box-shadow: 0 0 0 3px #ffab5c, 0 12px 38px #d87a3240;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-library-header a:last-child {
+  border-color: #ffab5c70; background-color: #322039; color: #ffe0b6;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-premium-footer { border-color: #996b6655; }
+
+@keyframes ttv-afterdark-glow { from { opacity: .45; } to { opacity: .95; } }
+@keyframes ttv-afterdark-mist { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
+@keyframes ttv-afterdark-flight { from { transform: translate(35%, 8%) rotate(5deg); } to { transform: translate(-65%, -10%) rotate(-4deg); } }
+@keyframes ttv-afterdark-bats { from { transform: translate(0, 0); } to { transform: translate(22%, -14%); } }
+@keyframes ttv-afterdark-wave { 0%, 30%, 60%, 100% { transform: rotate(0); } 38%, 52% { transform: rotate(-18deg); } 45% { transform: rotate(4deg); } }
+@keyframes ttv-afterdark-ember { 0% { opacity: 0; transform: translate(0, 0); } 15%, 65% { opacity: .65; } 100% { opacity: 0; transform: translate(30px, -38vh) rotate(180deg); } }
+
+@media (max-width: 760px) {
+  .ttv-afterdark-witch { top: 9%; right: 8%; width: 68px; }
+  .ttv-afterdark-bats { left: 2%; top: 16%; width: 78px; }
+  .ttv-afterdark-skeleton { bottom: max(6rem, calc(4rem + env(safe-area-inset-bottom))); width: 54px; left: .35rem; opacity: .55; }
+  .ttv-afterdark-fog-far, .ttv-afterdark-embers i:nth-child(even) { display: none; }
+  :root[data-ttv-theme="halloween-night"] .ttv-premium-topbar { background: #1c1224d9; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .ttv-afterdark-skeleton, .ttv-afterdark-embers, .ttv-afterdark-fog-far { display: none; }
+}
+:root[data-ttv-page-visible="false"] .ttv-afterdark-world * { animation-play-state: paused; }
+:root[data-ttv-reduced-motion="true"] .ttv-afterdark-world * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .ttv-afterdark-world * { animation: none !important; } }
+@media (forced-colors: active) {
+  .ttv-afterdark-world { display: none; }
+  :root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) { background: Canvas !important; }
+  :root[data-ttv-theme="halloween-night"] :is(.ttv-brand-wordmark, .ttv-profile-wordmark, .ttv-section-kicker, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) { color: CanvasText; text-shadow: none; }
+}

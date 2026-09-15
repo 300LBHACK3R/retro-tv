@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import afterDarkWorld from "@/public/themes/halloween-after-dark-world.webp";
 import hauntedWorld from "@/public/themes/haunted-arcade-world.webp";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
@@ -124,6 +125,8 @@ function ThemeCard({
       >
         {theme.id === "halloween-haunted-arcade" ? (
           <Image src={hauntedWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-haunted-preview-art" />
+        ) : theme.id === "halloween-night" ? (
+          <Image src={afterDarkWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-afterdark-preview-art" />
         ) : (
         <span className="theme-card__preview-ui">
           <span />

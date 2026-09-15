@@ -117,7 +117,7 @@ export const THEMES = [
     name: "Halloween After Dark",
     shortName: "Halloween",
     description:
-      "Pumpkin lanterns, a moonlit witch, violet skies, and warm amber light. A little magic for your nightly TV ritual.",
+      "A whole moonlit world: a haunted manor, friendly skeletons, glowing pumpkins, drifting fog and a witch in the harvest sky. Amber and violet light follow you through every page.",
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",
@@ -125,7 +125,7 @@ export const THEMES = [
     appearance: "dark",
     previewGradient:
       "radial-gradient(circle at 15% 80%, #b64e26, transparent 48%), radial-gradient(circle at 85% 15%, #643695, transparent 50%), linear-gradient(135deg, #100b16, #281a30)",
-    recommendedFor: ["seasonal", "Halloween", "pumpkins", "movie night"],
+    recommendedFor: ["Halloween", "skeletons", "pumpkins", "haunted manor", "movie night"],
     colors: {
       appBg: "#100b16",
       panelBg: "#1c1224",

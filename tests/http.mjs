@@ -124,6 +124,14 @@ try {
   const mobileBackdrop = await get("/_next/image?url=%2Fthemes%2Fhaunted-arcade-world.webp&w=640&q=75");
   assert.equal(mobileBackdrop.status, 200, "Haunted Arcade mobile optimization works");
   assert.match(mobileBackdrop.headers["content-type"], /^image\//);
+  for (const name of ["world", "mobile"]) {
+    const artwork = await get(`/themes/halloween-after-dark-${name}.webp`, "HEAD");
+    assert.equal(artwork.status, 200, `After Dark ${name}: artwork is available`);
+    assert.match(artwork.headers["content-type"], /^image\/webp\b/);
+    const optimized = await get(`/_next/image?url=%2Fthemes%2Fhalloween-after-dark-${name}.webp&w=640&q=75`);
+    assert.equal(optimized.status, 200, `After Dark ${name}: image optimization works`);
+    assert.match(optimized.headers["content-type"], /^image\//);
+  }
   for (const path of [
     "/admin",
     "/backup",

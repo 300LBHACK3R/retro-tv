@@ -300,7 +300,7 @@ test("TV mode keeps channel navigation available and hides station management", 
 
 test("every theme applies, keeps readable surfaces and respects reduced motion", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(120000);
   await page.goto("/library");
   await expect(
@@ -318,6 +318,39 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     await expect(
       page.getByRole("dialog", { name: /Theme Library/i }),
     ).toHaveCount(0);
+    if (theme.id === "halloween-night") {
+      const world = page.locator(".ttv-afterdark-world");
+      await expect(world).toBeVisible();
+      await expect(world).toHaveAttribute("aria-hidden", "true");
+      const layout = await world.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const styles = getComputedStyle(element);
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
+          viewportWidth: document.documentElement.clientWidth, viewportHeight: window.innerHeight,
+          position: styles.position, pointerEvents: styles.pointerEvents };
+      });
+      expect(layout.position).toBe("fixed");
+      expect(layout.pointerEvents).toBe("none");
+      expect(layout.x).toBe(0);
+      expect(layout.y).toBe(0);
+      expect(Math.abs(layout.width - layout.viewportWidth)).toBeLessThanOrEqual(1);
+      expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
+      const portrait = await page.evaluate(() => matchMedia("(max-width: 760px) and (orientation: portrait)").matches);
+      await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, portrait) =>
+        image.complete && image.naturalWidth > 0 && image.currentSrc.includes(portrait ? "halloween-after-dark-mobile" : "halloween-after-dark-world"),
+        // Pass the media result into the browser evaluation.
+        portrait,
+      )).toBe(true);
+      await expect(page.locator(".ttv-halloween-scene")).toHaveCount(0);
+      expect(await page.locator(".ttv-library-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      for (const selector of [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"])
+        expect(await world.locator(selector).first().evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+      await testInfo.attach("after-dark-full-page", { body: await page.screenshot(), contentType: "image/png" });
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+    } else {
+      await expect(page.locator(".ttv-afterdark-world")).toHaveCount(0);
+    }
     await noPageOverflow(page);
     expect(
       await page
