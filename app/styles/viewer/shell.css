@@ -95,6 +95,8 @@ body[data-ttv-overlay-open="true"] .ttv-remote-launcher, body[data-ttv-overlay-o
 .ttv-player-shell[data-controls-visible="false"] ~ .ttv-remote-launcher:not(:focus-visible) { opacity: 0; pointer-events: none; }
 .ttv-remote-panel button { font-size: .875rem; min-height: 2.75rem; }
 @media (max-width: 760px) {
- .ttv-remote-launcher { position: absolute; right: .5rem; bottom: 4.5rem; padding: .5rem .65rem; }
+ /* Keep the launcher away from Firefox's native PiP target at the video's
+    centre-right. Browser chrome can intercept a click above our own controls. */
+ .ttv-remote-launcher { position: absolute; left: .5rem; right: auto; bottom: 4.5rem; padding: .5rem .65rem; }
  .ttv-remote-panel { position: fixed; inset: auto .75rem calc(5.25rem + env(safe-area-inset-bottom)); max-height: 65vh; max-height: 65dvh; width: auto; z-index: 170; }
 }
