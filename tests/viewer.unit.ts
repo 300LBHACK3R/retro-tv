@@ -20,6 +20,26 @@ test('cloud refresh preserves viewer choices; explicit restore restores the snap
   expect(useStore.getState().viewerSettings.playerViewMode).toBe('normal');
 });
 
+test('mobile tuning retains an open guide without opening a closed guide; default tuning still closes it', () => {
+  useStore.getState().replaceProgramming(programming);
+  useStore.setState({ isGuideOpen: true });
+  useStore.getState().setChannel('25', { keepGuideOpen: true });
+  expect(useStore.getState().currentChannelId).toBe('25');
+  expect(useStore.getState().isGuideOpen).toBe(true);
+  // Re-selecting the current channel is also a live tune, not a dismiss action.
+  useStore.getState().setChannel('25', { keepGuideOpen: true });
+  expect(useStore.getState().isGuideOpen).toBe(true);
+  useStore.getState().setChannel('missing');
+  expect(useStore.getState().currentChannelId).toBe('25');
+  expect(useStore.getState().isGuideOpen).toBe(true);
+  useStore.getState().setChannel('24');
+  expect(useStore.getState().currentChannelId).toBe('24');
+  expect(useStore.getState().isGuideOpen).toBe(false);
+  useStore.getState().setChannel('25', { keepGuideOpen: true });
+  expect(useStore.getState().currentChannelId).toBe('25');
+  expect(useStore.getState().isGuideOpen).toBe(false);
+});
+
 test('numeric tuning ignores disabled channels and accepts leading zeroes', () => {
   const channels = sortEnabledChannels([...programming.channels, {id:'99', number:99, name:'Disabled', mediaIds:[], isEnabled:false}]);
   expect(findChannelByNumber(channels,'025')?.id).toBe('25');

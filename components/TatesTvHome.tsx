@@ -230,13 +230,13 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
 
   const selectChannel = useCallback(
     (channelId: string, shouldScroll = true) => {
-      setChannel(channelId);
+      setChannel(channelId, { keepGuideOpen: mobileLayout });
 
       if (shouldScroll) {
         window.setTimeout(scrollToLive, 0);
       }
     },
-    [scrollToLive, setChannel],
+    [mobileLayout, scrollToLive, setChannel],
   );
 
   const numericTune = useNumericChannelTune(

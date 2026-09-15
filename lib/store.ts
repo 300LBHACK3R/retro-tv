@@ -42,7 +42,7 @@ interface AppState {
   removeMedia: (mediaId: string) => void;
   removeManyMedia: (mediaIds: string[]) => void;
 
-  setChannel: (id: string) => void;
+  setChannel: (id: string, options?: { keepGuideOpen?: boolean }) => void;
   moveChannel: (channelId: string, direction: "up" | "down") => void;
 
   updateChannelBranding: (
@@ -1468,7 +1468,7 @@ export const useStore = create<AppState>()(
           };
         }),
 
-      setChannel: (id) =>
+      setChannel: (id, options) =>
         set((state) => {
           const channelExists = state.channels.some(
             (channel) => channel.id === id,
@@ -1478,7 +1478,7 @@ export const useStore = create<AppState>()(
 
           return {
             currentChannelId: id,
-            isGuideOpen: false,
+            isGuideOpen: options?.keepGuideOpen ? state.isGuideOpen : false,
           };
         }),
 

@@ -451,12 +451,22 @@
 
 /* Rotation fills the web viewport without requiring a fullscreen API gesture.
    Mini remains floating. Opening Guide restores the compact inline preview. */
-.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) .ttv-premium-player-frame {
+.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) .ttv-live-stage {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147482000;
   width: 100% !important;
   height: 100dvh !important;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #000;
+}
+.ttv-premium-viewer-shell[data-mobile-landscape="true"]:not([data-mobile-guide-open="true"]):not([data-player-mode="mini"]) .ttv-premium-player-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 100% !important;
   max-width: none !important;
   max-height: none !important;
   aspect-ratio: auto !important;

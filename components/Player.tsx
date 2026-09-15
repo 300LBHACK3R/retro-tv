@@ -916,10 +916,10 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       const nextChannel = orderedChannels[nextIndex];
 
       if (nextChannel) {
-        setChannel(nextChannel.id);
+        setChannel(nextChannel.id, { keepGuideOpen: mobileLayout });
       }
     },
-    [currentChannelId, orderedChannels, setChannel],
+    [currentChannelId, mobileLayout, orderedChannels, setChannel],
   );
 
   const exitFullscreenView = useCallback(async () => {

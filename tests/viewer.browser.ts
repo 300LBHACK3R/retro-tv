@@ -365,6 +365,7 @@ test("favourite channels and guide filtering persist without accounts", async ({
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.reload();
+  await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   const desktop = page.getByRole("button", {
     name: "Open live guide",
     exact: true,
@@ -374,17 +375,21 @@ test("favourite channels and guide filtering persist without accounts", async ({
     .getByRole("button", { name: "Guide", exact: true });
   await desktop.or(mobile).filter({ visible: true }).click();
   const dialog = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  // The dialog mounts before its dynamically loaded guide. Wait for a real
+  // layout before deciding which controls should be visible.
+  await expect(dialog.locator(".ttv-mobile-guide, .ttv-desktop-guide")).toBeVisible();
+  const mobileGuide = (await dialog.locator('[data-mobile="true"]').count()) > 0;
   const channelCount = dialog
     .locator(".ttv-guide-tools")
     .getByText(/^\d+ channels? · Local time$/);
-  if (!(await dialog.locator('[data-mobile="true"]').count())) await expect(channelCount).toBeVisible();
+  if (!mobileGuide) await expect(channelCount).toBeVisible();
   const allChannelsText = await channelCount.textContent();
   await dialog.getByRole("button", { name: "Favourites", exact: true }).click();
   await expect(channelCount).toHaveText("1 channel · Local time");
   const search = dialog.getByRole("searchbox", {
     name: "Find a channel in the guide",
   });
-  if (await dialog.locator('[data-mobile="true"]').count()) await dialog.getByRole("button", { name: "Find", exact: true }).click();
+  if (mobileGuide) await dialog.getByRole("button", { name: "Find", exact: true }).click();
   await search.fill("no-such-channel");
   await expect(channelCount).toHaveText("0 channels · Local time");
   await search.fill("24");
@@ -393,7 +398,7 @@ test("favourite channels and guide filtering persist without accounts", async ({
     name: "Compact rows",
     exact: true,
   });
-  if (await dialog.locator('[data-mobile="true"]').count()) {
+  if (mobileGuide) {
     await expect(compact).toHaveCount(0);
   } else {
     await compact.click();
@@ -403,7 +408,7 @@ test("favourite channels and guide filtering persist without accounts", async ({
     .getByRole("button", { name: "Show all channels", exact: true })
     .click();
   await expect(search).toHaveValue("");
-  if (await dialog.locator('[data-mobile="true"]').count()) {
+  if (mobileGuide) {
     await expect(search).not.toBeFocused();
     await expect(dialog.getByRole("button", { name: "All channels", exact: true })).toBeFocused();
   } else {
@@ -506,6 +511,7 @@ test("mobile guide compares channels, browses without tuning and restores your p
   const fixedNow = new Date("2026-09-12T05:58:25Z");
   await page.clock.setFixedTime(fixedNow);
   await page.goto("/?ch=24");
+  await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   const open = page
     .getByRole("button", { name: "Open live guide", exact: true })
     .or(
@@ -515,9 +521,11 @@ test("mobile guide compares channels, browses without tuning and restores your p
     );
   const video = page.locator(".ttv-player-shell video");
   await expect(video).toHaveCount(1);
+  await expect(video).toHaveJSProperty("currentSrc", new URL("/qa-media.webm", page.url()).href);
   await video.evaluate((element) => element.setAttribute("data-test-player-identity", "original"));
   await open.filter({ visible: true }).click();
   const dialog = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  await expect(dialog.locator(".ttv-mobile-guide")).toBeVisible();
   await expect(video).toHaveAttribute("data-test-player-identity", "original");
   const playerBounds = await video.boundingBox();
   const guideBounds = await dialog.locator(".ttv-guide-inline").boundingBox();
@@ -790,16 +798,20 @@ test("phones use hardware volume, expand on rotation and preserve the floating m
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem("retro-tv-player-controls-v1", JSON.stringify({ version: 3, state: { volume: 0, muted: true } })));
   await page.goto("/?ch=24");
+  await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   const root = page.locator(".ttv-premium-viewer-shell");
+  const stage = page.getByRole("region", { name: "Live Tate's TV player", exact: true });
   const frame = page.locator(".ttv-premium-player-frame");
   const video = frame.locator("video");
   await expect(root).toHaveAttribute("data-mobile-layout", "true");
+  await expect(video).toHaveJSProperty("currentSrc", new URL("/qa-media.webm", page.url()).href);
   await expect(video).toHaveJSProperty("muted", false);
   await expect(video).toHaveJSProperty("volume", 1);
   await video.evaluate((element) => element.setAttribute("data-test-player-identity", "original"));
   await page.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
   await page.getByRole("button", { name: "Remote", exact: true }).click();
   const remote = page.getByRole("region", { name: "On-screen remote", exact: true });
+  await expect(remote).toBeVisible();
   await expect(remote.getByRole("slider", { name: "Volume", exact: true })).toHaveCount(0);
   await expect(remote.getByRole("button", { name: /^(Mute|Muted|Full)$/ })).toHaveCount(0);
   await expect(frame.locator(".ttv-player-controls").getByRole("button", { name: "Full", exact: true })).toHaveCount(0);
@@ -829,17 +841,21 @@ test("phones use hardware volume, expand on rotation and preserve the floating m
   await expect(root).toHaveAttribute("data-player-mode", "mini");
   await page.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
   await page.getByRole("button", { name: "Remote", exact: true }).click();
+  await expect(remote).toBeVisible();
   await remote.getByRole("button", { name: "Normal", exact: true }).click();
   await remote.getByRole("button", { name: "Minimize remote", exact: true }).click();
   await page.setViewportSize({ width: 568, height: 320 });
   await expect(root).toHaveAttribute("data-mobile-landscape", "true");
-  await expect(frame).toHaveCSS("position", "fixed");
+  await expect(stage).toBeVisible();
+  await expect(stage).toHaveCSS("position", "fixed");
+  await expect(frame).toHaveCSS("position", "relative");
   const landscape = (await frame.boundingBox())!;
   expect(Math.abs(landscape.x) + Math.abs(landscape.y)).toBeLessThan(2);
   expect(Math.abs(landscape.width - 568)).toBeLessThan(2);
   expect(Math.abs(landscape.height - 320)).toBeLessThan(2);
   await expect(video).toHaveAttribute("data-test-player-identity", "original");
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(stage).not.toHaveCSS("position", "fixed");
   await expect(frame).toHaveCSS("position", "relative");
   await expect(root).toHaveAttribute("data-player-mode", "normal");
   await expect(video).toHaveAttribute("data-test-player-identity", "original");

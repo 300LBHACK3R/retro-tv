@@ -528,8 +528,8 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           onChannelBrowse={setMobileSelectedChannelId}
           onFindChannel={() => setMobileSearchOpen((value) => !value)}
           onTune={({ channel, item }) => {
-            setChannel(channel.id);
-            onProgramSelect?.({ channel, item });
+            if (onProgramSelect) onProgramSelect({ channel, item });
+            else setChannel(channel.id, { keepGuideOpen: true });
           }}
         />
       </div>
