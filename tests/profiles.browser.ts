@@ -452,11 +452,20 @@ test("Halloween entrance loads portraits, respects motion controls and keeps a l
   const witch = scene.locator(".ttv-halloween-witch");
   await expect(witch).toHaveCSS("animation-name", "ttv-witch-flight");
   await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
-  await expect(witch).toHaveCSS("animation-play-state", "paused");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
+  // The shared accessibility rule is `animation: none !important`, which
+  // removes the animation and resets animation-play-state to its initial value.
+  // Verify that motion is absent rather than expecting a paused animation.
+  await expect(witch).toHaveCSS("animation-name", "none");
   await page.reload();
   await expect(scene.getByRole("button", { name: "Effects paused" })).toHaveAttribute("aria-pressed", "true");
+  await expect(witch).toHaveCSS("animation-name", "none");
   await scene.getByRole("button", { name: "Effects paused" }).click();
+  await expect(witch).toHaveCSS("animation-name", "ttv-witch-flight");
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(witch).toHaveCSS("animation-name", "none");
+  await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
+  await scene.getByRole("button", { name: "Effects paused" }).click();
   await expect(witch).toHaveCSS("animation-name", "none");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);

@@ -44,7 +44,8 @@
 @keyframes ttv-witch-flight { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-26px, -7px); } }
 @keyframes ttv-bat-flight { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(10px, -8px); } }
 @keyframes ttv-lantern-glow { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
-:root[data-ttv-reduced-motion="true"] .ttv-halloween-scene *,
+/* The shared reduced-motion rule removes animations entirely. Hidden tabs
+   pause the remaining animations until the page becomes visible again. */
 :root[data-ttv-page-visible="false"] .ttv-halloween-scene * { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .ttv-halloween-scene * { animation: none; }
