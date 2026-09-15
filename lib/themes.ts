@@ -73,7 +73,7 @@ export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
 
 // Theme selection lasts for the current page visit only. Every new visit starts here.
-export const DEFAULT_THEME_ID: ThemeId = "halloween-haunted-arcade";
+export const DEFAULT_THEME_ID: ThemeId = "halloween-night";
 
 /** Zustand persistence key used by the pre-hydration theme bootstrap. */
 export const THEME_STORAGE_KEY = "retro-tv-programming-v1";
@@ -151,7 +151,7 @@ export const THEMES = [
     name: "Haunted Arcade",
     shortName: "Haunted Arcade",
     description:
-      "Step into a moonlit pixel arcade: glowing cabinets, a pumpkin courtyard, wandering ghosts, drifting mist, and violet-green cabinet lighting.",
+      "A whole-page pixel arcade after hours: glowing cabinets, pumpkin lanterns, wandering ghosts, drifting mist and violet-green light from the courtyard to your guide.",
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",

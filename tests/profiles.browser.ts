@@ -432,7 +432,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   ).toBe(true);
 });
 
-test("Haunted Arcade entrance loads portraits, remembers accessibility and resets temporary themes", async ({ page }) => {
+test("After Dark entrance fills the viewport, remembers accessibility and resets temporary themes", async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     if (localStorage.getItem("ttv-profiles-v1")) return;
     // A returning household from before the seasonal release.
@@ -445,38 +445,38 @@ test("Haunted Arcade entrance loads portraits, remembers accessibility and reset
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
-  const scene = page.getByRole("complementary", { name: "Halloween on Tate’s TV" });
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  const scene = page.locator(".ttv-afterdark-world");
   await expect(scene).toBeVisible();
-  await expect(scene).toHaveAttribute("data-entrance", "true");
-  const backdrop = scene.locator(".ttv-haunted-backdrop");
+  await expect(scene).toHaveCSS("position", "fixed");
+  await expect(scene).toHaveCSS("pointer-events", "none");
+  await expect(scene).toHaveAttribute("aria-hidden", "true");
+  const backdrop = scene.locator(".ttv-afterdark-art");
   await expect.poll(() => backdrop.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
-  const entranceBounds = await scene.boundingBox();
-  const chooserBounds = await page.locator(".ttv-profile-chooser").boundingBox();
-  // The artwork joins the profile panel without covering any profile controls.
-  expect(Math.abs(entranceBounds!.y + entranceBounds!.height - chooserBounds!.y)).toBeLessThanOrEqual(2);
-  if (page.viewportSize()!.width <= 760) expect(entranceBounds!.height).toBeLessThanOrEqual(200);
-  const ghost = scene.locator(".ttv-haunted-ghost").first();
-  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
+  const bounds = await scene.boundingBox();
+  const viewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: innerHeight }));
+  expect(bounds!.x).toBe(0);
+  expect(bounds!.y).toBe(0);
+  expect(Math.abs(bounds!.width - viewport.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(bounds!.height - viewport.height)).toBeLessThanOrEqual(1);
+  expect(await page.locator(".ttv-profile-screen").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  const witch = scene.locator(".ttv-afterdark-witch");
+  await expect(witch).toHaveCSS("animation-name", "ttv-afterdark-flight");
   await page.locator(".ttv-profile-footer").scrollIntoViewIfNeeded();
-  // On short viewports the scene is offscreen while choosing a profile.
-  if ((await scene.boundingBox())!.y + (await scene.boundingBox())!.height <= 0) {
-    await expect(scene).toHaveAttribute("data-scene-visible", "false");
-    await expect(ghost).toHaveCSS("animation-play-state", "paused");
-  }
-  await scene.scrollIntoViewIfNeeded();
+  expect((await scene.boundingBox())!.y).toBe(0);
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(ghost).toHaveCSS("animation-name", "none");
+  await expect(witch).toHaveCSS("animation-name", "none");
   await page.reload();
-  await expect(ghost).toHaveCSS("animation-name", "none");
+  await expect(witch).toHaveCSS("animation-name", "none");
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await expect(ghost).toHaveCSS("animation-name", "ttv-ghost-float");
+  await expect(witch).toHaveCSS("animation-name", "ttv-afterdark-flight");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
   await expect.poll(() => portraits.evaluateAll((items: HTMLImageElement[]) => items.every((item) => item.complete && item.naturalWidth > 0))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await testInfo.attach("after-dark-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.goto("/library");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
@@ -484,14 +484,14 @@ test("Haunted Arcade entrance loads portraits, remembers accessibility and reset
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
   const savedProfiles = await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles);
   expect(savedProfiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await switchProfile(page);
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
-  await expect(scene).toHaveAttribute("data-entrance", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(scene).toBeVisible();
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
 });

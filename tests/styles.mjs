@@ -53,8 +53,7 @@ export function assertProfileStyles(css, context = "Profile entry") {
 }
 
 export function assertHalloweenStyles(css, context = "Halloween") {
-  for (const name of ["scene", "copy", "eyebrow"])
-    assert.ok(css.includes(`.ttv-halloween-${name}`), `${context}: missing ${name} styling`);
+  assert.ok(css.includes(".ttv-seasonal-world"), `${context}: missing full-page scenery layout`);
   assert.ok(css.includes("prefers-reduced-motion"), `${context}: missing reduced motion support`);
   for (const name of ["ttv-haunted-world", "ttv-haunted-mist", "ttv-haunted-preview-art"])
     assert.ok(css.includes(name), `${context}: missing ${name}`);
@@ -64,6 +63,14 @@ export function assertHalloweenStyles(css, context = "Halloween") {
   for (const name of ["world", "art", "scrim", "fog", "witch", "skeleton", "skeleton-wave", "preview-art"])
     assert.ok(css.includes(`.ttv-afterdark-${name}`), `${context}: missing full-page After Dark ${name}`);
   assert.ok(css.includes("ttv-afterdark-flight"), `${context}: missing seasonal animation`);
+}
+
+export function assertDefaultScenery(html, context) {
+  assert.ok(html.includes('data-ttv-theme="halloween-night"'), `${context}: After Dark is the starting theme`);
+  // Verify real server-rendered elements, not strings embedded in RSC scripts.
+  assert.match(html, /<div[^>]*class="ttv-seasonal-world ttv-afterdark-world"[^>]*aria-hidden="true"/, `${context}: default scenery exists before hydration`);
+  assert.match(html, /<source[^>]*srcSet="[^"<>]*halloween-after-dark-mobile/, `${context}: mobile composition is available on first paint`);
+  assert.match(html, /<img[^>]*class="ttv-afterdark-art"/, `${context}: default artwork is server-rendered`);
 }
 
 function verifyBuild() {
@@ -76,7 +83,7 @@ function verifyBuild() {
       .join("\n");
     assertProfileStyles(css, `Built ${route} page`);
     assertHalloweenStyles(css, `Built ${route} page`);
-    assert.ok(html.includes('data-ttv-theme="halloween-haunted-arcade"'), `${route}: seasonal first paint`);
+    assertDefaultScenery(html, `Built ${route}`);
   }
   console.log("PASS: built viewer pages link profile portrait and Halloween styles with the seasonal first paint.");
 }
@@ -103,6 +110,7 @@ async function verifySite(origin) {
   }
   for (const route of ["/", "/library", "/tv"]) {
     const html = await get(route, "text/html");
+    assertDefaultScenery(html, `Published ${route}`);
     const styles = [];
     for (const path of stylesheetPaths(html)) {
       if (!assets.has(path)) assets.set(path, await get(path, "text/css"));
@@ -119,6 +127,8 @@ async function verifySite(origin) {
     assert.ok(response.headers.get("content-type")?.startsWith("image/png"), `${name}: portrait MIME type`);
   }
   for (const path of [
+    "/themes/haunted-arcade-mobile.webp",
+    "/_next/image?url=%2Fthemes%2Fhaunted-arcade-mobile.webp&w=640&q=75",
     "/themes/haunted-arcade-world.webp", "/_next/image?url=%2Fthemes%2Fhaunted-arcade-world.webp&w=640&q=75",
     "/themes/halloween-after-dark-world.webp", "/themes/halloween-after-dark-mobile.webp",
     "/_next/image?url=%2Fthemes%2Fhalloween-after-dark-world.webp&w=1080&q=75",

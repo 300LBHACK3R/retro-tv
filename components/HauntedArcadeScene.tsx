@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import hauntedWorld from "@/public/themes/haunted-arcade-world.webp";
+import hauntedMobile from "@/public/themes/haunted-arcade-mobile.webp";
+
+const common = { alt: "", sizes: "100vw", loading: "eager" as const };
+const { props: desktop } = getImageProps({ ...common, src: hauntedWorld });
+const { props: mobile } = getImageProps({ ...common, src: hauntedMobile });
 
 function ArcadeGhost({ variant }: { variant: "mint" | "violet" | "amber" }) {
   return (
@@ -37,60 +41,25 @@ function ArcadeGhost({ variant }: { variant: "mint" | "violet" | "amber" }) {
   );
 }
 
-/** One bounded illustrated scene. Motion never occupies the playback surface. */
-export default function HauntedArcadeScene({
-  entrance,
-}: {
-  entrance: boolean;
-}) {
-  const sceneRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene || !("IntersectionObserver" in window)) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      scene.dataset.sceneVisible = String(entry?.isIntersecting ?? false);
-    });
-    observer.observe(scene);
-    return () => observer.disconnect();
-  }, []);
-
+/** The arcade surrounds every route without occupying player or guide space. */
+export default function HauntedArcadeScene() {
   return (
-    <aside
-      ref={sceneRef}
-      className="ttv-halloween-scene ttv-haunted-world"
-      data-entrance={entrance}
-      data-variant="arcade"
-      aria-label="Halloween on Tate’s TV"
-    >
-      <div className="ttv-haunted-art" aria-hidden="true">
-        <Image
-          src={hauntedWorld}
-          alt=""
-          fill
-          sizes="(max-width: 760px) 100vw, (max-width: 1100px) 95vw, 1440px"
-          loading="eager"
-          className="ttv-haunted-backdrop"
-        />
-        <div className="ttv-haunted-scrim" />
-        <div className="ttv-haunted-mist ttv-haunted-mist--near" />
-        <div className="ttv-haunted-mist ttv-haunted-mist--far" />
-        <div className="ttv-haunted-embers">
-          {[0, 1, 2, 3, 4, 5].map((spark) => <i key={spark} />)}
-        </div>
-        <ArcadeGhost variant="mint" />
-        <ArcadeGhost variant="violet" />
-        <ArcadeGhost variant="amber" />
-        <span className="ttv-haunted-corner ttv-haunted-corner--left" />
-        <span className="ttv-haunted-corner ttv-haunted-corner--right" />
+    <div className="ttv-seasonal-world ttv-haunted-world" aria-hidden="true">
+      <picture>
+        <source media="(max-width: 760px) and (orientation: portrait)" srcSet={mobile.srcSet} sizes={mobile.sizes} />
+        <img {...desktop} alt="" className="ttv-haunted-backdrop" />
+      </picture>
+      <div className="ttv-haunted-scrim" />
+      <div className="ttv-haunted-moonlight" />
+      <div className="ttv-haunted-cabinet-light" />
+      <div className="ttv-haunted-mist ttv-haunted-mist--near" />
+      <div className="ttv-haunted-mist ttv-haunted-mist--far" />
+      <div className="ttv-haunted-embers">
+        {[0, 1, 2, 3, 4, 5].map((spark) => <i key={spark} />)}
       </div>
-      <div className="ttv-halloween-copy ttv-haunted-copy">
-        <span className="ttv-halloween-eyebrow">Tate’s TV · Haunted Arcade</span>
-        <p className="ttv-haunted-title">Stay a little <span>spooky.</span></p>
-        <strong className="ttv-haunted-mobile-title">Haunted Arcade</strong>
-        <span className="ttv-haunted-caption">{entrance ? "Your favourite seat. A stranger kind of night." : "Good TV. Strange company."}</span>
-      </div>
-      <div className="ttv-haunted-edition" aria-hidden="true"><span>AFTER HOURS</span><span>HALLOWEEN ’26</span></div>
-    </aside>
+      <ArcadeGhost variant="mint" />
+      <ArcadeGhost variant="violet" />
+      <ArcadeGhost variant="amber" />
+    </div>
   );
 }

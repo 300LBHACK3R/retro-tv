@@ -3,7 +3,7 @@ import { statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { request } from "node:https";
 import { setTimeout as delay } from "node:timers/promises";
-import { assertProfileStyles, assertHalloweenStyles, stylesheetPaths } from "./styles.mjs";
+import { assertProfileStyles, assertHalloweenStyles, assertDefaultScenery, stylesheetPaths } from "./styles.mjs";
 
 const origin = "https://127.0.0.1:3100";
 function get(path, method = "GET", headers = {}) {
@@ -72,6 +72,7 @@ try {
     assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.ok(!response.headers["x-powered-by"]);
     if (["/", "/library", "/tv"].includes(path)) {
+      assertDefaultScenery(response.body, `HTTP ${path}`);
       const styles = [];
       for (const asset of stylesheetPaths(response.body)) {
         if (!stylesheetResponses.has(asset))
@@ -124,6 +125,12 @@ try {
   const mobileBackdrop = await get("/_next/image?url=%2Fthemes%2Fhaunted-arcade-world.webp&w=640&q=75");
   assert.equal(mobileBackdrop.status, 200, "Haunted Arcade mobile optimization works");
   assert.match(mobileBackdrop.headers["content-type"], /^image\//);
+  const arcadePortrait = await get("/themes/haunted-arcade-mobile.webp", "HEAD");
+  assert.equal(arcadePortrait.status, 200, "Haunted Arcade portrait is available");
+  assert.match(arcadePortrait.headers["content-type"], /^image\/webp\b/);
+  const arcadeThumbnail = await get("/_next/image?url=%2Fthemes%2Fhaunted-arcade-mobile.webp&w=640&q=75");
+  assert.equal(arcadeThumbnail.status, 200, "Haunted Arcade portrait optimization works");
+  assert.match(arcadeThumbnail.headers["content-type"], /^image\//);
   for (const name of ["world", "mobile"]) {
     const artwork = await get(`/themes/halloween-after-dark-${name}.webp`, "HEAD");
     assert.equal(artwork.status, 200, `After Dark ${name}: artwork is available`);

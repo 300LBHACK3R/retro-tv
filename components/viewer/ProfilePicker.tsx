@@ -13,7 +13,6 @@ import {
   type Profile,
 } from "@/lib/deviceProfiles";
 import { ProfileAvatar, PROFILE_PORTRAITS } from "./ProfileAvatar";
-import HalloweenScene from "@/components/HalloweenScene";
 import { useSpatialNavigation } from "./useSpatialNavigation";
 
 type Home = { kind: "choose" | "manage"; focus?: string; notice?: string };
@@ -503,7 +502,6 @@ export default function ProfilePicker() {
         <span className="ttv-profile-device">Your TV. Your people.</span>
       </header>
       <div className="ttv-profile-content">
-        {screen.kind === "choose" && <HalloweenScene entrance />}
         {screen.kind === "pin" ? (
           <PinEntry
             screen={screen}

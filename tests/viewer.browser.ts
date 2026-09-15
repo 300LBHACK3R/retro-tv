@@ -247,7 +247,7 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "halloween-haunted-arcade",
+    "halloween-night",
   );
 });
 
@@ -318,8 +318,10 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     await expect(
       page.getByRole("dialog", { name: /Theme Library/i }),
     ).toHaveCount(0);
-    if (theme.id === "halloween-night") {
-      const world = page.locator(".ttv-afterdark-world");
+    if (theme.id === "halloween-night" || theme.id === "halloween-haunted-arcade") {
+      const afterDark = theme.id === "halloween-night";
+      const world = page.locator(".ttv-seasonal-world");
+      await expect(world).toHaveCount(1);
       await expect(world).toBeVisible();
       await expect(world).toHaveAttribute("aria-hidden", "true");
       const layout = await world.evaluate((element) => {
@@ -336,20 +338,31 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       expect(Math.abs(layout.width - layout.viewportWidth)).toBeLessThanOrEqual(1);
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
       const portrait = await page.evaluate(() => matchMedia("(max-width: 760px) and (orientation: portrait)").matches);
-      await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, portrait) =>
-        image.complete && image.naturalWidth > 0 && image.currentSrc.includes(portrait ? "halloween-after-dark-mobile" : "halloween-after-dark-world"),
-        // Pass the media result into the browser evaluation.
-        portrait,
+      const imageName = `${afterDark ? "halloween-after-dark" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
+      await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
+        image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
       )).toBe(true);
       await expect(page.locator(".ttv-halloween-scene")).toHaveCount(0);
       expect(await page.locator(".ttv-library-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
       await page.emulateMedia({ reducedMotion: "reduce" });
-      for (const selector of [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"])
+      for (const selector of afterDark
+        ? [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"]
+        : [".ttv-haunted-ghost", ".ttv-haunted-mist", ".ttv-haunted-cabinet-light"])
         expect(await world.locator(selector).first().evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
-      await testInfo.attach("after-dark-full-page", { body: await page.screenshot(), contentType: "image/png" });
+      await testInfo.attach(`${theme.id}-full-page`, { body: await page.screenshot(), contentType: "image/png" });
       await page.emulateMedia({ reducedMotion: "no-preference" });
+      if (!afterDark) {
+        await page.getByRole("link", { name: "Back to Live TV", exact: true }).click();
+        await expect(page.locator(".ttv-premium-viewer-shell")).toBeVisible();
+        await expect(world).toHaveCount(1);
+        await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", theme.id);
+        expect(await page.locator(".ttv-app-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+        await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
+        await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
+        await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", theme.id);
+      }
     } else {
-      await expect(page.locator(".ttv-afterdark-world")).toHaveCount(0);
+      await expect(page.locator(".ttv-seasonal-world")).toHaveCount(0);
     }
     await noPageOverflow(page);
     expect(
@@ -369,7 +382,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "halloween-haunted-arcade",
+    "halloween-night",
   );
 });
 
@@ -796,12 +809,14 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(close).toBeInViewport();
-  await dialog.getByRole("button", { name: "Current theme: Haunted Arcade", exact: true }).click();
+  await dialog.getByRole("button", { name: "Apply theme: Haunted Arcade", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
-  const scene = page.getByRole("complementary", { name: "Halloween on Tate’s TV" });
-  await expect(scene).toHaveAttribute("data-variant", "arcade");
+  const scene = page.locator(".ttv-haunted-world");
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveCSS("position", "fixed");
+  await expect(scene).toHaveAttribute("aria-hidden", "true");
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.goto("/?ch=24");
   await openMore(page);
@@ -810,8 +825,8 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
   await page.goto("/library");
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
-  await expect(scene.locator(".ttv-haunted-ghost").first()).toHaveCSS("animation-name", "none");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator(".ttv-afterdark-witch")).toHaveCSS("animation-name", "none");
   await trigger.click();
   await page.setViewportSize({ width: 568, height: 320 });
   await expect(close).toBeInViewport();
@@ -821,8 +836,9 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await close.click();
   await page.goto("/?ch=24");
   await expect(page.getByRole("region", { name: "Live Tate's TV player", exact: true })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
-  await expect(page.locator(".ttv-premium-viewer-shell .ttv-halloween-scene")).toBeHidden();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator(".ttv-seasonal-world")).toHaveCSS("position", "fixed");
+  await expect(page.locator(".ttv-premium-viewer-shell .ttv-halloween-scene")).toHaveCount(0);
 });
 
 

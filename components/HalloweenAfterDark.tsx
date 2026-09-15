@@ -11,7 +11,7 @@ const { props: mobile } = getImageProps({ ...common, src: mobileWorld });
 /** One decorative world behind every route. Never part of the player or focus order. */
 export default function HalloweenAfterDark() {
   return (
-    <div className="ttv-afterdark-world" aria-hidden="true">
+    <div className="ttv-seasonal-world ttv-afterdark-world" aria-hidden="true">
       <picture>
         <source media="(max-width: 760px) and (orientation: portrait)" srcSet={mobile.srcSet} sizes={mobile.sizes} />
         {/* getImageProps supplies optimized responsive sources for the picture element. */}

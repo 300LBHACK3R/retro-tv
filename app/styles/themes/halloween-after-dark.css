@@ -1,16 +1,7 @@
 /* A full-page world, independent of the video, guide and scrolling containers. */
-.ttv-afterdark-world {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  user-select: none;
-  contain: strict;
-  background: #100b16;
-}
+.ttv-afterdark-world { background: #100b16; }
 :root:not([data-ttv-theme="halloween-night"]) .ttv-afterdark-world { display: none; }
-.ttv-afterdark-world > picture, .ttv-afterdark-art, .ttv-afterdark-scrim {
+.ttv-afterdark-scrim {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -74,15 +65,6 @@
 .ttv-afterdark-embers i:nth-child(6) { left: 97%; animation-delay: -6s; animation-duration: 21s; }
 .ttv-afterdark-preview-art { object-fit: cover; object-position: center 68%; }
 
-/* Let the scenery reach the whole page, including its gutters and footer.
-   These shells have inline backgrounds; only their backdrop is overridden. */
-:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
-  background: transparent !important;
-}
-:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,
-:root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after,
-:root[data-ttv-theme="halloween-night"] .ttv-library-ambient { display: none; }
-
 /* Warm lamplight along the station chrome; readable opaque programme surfaces. */
 :root[data-ttv-theme="halloween-night"] :is(.ttv-premium-topbar, .ttv-library-header, .ttv-mobile-viewer-nav) {
   border-color: #b67c5266;
@@ -142,11 +124,6 @@
 @media (max-height: 560px) and (orientation: landscape) {
   .ttv-afterdark-skeleton, .ttv-afterdark-embers, .ttv-afterdark-fog-far { display: none; }
 }
-:root[data-ttv-page-visible="false"] .ttv-afterdark-world * { animation-play-state: paused; }
-:root[data-ttv-reduced-motion="true"] .ttv-afterdark-world * { animation: none !important; }
-@media (prefers-reduced-motion: reduce) { .ttv-afterdark-world * { animation: none !important; } }
 @media (forced-colors: active) {
-  .ttv-afterdark-world { display: none; }
-  :root[data-ttv-theme="halloween-night"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) { background: Canvas !important; }
   :root[data-ttv-theme="halloween-night"] :is(.ttv-brand-wordmark, .ttv-profile-wordmark, .ttv-section-kicker, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) { color: CanvasText; text-shadow: none; }
 }
