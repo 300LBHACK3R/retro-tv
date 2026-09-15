@@ -1,0 +1,66 @@
+/* Keep seasonal artwork in its own space, away from video and guide controls. */
+.ttv-halloween-scene {
+  display: none;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-halloween-scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) minmax(110px, 195px);
+  align-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 112px;
+  border: 1px solid #65466c;
+  border-radius: 20px;
+  background: radial-gradient(ellipse at 8% 100%, #6a311f66, transparent 44%),
+    radial-gradient(ellipse at 95% 5%, #783fc955, transparent 52%), #1c1224;
+  box-shadow: inset 0 1px 0 #ffdba712, 0 12px 36px #0a051533;
+}
+.ttv-halloween-pumpkins, .ttv-halloween-sky { width: 100%; height: auto; pointer-events: none; }
+.ttv-halloween-copy { padding: 1rem .25rem; text-align: center; position: relative; z-index: 1; }
+.ttv-halloween-eyebrow { display: block; color: #ffd39c; font-size: .65rem; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; line-height: 1.6; }
+.ttv-halloween-copy p { color: #fff5e9; font-size: clamp(1rem, 2.5vw, 1.45rem); font-weight: 650; line-height: 1.35; margin: .25rem 0; text-wrap: balance; }
+.ttv-halloween-copy button { min-height: 44px; padding: .5rem .75rem; color: #cdbad4; font-size: .75rem; border-radius: .5rem; text-decoration: underline; text-underline-offset: 4px; }
+.ttv-halloween-copy button:hover { color: #fff5e9; background: #ffffff0a; }
+.ttv-halloween-copy button:focus-visible { outline: 3px solid #ffcc8a; outline-offset: 2px; }
+.ttv-profile-content > .ttv-halloween-scene { max-width: 46rem; margin: 0 auto clamp(1.5rem, 4vh, 2.5rem); }
+.ttv-library-shell .ttv-halloween-scene { margin-bottom: 2rem; }
+:root[data-ttv-theme="halloween-night"] .ttv-profile-screen {
+  background: radial-gradient(ellipse at 10% 90%, #662e2638, transparent 48%),
+    radial-gradient(ellipse at 85% 8%, #63318f38, transparent 52%), #100b16;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-profile-card:hover .ttv-profile-avatar {
+  box-shadow: 0 0 0 3px #ffab5c, 0 12px 38px #d87a3233;
+}
+:root[data-ttv-theme="halloween-night"] .ttv-premium-topbar {
+  border-bottom: 1px solid #65466c;
+}
+:root[data-ttv-theme="halloween-night"] :where(.ttv-live-stage, .ttv-guide-shell) {
+  box-shadow: 0 0 0 1px #ffab5c15, 0 16px 50px #12071e55;
+}
+.ttv-halloween-witch { animation: ttv-witch-flight 12s ease-in-out infinite; }
+.ttv-halloween-bats { animation: ttv-bat-flight 9s ease-in-out infinite; }
+.ttv-halloween-lantern { animation: ttv-lantern-glow 7s ease-in-out infinite; }
+@keyframes ttv-witch-flight { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-26px, -7px); } }
+@keyframes ttv-bat-flight { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(10px, -8px); } }
+@keyframes ttv-lantern-glow { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
+:root[data-ttv-reduced-motion="true"] .ttv-halloween-scene *,
+:root[data-ttv-page-visible="false"] .ttv-halloween-scene * { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ttv-halloween-scene * { animation: none; }
+}
+@media (max-width: 560px) {
+  :root[data-ttv-theme="halloween-night"] .ttv-halloween-scene {
+    grid-template-columns: 62px minmax(0, 1fr) 72px;
+    min-height: 106px;
+    border-radius: 16px;
+  }
+  .ttv-halloween-eyebrow { font-size: .6rem; letter-spacing: .08em; }
+  .ttv-halloween-copy { padding: .65rem 0; }
+  .ttv-halloween-copy p { font-size: 1rem; }
+}
+@media (forced-colors: active) {
+  .ttv-halloween-pumpkins, .ttv-halloween-sky { display: none; }
+  :root[data-ttv-theme="halloween-night"] .ttv-halloween-scene { grid-template-columns: 1fr; }
+  .ttv-halloween-copy :where(p, span, button) { color: CanvasText; }
+}

@@ -15,6 +15,7 @@ import {
 import ProfileGate, { ProfileButton } from "@/components/viewer/ProfileGate";
 import { profileProgressKey, useProfiles } from "@/lib/deviceProfiles";
 import ThemeButton from "@/components/ThemeButton";
+import HalloweenScene from "@/components/HalloweenScene";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
@@ -439,6 +440,7 @@ function ProfileLibrary() {
       </header>
 
       <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-10">
+        <HalloweenScene />
         <section className="ttv-library-intro">
           <div>
             <span className="ttv-section-kicker">On demand</span>

@@ -33,6 +33,7 @@ import ViewerFooter from "@/components/viewer/ViewerFooter";
 import ViewerGuideDialog from "@/components/viewer/ViewerGuideDialog";
 import ViewerMoreDialog from "@/components/viewer/ViewerMoreDialog";
 import ViewerTopBar from "@/components/viewer/ViewerTopBar";
+import HalloweenScene from "@/components/HalloweenScene";
 import { useBroadcastDayAnchor } from "@/components/viewer/useBroadcastDayAnchor";
 import { useNumericChannelTune } from "@/components/viewer/useNumericChannelTune";
 import { buildSchedule } from "@/lib/scheduler";
@@ -353,6 +354,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
           onScrollToLive={scrollToLive}
         />
 
+        {!tvMode && playerViewMode === "normal" && <HalloweenScene />}
         {enabledChannels.length === 0 ? (
           <EmptyStationState />
         ) : (

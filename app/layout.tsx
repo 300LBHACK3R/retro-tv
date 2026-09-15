@@ -1,8 +1,9 @@
 import "./globals.css";
 import "./styles/profiles.css";
+import "./styles/themes/halloween.css";
 
 import type { Metadata, Viewport } from "next";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { GoogleCastProvider } from "@/components/GoogleCastProvider";
@@ -10,7 +11,7 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ThemeBootstrapScript from "@/components/ThemeBootstrapScript";
 import DeviceLibraryRuntime from "@/components/viewer/DeviceLibraryRuntime";
 import ThemeRuntime from "@/components/ThemeRuntime";
-import { getDefaultTheme } from "@/lib/themes";
+import { createThemeCssVars, getDefaultTheme } from "@/lib/themes";
 
 import { getSiteUrl } from "@/lib/metadata";
 const DEFAULT_OG_IMAGE = "/opengraph-image.png";
@@ -224,6 +225,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
       lang="en-CA"
+      style={createThemeCssVars(DEFAULT_THEME) as CSSProperties}
       data-ttv-theme={DEFAULT_THEME.id}
       data-ttv-category={DEFAULT_THEME.category}
       data-ttv-layout={DEFAULT_THEME.layout}

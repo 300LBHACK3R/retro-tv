@@ -239,7 +239,7 @@ test("scheduled days respect both daylight-saving transitions", () => {
   }
 });
 
-test("all nine themes use valid colour tokens and readable text pairs", async () => {
+test("all themes use valid colour tokens and readable text pairs", async () => {
   const { THEMES, THEME_ACCESS_MODE } = await import("../lib/themes");
   const luminance = (hex: string) => {
     const channels = hex
@@ -256,7 +256,7 @@ test("all nine themes use valid colour tokens and readable text pairs", async ()
   const ratio = (a: string, b: string) =>
     (Math.max(luminance(a), luminance(b)) + 0.05) /
     (Math.min(luminance(a), luminance(b)) + 0.05);
-  expect(THEMES).toHaveLength(9);
+  expect(THEMES).toHaveLength(10);
   expect(THEME_ACCESS_MODE).toBe("all-unlocked");
   for (const theme of THEMES) {
     for (const key of [

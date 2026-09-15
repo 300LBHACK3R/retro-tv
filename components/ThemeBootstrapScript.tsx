@@ -1,5 +1,6 @@
 import {
   DEFAULT_THEME_ID,
+  DEFAULT_THEME_REVISION,
   getThemeBootstrapEntries,
   THEME_STORAGE_KEY,
 } from "@/lib/themes";
@@ -8,7 +9,7 @@ import {
  * Applies the persisted theme before React hydrates, preventing a bright/dark
  * flash and keeping every route visually consistent from the first paint.
  */
-export default function ThemeBootstrapScript() {
+export function createThemeBootstrapScript() {
   const entries = Object.fromEntries(
     getThemeBootstrapEntries().map((entry) => [entry.id, entry]),
   );
@@ -21,7 +22,8 @@ export default function ThemeBootstrapScript() {
     try {
       const storedValue = window.localStorage.getItem(storageKey);
       const storedState = storedValue ? JSON.parse(storedValue) : null;
-      const requestedId = storedState?.state?.themeId;
+      const requestedId = storedState?.state?.themeRevision === ${JSON.stringify(DEFAULT_THEME_REVISION)}
+        ? storedState?.state?.themeId : fallbackId;
       const theme = themes[requestedId] || themes[fallbackId];
 
       if (!theme) return;
@@ -32,6 +34,8 @@ export default function ThemeBootstrapScript() {
       root.dataset.ttvLayout = theme.layout;
       root.dataset.ttvAppearance = theme.appearance;
       root.style.colorScheme = theme.appearance;
+      if (storedState?.state?.viewerSettings?.preferReducedMotion)
+        root.dataset.ttvReducedMotion = "true";
 
       for (const [property, value] of Object.entries(theme.cssVars)) {
         root.style.setProperty(property, value);
@@ -41,11 +45,15 @@ export default function ThemeBootstrapScript() {
     }
   })();`;
 
+  return script.replace(/</g, "\\u003c");
+}
+
+export default function ThemeBootstrapScript() {
   return (
     <script
       id="ttv-theme-bootstrap"
       dangerouslySetInnerHTML={{
-        __html: script.replace(/</g, "\\u003c"),
+        __html: createThemeBootstrapScript(),
       }}
     />
   );

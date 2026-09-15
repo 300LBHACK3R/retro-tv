@@ -57,6 +57,51 @@ export function kidsChannelReview(
   return reasons;
 }
 type Catalog = { channels: Channel[]; media: MediaItem[] };
+
+/** A review covers every regular/block programme and every potentially eligible ad. */
+export function kidsLineupReview(channel: Channel, media: readonly MediaItem[]) {
+  const programmeIds = new Set([
+    ...channel.mediaIds,
+    ...(channel.programmeBlocks ?? []).flatMap((block) => block.mediaIds),
+  ]);
+  const items = media.filter(
+    (item) => programmeIds.has(item.id) || couldAdvertiseOnChannel(item, channel),
+  );
+  const knownIds = new Set(items.map((item) => item.id));
+  const missingIds = [...programmeIds].filter((id) => !knownIds.has(id));
+  return {
+    items,
+    programmeCount: programmeIds.size,
+    adCount: items.filter((item) => couldAdvertiseOnChannel(item, channel)).length,
+    missingIds,
+    // Include content and scheduling, not just IDs: edits invalidate consent.
+    signature: JSON.stringify([channel, items]),
+    canApprove: programmeIds.size > 0 && missingIds.length === 0 && channel.isEnabled !== false,
+  };
+}
+
+export function approveReviewedKidsLineup(
+  channels: Channel[],
+  media: MediaItem[],
+  channelId: string,
+  reviewedSignature: string,
+): Catalog {
+  const channel = channels.find((item) => item.id === channelId);
+  if (!channel) throw new Error("This channel is no longer available.");
+  const review = kidsLineupReview(channel, media);
+  if (review.signature !== reviewedSignature)
+    throw new Error("The lineup changed. Review it again before adding it to Kids.");
+  if (!review.canApprove)
+    throw new Error("Enable the channel and resolve empty or missing programmes before approving it.");
+  const ids = new Set(review.items.map((item) => item.id));
+  return {
+    channels: channels.map((item) => item.id === channelId
+      ? { ...item, kidsApproved: true, category: "Kids & Family" }
+      : item),
+    media: media.map((item) => ids.has(item.id) ? { ...item, kidsApproved: true } : item),
+  };
+}
+
 const cache = new WeakMap<Channel[], WeakMap<MediaItem[], Catalog>>();
 export function viewerCatalog(
   channels: Channel[],

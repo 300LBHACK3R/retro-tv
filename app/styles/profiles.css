@@ -92,6 +92,7 @@
   margin-bottom: 0.5rem;
 }
 .ttv-profile-avatar {
+  overflow: hidden;
   display: grid;
   place-items: center;
   width: 100%;
@@ -106,6 +107,14 @@
   transition:
     transform 160ms ease,
     box-shadow 160ms ease;
+}
+
+.ttv-profile-avatar .ttv-profile-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 .ttv-profile-avatar svg {
   width: 48%;
@@ -639,6 +648,8 @@
   border-radius: 1rem;
   background: var(--panel-alt-bg);
 }
+.ttv-audience-approve { display: grid; gap: 1rem; }
+.ttv-audience-approve button { justify-self: start; }
 .ttv-audience-channels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));

@@ -72,7 +72,15 @@ export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
 
-export const DEFAULT_THEME_ID: ThemeId = "ttv-neon-crt";
+export const DEFAULT_THEME_ID: ThemeId = "halloween-night";
+// Introduce the seasonal default once. Later theme choices remain personal.
+export const DEFAULT_THEME_REVISION = "halloween-2026";
+
+export function resolveSavedTheme(id: unknown, revision: unknown): ThemeId {
+  return revision === DEFAULT_THEME_REVISION && isThemeId(id)
+    ? id
+    : DEFAULT_THEME_ID;
+}
 
 /** Zustand persistence key used by the pre-hydration theme bootstrap. */
 export const THEME_STORAGE_KEY = "retro-tv-programming-v1";
@@ -106,6 +114,40 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 ];
 
 export const THEMES = [
+  {
+    id: "halloween-night",
+    name: "Halloween After Dark",
+    shortName: "Halloween",
+    description:
+      "Pumpkin lanterns, a moonlit witch, violet skies, and warm amber light. A little magic for your nightly TV ritual.",
+    priceLabel: "Free",
+    isPremium: false,
+    category: "premium",
+    layout: "cinematic-premium",
+    appearance: "dark",
+    previewGradient:
+      "radial-gradient(circle at 15% 80%, #b64e26, transparent 48%), radial-gradient(circle at 85% 15%, #643695, transparent 50%), linear-gradient(135deg, #100b16, #281a30)",
+    recommendedFor: ["seasonal", "Halloween", "pumpkins", "movie night"],
+    colors: {
+      appBg: "#100b16",
+      panelBg: "#1c1224",
+      panelAltBg: "#281a30",
+      border: "#65466c",
+      text: "#fff5e9",
+      textMuted: "#cdbad4",
+      buttonBg: "#322039",
+      buttonHover: "#48304e",
+      primary: "#ffab5c",
+      secondary: "#c4a0ff",
+      onPrimary: "#21100a",
+      focusRing: "#ffcc8a",
+      guideHeaderBg: "#281a30",
+      guideRowBg: "#1c1224",
+      guideRowAltBg: "#251a2e",
+      guideActiveBg: "#c4a0ff",
+      guideCurrentBg: "#ffab5c",
+    },
+  },
   {
     id: "ttv-neon-crt",
     name: "Tate's TV Neon CRT",

@@ -4,6 +4,8 @@ import {
   CHANNEL_CATEGORIES,
   channelCategory,
   kidsChannelReview,
+  kidsLineupReview,
+  approveReviewedKidsLineup,
   type ChannelCategory,
 } from "@/lib/audience";
 import { couldAdvertiseOnChannel } from "@/lib/scheduler";
@@ -18,7 +20,12 @@ export default function AudiencePanel() {
   const [query, setQuery] = useState("");
   const [unreviewed, setUnreviewed] = useState(false);
   const [limit, setLimit] = useState(40);
+  const [confirmedSignature, setConfirmedSignature] = useState("");
+  const [notice, setNotice] = useState("");
   const selected = channels.find((channel) => channel.id === selectedId);
+  const review = useMemo(() => selected ? kidsLineupReview(selected, media) : null, [selected, media]);
+  const fullLineupVisible = !!review && !query.trim() && !unreviewed && limit >= review.items.length;
+  const confirmed = !!review && confirmedSignature === review.signature;
   const visible = useMemo(() => {
     const ids = new Set(
       selected
@@ -45,8 +52,8 @@ export default function AudiencePanel() {
         <span className="ttv-section-kicker">Programming with care</span>
         <h2 id="audience-title">Audience & channels</h2>
         <p>
-          Review each programme and ad before approving it for Kids. Categories
-          organize browsing; they do not grant Kids access.
+          Main and other parent profiles can watch the full lineup. Kids profiles
+          only see programmes and channels you have approved for children.
         </p>
       </header>
       <div className="ttv-audience-notice">
@@ -104,6 +111,9 @@ export default function AudiencePanel() {
                 onClick={() => {
                   setSelectedId(channel.id);
                   setQuery("");
+                  setUnreviewed(false);
+                  setConfirmedSignature("");
+                  setNotice("");
                   setLimit(40);
                   const heading = document.getElementById(
                     "audience-media-title",
@@ -128,6 +138,8 @@ export default function AudiencePanel() {
             value={selectedId}
             onChange={(event) => {
               setSelectedId(event.target.value);
+              setConfirmedSignature("");
+              setNotice("");
               setLimit(40);
             }}
           >
@@ -200,6 +212,50 @@ export default function AudiencePanel() {
         <button type="button" onClick={() => setLimit(limit + 40)}>
           Show more
         </button>
+      )}
+      {selected && review && (
+        <section className="ttv-audience-notice ttv-audience-approve" aria-label="Add reviewed lineup to Kids">
+          <h3>Add {selected.branding?.displayName || selected.name} to Kids</h3>
+          <p>
+            This approval covers {review.programmeCount} programme{review.programmeCount === 1 ? "" : "s"}
+            {" "}and {review.adCount} eligible ad{review.adCount === 1 ? "" : "s"}, including recurring blocks
+            and future ad campaigns. Check every item for children’s suitability.
+            Animation, faith, or family categories alone do not mean a show is for children.
+          </p>
+          {review.missingIds.length > 0 && <p role="alert">{review.missingIds.length} assigned programme(s) are missing. Restore or remove them before approval.</p>}
+          {!review.programmeCount && <p>Assign children’s programmes to this channel first.</p>}
+          {selected.isEnabled === false && <p>Enable this channel before adding it to Kids.</p>}
+          {!fullLineupVisible && review.items.length > 0 && (
+            <button type="button" onClick={() => {
+              setQuery(""); setUnreviewed(false); setLimit(review.items.length);
+              document.getElementById("audience-media-title")?.focus();
+            }}>Show the complete lineup for review</button>
+          )}
+          <label className="ttv-profile-check">
+            <input type="checkbox" checked={confirmed && fullLineupVisible}
+              disabled={!review.canApprove || !fullLineupVisible}
+              onChange={(event) => {
+                setConfirmedSignature(event.target.checked ? review.signature : "");
+                setNotice("");
+              }} />
+            <span>I have reviewed every programme and ad in this lineup for children.</span>
+          </label>
+          <button type="button" className="ttv-profile-primary"
+            disabled={!confirmed || !fullLineupVisible || !review.canApprove}
+            onClick={() => {
+              try {
+                useStore.setState((state) => approveReviewedKidsLineup(
+                  state.channels, state.media, selected.id, confirmedSignature,
+                ));
+                setConfirmedSignature("");
+                setNotice("Added to Kids in this programming draft. Use Save beside the cloud status in the admin toolbar to publish it to viewers.");
+              } catch (error) {
+                setConfirmedSignature("");
+                setNotice(error instanceof Error ? error.message : "Please review the lineup again.");
+              }
+            }}>Add reviewed lineup to Kids</button>
+          <p role="status">{notice}</p>
+        </section>
       )}
       <p className="ttv-profile-note">
         Changing a media file, title, poster, description, or runtime clears its

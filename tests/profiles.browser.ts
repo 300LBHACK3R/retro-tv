@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
+import { DEFAULT_THEME_REVISION } from "../lib/themes";
 const video = Buffer.from(
   readFileSync("tests/fixtures/test-video.webm.base64", "utf8"),
   "base64",
@@ -61,6 +62,8 @@ async function switchProfile(page: Page) {
   await expect(page.locator(".ttv-profile-grid")).toHaveCSS("display", "flex");
   const avatar = page.locator(".ttv-profile-card [data-avatar]").first();
   await expect(avatar).toHaveCSS("display", "grid");
+  await expect(avatar.locator("img")).toBeVisible();
+  await expect.poll(() => avatar.locator("img").evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
   const avatarBounds = await avatar.boundingBox();
   expect(avatarBounds!.width).toBeGreaterThanOrEqual(64);
   expect(avatarBounds!.width).toBeLessThanOrEqual(180);
@@ -157,7 +160,7 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
   await name.pressSequentially("Alex");
   await expect(name).toHaveValue("Alex");
   await expect(name).toBeFocused();
-  await page.getByRole("button", { name: "moon avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Space explorer avatar", exact: true }).click();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
   await page
@@ -285,7 +288,7 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     page.getByRole("button", { name: "Save profile", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Profile name", { exact: true }).fill("Morgan");
-  await page.getByRole("button", { name: "bolt avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Robot avatar", exact: true }).click();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Watch as Morgan", exact: true }),
@@ -295,7 +298,7 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     .click();
   await page.getByRole("button", { name: "Edit Morgan", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "bolt avatar", exact: true }),
+    page.getByRole("button", { name: "Robot avatar", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page
     .getByRole("button", { name: "Delete profile", exact: true })
@@ -428,4 +431,44 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("Halloween entrance loads portraits, respects motion controls and keeps a later personal theme", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem("ttv-profiles-v1")) return;
+    // A returning household from before the seasonal release.
+    localStorage.setItem("ttv-profiles-v1", JSON.stringify({ profiles: [
+      { id: "main", name: "Main", kids: false, avatar: "sun", theme: "obsidian-gold" },
+      { id: "kids", name: "Kids", kids: true, avatar: "star", theme: "shaw-2006" },
+    ] }));
+    localStorage.setItem("retro-tv-programming-v1", JSON.stringify({ version: 6, state: { themeId: "obsidian-gold" } }));
+  });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  const scene = page.getByRole("complementary", { name: "Halloween on Tate’s TV" });
+  await expect(scene).toBeVisible();
+  const witch = scene.locator(".ttv-halloween-witch");
+  await expect(witch).toHaveCSS("animation-name", "ttv-witch-flight");
+  await scene.getByRole("button", { name: "Pause effects", exact: true }).click();
+  await expect(witch).toHaveCSS("animation-play-state", "paused");
+  await page.reload();
+  await expect(scene.getByRole("button", { name: "Effects paused" })).toHaveAttribute("aria-pressed", "true");
+  await scene.getByRole("button", { name: "Effects paused" }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(witch).toHaveCSS("animation-name", "none");
+  const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
+  await expect(portraits).toHaveCount(2);
+  await expect.poll(() => portraits.evaluateAll((items: HTMLImageElement[]) => items.every((item) => item.complete && item.naturalWidth > 0))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await page.goto("/library");
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+  await expect(scene).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).themeRevision)).toBe(DEFAULT_THEME_REVISION);
 });

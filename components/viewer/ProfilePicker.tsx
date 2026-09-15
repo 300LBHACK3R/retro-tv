@@ -12,7 +12,8 @@ import {
   verifyParentPin,
   type Profile,
 } from "@/lib/deviceProfiles";
-import { ProfileAvatar } from "./ProfileAvatar";
+import { ProfileAvatar, PROFILE_PORTRAITS } from "./ProfileAvatar";
+import HalloweenScene from "@/components/HalloweenScene";
 import { useSpatialNavigation } from "./useSpatialNavigation";
 
 type Home = { kind: "choose" | "manage"; focus?: string; notice?: string };
@@ -378,7 +379,7 @@ function ProfileEditor({
               <button
                 key={avatar}
                 type="button"
-                aria-label={`${avatar} avatar`}
+                aria-label={`${PROFILE_PORTRAITS[avatar].name} avatar`}
                 aria-pressed={profile.avatar === avatar}
                 onClick={() => setProfile({ ...profile, avatar })}
               >
@@ -502,6 +503,7 @@ export default function ProfilePicker() {
         <span className="ttv-profile-device">Your TV. Your people.</span>
       </header>
       <div className="ttv-profile-content">
+        {screen.kind === "choose" && <HalloweenScene entrance />}
         {screen.kind === "pin" ? (
           <PinEntry
             screen={screen}

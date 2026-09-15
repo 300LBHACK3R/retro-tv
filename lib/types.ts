@@ -7,6 +7,7 @@ export type AppMode = "viewer" | "admin";
 export type PlayerViewMode = "normal" | "mini" | "theater";
 
 export type ThemeId =
+  | "halloween-night"
   | "ttv-neon-crt"
   | "shaw-2006"
   | "telus-2008-inspired"

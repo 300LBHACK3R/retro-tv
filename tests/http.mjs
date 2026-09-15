@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { request } from "node:https";
 import { setTimeout as delay } from "node:timers/promises";
-import { assertProfileStyles, stylesheetPaths } from "./styles.mjs";
+import { assertProfileStyles, assertHalloweenStyles, stylesheetPaths } from "./styles.mjs";
 
 const origin = "https://127.0.0.1:3100";
 function get(path, method = "GET", headers = {}) {
@@ -89,7 +89,16 @@ try {
         styles.push(stylesheet.body);
       }
       assertProfileStyles(styles.join("\n"), `HTTP ${path}`);
+      assertHalloweenStyles(styles.join("\n"), `HTTP ${path}`);
     }
+  }
+  for (const name of ["fox", "explorer", "dinosaur", "robot", "cat"]) {
+    const portrait = await get(`/avatars/${name}.png`, "HEAD");
+    assert.equal(portrait.status, 200, `${name}: portrait is available`);
+    assert.match(portrait.headers["content-type"], /^image\/png\b/);
+    const thumbnail = await get(`/_next/image?url=%2Favatars%2F${name}.png&w=128&q=75`);
+    assert.equal(thumbnail.status, 200, `${name}: optimized portrait is available`);
+    assert.match(thumbnail.headers["content-type"], /^image\//);
   }
   for (const path of [
     "/admin",
@@ -134,7 +143,7 @@ try {
   assert.ok(sitemap.body.includes("/library"));
   assert.ok(!sitemap.body.includes("/admin"));
   console.log(
-    "PASS: production public routes, canonical metadata, security headers, private cache rules, admin authorization, cross-origin rejection and analytics opt-out.",
+    "PASS: production routes, profile and Halloween styles, five optimized portraits, metadata, security headers, private cache rules, authorization, cross-origin rejection and analytics opt-out.",
   );
 } finally {
   server.kill("SIGTERM");

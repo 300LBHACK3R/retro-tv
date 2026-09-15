@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { useDeviceLibrary } from "./deviceLibrary";
 import { useStore } from "./store";
-import { DEFAULT_THEME_ID, isThemeId } from "./themes";
+import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION, resolveSavedTheme, isThemeId } from "./themes";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 import type { ThemeId } from "./types";
 
@@ -18,6 +18,7 @@ export type Profile = {
 };
 type Pin = { salt: string; hash: string };
 type Data = {
+  themeRevision?: string;
   profiles: Profile[];
   pin: Pin | null;
   failures: number;
@@ -71,7 +72,11 @@ function readData(): Data {
       ? data.pin
       : null;
   return {
-    profiles: sanitizeProfiles(data.profiles),
+    themeRevision: DEFAULT_THEME_REVISION,
+    profiles: sanitizeProfiles(data.profiles).map((profile) => ({
+      ...profile,
+      theme: resolveSavedTheme(profile.theme, data.themeRevision),
+    })),
     pin,
     failures: Number.isInteger(data.failures)
       ? Math.min(5, Math.max(0, data.failures!))
@@ -103,7 +108,7 @@ function saveData() {
   try {
     localStorage.setItem(
       PROFILE_STORAGE_KEY,
-      JSON.stringify({ profiles, pin, failures, lockedUntil }),
+      JSON.stringify({ profiles, pin, failures, lockedUntil, themeRevision: DEFAULT_THEME_REVISION }),
     );
   } catch {
     useProfiles.setState({ storageAvailable: false });
@@ -127,8 +132,6 @@ function saveSession(id: string | null) {
 export function initializeProfiles() {
   if (useProfiles.getState().ready) return;
   const data = readData();
-  const main = data.profiles.find((profile) => profile.id === "main");
-  if (main && !main.theme) main.theme = useStore.getState().themeId;
   let activeId: string | null = null;
   try {
     const session = JSON.parse(

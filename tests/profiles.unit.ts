@@ -18,7 +18,10 @@ import {
   activateProfile,
   lockProfiles,
   refreshProfiles,
+  saveProfile,
+  PROFILE_STORAGE_KEY,
 } from "../lib/deviceProfiles";
+import { DEFAULT_THEME_ID, DEFAULT_THEME_REVISION } from "../lib/themes";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 const programme: MediaItem = { ...programming.media[0]!, kidsApproved: true };
@@ -212,7 +215,7 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
     ),
   ).toHaveLength(5);
 });
-test("startup selects Channel 1, preserves the legacy theme, and external profile changes lock the viewer", () => {
+test("the seasonal profile migration runs once, preserves profiles and PIN, and keeps later theme choices", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const session = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
   function memory() {
@@ -234,14 +237,29 @@ test("startup selects Channel 1, preserves the legacy theme, and external profil
     });
     useStore.getState().replaceProgramming(programming);
     useStore.getState().setTheme("obsidian-gold");
+    const pin = { salt: "a".repeat(32), hash: "b".repeat(64) };
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
+      profiles: [
+        { id: "main", name: "Tate", kids: false, avatar: "moon", theme: "obsidian-gold" },
+        { id: "kids", name: "Kids", kids: true, avatar: "star", theme: "shaw-2006" },
+      ], pin, failures: 2, lockedUntil: 0,
+    }));
     useProfiles.setState({ ready: false });
     initializeProfiles();
     expect(
       useProfiles.getState().profiles.find((profile) => profile.id === "main")
         ?.theme,
-    ).toBe("obsidian-gold");
+    ).toBe(DEFAULT_THEME_ID);
+    expect(useProfiles.getState().pin).toEqual(pin);
+    expect(useProfiles.getState().failures).toBe(2);
+    expect(useProfiles.getState().profiles[0]).toMatchObject({ name: "Tate", avatar: "moon" });
+    expect(useProfiles.getState().profiles[1]).toMatchObject({ kids: true, theme: DEFAULT_THEME_ID });
+    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).themeRevision).toBe(DEFAULT_THEME_REVISION);
     activateProfile("main");
     expect(useStore.getState().currentChannelId).toBe("1");
+    saveProfile({ ...useProfiles.getState().profiles[0]!, theme: "obsidian-gold" });
+    useProfiles.setState({ ready: false });
+    initializeProfiles();
     lockProfiles();
     useStore.getState().setTheme("electric-blue-live");
     activateProfile("main");

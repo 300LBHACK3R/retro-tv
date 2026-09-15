@@ -38,6 +38,7 @@ export function assertProfileStyles(css, context = "Profile entry") {
     "grid",
     "card",
     "avatar",
+    "portrait",
     "panel",
     "form",
     "actions",
@@ -51,6 +52,13 @@ export function assertProfileStyles(css, context = "Profile entry") {
   }
 }
 
+export function assertHalloweenStyles(css, context = "Halloween") {
+  for (const name of ["scene", "pumpkins", "sky", "copy", "witch", "bats", "lantern"])
+    assert.ok(css.includes(`.ttv-halloween-${name}`), `${context}: missing ${name} styling`);
+  assert.ok(css.includes("prefers-reduced-motion"), `${context}: missing reduced motion support`);
+  assert.ok(css.includes("ttv-witch-flight"), `${context}: missing seasonal animation`);
+}
+
 function verifyBuild() {
   for (const route of ["index", "library", "tv"]) {
     const html = readFileSync(`.next/server/app/${route}.html`, "utf8");
@@ -60,8 +68,10 @@ function verifyBuild() {
       )
       .join("\n");
     assertProfileStyles(css, `Built ${route} page`);
+    assertHalloweenStyles(css, `Built ${route} page`);
+    assert.ok(html.includes('data-ttv-theme="halloween-night"'), `${route}: seasonal first paint`);
   }
-  console.log("PASS: built viewer pages link complete profile styles.");
+  console.log("PASS: built viewer pages link profile portrait and Halloween styles with the seasonal first paint.");
 }
 
 async function verifySite(origin) {
@@ -92,8 +102,16 @@ async function verifySite(origin) {
       styles.push(assets.get(path));
     }
     assertProfileStyles(styles.join("\n"), `Published ${route}`);
+    assertHalloweenStyles(styles.join("\n"), `Published ${route}`);
   }
-  console.log("PASS: the live viewer pages serve complete profile styles.");
+  for (const name of ["fox", "explorer", "dinosaur", "robot", "cat"]) {
+    const response = await fetch(new URL(`/avatars/${name}.png`, site.origin), {
+      method: "HEAD", signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(response.status, 200, `${name}: published portrait is available`);
+    assert.ok(response.headers.get("content-type")?.startsWith("image/png"), `${name}: portrait MIME type`);
+  }
+  console.log("PASS: the live viewer pages serve complete profile and Halloween styles, with all five portraits.");
 }
 
 if (
