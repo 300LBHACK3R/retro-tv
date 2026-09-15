@@ -5,6 +5,7 @@ import { useViewerCatalog } from "@/lib/useViewerCatalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
+import { useNativeTvPlayback } from "@/components/viewer/useNativeTvPlayback";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import {
   useGoogleCast,
@@ -23,10 +24,6 @@ interface PlayerProps {
 
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
-type RemotePlaybackLike = {
-  prompt?: () => Promise<void>;
-};
-
 type ScreenWakeLockSentinelLike = {
   released?: boolean;
   release: () => Promise<void>;
@@ -41,7 +38,6 @@ type NavigatorWithWakeLock = Navigator & {
 
 type WebKitVideoElement = HTMLVideoElement & {
   disableRemotePlayback?: boolean;
-  remote?: RemotePlaybackLike;
   webkitSupportsFullscreen?: boolean;
   webkitDisplayingFullscreen?: boolean;
   webkitEnterFullscreen?: () => void;
@@ -452,26 +448,6 @@ function configureVideoForAppPlayback(video: HTMLVideoElement): void {
   castVideo.disableRemotePlayback = false;
 }
 
-async function requestAirPlayTarget(video: HTMLVideoElement): Promise<string> {
-  const castVideo = video as WebKitVideoElement;
-
-  try {
-    if (castVideo.webkitShowPlaybackTargetPicker) {
-      castVideo.webkitShowPlaybackTargetPicker();
-      return "Opening AirPlay.";
-    }
-
-    if (castVideo.remote?.prompt) {
-      await castVideo.remote.prompt();
-      return "Opening the browser TV playback picker.";
-    }
-  } catch {
-    return "Could not open TV playback picker.";
-  }
-
-  return "AirPlay is not available in this browser. Use Google Cast, TV Mode, screen mirroring, or HDMI instead.";
-}
-
 const CAST_QUEUE_MAX_ITEMS = 180;
 const CAST_QUEUE_MAX_SECONDS = 8 * 60 * 60;
 
@@ -591,6 +567,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const lastCastQueueKeyRef = useRef("");
   const wasCastingRef = useRef(false);
   const isCastingRef = useRef(false);
+  const tvPickerPendingRef = useRef(false);
 
   const volume = usePlayerControls((state) => state.volume);
   const muted = usePlayerControls((state) => state.muted);
@@ -599,6 +576,8 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     remote: castRemote,
     deviceName: castDeviceName,
     loadQueue: loadCastQueue,
+    sdkState: castSdkState,
+    requestSession: requestCastSession,
   } = useGoogleCast();
 
   isCastingRef.current = castRemote.isConnected;
@@ -620,6 +599,8 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const [isElementFullscreen, setIsElementFullscreen] = useState(false);
   const [isNativeVideoFullscreen, setIsNativeVideoFullscreen] = useState(false);
   const [watchOnTvOpen, setWatchOnTvOpen] = useState(false);
+  const [tvPickerPending, setTvPickerPending] = useState(false);
+  const [tvConnectionNotice, setTvConnectionNotice] = useState("");
   const [castSyncRequestId, setCastSyncRequestId] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
 
@@ -628,6 +609,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   liveRef.current = live;
 
   const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+  const nativeTv = useNativeTvPlayback(videoRef, playbackKey);
   const scheduleSignature = useMemo(
     () => schedule.map((item) => getPlaybackKey(item)).join("~"),
     [schedule],
@@ -776,7 +758,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       const video = videoRef.current;
       const item = live.item;
 
-      if (castRemote.isConnected) {
+      if (castRemote.isConnected || (nativeTv.connected && !options.force)) {
         return;
       }
 
@@ -809,7 +791,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         // Seeking can be rejected briefly while metadata settles.
       }
     },
-    [castRemote.isConnected, live.item, live.sourceElapsed],
+    [castRemote.isConnected, nativeTv.connected, live.item, live.sourceElapsed],
   );
 
   const tryPlay = useCallback(async () => {
@@ -882,7 +864,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     channelId: currentChannelId,
     mediaId: live.item?.parentMediaId ?? live.item?.id ?? "",
     mode: "live",
-    disabled: castRemote.isConnected,
+    disabled: castRemote.isConnected || nativeTv.connected,
     reload: () => {
       setNowMs(Date.now());
       loadCurrentSource();
@@ -1026,17 +1008,27 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     });
   }, [exitFullscreenView, toggleGuide]);
 
-  const openAirPlayTarget = useCallback(async (): Promise<string> => {
-    const video = videoRef.current;
-
-    if (!video) {
-      return "The video player is not ready yet.";
+  const connectToTv = useCallback(async (chooseAgain = false) => {
+    setWatchOnTvOpen(true);
+    if (tvPickerPendingRef.current) return;
+    if (!chooseAgain && (castRemote.isConnected || nativeTv.connected)) return;
+    setTvConnectionNotice("");
+    tvPickerPendingRef.current = true;
+    setTvPickerPending(true);
+    try {
+      // Call the native API in this tap's stack; effects/timers lose activation.
+      if (nativeTv.kind === "airplay") {
+        setTvConnectionNotice(await nativeTv.request());
+      } else if (castSdkState === "ready") {
+        await requestCastSession();
+      } else if (nativeTv.kind === "remote" && castSdkState !== "loading") {
+        setTvConnectionNotice(await nativeTv.request());
+      }
+    } finally {
+      tvPickerPendingRef.current = false;
+      setTvPickerPending(false);
     }
-
-    const result = await requestAirPlayTarget(video);
-    setTimedCastMessage(result);
-    return result;
-  }, [setTimedCastMessage]);
+  }, [castRemote.isConnected, nativeTv, castSdkState, requestCastSession]);
 
   const requestCastLiveSync = useCallback(() => {
     lastCastQueueKeyRef.current = "";
@@ -1089,6 +1081,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     }
 
     lastCastQueueKeyRef.current = queueKey;
+    let currentRequest = true;
 
     void loadCastQueue({
       entries,
@@ -1096,6 +1089,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       queueDescription: "Tate's TV live scheduled channel",
       channelId: currentChannelId,
     }).then((loaded) => {
+      if (!currentRequest) return;
       if (loaded) {
         setTimedCastMessage(`Playing on ${castDeviceName || "your TV"}.`);
         return;
@@ -1106,6 +1100,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         "The TV connected, but the live channel could not be loaded.",
       );
     });
+    return () => { currentRequest = false; };
   }, [
     castDeviceName,
     castRemote.isConnected,
@@ -1576,11 +1571,17 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            setWatchOnTvOpen(true);
+            void connectToTv();
           }}
           aria-label="Watch on TV"
-          className="ttv-touch-target rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
+          aria-haspopup="dialog"
+          aria-expanded={watchOnTvOpen}
+          className="ttv-touch-target inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition hover:bg-white/15"
         >
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 8V5a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-6M2 12a10 10 0 0 1 10 10M2 17a5 5 0 0 1 5 5" />
+            <circle cx="2" cy="22" r="1" fill="currentColor" stroke="none" />
+          </svg>
           <span className="ttv-player-cast-label">Watch on TV</span>
           <span className="ttv-player-cast-short" aria-hidden="true">TV</span>
         </button>
@@ -1599,7 +1600,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         ) : null}
       </div>
 
-      {castRemote.isConnected ? (
+      {castRemote.isConnected || nativeTv.connected ? (
         <button
           type="button"
           onClick={(event) => {
@@ -1608,7 +1609,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
           }}
           className="absolute right-3 top-3 z-40 max-w-[calc(100%-1.5rem)] rounded-full border border-emerald-300/30 bg-emerald-300/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100 shadow-xl backdrop-blur-md transition hover:bg-emerald-300/20"
         >
-          Playing on {castDeviceName || "TV"}
+          {nativeTv.connected ? "Connected to TV" : castRemote.isMediaLoaded ? `Playing on ${castDeviceName || "TV"}` : `Connected to ${castDeviceName || "TV"}`}
         </button>
       ) : null}
 
@@ -1668,12 +1669,16 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
           setWatchOnTvOpen(false);
           revealControls();
         }}
-        onAirPlay={openAirPlayTarget}
+        onConnect={() => void connectToTv(true)}
+        nativeKind={nativeTv.kind}
+        nativeConnected={nativeTv.connected}
+        connecting={tvPickerPending}
+        connectionNotice={tvConnectionNotice}
         onPreviousChannel={() => stepChannel("previous")}
         onNextChannel={() => stepChannel("next")}
         onOpenGuide={() => {
           setWatchOnTvOpen(false);
-          openGuideFromFullscreen();
+          if (!useStore.getState().isGuideOpen) openGuideFromFullscreen();
         }}
         onSyncLive={requestCastLiveSync}
         currentTitle={title}

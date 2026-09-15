@@ -908,3 +908,122 @@ test("phones use hardware volume, expand on rotation and preserve the floating m
   await expect(root).toHaveAttribute("data-player-mode", "normal");
   await expect(video).toHaveAttribute("data-test-player-identity", "original");
 });
+
+test("TV picker survives delayed Cast startup, opens on the first tap and treats cancellation normally", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "television");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    // Protocol fixture only: this checks app behavior, not physical TV discovery.
+    Object.defineProperty(navigator, "userAgent", { configurable: true, get: () => "Android Samsung Chrome/140.0" });
+    Object.defineProperty(HTMLVideoElement.prototype, "webkitShowPlaybackTargetPicker", { configurable: true, value: undefined });
+    Object.defineProperty(HTMLVideoElement.prototype, "remote", { configurable: true, get: () => undefined });
+    const state = { requests: 0, loads: 0, connected: false, stop: 0, options: {} as Record<string, unknown> };
+    Object.assign(window, { ttvCastTest: state });
+    window.addEventListener("ttv-test-cast-ready", () => {
+      const listeners = new Set<() => void>();
+      class RemotePlayer {
+        isConnected = false;
+        isMediaLoaded = false;
+        isPaused = false;
+        isMuted = false;
+        canPause = true;
+        canSeek = true;
+        canControlVolume = true;
+        volumeLevel = 0.5;
+        currentTime = 10;
+        duration = 120;
+        playerState = "IDLE";
+        title = "Studio TV";
+      }
+      const player = new RemotePlayer();
+      const emit = () => listeners.forEach((listener) => listener());
+      const session = {
+        getCastDevice: () => ({ friendlyName: "Living Room Google TV" }),
+        getMediaSession: () => null,
+        loadMedia: async () => {
+          state.loads += 1;
+          player.isMediaLoaded = true;
+          player.playerState = "PLAYING";
+          emit();
+        },
+      };
+      const context = {
+        setOptions: (options: Record<string, unknown>) => { state.options = options; },
+        getCastState: () => state.connected ? "CONNECTED" : "NOT_CONNECTED",
+        getSessionState: () => state.connected ? "SESSION_STARTED" : "NO_SESSION",
+        getCurrentSession: () => state.connected ? session : null,
+        addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+        requestSession: async () => {
+          state.requests += 1;
+          if (state.requests === 1) throw { code: "cancel" };
+          state.connected = true;
+          player.isConnected = true;
+          emit();
+        },
+        endCurrentSession: () => {
+          state.stop += 1;
+          state.connected = false;
+          player.isConnected = false;
+          player.isMediaLoaded = false;
+          emit();
+        },
+      };
+      class MediaInfo { constructor(public contentId: string, public contentType: string) {} }
+      class QueueItem { constructor(public media: MediaInfo) {} }
+      class LoadRequest { constructor(public media: MediaInfo) {} }
+      const framework = {
+        CastContext: { getInstance: () => context },
+        CastContextEventType: { CAST_STATE_CHANGED: "cast", SESSION_STATE_CHANGED: "session" },
+        RemotePlayerEventType: { ANY_CHANGE: "remote" },
+        RemotePlayer: class { constructor() { return player; } },
+        RemotePlayerController: class {
+          addEventListener(_type: string, listener: () => void) { listeners.add(listener); }
+          removeEventListener(_type: string, listener: () => void) { listeners.delete(listener); }
+          playOrPause() { player.isPaused = !player.isPaused; emit(); }
+          muteOrUnmute() { player.isMuted = !player.isMuted; emit(); }
+          setVolumeLevel() { emit(); }
+        },
+      };
+      const chromeCast = {
+        AutoJoinPolicy: { PAGE_SCOPED: "page_scoped" },
+        media: { DEFAULT_MEDIA_RECEIVER_APP_ID: "default", StreamType: { BUFFERED: "BUFFERED" },
+          QueueType: { LIVE_TV: "LIVE_TV" }, RepeatMode: { OFF: "OFF" }, MediaInfo, QueueItem, LoadRequest,
+          GenericMediaMetadata: class {}, QueueData: class {} },
+      };
+      Object.assign(window, { cast: { framework } });
+      const castWindow = window as typeof window & { chrome?: object; __onGCastApiAvailable?: (available: boolean) => void };
+      if (!castWindow.chrome) Object.assign(window, { chrome: {} });
+      Object.assign(castWindow.chrome!, { cast: chromeCast });
+      castWindow.__onGCastApiAvailable?.(true);
+    }, { once: true });
+  });
+  await page.goto("/?ch=24");
+  await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
+  const frame = page.locator(".ttv-premium-player-frame");
+  const revealAndOpen = async () => {
+    await frame.locator(".ttv-player-shell").click({ position: { x: 10, y: 10 } });
+    await frame.getByRole("button", { name: "Watch on TV", exact: true }).click();
+  };
+  await revealAndOpen();
+  const dialog = page.getByRole("dialog", { name: "Watch on TV", exact: true });
+  await expect(dialog.getByText("Roku / Samsung Smart View", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Smart View", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /AirPlay/ })).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new Event("ttv-test-cast-ready")));
+  await expect(dialog.getByRole("button", { name: "Choose TV — Google Cast", exact: true })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Close Watch on TV", exact: true }).click();
+  await revealAndOpen();
+  const readState = () => page.evaluate(() => (window as typeof window & { ttvCastTest: { requests: number; loads: number; stop: number; options: { autoJoinPolicy?: string } } }).ttvCastTest);
+  await expect.poll(async () => (await readState()).requests).toBe(1);
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Choose TV — Google Cast", exact: true }).click();
+  await expect(dialog.getByText("Connected to Living Room Google TV", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await readState()).loads).toBeGreaterThan(0);
+  expect((await readState()).options.autoJoinPolicy).toBe("page_scoped");
+  await expect(dialog.getByRole("button", { name: "Pause", exact: true })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Stop casting", exact: true }).click();
+  await expect.poll(async () => (await readState()).stop).toBe(1);
+  await expect(dialog.getByRole("button", { name: "Choose TV — Google Cast", exact: true })).toBeVisible();
+  await noPageOverflow(page);
+});

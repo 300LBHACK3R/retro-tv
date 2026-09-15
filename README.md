@@ -83,6 +83,16 @@ Phones use their hardware volume. The local video ignores saved desktop volume/m
 
 Rotate to landscape to fill the web viewport; portrait restores the page. Native browser chrome is controlled by the browser, so the app does not depend on a fullscreen API gesture. Opening the guide keeps the same video mounted above the listings. Choose **More > Mini** for the floating player; it remains floating through rotation and returns after closing the guide. No phone remote, volume slider or fullscreen-entry button is shown. The on-screen remote remains available on desktop and in TV mode.
 
+## Watch on TV
+
+The player's **Watch on TV** button opens the supported device picker directly: AirPlay when the video exposes Safari's AirPlay API, Google Cast when its SDK is ready, or the browser's Remote Playback picker when available. Connection status comes from the receiver/browser, not from opening a picker. Cancelling does not show an error. The connection sheet includes retry, stop casting, channel selection and receiver volume where supported.
+
+On Samsung phones, a Roku stick uses **Smart View** screen mirroring; it is not a Google Cast receiver. The connection sheet shows the Samsung steps. Compatible Apple devices can use AirPlay to supported Roku models. Direct Android-to-Roku app casting requires a native sender and a matching Roku app; the website and its installable PWA do not implement that integration. TV Mode links are for devices with a web browser, not Roku pairing.
+
+Cast initialization waits for Google's asynchronous SDK callback with a bounded fallback instead of treating script download completion as SDK readiness. An older failed channel load cannot launch a fallback over a newer selection. AirPlay/Remote Playback connections bypass the local network-retry watchdog and periodic drift correction; explicit tuning and programme transitions still use the live schedule. A browser tab can be suspended by the phone, so uninterrupted scheduled playback with the phone asleep must be verified on real hardware and ultimately needs a receiver-owned live stream or native app.
+
+Connection references: [Google Web Sender support](https://developers.google.com/cast/docs/web_sender), [Roku app casting](https://support.roku.com/article/360002990094), [Roku screen mirroring](https://support.roku.com/article/screen-mirror-your-phone-tablet-or-computer), [Roku AirPlay](https://support.roku.com/article/360057488733).
+
 ## Keep one clean working folder
 
 Use `C:\Users\techn\retro-tv` as the main Windows checkout. Apply updates there instead of creating new review folders. Keep the source directories, public assets, dependency lockfile, configuration, migrations and tests together; each has a separate purpose in the build or station maintenance.

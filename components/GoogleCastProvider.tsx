@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { tvConnectionError } from "@/lib/tvPlayback";
 import {
   createContext,
   useCallback,
@@ -239,15 +240,7 @@ function getCastWindow(): GoogleCastWindow | null {
 }
 
 function getErrorText(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  return "Google Cast could not complete the request.";
+  return tvConnectionError(error);
 }
 
 function clampVolume(value: number): number {
@@ -288,6 +281,8 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
   const sessionStateHandlerRef = useRef<((event: unknown) => void) | null>(null);
   const remoteChangeHandlerRef = useRef<((event: unknown) => void) | null>(null);
   const initializedRef = useRef(false);
+  const requestPendingRef = useRef(false);
+  const loadGenerationRef = useRef(0);
 
   const [sdkState, setSdkState] = useState<GoogleCastSdkState>("loading");
   const [castState, setCastState] = useState("NO_DEVICES_AVAILABLE");
@@ -317,7 +312,8 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
     const chromeCast = castWindow?.chrome?.cast;
 
     if (!framework || !chromeCast?.media) {
-      setSdkState("unavailable");
+      // The loader script's onReady runs before its asynchronous SDK callback.
+      // Keep waiting; only the callback or timeout establishes availability.
       return;
     }
 
@@ -399,7 +395,12 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
       initializeCast();
     }
 
+    const timeout = window.setTimeout(() => {
+      if (!initializedRef.current) setSdkState((state) => state === "loading" ? "unavailable" : state);
+    }, 10000);
+
     return () => {
+      window.clearTimeout(timeout);
       castWindow.__onGCastApiAvailable = previousHandler;
     };
   }, [initializeCast]);
@@ -433,37 +434,49 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
           remoteChangeHandlerRef.current,
         );
       }
+      initializedRef.current = false;
+      castContextRef.current = null;
+      remotePlayerRef.current = null;
+      remoteControllerRef.current = null;
+      loadGenerationRef.current += 1;
     };
   }, []);
 
   const requestSession = useCallback(async (): Promise<boolean> => {
     const context = castContextRef.current;
 
+    if (requestPendingRef.current) return false;
+    if (!window.isSecureContext) {
+      setErrorMessage("Open https://www.tatestv.ca to connect securely to your TV.");
+      return false;
+    }
+
     if (!context) {
       setErrorMessage(
-        "Google Cast is not available here. Use Chrome or Edge on the same Wi-Fi as the TV.",
+        "Google Cast is not available in this browser. Try Chrome on Android or a computer. For Roku on Samsung, use Smart View.",
       );
       return false;
     }
 
     try {
+      requestPendingRef.current = true;
       setErrorMessage("");
       await context.requestSession();
       refreshSessionState();
       return Boolean(context.getCurrentSession());
     } catch (error) {
-      const message = getErrorText(error);
-
-      if (!/cancel/i.test(message)) {
-        setErrorMessage(message);
-      }
+      setErrorMessage(getErrorText(error));
 
       refreshSessionState();
       return false;
+    } finally {
+      requestPendingRef.current = false;
     }
   }, [refreshSessionState]);
 
   const disconnect = useCallback(() => {
+    loadGenerationRef.current += 1;
+    setErrorMessage("");
     try { castContextRef.current?.endCurrentSession(true); }
     catch (error) { setErrorMessage(getErrorText(error)); }
     refreshSessionState();
@@ -479,6 +492,10 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
       if (!mediaApi || !session || !firstEntry) {
         return false;
       }
+      const generation = ++loadGenerationRef.current;
+      const isCurrent = () => generation === loadGenerationRef.current &&
+        castContextRef.current?.getCurrentSession() === session;
+      setErrorMessage("");
 
       const createMediaInfo = (entry: CastQueueEntry) => {
         const mediaInfo = new mediaApi.MediaInfo(entry.url, entry.mimeType);
@@ -573,15 +590,19 @@ export function GoogleCastProvider({ children }: { children: ReactNode }) {
         } catch {
           // Some Cast receivers reject queue metadata even though they can play
           // the current H.264/AAC MP4. Fall back to a normal media load.
+          if (!isCurrent()) return false;
           await loadSingleItem();
         }
 
+        if (!isCurrent()) return false;
         setErrorMessage("");
         refreshSessionState();
         return true;
       } catch (error) {
-        setErrorMessage(getErrorText(error));
-        refreshSessionState();
+        if (isCurrent()) {
+          setErrorMessage(getErrorText(error));
+          refreshSessionState();
+        }
         return false;
       }
     },
