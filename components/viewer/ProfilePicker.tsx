@@ -545,7 +545,7 @@ export default function ProfilePicker() {
               alt="Tate's TV"
               width={1536}
               height={1024}
-              sizes="(max-width: 560px) 52vw, 280px"
+              sizes="min(560px, 82vw, 60vh)"
               className="ttv-profile-logo"
               loading="eager"
               fetchPriority="high"

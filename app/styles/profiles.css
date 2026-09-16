@@ -23,11 +23,11 @@
 }
 .ttv-profile-logo {
   display: block;
-  width: min(17.5rem, 52vw, 28vh);
-  width: min(17.5rem, 52vw, 28svh);
+  width: min(35rem, 82vw, 60vh);
+  width: min(35rem, 82vw, 60svh);
   max-width: 100%;
   height: auto;
-  margin: 0 auto clamp(0.75rem, 2vh, 1.25rem);
+  margin: 0 auto clamp(0.5rem, 1.5vh, 1rem);
   object-fit: contain;
   border-radius: 0.75rem;
 }
@@ -42,7 +42,7 @@
   text-align: center;
 }
 .ttv-profile-screen[data-view="chooser"] .ttv-profile-content {
-  padding-block: clamp(1rem, 3vh, 2rem);
+  padding-block: clamp(0.5rem, 2vh, 1.25rem);
 }
 .ttv-profile-screen h1 {
   margin: 0;
