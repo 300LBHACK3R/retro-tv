@@ -1,5 +1,7 @@
 "use client";
 
+import { findChannelByNumber } from "@/lib/viewer";
+
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -37,10 +39,6 @@ function getChannelNumberText(channel: Channel | undefined): string {
 
 function normalizeChannelEntry(value: string): string {
   return value.replace(/\D/g, "").slice(0, MAX_TUNE_DIGITS);
-}
-
-function stripLeadingZeros(value: string): string {
-  return value.replace(/^0+/, "") || "0";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -126,33 +124,6 @@ function getPreviousChannelIndex(
   return (safeIndex - 1 + channelCount) % channelCount;
 }
 
-function channelMatchesEntry(channel: Channel, entry: string): boolean {
-  const cleanEntry = stripLeadingZeros(entry);
-  const paddedTwo = cleanEntry.padStart(2, "0");
-  const paddedThree = cleanEntry.padStart(3, "0");
-
-  const idText = String(channel.id).trim().toLowerCase();
-  const numberText = String(channel.number ?? "").trim();
-  const fallbackNumberText = String(Number(channel.id));
-
-  const candidates = new Set<string>([
-    idText,
-    numberText,
-    stripLeadingZeros(numberText),
-    numberText.padStart(2, "0"),
-    numberText.padStart(3, "0"),
-    fallbackNumberText,
-    `channel-${cleanEntry}`,
-    `ch-${cleanEntry}`,
-    `channel-${paddedTwo}`,
-    `ch-${paddedTwo}`,
-    `channel-${paddedThree}`,
-    `ch-${paddedThree}`,
-  ]);
-
-  return candidates.has(cleanEntry) || candidates.has(entry.toLowerCase());
-}
-
 function findChannelByEntry(
   channels: Channel[],
   entry: string,
@@ -163,7 +134,7 @@ function findChannelByEntry(
     return undefined;
   }
 
-  return channels.find((channel) => channelMatchesEntry(channel, cleanEntry));
+  return findChannelByNumber(channels, cleanEntry);
 }
 
 function RemoteButton({

@@ -16,7 +16,7 @@ export default function AudiencePanel() {
   const media = useStore((state) => state.media);
   const updateChannel = useStore((state) => state.updateChannelSettings);
   const updateMedia = useStore((state) => state.updateMedia);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(useStore.getState().currentChannelId);
   const [query, setQuery] = useState("");
   const [unreviewed, setUnreviewed] = useState(false);
   const [limit, setLimit] = useState(40);
@@ -98,13 +98,14 @@ export default function AudiencePanel() {
                 <input
                   type="checkbox"
                   checked={channel.kidsApproved === true}
+                  disabled={channel.adultOnly === true}
                   onChange={(event) =>
                     updateChannel(channel.id, {
                       kidsApproved: event.target.checked,
                     })
                   }
                 />
-                <span>Approve channel for Kids</span>
+                <span>{channel.adultOnly ? "Adults only — unavailable to Kids" : "Approve channel for Kids"}</span>
               </label>
               <button
                 type="button"
@@ -223,6 +224,7 @@ export default function AudiencePanel() {
             Animation, faith, or family categories alone do not mean a show is for children.
           </p>
           {review.missingIds.length > 0 && <p role="alert">{review.missingIds.length} assigned programme(s) are missing. Restore or remove them before approval.</p>}
+          {selected.adultOnly && <p>Adults-only channels cannot be added to Kids.</p>}
           {!review.programmeCount && <p>Assign children’s programmes to this channel first.</p>}
           {selected.isEnabled === false && <p>Enable this channel before adding it to Kids.</p>}
           {!fullLineupVisible && review.items.length > 0 && (

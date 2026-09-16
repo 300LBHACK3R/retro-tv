@@ -101,7 +101,6 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
 
 function sortChannels(channels: Channel[]): Channel[] {
   return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
     .sort((a, b) => {
       const aNumber = Number(a.number ?? a.id);
       const bNumber = Number(b.number ?? b.id);
@@ -145,7 +144,7 @@ function validateUpload({
   normalizedFile,
   parsedDurationSeconds,
   channelId,
-  enabledChannels,
+  availableChannels,
   type,
   adTargetMode,
   breakpoints,
@@ -157,7 +156,7 @@ function validateUpload({
   normalizedFile: string;
   parsedDurationSeconds: number;
   channelId: string;
-  enabledChannels: Channel[];
+  availableChannels: Channel[];
   type: MediaType;
   adTargetMode: AdTargetMode;
   breakpoints: number[];
@@ -189,10 +188,10 @@ function validateUpload({
       return { ok: false, message: "Select a channel first." };
     }
 
-    if (!enabledChannels.some((channel) => channel.id === channelId)) {
+    if (!availableChannels.some((channel) => channel.id === channelId)) {
       return {
         ok: false,
-        message: "The selected channel is disabled or no longer exists.",
+        message: "The selected channel no longer exists.",
       };
     }
   }
@@ -381,11 +380,11 @@ export default function UploadPanel() {
     [slotLengthInput],
   );
 
-  const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
+  const availableChannels = useMemo(() => sortChannels(channels), [channels]);
 
   const selectedChannel = useMemo(
-    () => enabledChannels.find((channel) => channel.id === channelId),
-    [channelId, enabledChannels],
+    () => availableChannels.find((channel) => channel.id === channelId),
+    [channelId, availableChannels],
   );
 
   const existingUrlMatch = useMemo(
@@ -409,7 +408,7 @@ export default function UploadPanel() {
         normalizedFile,
         parsedDurationSeconds,
         channelId,
-        enabledChannels,
+        availableChannels,
         type,
         adTargetMode,
         breakpoints: parsedBreakpoints,
@@ -420,7 +419,7 @@ export default function UploadPanel() {
     [
       adTargetMode,
       channelId,
-      enabledChannels,
+      availableChannels,
       normalizedFile,
       normalizedTitle,
       fillSlotWithCommercials,
@@ -434,13 +433,13 @@ export default function UploadPanel() {
 
   useEffect(() => {
     const fallbackChannel =
-      enabledChannels.find((channel) => channel.id === currentChannelId) ??
-      enabledChannels[0];
+      availableChannels.find((channel) => channel.id === currentChannelId) ??
+      availableChannels[0];
 
     if (!selectedChannel && fallbackChannel) {
       setChannelId(fallbackChannel.id);
     }
-  }, [currentChannelId, enabledChannels, selectedChannel]);
+  }, [currentChannelId, availableChannels, selectedChannel]);
 
   const toggleAirDay = (day: Weekday) => {
     setSelectedAirDays((current) =>
@@ -893,9 +892,10 @@ export default function UploadPanel() {
                   color: "var(--text)",
                 }}
               >
-                {enabledChannels.map((channel) => (
+                {availableChannels.map((channel) => (
                   <option key={channel.id} value={channel.id}>
                     {getChannelLabel(channel)} • {getChannelName(channel)}
+                    {channel.isEnabled === false ? " (off air)" : ""}
                   </option>
                 ))}
               </select>

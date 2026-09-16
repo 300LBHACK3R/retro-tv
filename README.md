@@ -45,6 +45,12 @@ Profiles require no signup or database migration and do not sync across devices.
 
 ## Schedule recurring blocks
 
+**Admin → Channel Lineup** has Up, Down and Move to controls. Moving Channel 3 down makes it Channel 4; the previous Channel 4 becomes Channel 3. Moves renumber the complete station from 1, including off-air channels. Permanent channel IDs, programming, branding, favourites and ad assignments stay with their station. Changes save automatically; confirm the cloud status before leaving, or use its Save button.
+
+Choose **Add Halloween channels** to create **Friday Night Horror** and **Halloween Kids** once. Both start off air, without programmes or ads. Use **Add shows** in their rows to select existing media without removing it from other channels; use Add Media for new uploads. Turn on each channel when ready. Horror is marked Adults only and cannot pass Kids review. Review Halloween Kids in **Audience & Channels** before adding it to Kids profiles; its name/category alone grants no approval. These are profile filters, not server-enforced age verification.
+
+Use each channel's **Schedule blocks** button for recurring Friday nights. The Horror and Kids presets fill in a title and time; select actual programmes and save the block. A channel's name does not restrict it to Fridays automatically.
+
 Open **Admin → Blocks**, select a channel, title, weekdays, local start time, duration and programmes. Presets provide starting points for cartoons, movie nights and late-night programming. Save the station to the cloud using the existing admin control.
 
 Programmes play in the chosen order, repeat if the window is longer, and may be clipped at the window boundary. Durations are elapsed minutes. Blocks cannot overlap or be configured past local midnight. Imported invalid overlaps are ignored. Unconfigured channels retain their existing broadcast clock and commercials. The shared guide/player clock supports 23-hour and 25-hour local days.

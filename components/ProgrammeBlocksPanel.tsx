@@ -8,6 +8,7 @@ import {
   WEEKDAYS,
 } from "@/lib/programmeBlocks";
 import { cleanDisplayText } from "@/lib/textClean";
+import { sortChannelLineup } from "@/lib/channelLineup";
 import type { ProgrammeBlock, Weekday } from "@/lib/types";
 
 export default function ProgrammeBlocksPanel() {
@@ -67,7 +68,7 @@ export default function ProgrammeBlocksPanel() {
     setTitle("");
     setSelected([]);
     setMessage(
-      "Block added to your station programming. Publish with Save to Cloud when ready.",
+      "Block added. Changes save automatically; check the cloud status in the admin toolbar.",
     );
   }
   return (
@@ -83,6 +84,8 @@ export default function ProgrammeBlocksPanel() {
         {[
           ["Saturday Morning Cartoons", "09:00", "saturday"],
           ["Friday Night Movies", "20:00", "friday"],
+          ["Friday Night Horror", "20:00", "friday"],
+          ["Halloween Kids Specials", "18:00", "friday"],
           ["Late Night Throwbacks", "22:00", "saturday"],
         ].map(([name = "", time = "20:00", day = "friday"]) => (
           <button
@@ -111,7 +114,7 @@ export default function ProgrammeBlocksPanel() {
               setMessage("");
             }}
           >
-            {channels.map((item) => (
+          {sortChannelLineup(channels).map((item) => (
               <option key={item.id} value={item.id}>
                 CH {item.number ?? item.id} ·{" "}
                 {item.branding?.displayName || item.name}

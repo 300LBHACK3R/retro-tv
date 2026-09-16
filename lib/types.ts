@@ -96,7 +96,7 @@ export interface ChannelAdPolicy {
   allowGlobalAds?: boolean;
 
   /**
-   * Allows ads explicitly targeted to this channel id or channel number.
+   * Allows ads explicitly targeted to this permanent channel id.
    */
   allowChannelTargetedAds?: boolean;
 
@@ -262,7 +262,8 @@ export interface MediaItem {
   commercialCategory?: string;
 
   /**
-   * Channels this commercial/bumper is allowed to run on.
+   * Permanent channel IDs this commercial/bumper is allowed to run on.
+   * Display numbers can change when the lineup is reordered.
    *
    * Examples:
    * ["all"]
@@ -338,6 +339,8 @@ export interface ProgrammeBlock {
 }
 
 export interface Channel {
+  /** Full-lineup profiles only, even if content is individually Kids-approved. */
+  adultOnly?: boolean;
   kidsApproved?: boolean;
   category?: ChannelCategory;
   programmeBlocks?: ProgrammeBlock[];

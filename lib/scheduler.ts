@@ -376,17 +376,12 @@ function isAdTargetAllowed(item: MediaItem, channel?: Channel): boolean {
     return false;
   }
 
-  const channelIds = new Set([
-    String(channel.id),
-    String(channel.number ?? channel.id),
-  ]);
-
   if (targets.some((target) => String(target) === "all")) {
     return channel.adPolicy?.allowGlobalAds === true;
   }
 
   const targetsThisChannel = targets.some((target) =>
-    channelIds.has(String(target)),
+    String(target) === String(channel.id),
   );
 
   if (!targetsThisChannel) {

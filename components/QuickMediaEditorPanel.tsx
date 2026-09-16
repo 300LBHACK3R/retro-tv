@@ -71,7 +71,6 @@ function getMediaTypeLabel(type: MediaType): string {
 
 function sortChannels(channels: Channel[]): Channel[] {
   return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
     .sort((a, b) => {
       const aNumber = Number(a.number ?? a.id);
       const bNumber = Number(b.number ?? b.id);
@@ -111,7 +110,7 @@ function getChannelName(channel: Channel | undefined): string {
 }
 
 function getChannelOptionLabel(channel: Channel): string {
-  return `${getChannelLabel(channel)} • ${getChannelName(channel)}`;
+  return `${getChannelLabel(channel)} • ${getChannelName(channel)}${channel.isEnabled === false ? " (off air)" : ""}`;
 }
 
 function getMediaSearchLabel(item: MediaItem): string {
@@ -412,7 +411,7 @@ export default function QuickMediaEditorPanel() {
     "Select a media item to edit its title, channel, schedule, and commercial behavior.",
   );
 
-  const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
+  const availableChannels = useMemo(() => sortChannels(channels), [channels]);
 
   const selectedMedia = useMemo(
     () => media.find((item) => item.id === selectedMediaId),
@@ -461,8 +460,8 @@ export default function QuickMediaEditorPanel() {
   );
 
   const selectedProgramChannel = useMemo(
-    () => enabledChannels.find((channel) => channel.id === targetChannelId),
-    [enabledChannels, targetChannelId],
+    () => availableChannels.find((channel) => channel.id === targetChannelId),
+    [availableChannels, targetChannelId],
   );
 
   useEffect(() => {
@@ -509,16 +508,16 @@ export default function QuickMediaEditorPanel() {
   }, [channels, currentChannelId, selectedMedia]);
 
   useEffect(() => {
-    if (enabledChannels.length === 0) return;
+    if (availableChannels.length === 0) return;
 
-    const targetExists = enabledChannels.some(
+    const targetExists = availableChannels.some(
       (channel) => channel.id === targetChannelId,
     );
 
     if (!targetExists) {
-      setTargetChannelId(enabledChannels[0]?.id ?? currentChannelId);
+      setTargetChannelId(availableChannels[0]?.id ?? currentChannelId);
     }
-  }, [currentChannelId, enabledChannels, targetChannelId]);
+  }, [currentChannelId, availableChannels, targetChannelId]);
 
   const toggleAirDay = (day: Weekday) => {
     setAirDays((current) =>
@@ -539,7 +538,7 @@ export default function QuickMediaEditorPanel() {
   };
 
   const selectAllAdChannels = () => {
-    setAdChannelIds(enabledChannels.map((channel) => channel.id));
+    setAdChannelIds(availableChannels.map((channel) => channel.id));
     setAdTargetMode("channels");
   };
 
@@ -641,9 +640,9 @@ export default function QuickMediaEditorPanel() {
     if (
       selectedIsProgram &&
       targetChannelId &&
-      !enabledChannels.some((channel) => channel.id === targetChannelId)
+      !availableChannels.some((channel) => channel.id === targetChannelId)
     ) {
-      return "Select a valid enabled channel.";
+      return "Select a channel from the current lineup.";
     }
 
     if (
@@ -1048,7 +1047,7 @@ export default function QuickMediaEditorPanel() {
                           color: "var(--text)",
                         }}
                       >
-                        {enabledChannels.map((channel) => (
+                        {availableChannels.map((channel) => (
                           <option key={channel.id} value={channel.id}>
                             {getChannelOptionLabel(channel)}
                           </option>
@@ -1142,7 +1141,7 @@ export default function QuickMediaEditorPanel() {
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                      {enabledChannels.map((channel) => {
+                      {availableChannels.map((channel) => {
                         const active = adChannelIds.includes(channel.id);
 
                         return (

@@ -1,3 +1,4 @@
+import { addHalloweenChannels, moveChannelToPosition, sortChannelLineup } from "./channelLineup";
 import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import { create } from "zustand";
@@ -45,6 +46,8 @@ interface AppState {
 
   setChannel: (id: string, options?: { keepGuideOpen?: boolean }) => void;
   moveChannel: (channelId: string, direction: "up" | "down") => void;
+  moveChannelTo: (channelId: string, position: number) => void;
+  addHalloweenChannels: () => void;
 
   updateChannelBranding: (
     channelId: string,
@@ -55,6 +58,8 @@ interface AppState {
     channelId: string,
     patch: Partial<{
       kidsApproved: boolean;
+      adultOnly: boolean;
+      isEnabled: boolean;
       category: Channel["category"];
       programmeBlocks: ProgrammeBlock[];
       scheduleMode: ScheduleMode;
@@ -1121,7 +1126,7 @@ function isGenericBrandingForChannel(
 }
 
 function shouldRefreshOfficialBranding(channel: Channel): boolean {
-  const channelNumber = Number(channel.number ?? channel.id);
+  const channelNumber = Number(channel.id);
 
   if (
     !Number.isFinite(channelNumber) ||
@@ -1163,14 +1168,26 @@ function mergeChannelBranding(
   };
 }
 
+function fallbackChannelBranding(channel: Channel): ChannelBranding {
+  const originalNumber = Number(channel.id);
+  if (Number.isInteger(originalNumber) && originalNumber >= 1 && originalNumber <= DEFAULT_CHANNEL_COUNT)
+    return createDefaultChannelBranding(originalNumber);
+  const label = `Channel ${channel.number ?? channel.id}`;
+  return {
+    displayName: channel.name || label,
+    callsign: label,
+    description: "",
+    accentColor: DEFAULT_ACCENT_COLOR,
+    logoText: channel.name || label,
+  };
+}
+
 function normalizeChannel(channel: Channel): Channel {
   const channelNumber = Number(channel.number ?? channel.id);
   const resolvedChannelNumber = Number.isFinite(channelNumber)
     ? channelNumber
     : undefined;
-  const fallbackBranding = createDefaultChannelBranding(
-    resolvedChannelNumber ?? 1,
-  );
+  const fallbackBranding = fallbackChannelBranding(channel);
   const explicitDefaultSlotLength = normalizePositiveInteger(
     channel.defaultSlotLengthSeconds,
   );
@@ -1184,7 +1201,8 @@ function normalizeChannel(channel: Channel): Channel {
 
   return ensureChannelAdPolicy({
     ...channel,
-    kidsApproved: channel.kidsApproved === true,
+    adultOnly: channel.adultOnly === true,
+    kidsApproved: channel.adultOnly !== true && channel.kidsApproved === true,
     category: validChannelCategory(channel.category),
     id: normalizeText(channel.id, String(resolvedChannelNumber || 1)),
     name: normalizeText(channel.name, fallbackChannelName),
@@ -1282,11 +1300,6 @@ function normalizeViewerSettings(value: unknown): ViewerSettings {
       settings.guideDensity === "compact" ? "compact" : "comfortable",
     preferReducedMotion: Boolean(settings.preferReducedMotion),
   };
-}
-
-function getChannelSortNumber(channel: Channel): number {
-  const value = Number(channel.number ?? channel.id);
-  return Number.isFinite(value) ? value : 9999;
 }
 
 function getSafeCurrentChannelId(
@@ -1485,55 +1498,22 @@ export const useStore = create<AppState>()(
 
       moveChannel: (channelId, direction) =>
         set((state) => {
-          const orderedChannels = [...state.channels].sort((a, b) => {
-            const numberSort =
-              getChannelSortNumber(a) - getChannelSortNumber(b);
+          const index = sortChannelLineup(state.channels).findIndex(channel => channel.id === channelId);
+          if (index < 0) return state;
+          const channels = moveChannelToPosition(state.channels, channelId, index + (direction === "up" ? 0 : 2));
+          return channels === state.channels ? state : { channels };
+        }),
 
-            if (numberSort !== 0) return numberSort;
+      moveChannelTo: (channelId, position) =>
+        set((state) => {
+          const channels = moveChannelToPosition(state.channels, channelId, position);
+          return channels === state.channels ? state : { channels };
+        }),
 
-            return a.id.localeCompare(b.id);
-          });
-
-          const currentIndex = orderedChannels.findIndex(
-            (channel) => channel.id === channelId,
-          );
-
-          if (currentIndex === -1) return state;
-
-          const targetIndex =
-            direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-          if (targetIndex < 0 || targetIndex >= orderedChannels.length) {
-            return state;
-          }
-
-          const currentChannel = orderedChannels[currentIndex];
-          const targetChannel = orderedChannels[targetIndex];
-
-          if (!currentChannel || !targetChannel) return state;
-
-          const currentNumber = getChannelSortNumber(currentChannel);
-          const targetNumber = getChannelSortNumber(targetChannel);
-
-          return {
-            channels: state.channels.map((channel) => {
-              if (channel.id === currentChannel.id) {
-                return {
-                  ...channel,
-                  number: targetNumber,
-                };
-              }
-
-              if (channel.id === targetChannel.id) {
-                return {
-                  ...channel,
-                  number: currentNumber,
-                };
-              }
-
-              return channel;
-            }),
-          };
+      addHalloweenChannels: () =>
+        set((state) => {
+          const channels = addHalloweenChannels(state.channels);
+          return channels === state.channels ? state : { channels };
         }),
 
       updateChannelBranding: (channelId, brandingPatch) =>
@@ -1543,9 +1523,7 @@ export const useStore = create<AppState>()(
 
             const fallbackBranding =
               channel.branding ??
-              createDefaultChannelBranding(
-                Number(channel.number ?? channel.id),
-              );
+              fallbackChannelBranding(channel);
 
             return {
               ...channel,
@@ -1582,6 +1560,8 @@ export const useStore = create<AppState>()(
 
             return normalizeChannel({
               ...channel,
+              adultOnly: patch.adultOnly ?? channel.adultOnly,
+              isEnabled: patch.isEnabled ?? channel.isEnabled,
               kidsApproved: patch.kidsApproved ?? channel.kidsApproved,
               category: patch.category ?? channel.category,
               programmeBlocks: patch.programmeBlocks ?? channel.programmeBlocks,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ChannelLineupPanel from "@/components/ChannelLineupPanel";
 import AudiencePanel from "@/components/AudiencePanel";
 import StationInsightsPanel from "@/components/StationInsightsPanel";
 import ProgrammeBlocksPanel from "@/components/ProgrammeBlocksPanel";
@@ -15,6 +16,7 @@ import { useStore } from "@/lib/store";
 import type { Channel, MediaItem } from "@/lib/types";
 
 type AdminTab =
+  | "lineup"
   | "audience"
   | "insights"
   | "blocks"
@@ -51,6 +53,7 @@ const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
 const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
+  { id: "lineup", label: "Channel Lineup", shortLabel: "Channels", description: "Move and renumber channels, control on-air status, and add seasonal channels." },
   { id: "audience", label: "Audience & Channels", shortLabel: "Audience", description: "Review Kids programming and organize channel categories." },
   {
     id: "insights",
@@ -365,6 +368,7 @@ function TabButton({
           : "none",
       }}
       title={tab.description}
+      aria-label={tab.label}
       aria-pressed={active}
     >
       <div className="text-xs font-black uppercase tracking-[0.1em] sm:hidden">
@@ -853,6 +857,10 @@ export default function AdminDashboard() {
       </section>
 
       <div className="min-w-0">
+        {activeTab === "lineup" ? <ChannelLineupPanel onOpen={(tab, channelId) => {
+          if (channelId) useStore.getState().setChannel(channelId);
+          setActiveTab(tab);
+        }} /> : null}
         {activeTab === "audience" ? <AudiencePanel /> : null}
         {activeTab === "insights" ? <StationInsightsPanel /> : null}
         {activeTab === "blocks" ? <ProgrammeBlocksPanel /> : null}

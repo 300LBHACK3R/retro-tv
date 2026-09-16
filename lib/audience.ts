@@ -37,6 +37,7 @@ export function kidsChannelReview(
   media: readonly MediaItem[],
 ): string[] {
   const reasons: string[] = [];
+  if (channel.adultOnly === true) reasons.push("Adults-only channel");
   if (channel.kidsApproved !== true)
     reasons.push("Channel needs Kids approval");
   const items = new Map(media.map((item) => [item.id, item]));
@@ -76,7 +77,7 @@ export function kidsLineupReview(channel: Channel, media: readonly MediaItem[]) 
     missingIds,
     // Include content and scheduling, not just IDs: edits invalidate consent.
     signature: JSON.stringify([channel, items]),
-    canApprove: programmeIds.size > 0 && missingIds.length === 0 && channel.isEnabled !== false,
+    canApprove: channel.adultOnly !== true && programmeIds.size > 0 && missingIds.length === 0 && channel.isEnabled !== false,
   };
 }
 
@@ -91,6 +92,7 @@ export function approveReviewedKidsLineup(
   const review = kidsLineupReview(channel, media);
   if (review.signature !== reviewedSignature)
     throw new Error("The lineup changed. Review it again before adding it to Kids.");
+  if (channel.adultOnly === true) throw new Error("Adults-only channels cannot be approved for Kids.");
   if (!review.canApprove)
     throw new Error("Enable the channel and resolve empty or missing programmes before approving it.");
   const ids = new Set(review.items.map((item) => item.id));
@@ -116,6 +118,15 @@ export function viewerCatalog(
       channel.isEnabled !== false &&
       kidsChannelReview(channel, media).length === 0,
   );
+  // Library playback uses this catalog too. A stale media approval must not
+  // expose an adults-only station's shows outside the guide. Shared specials
+  // remain available when explicitly included in a reviewed Kids lineup.
+  const programmeIds = (channel: Channel) => [
+    ...channel.mediaIds,
+    ...(channel.programmeBlocks ?? []).flatMap(block => block.mediaIds),
+  ];
+  const adultIds = new Set(channels.filter(channel => channel.adultOnly === true).flatMap(programmeIds));
+  const approvedIds = new Set(approved.flatMap(programmeIds));
   // Hold whole channels, rather than removing programmes and changing their shared broadcast clock.
   if (!approved.some((channel) => Number(channel.number ?? channel.id) === 1))
     approved.unshift({
@@ -141,7 +152,7 @@ export function viewerCatalog(
     });
   const result = {
     channels: approved,
-    media: media.filter((item) => item.kidsApproved === true),
+    media: media.filter((item) => item.kidsApproved === true && (!adultIds.has(item.id) || approvedIds.has(item.id))),
   };
   const byMedia = cache.get(channels) ?? new WeakMap<MediaItem[], Catalog>();
   byMedia.set(media, result);
