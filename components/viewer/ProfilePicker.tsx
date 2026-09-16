@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   activateProfile,
@@ -503,9 +504,6 @@ export default function ProfilePicker() {
       aria-labelledby="profile-heading"
     >
       <header className="ttv-profile-header">
-        <span className="ttv-profile-wordmark">
-          TATE’S <span>TV</span>
-        </span>
         <span className="ttv-profile-device">Your TV. Your people.</span>
       </header>
       <div className="ttv-profile-content">
@@ -542,6 +540,17 @@ export default function ProfilePicker() {
             className="ttv-profile-chooser"
             aria-labelledby="profile-heading"
           >
+            <Image
+              src="/tatestv-logo.png"
+              alt="Tate's TV"
+              width={1536}
+              height={1024}
+              sizes="(max-width: 560px) 52vw, 280px"
+              className="ttv-profile-logo"
+              loading="eager"
+              fetchPriority="high"
+              draggable={false}
+            />
             <h1 id="profile-heading" tabIndex={-1}>
               {screen.kind === "manage" ? "Your household" : "Who’s watching?"}
             </h1>

@@ -14,27 +14,22 @@
 }
 .ttv-profile-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 1rem;
   width: min(80rem, 100%);
   margin: 0 auto;
   min-height: 2.5rem;
 }
-.ttv-profile-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-  font-size: 1rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  color: var(--text);
-}
-.ttv-profile-wordmark span {
-  border: 1px solid var(--border);
-  border-radius: 0.4rem;
-  padding: 0.15em 0.35em;
-  color: var(--primary);
+.ttv-profile-logo {
+  display: block;
+  width: min(17.5rem, 52vw, 28vh);
+  width: min(17.5rem, 52vw, 28svh);
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto clamp(0.75rem, 2vh, 1.25rem);
+  object-fit: contain;
+  border-radius: 0.75rem;
 }
 .ttv-profile-device {
   color: var(--text-muted);
@@ -45,6 +40,9 @@
   margin: auto;
   padding: clamp(2rem, 6vh, 5rem) 0;
   text-align: center;
+}
+.ttv-profile-screen[data-view="chooser"] .ttv-profile-content {
+  padding-block: clamp(1rem, 3vh, 2rem);
 }
 .ttv-profile-screen h1 {
   margin: 0;

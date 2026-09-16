@@ -72,7 +72,7 @@
   box-shadow: 0 1px 0 #ffcb7d19, 0 10px 34px #07030b38;
 }
 :root[data-ttv-theme="halloween-night"] .ttv-premium-topbar { background: linear-gradient(100deg, #30203480, #170f2080 48%, #30203b80); }
-:root[data-ttv-theme="halloween-night"] :is(.ttv-profile-wordmark, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
+:root[data-ttv-theme="halloween-night"] :is(.ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
   color: #fff5e9;
   text-shadow: 0 2px 14px #100b16, 0 0 28px #ffab5c20;
 }
@@ -125,5 +125,5 @@
   .ttv-afterdark-skeleton, .ttv-afterdark-embers, .ttv-afterdark-fog-far { display: none; }
 }
 @media (forced-colors: active) {
-  :root[data-ttv-theme="halloween-night"] :is(.ttv-profile-wordmark, .ttv-section-kicker, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) { color: CanvasText; text-shadow: none; }
+  :root[data-ttv-theme="halloween-night"] :is(.ttv-section-kicker, .ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) { color: CanvasText; text-shadow: none; }
 }
