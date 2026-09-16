@@ -182,7 +182,7 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
   await name.pressSequentially("Alex");
   await expect(name).toHaveValue("Alex");
   await expect(name).toBeFocused();
-  await page.getByRole("button", { name: "Space explorer avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Dad fox avatar", exact: true }).click();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
   await page
@@ -310,7 +310,7 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     page.getByRole("button", { name: "Save profile", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Profile name", { exact: true }).fill("Morgan");
-  await page.getByRole("button", { name: "Robot avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Boy robot avatar", exact: true }).click();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Watch as Morgan", exact: true }),
@@ -320,7 +320,7 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     .click();
   await page.getByRole("button", { name: "Edit Morgan", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Robot avatar", exact: true }),
+    page.getByRole("button", { name: "Boy robot avatar", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page
     .getByRole("button", { name: "Delete profile", exact: true })
@@ -444,10 +444,12 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
     .click();
   await page.getByRole("button", { name: "Edit Taylor", exact: true }).click();
   await page.getByLabel("Profile name", { exact: true }).fill("Taylor updated");
-  const avatarOptions = page.locator(".ttv-avatar-options");
-  await expect(avatarOptions.getByRole("button")).toHaveCount(8);
+  const avatarOptions = page.locator(".ttv-avatar-groups");
+  await expect(avatarOptions.getByRole("button")).toHaveCount(22);
   await expect(avatarOptions).toHaveCSS("display", "grid");
-  const newAvatar = avatarOptions.getByRole("button", { name: "Jesus for Kids avatar", exact: true });
+  await expect(avatarOptions.getByRole("group")).toHaveCount(6);
+  await expect(avatarOptions.locator(".ttv-avatar-options").first()).toHaveCSS("display", "grid");
+  const newAvatar = avatarOptions.getByRole("button", { name: "Female doctor avatar", exact: true });
   await newAvatar.click();
   await expect(newAvatar).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => newAvatar.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -456,7 +458,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   await expect(
     page.getByRole("button", { name: "Edit Taylor updated", exact: true }),
   ).toBeFocused();
-  await expect(page.getByRole("button", { name: "Edit Taylor updated", exact: true }).locator("[data-avatar]")).toHaveAttribute("data-avatar", "kidsjesus");
+  await expect(page.getByRole("button", { name: "Edit Taylor updated", exact: true }).locator("[data-avatar]")).toHaveAttribute("data-avatar", "femaledoctors");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,

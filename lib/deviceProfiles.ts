@@ -7,7 +7,14 @@ import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
 export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
 export const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
-export const AVATARS = ["sun", "moon", "star", "bolt", "flower", "boycat", "jesus", "kidsjesus"] as const;
+// Preserve Fox, Robot and Cat IDs. Retired Dinosaur profiles migrate to
+// Boy dragon, and Space explorer profiles fall back to Boy fox.
+export const AVATARS = [
+  "sun", "girlfox", "dadfox", "momfox", "flower", "boycat", "bolt",
+  "girlrobot", "boydragon", "girldragon", "daddragon", "momdragon",
+  "malepirate", "femalepirate", "malemechanic", "femalemechanic",
+  "maledoctors", "femaledoctors", "maleserver", "femaleserver", "jesus", "kidsjesus",
+] as const;
 export type Profile = {
   id: string;
   name: string;
@@ -23,7 +30,7 @@ type Data = {
 };
 const defaults: Profile[] = [
   { id: "main", name: "Main", kids: false, avatar: "sun" },
-  { id: "kids", name: "Kids", kids: true, avatar: "star" },
+  { id: "kids", name: "Kids", kids: true, avatar: "boydragon" },
 ];
 export function sanitizeProfiles(value: unknown): Profile[] {
   if (!Array.isArray(value)) return defaults.map((profile) => ({ ...profile }));
@@ -43,7 +50,7 @@ export function sanitizeProfiles(value: unknown): Profile[] {
       id: entry.id,
       name,
       kids: entry.id === "main" ? false : entry.kids === true,
-      avatar: AVATARS.includes(entry.avatar) ? entry.avatar : "sun",
+      avatar: entry.avatar === "star" ? "boydragon" : AVATARS.includes(entry.avatar) ? entry.avatar : "sun",
     });
   }
   if (!unique.has("main")) unique.set("main", { ...defaults[0]! });

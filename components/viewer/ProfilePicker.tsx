@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   activateProfile,
-  AVATARS,
   deleteProfile,
   newProfileId,
   saveProfile,
@@ -12,7 +11,7 @@ import {
   verifyParentPin,
   type Profile,
 } from "@/lib/deviceProfiles";
-import { ProfileAvatar, PROFILE_PORTRAITS } from "./ProfileAvatar";
+import { ProfileAvatar, PROFILE_PORTRAITS, PROFILE_AVATAR_GROUPS } from "./ProfileAvatar";
 import { useSpatialNavigation } from "./useSpatialNavigation";
 
 type Home = { kind: "choose" | "manage"; focus?: string; notice?: string };
@@ -373,17 +372,25 @@ function ProfileEditor({
         </label>
         <fieldset>
           <legend>Choose an avatar</legend>
-          <div className="ttv-avatar-options">
-            {AVATARS.map((avatar) => (
-              <button
-                key={avatar}
-                type="button"
-                aria-label={`${PROFILE_PORTRAITS[avatar].name} avatar`}
-                aria-pressed={profile.avatar === avatar}
-                onClick={() => setProfile({ ...profile, avatar })}
-              >
-                <ProfileAvatar profile={{ avatar }} />
-              </button>
+          <div className="ttv-avatar-groups">
+            {PROFILE_AVATAR_GROUPS.map((group) => (
+              <div key={group.name} role="group" aria-label={group.name}>
+                <h3 className="ttv-avatar-group-title">{group.name}</h3>
+                <div className="ttv-avatar-options">
+                  {group.avatars.map((avatar) => (
+                    <button
+                      key={avatar}
+                      type="button"
+                      aria-label={`${PROFILE_PORTRAITS[avatar].name} avatar`}
+                      aria-pressed={profile.avatar === avatar}
+                      onClick={() => setProfile({ ...profile, avatar })}
+                    >
+                      <ProfileAvatar profile={{ avatar }} />
+                      <span className="ttv-avatar-name">{PROFILE_PORTRAITS[avatar].name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </fieldset>
@@ -454,7 +461,7 @@ export default function ProfilePicker() {
   function add(back: Home) {
     setScreen({
       kind: "edit",
-      profile: { id: newProfileId(), name: "", kids: false, avatar: "moon" },
+      profile: { id: newProfileId(), name: "", kids: false, avatar: "sun" },
       back,
     });
   }

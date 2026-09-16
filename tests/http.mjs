@@ -117,7 +117,7 @@ try {
   for (const [, path] of shellArray.matchAll(/"([^"\n]+)"/g)) {
     assert.equal((await get(path, "HEAD")).status, 200, `Offline precache asset ${path}`);
   }
-  for (const name of ["fox", "explorer", "dinosaur", "robot", "girlcat", "boycat", "jesus", "kidsjesus"]) {
+  for (const name of ["boyfox", "girlfox", "dadfox", "momfox", "girlcat", "boycat", "boyrobot", "girlrobot", "boydragon", "girldragon", "daddragon", "momdragon", "malepirate", "femalepirate", "malemechanic", "femalemechanic", "maledoctors", "femaledoctors", "maleserver", "femaleserver", "jesus", "kidsjesus"]) {
     const portrait = await get(`/avatars/${name}.png`, "HEAD");
     assert.equal(portrait.status, 200, `${name}: portrait is available`);
     assert.match(portrait.headers["content-type"], /^image\/png\b/);
@@ -188,7 +188,7 @@ try {
   assert.ok(sitemap.body.includes("/library"));
   assert.ok(!sitemap.body.includes("/admin"));
   console.log(
-    "PASS: production routes, profile and Halloween styles, eight optimized portraits, metadata, security headers, private cache rules, authorization, cross-origin rejection and analytics opt-out.",
+    "PASS: production routes, profile and Halloween styles, 22 optimized portraits, metadata, security headers, private cache rules, authorization, cross-origin rejection and analytics opt-out.",
   );
 } finally {
   server.kill("SIGTERM");

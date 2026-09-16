@@ -411,6 +411,17 @@
   font-size: 0.875rem;
   font-weight: 650;
 }
+.ttv-avatar-groups {
+  display: grid;
+  gap: 1.15rem;
+}
+.ttv-avatar-group-title {
+  margin: 0 0 .5rem;
+  color: var(--text-muted);
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .ttv-avatar-options {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -427,6 +438,14 @@
 }
 .ttv-avatar-options button[aria-pressed="true"] {
   border-color: var(--primary);
+}
+.ttv-avatar-name {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 .ttv-profile-check {
   display: flex;

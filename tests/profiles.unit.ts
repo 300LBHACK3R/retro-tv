@@ -226,6 +226,20 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
       { id: "child", name: "Child", avatar, kids: true },
     ]);
   }
+  expect(sanitizeProfiles([
+    { id: "main", name: "Tate", avatar: "moon", kids: false },
+    { id: "child", name: "Child", avatar: "moon", kids: true },
+  ])).toEqual([
+    { id: "main", name: "Tate", avatar: "sun", kids: false },
+    { id: "child", name: "Child", avatar: "sun", kids: true },
+  ]);
+  expect(sanitizeProfiles([
+    { id: "main", name: "Parent", avatar: "star", kids: false },
+    { id: "child", name: "Child", avatar: "star", kids: true },
+  ])).toEqual([
+    { id: "main", name: "Parent", avatar: "boydragon", kids: false },
+    { id: "child", name: "Child", avatar: "boydragon", kids: true },
+  ]);
 });
 test("legacy theme preferences are removed without losing profiles or PIN; every profile starts with the default", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -262,7 +276,7 @@ test("legacy theme preferences are removed without losing profiles or PIN; every
     expect(useProfiles.getState().profiles.every((profile) => !("theme" in profile))).toBe(true);
     expect(useProfiles.getState().pin).toEqual(pin);
     expect(useProfiles.getState().failures).toBe(2);
-    expect(useProfiles.getState().profiles[0]).toMatchObject({ name: "Tate", avatar: "moon" });
+    expect(useProfiles.getState().profiles[0]).toMatchObject({ name: "Tate", avatar: "sun" });
     expect(useProfiles.getState().profiles[1]).toMatchObject({ kids: true });
     expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).themeRevision).toBeUndefined();
     activateProfile("main");
