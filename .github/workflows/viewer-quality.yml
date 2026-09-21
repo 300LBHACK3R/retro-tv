@@ -2,7 +2,7 @@ name: Viewer quality
 on:
   pull_request:
   push:
-    branches: [master, refactor/premium-v1, feature/daily-tv-experience]
+    branches: [master, refactor/premium-v1, feature/daily-tv-experience, feature/library-artwork-coming-soon]
 permissions:
   contents: read
 concurrency:

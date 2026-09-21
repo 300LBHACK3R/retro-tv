@@ -7,14 +7,18 @@ const video = Buffer.from(
   "base64",
 );
 async function fixture(page: Page, kids = false) {
-  await page.addInitScript(
-    (id) =>
-      sessionStorage.setItem(
-        "ttv-profile-session-v1",
-        JSON.stringify({ id, pinHash: null }),
-      ),
-    kids ? "kids" : "main",
-  );
+  await page.addInitScript((isKids) => {
+    const hash = isKids ? "0".repeat(64) : null;
+    if (isKids)
+      localStorage.setItem(
+        "ttv-profiles-v1",
+        JSON.stringify({ pin: { salt: "0".repeat(32), hash } }),
+      );
+    sessionStorage.setItem(
+      "ttv-profile-session-v1",
+      JSON.stringify({ id: isKids ? "kids" : "main", pinHash: hash }),
+    );
+  }, kids);
   await page.route("**/api/engagement", (route) =>
     route.fulfill({ json: { ok: true } }),
   );
@@ -43,7 +47,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
     ...structuredClone(programming),
     libraryArtwork: {
       "show:studio-sessions": {
-        poster: "/avatars/robot.webp",
+        poster: "/avatars/boyrobot.png",
         kidsApproved: true,
       },
     },
@@ -62,6 +66,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
   const search = page.getByRole("searchbox", {
     name: "Search the Tate's TV library",
   });
+  await expect(page.locator(".ttv-profile-switch .ttv-profile-avatar")).toBeVisible();
   await search.fill("Studio");
   const card = page.getByRole("button", {
     name: "Open Studio Sessions",
@@ -69,7 +74,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
   });
   await expect(card.locator("img")).toHaveAttribute(
     "src",
-    "/avatars/robot.webp",
+    /\/avatars\/boyrobot\.png$/,
   );
   await card.click();
   const dialog = page.getByRole("dialog", {
@@ -87,7 +92,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
   await dialog.getByRole("button", { name: /S02E01/ }).click();
   await expect(dialog.locator("video")).toHaveAttribute(
     "src",
-    "/qa-media.webm",
+    /\/qa-media\.webm$/,
   );
   await dialog.getByRole("button", { name: "Close title ✕" }).click();
   await expect(card).toBeFocused();
@@ -124,7 +129,7 @@ test("Kids library blocks unapproved deep links, inherits reviewed channels and 
     })),
     libraryArtwork: {
       "show:studio-sessions": {
-        poster: "/avatars/robot.webp",
+        poster: "/avatars/boyrobot.png",
         kidsApproved: false,
       },
     },
@@ -133,7 +138,7 @@ test("Kids library blocks unapproved deep links, inherits reviewed channels and 
         id: "adult",
         title: "Adult announcement",
         description: "",
-        poster: "/avatars/robot.webp",
+        poster: "/avatars/boyrobot.png",
         type: "movie",
         releaseLabel: "Soon",
         published: true,
@@ -188,7 +193,7 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
       json: {
         ok: true,
         uploadUrl: "https://storage.example/poster",
-        publicUrl: "/avatars/robot.webp",
+        publicUrl: "/avatars/boyrobot.png",
       },
     });
   });
@@ -206,7 +211,7 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     .selectOption("show:studio-sessions");
   await page
     .getByLabel("Upload poster", { exact: true })
-    .setInputFiles("public/avatars/robot.webp");
+    .setInputFiles("public/avatars/boyrobot.png");
   await expect(
     page.getByText("Poster ready. Save your artwork changes below."),
   ).toBeVisible();
@@ -219,7 +224,7 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     .click();
   await expect
     .poll(() => saved.libraryArtwork?.["show:studio-sessions"]?.poster)
-    .toBe("/avatars/robot.webp");
+    .toBe("/avatars/boyrobot.png");
   await page.getByRole("checkbox", { name: "S01E01", exact: true }).check();
   await expect.poll(() => saved.media[0]?.kidsApproved).toBe(true);
   await page
@@ -228,14 +233,12 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
   await page
     .getByRole("textbox", { name: "Upcoming title", exact: true })
     .fill("Saturday Morning Rewind");
-  const form = page
-    .locator("form")
-    .filter({
-      has: page.getByRole("textbox", { name: "Upcoming title", exact: true }),
-    });
+  const form = page.locator("form").filter({
+    has: page.getByRole("textbox", { name: "Upcoming title", exact: true }),
+  });
   await form
     .getByRole("textbox", { name: "Artwork URL", exact: true })
-    .fill("/avatars/robot.webp");
+    .fill("/avatars/boyrobot.png");
   await form
     .getByRole("button", { name: "Use artwork URL", exact: true })
     .click();

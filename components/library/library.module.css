@@ -123,11 +123,8 @@
 .primary,
 .filters button[aria-pressed="true"] {
   background: var(--primary);
-  color: #11131a;
+  color: var(--on-primary, #11131a);
   border-color: transparent;
-}
-:global([data-theme="ttv-daylight"]) .primary {
-  color: white;
 }
 .page button:focus-visible,
 .page a:focus-visible,
@@ -537,7 +534,7 @@
     padding: 9px 10px;
     font-size: 12px;
   }
-  .headerActions :global(.ttv-profile-switch span) {
+  .headerActions :global(.ttv-profile-switch > span:not(.ttv-profile-avatar)) {
     display: none;
   }
   .content {
@@ -672,6 +669,13 @@
 }
 
 @media (max-width: 760px) {
-  .headerActions :global(.theme-trigger__copy), .headerActions :global(.theme-trigger__chevron) { display: none; }
-  .headerActions :global(.theme-trigger) { width: 44px; padding: 10px; flex-shrink: 0; }
+  .headerActions :global(.theme-trigger__copy),
+  .headerActions :global(.theme-trigger__chevron) {
+    display: none;
+  }
+  .headerActions :global(.theme-trigger) {
+    width: 44px;
+    padding: 10px;
+    flex-shrink: 0;
+  }
 }
