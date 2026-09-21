@@ -108,6 +108,9 @@ export async function PUT(request: Request) {
     );
   }
 
+  if (typeof body !== "object" || !("libraryArtwork" in body) || !("upcomingTitles" in body)) {
+    return jsonResponse({ ok: false, error: "Refresh the admin page before saving this update." }, { status: 409 });
+  }
   const snapshot = sanitizeProgrammingSnapshot(body);
 
   if (!snapshot) {

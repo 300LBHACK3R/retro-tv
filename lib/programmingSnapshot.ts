@@ -1,3 +1,4 @@
+import { sanitizeLibraryArtwork, sanitizeUpcomingTitles, type LibraryArtwork, type UpcomingTitle } from "./libraryPresentation";
 import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import type {
@@ -19,6 +20,8 @@ import type {
 import { DEFAULT_THEME_ID, isThemeId } from "./themes";
 
 export interface ProgrammingSnapshot {
+  libraryArtwork?: LibraryArtwork;
+  upcomingTitles?: UpcomingTitle[];
   media: MediaItem[];
   channels: Channel[];
   currentChannelId: string;
@@ -644,6 +647,8 @@ export function sanitizeProgrammingSnapshot(
   return {
     media,
     channels,
+    libraryArtwork: sanitizeLibraryArtwork(value.libraryArtwork),
+    upcomingTitles: sanitizeUpcomingTitles(value.upcomingTitles),
     currentChannelId,
     sidebarWidth: clamp(
       validNumber(value.sidebarWidth, DEFAULT_SIDEBAR_WIDTH),

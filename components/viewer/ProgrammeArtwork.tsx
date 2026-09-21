@@ -1,5 +1,6 @@
 "use client";
 
+import { safeArtworkUrl } from "@/lib/libraryPresentation";
 import Image from "next/image";
 import { useState, type CSSProperties } from "react";
 
@@ -13,6 +14,7 @@ export default function ProgrammeArtwork({
   kind?: string;
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
+  src = safeArtworkUrl(src) || undefined;
   const hue = Array.from(title).reduce(
     (sum, char) => (sum * 31 + char.charCodeAt(0)) % 360,
     0,

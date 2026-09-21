@@ -1,4 +1,5 @@
 "use client";
+import { useStore } from "@/lib/store";
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -18,6 +19,8 @@ type ExportPayload = ProgrammingSnapshot & {
 };
 
 type StoreSnapshot = {
+  libraryArtwork?: ProgrammingSnapshot["libraryArtwork"];
+  upcomingTitles?: ProgrammingSnapshot["upcomingTitles"];
   media: MediaItem[];
   channels: Channel[];
   currentChannelId: string;
@@ -77,6 +80,8 @@ function buildExportPayload(snapshot: StoreSnapshot): ExportPayload {
     schemaVersion: 2,
     exportedAt: now,
     app: "tates-tv",
+    libraryArtwork: snapshot.libraryArtwork ?? {},
+    upcomingTitles: snapshot.upcomingTitles ?? [],
     media: snapshot.media,
     channels: snapshot.channels,
     currentChannelId: snapshot.currentChannelId,
@@ -168,6 +173,8 @@ function downloadJson(filename: string, payload: unknown): void {
 function buildZustandPayload(snapshot: ProgrammingSnapshot) {
   return {
     state: {
+      libraryArtwork: snapshot.libraryArtwork ?? {},
+      upcomingTitles: snapshot.upcomingTitles ?? [],
       media: snapshot.media,
       channels: snapshot.channels,
       currentChannelId: snapshot.currentChannelId,
@@ -412,6 +419,8 @@ export default function StationConfigPanel({
 
   const exportConfig = useCallback(() => {
     const payload = buildExportPayload({
+      libraryArtwork: useStore.getState().libraryArtwork,
+      upcomingTitles: useStore.getState().upcomingTitles,
       media,
       channels,
       currentChannelId,

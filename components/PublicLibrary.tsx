@@ -1,11 +1,8 @@
 "use client";
-
-import { useViewerCatalog } from "@/lib/useViewerCatalog";
-
-import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -13,56 +10,37 @@ import {
   type CSSProperties,
 } from "react";
 import ProfileGate, { ProfileButton } from "@/components/viewer/ProfileGate";
-import { profileProgressKey, useProfiles } from "@/lib/deviceProfiles";
 import ThemeButton from "@/components/ThemeButton";
+import SaveButton from "@/components/viewer/SaveButton";
+import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
+import ComingSoon from "@/components/library/ComingSoon";
+import TitleDetails from "@/components/library/TitleDetails";
+import { useViewerCatalog } from "@/lib/useViewerCatalog";
+import { useProfiles, profileProgressKey } from "@/lib/deviceProfiles";
+import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import {
-  FILTERS,
-  sanitizeProgress,
   buildLibrary,
+  FILTERS,
   formatClock,
-  formatDuration,
-  getSafeDuration,
   getTypeLabel,
+  sanitizeProgress,
   type LibraryFilter,
   type LibraryGroup,
-  type ParsedLibraryItem,
-  type ProgressEntry,
   type ProgressMap,
+  type ProgressEntry,
 } from "@/lib/libraryCatalog";
-import { useDeviceLibrary } from "@/lib/deviceLibrary";
-import SaveButton from "@/components/viewer/SaveButton";
-import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
+import styles from "./library/library.module.css";
 
-function loadProgress(key: string): ProgressMap {
-  if (typeof window === "undefined") return {};
-
+function readProgress(key: string): ProgressMap {
   try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as ProgressMap) : {};
-    return sanitizeProgress(parsed);
+    return sanitizeProgress(JSON.parse(localStorage.getItem(key) || "{}"));
   } catch {
     return {};
   }
 }
-
-function getProgressPercent(entry: ProgressEntry | undefined): number {
-  if (!entry || entry.duration <= 0) return 0;
-  return Math.min(100, Math.max(0, (entry.position / entry.duration) * 100));
-}
-
-function Poster({ group }: { group: LibraryGroup }) {
-  return (
-    <ProgrammeArtwork
-      src={group.poster}
-      title={group.title}
-      kind={getTypeLabel(group.type)}
-    />
-  );
-}
-
 export default function PublicLibrary() {
   return (
     <ProfileGate>
@@ -71,817 +49,362 @@ export default function PublicLibrary() {
   );
 }
 function ProfileLibrary() {
-  const [progressKey] = useState(profileProgressKey);
+  const { media } = useViewerCatalog();
   const kids = useProfiles(
     (state) =>
       state.profiles.find((profile) => profile.id === state.activeId)?.kids ===
       true,
   );
-  const { channels, media } = useViewerCatalog();
   const themeId = useStore((state) => state.themeId);
-
-  const theme = useMemo(() => getThemeById(themeId), [themeId]);
-  const themeLayoutClass = useMemo(
-    () => getThemeLayoutClass(themeId),
+  const artwork = useStore((state) => state.libraryArtwork);
+  const watchlist = useDeviceLibrary((state) => state.watchlist);
+  const themeStyle = useMemo(
+    () => createThemeCssVars(getThemeById(themeId)) as CSSProperties,
     [themeId],
   );
-  const themeVars = useMemo(
-    () => createThemeCssVars(theme) as CSSProperties,
-    [theme],
+  const library = useMemo(
+    () => buildLibrary(media, artwork, kids),
+    [media, artwork, kids],
   );
-
-  const watchlist = useDeviceLibrary((state) => state.watchlist);
-  const [savedOnly, setSavedOnly] = useState(false);
   const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement | null>(null);
   const [filter, setFilter] = useState<LibraryFilter>("all");
-  const [selectedGroupKey, setSelectedGroupKey] = useState("");
-  const [selectedSeason, setSelectedSeason] = useState(1);
-  const [selectedMediaId, setSelectedMediaId] = useState("");
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [sort, setSort] = useState("az");
+  const [limit, setLimit] = useState(30);
+  const [selection, setSelection] = useState<{
+    key: string;
+    mediaId?: string;
+    play?: boolean;
+  } | null>(null);
+  const [progressKey] = useState(profileProgressKey);
   const [progress, setProgress] = useState<ProgressMap>({});
-  const [autoPlayRequested, setAutoPlayRequested] = useState(false);
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const lastProgressWriteRef = useRef(0);
-  const progressRef = useRef<ProgressMap>({});
-
-  const library = useMemo(() => buildLibrary(media), [media]);
-
-  const filteredGroups = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return library.filter((group) => {
-      const matchesFilter = filter === "all" || group.type === filter;
-      const matchesQuery =
-        !normalizedQuery ||
-        group.title.toLowerCase().includes(normalizedQuery) ||
-        group.searchText.includes(normalizedQuery);
-
-      return (
-        matchesFilter &&
-        matchesQuery &&
-        (!savedOnly || watchlist.includes(group.key))
-      );
-    });
-  }, [filter, library, query, savedOnly, watchlist]);
-
-  const selectedGroup = useMemo(
-    () =>
-      filteredGroups.find((group) => group.key === selectedGroupKey) ??
-      filteredGroups[0] ??
-      null,
-    [filteredGroups, selectedGroupKey],
-  );
-
-  const activeSeason = selectedGroup?.seasons.includes(selectedSeason)
-    ? selectedSeason
-    : (selectedGroup?.seasons[0] ?? 1);
-
-  const activeItems = useMemo(() => {
-    if (!selectedGroup) return [];
-    return selectedGroup.items.filter((item) => item.season === activeSeason);
-  }, [activeSeason, selectedGroup]);
-
-  const selectedItem = useMemo(
-    () =>
-      activeItems.find((item) => item.media.id === selectedMediaId) ??
-      activeItems[0] ??
-      null,
-    [activeItems, selectedMediaId],
-  );
-
-  const playbackMonitor = usePlaybackMonitor(videoRef, {
-    sourceKey: selectedItem?.media.id ?? "",
-    channelId: "library",
-    mediaId: selectedItem?.media.id ?? "",
-    mode: "library",
-    reload: () => {
-      const video = videoRef.current;
-      if (video) {
-        video.load();
-        void video
-          .play()
-          .catch(() => video.dispatchEvent(new Event("ttv-autoplay-blocked")));
-      }
-    },
-  });
-
-  const currentIndex = selectedItem
-    ? activeItems.findIndex((item) => item.media.id === selectedItem.media.id)
-    : -1;
-
-  const previousItem =
-    currentIndex > 0 ? (activeItems[currentIndex - 1] ?? null) : null;
-
-  const nextItem =
-    currentIndex >= 0 && currentIndex < activeItems.length - 1
-      ? (activeItems[currentIndex + 1] ?? null)
-      : null;
-
-  const allItems = useMemo(
-    () => library.flatMap((group) => group.items),
-    [library],
-  );
-
-  const continueWatching = useMemo(() => {
-    const entries: Array<{
-      item: ParsedLibraryItem;
-      entry: ProgressEntry;
-    }> = [];
-
-    for (const item of allItems) {
-      const entry = progress[item.media.id];
-
-      if (!entry) {
-        continue;
-      }
-
-      const duration = getSafeDuration(item.media.duration);
-
-      if (entry.position >= 10 && entry.position < duration - 10) {
-        entries.push({ item, entry });
-      }
-    }
-
-    return entries
-      .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
-      .slice(0, 6);
-  }, [allItems, progress]);
-
-  const stats = useMemo(
-    () => ({
-      groups: library.length,
-      items: allItems.length,
-      duration: allItems.reduce(
-        (total, item) => total + getSafeDuration(item.media.duration),
-        0,
-      ),
-    }),
-    [allItems, library.length],
-  );
-
-  const selectedChannels = useMemo(() => {
-    if (!selectedItem) return [];
-
-    return channels
-      .filter((channel) => channel.mediaIds.includes(selectedItem.media.id))
-      .sort((a, b) => Number(a.number ?? a.id) - Number(b.number ?? b.id))
-      .map(
-        (channel) =>
-          `CH ${channel.number ?? channel.id} · ${
-            channel.branding?.displayName ?? channel.name
-          }`,
-      );
-  }, [channels, selectedItem]);
-
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const requestedRef = useRef(false);
   useEffect(() => {
-    progressRef.current = loadProgress(progressKey);
-    setProgress(progressRef.current);
+    setProgress(readProgress(progressKey));
   }, [progressKey]);
-
+  const updateProgress = useCallback(
+    (id: string, entry: ProgressEntry | null) => {
+      setProgress((previous) => {
+        const next = { ...previous, ...readProgress(progressKey) };
+        if (entry) next[id] = entry;
+        else delete next[id];
+        const safe = sanitizeProgress(next);
+        try {
+          localStorage.setItem(progressKey, JSON.stringify(safe));
+        } catch {}
+        return safe;
+      });
+    },
+    [progressKey],
+  );
   useEffect(() => {
-    if (!selectedGroupKey && filteredGroups[0]) {
-      setSelectedGroupKey(filteredGroups[0].key);
-      return;
-    }
-
-    if (
-      selectedGroupKey &&
-      !filteredGroups.some((group) => group.key === selectedGroupKey)
-    ) {
-      setSelectedGroupKey(filteredGroups[0]?.key ?? "");
-    }
-  }, [filteredGroups, selectedGroupKey]);
-
-  useEffect(() => {
-    if (!selectedGroup) return;
-
-    if (!selectedGroup.seasons.includes(selectedSeason)) {
-      setSelectedSeason(selectedGroup.seasons[0] ?? 1);
-    }
-  }, [selectedGroup, selectedSeason]);
-
-  useEffect(() => {
-    const firstActiveItem = activeItems[0];
-
-    if (!firstActiveItem) {
-      setSelectedMediaId("");
-      return;
-    }
-
-    if (!activeItems.some((item) => item.media.id === selectedMediaId)) {
-      setSelectedMediaId(firstActiveItem.media.id);
-    }
-  }, [activeItems, selectedMediaId]);
-
-  const requestedItemApplied = useRef(false);
-  useEffect(() => {
-    if (requestedItemApplied.current || !allItems.length) return;
+    if (requestedRef.current || !library.length) return;
     const id = new URLSearchParams(window.location.search).get("watch");
     if (!id) {
-      requestedItemApplied.current = true;
+      requestedRef.current = true;
       return;
     }
-    const item = allItems.find((entry) => entry.media.id === id);
-    if (!item) return;
-    requestedItemApplied.current = true;
-    setSelectedGroupKey(item.groupKey);
-    setSelectedSeason(item.season);
-    setSelectedMediaId(id);
-  }, [allItems]);
-
-  function showAllTitles() {
+    const group = library.find((entry) =>
+      entry.items.some((item) => item.media.id === id),
+    );
+    if (group) {
+      requestedRef.current = true;
+      setSelection({ key: group.key, mediaId: id });
+    }
+  }, [library]);
+  const selectedGroup = selection
+    ? library.find((group) => group.key === selection.key)
+    : undefined;
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const groups = library.filter(
+      (group) =>
+        (filter === "all" || group.type === filter) &&
+        (!savedOnly || watchlist.includes(group.key)) &&
+        (!normalized || group.searchText.includes(normalized)),
+    );
+    return groups.sort((a, b) =>
+      sort === "recent"
+        ? Math.max(
+            ...b.items.map(
+              (item) => Date.parse(item.media.createdAt || "") || 0,
+            ),
+          ) -
+            Math.max(
+              ...a.items.map(
+                (item) => Date.parse(item.media.createdAt || "") || 0,
+              ),
+            ) || a.title.localeCompare(b.title)
+        : a.title.localeCompare(b.title),
+    );
+  }, [library, query, filter, savedOnly, watchlist, sort]);
+  const continuing = useMemo(
+    () =>
+      library
+        .flatMap((group) => {
+          const recent = group.items
+            .filter((item) => {
+              const entry = progress[item.media.id];
+              return (
+                entry &&
+                entry.position >= 10 &&
+                entry.position < entry.duration - 10
+              );
+            })
+            .sort(
+              (a, b) =>
+                (progress[b.media.id]?.updatedAt ?? 0) -
+                (progress[a.media.id]?.updatedAt ?? 0),
+            )[0];
+          return recent
+            ? [{ group, item: recent, entry: progress[recent.media.id]! }]
+            : [];
+        })
+        .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
+        .slice(0, 10),
+    [library, progress],
+  );
+  function open(
+    group: LibraryGroup,
+    target: HTMLElement,
+    mediaId?: string,
+    play = false,
+  ) {
+    returnFocusRef.current = target;
+    setSelection({ key: group.key, mediaId, play });
+  }
+  function browseAll() {
     setQuery("");
     setFilter("all");
     setSavedOnly(false);
-    window.requestAnimationFrame(() =>
-      searchRef.current?.focus({ preventScroll: true }),
-    );
+    setLimit(30);
+    searchRef.current?.focus({ preventScroll: true });
   }
-
-  function persistProgress(value: ProgressMap): void {
-    const next = sanitizeProgress(value);
-    progressRef.current = next;
-    setProgress(next);
-
-    try {
-      window.localStorage.setItem(progressKey, JSON.stringify(next));
-    } catch {
-      // Local progress is optional. Playback must continue if storage is blocked.
-    }
-  }
-
-  function saveCurrentProgress(force = false): void {
-    const video = videoRef.current;
-    const item = selectedItem;
-
-    if (!video || !item) return;
-
-    const now = Date.now();
-
-    if (!force && now - lastProgressWriteRef.current < 4000) {
-      return;
-    }
-
-    lastProgressWriteRef.current = now;
-
-    const duration = Number.isFinite(video.duration)
-      ? video.duration
-      : getSafeDuration(item.media.duration);
-    const position = Math.min(
-      duration,
-      Math.max(0, Math.floor(video.currentTime)),
-    );
-
-    persistProgress({
-      ...progressRef.current,
-      ...loadProgress(progressKey),
-      [item.media.id]: {
-        position,
-        duration: Math.max(1, Math.floor(duration)),
-        updatedAt: now,
-      },
-    });
-  }
-
-  function openItem(item: ParsedLibraryItem, shouldPlay = false): void {
-    const group = library.find((entry) => entry.key === item.groupKey);
-
-    setSavedOnly(false);
-    setFilter("all");
-    setQuery("");
-    setSelectedGroupKey(item.groupKey);
-    setSelectedSeason(item.season);
-    setSelectedMediaId(item.media.id);
-    setAutoPlayRequested(shouldPlay);
-
-    if (!group) return;
-
-    window.setTimeout(() => {
-      document.getElementById("ttv-library-player")?.scrollIntoView({
-        behavior:
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-          useStore.getState().viewerSettings.preferReducedMotion
-            ? "auto"
-            : "smooth",
-        block: "start",
-      });
-    }, 50);
-  }
-
-  function moveToItem(item: ParsedLibraryItem | null): void {
-    if (!item) return;
-    setSelectedMediaId(item.media.id);
-    setAutoPlayRequested(true);
-  }
-
-  function handleEnded(): void {
-    if (!selectedItem) return;
-
-    const nextProgress = {
-      ...progressRef.current,
-      ...loadProgress(progressKey),
-    };
-    delete nextProgress[selectedItem.media.id];
-    persistProgress(nextProgress);
-
-    if (nextItem) {
-      moveToItem(nextItem);
-    }
-  }
-
-  const pageStyle = {
-    ...themeVars,
-    "--library-border": "var(--border)",
-    "--library-panel": "var(--panel-bg)",
-  } as CSSProperties;
-
+  const savedCount = library.filter((group) =>
+    watchlist.includes(group.key),
+  ).length;
   return (
-    <main
-      className={`ttv-library-shell ${themeLayoutClass} min-h-screen`}
-      style={pageStyle}
-    >
-      <div
-        className="ttv-library-ambient pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden="true"
+    <>
+      <main
+        className={`ttv-library-shell ${getThemeLayoutClass(themeId)} ${styles.page}`}
+        style={themeStyle}
+        inert={selectedGroup ? true : undefined}
+        aria-hidden={selectedGroup ? true : undefined}
       >
-        <div className="ttv-library-ambient__primary absolute -left-32 top-0 h-96 w-96 rounded-full blur-3xl" />
-        <div className="ttv-library-ambient__secondary absolute right-0 top-24 h-[28rem] w-[28rem] rounded-full blur-3xl" />
-      </div>
-
-      <header className="ttv-library-header sticky top-0 z-40 border-b backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link href="/" aria-label="Back to Tate's TV live channels">
-            <Image
-              src="/tatestv-logo.png"
-              alt="Tate's TV"
-              width={210}
-              height={72}
-              className="h-auto w-[150px] sm:w-[190px]"
-              priority
-            />
-          </Link>
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <ProfileButton />
-            <ThemeButton />
-            <span className="hidden rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 sm:inline-flex">
-              Watch free
-            </span>
-            <Link
-              href="/"
-              className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.15em] text-cyan-100 transition hover:bg-cyan-400/20"
-            >
-              Back to Live TV
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="relative mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-10">
-        <section className="ttv-library-intro">
-          <div>
-            <span className="ttv-section-kicker">On demand</span>
-            <h1>Your time. Your TV.</h1>
-            <p>Find a favourite. Discover something new. Continue watching.</p>
-          </div>
-          <span className="ttv-library-title-count">
-            {stats.groups} titles · {stats.items} videos
-          </span>
-        </section>
-
-        {continueWatching.length > 0 ? (
-          <section className="mt-8">
-            <div className="mb-3 flex items-end justify-between gap-4">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-fuchsia-200">
-                  Continue Watching
-                </div>
-                <h2 className="mt-1 text-2xl font-semibold">
-                  Pick up where you left off
-                </h2>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              {continueWatching.map(({ item, entry }) => (
-                <button
-                  key={item.media.id}
-                  type="button"
-                  onClick={() => openItem(item, true)}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] text-left transition hover:-translate-y-0.5 hover:border-fuchsia-300/35 hover:bg-white/[0.07]"
-                >
-                  <div className="aspect-video bg-black">
-                    {item.media.poster ? (
-                      <Image
-                        unoptimized
-                        width={480}
-                        height={270}
-                        src={item.media.poster}
-                        alt=""
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(217,70,239,0.35),transparent_50%),#0f172a] px-4 text-center text-xs font-semibold text-white/80">
-                        {item.groupTitle}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <div className="line-clamp-1 text-sm font-semibold">
-                      {item.groupTitle}
-                    </div>
-                    <div className="mt-1 line-clamp-1 text-xs text-white/55">
-                      {item.displayTitle}
-                    </div>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-fuchsia-400"
-                        style={{ width: `${getProgressPercent(entry)}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 text-xs font-bold tracking-normal text-white/45">
-                      {formatClock(entry.position)} watched
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="mt-8 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 shadow-2xl shadow-black/30 sm:p-5">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <label className="block">
-              <span className="sr-only">Search the Tate&apos;s TV library</span>
-              <input
-                ref={searchRef}
-                maxLength={160}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search titles, episodes, movies, or music..."
-                className="w-full rounded-2xl border border-cyan-300/20 bg-black/35 px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-cyan-300/55"
+        <header className={styles.header}>
+          <div className={styles.headerInner}>
+            <Link href="/" aria-label="Back to Tate's TV live channels">
+              <Image
+                src="/tatestv-logo.png"
+                alt="Tate’s TV"
+                width={210}
+                height={110}
+                className={styles.logo}
+                priority
               />
-            </label>
-
-            <div className="flex gap-2 overflow-x-auto pb-1 lg:justify-end lg:pb-0">
-              <button
-                type="button"
-                className="ttv-section-action"
-                aria-pressed={savedOnly}
-                onClick={() => setSavedOnly(!savedOnly)}
+            </Link>
+            <div className={styles.headerActions}>
+              <ProfileButton />
+              <ThemeButton />
+              <Link href="/" className={styles.button}>
+                Live TV
+              </Link>
+            </div>
+          </div>
+        </header>
+        <div className={styles.content}>
+          <section className={styles.intro}>
+            <div>
+              <span className={styles.eyebrow}>
+                {kids ? "Just for Kids" : "On demand · Always free"}
+              </span>
+              <h1>Your time. Your TV.</h1>
+              <p>
+                Find a favourite. Discover something new. Settle into something
+                good.
+              </p>
+            </div>
+            <span className={styles.count}>{library.length} titles</span>
+          </section>
+          {continuing.length > 0 && (
+            <section className={styles.section} aria-label="Continue watching">
+              <div className={styles.sectionHead}>
+                <h2>Pick up where you left off</h2>
+              </div>
+              <div className={styles.rail}>
+                {continuing.map(({ group, item, entry }) => (
+                  <button
+                    key={group.key}
+                    className={styles.continueCard}
+                    onClick={(event) =>
+                      open(group, event.currentTarget, item.media.id, true)
+                    }
+                  >
+                    <strong>{group.title}</strong>
+                    <small>{item.displayTitle}</small>
+                    <progress
+                      className={styles.progress}
+                      value={entry.position}
+                      max={entry.duration}
+                      aria-label="Watch progress"
+                    />
+                    <small>{formatClock(entry.position)} watched</small>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          <section className={styles.catalogue} aria-label="Library titles">
+            <div className={styles.tools}>
+              <label className={styles.search}>
+                <span aria-hidden="true">⌕</span>
+                <input
+                  ref={searchRef}
+                  type="search"
+                  aria-label="Search the Tate's TV library"
+                  placeholder="Search titles, episodes, movies…"
+                  value={query}
+                  maxLength={160}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setLimit(30);
+                  }}
+                />
+              </label>
+              <select
+                aria-label="Sort titles"
+                className={styles.select}
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
               >
-                My watchlist ({watchlist.length})
-              </button>
-              {FILTERS.map((item) => {
-                const active = item.id === filter;
-
-                return (
+                <option value="az">Title A–Z</option>
+                <option value="recent">Recently added</option>
+              </select>
+              <div className={styles.filters} aria-label="Library filters">
+                <button
+                  aria-pressed={savedOnly}
+                  onClick={() => {
+                    setSavedOnly(!savedOnly);
+                    setLimit(30);
+                  }}
+                >
+                  My watchlist ({savedCount})
+                </button>
+                {FILTERS.map((item) => (
                   <button
                     key={item.id}
-                    type="button"
-                    onClick={() => setFilter(item.id)}
-                    className={`shrink-0 rounded-full border px-4 py-3 text-xs font-semibold tracking-normal transition ${
-                      active
-                        ? "border-cyan-300 bg-cyan-300 text-slate-950"
-                        : "border-white/10 bg-white/[0.04] text-white/65 hover:border-cyan-300/30 hover:text-white"
-                    }`}
+                    aria-pressed={filter === item.id}
+                    onClick={() => {
+                      setFilter(item.id);
+                      setLimit(30);
+                    }}
                   >
                     {item.label}
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {library.length === 0 ? (
-          <section className="mt-6 rounded-2xl border border-dashed border-cyan-300/25 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-semibold">
-              {kids
-                ? "Your Kids library is being prepared"
-                : "The library is syncing"}
-            </div>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/55">
-              {kids
-                ? "Approved shows will appear here after the station reviews them. You can browse your Kids channels in the meantime."
-                : "We’re loading your shows, movies and music. You can watch live TV while you wait."}
-            </p>
-            <Link href="/" className="ttv-section-action ttv-empty-action">
-              Watch live TV
-            </Link>
-          </section>
-        ) : filteredGroups.length === 0 ? (
-          <section className="mt-6 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-semibold">
-              {savedOnly && !watchlist.length
-                ? "Your watchlist is empty"
-                : "No matching library titles"}
-            </div>
-            <p className="mt-2 text-sm text-white/50">
-              {savedOnly && !watchlist.length
-                ? "Find something you like and select Watchlist to save it on this device."
-                : savedOnly
-                  ? "No saved titles match these filters. Browse all titles to find something to watch."
-                  : "Try a different title, or browse everything below."}
-            </p>
-            <button
-              type="button"
-              className="ttv-section-action ttv-empty-action"
-              onClick={showAllTitles}
-            >
-              Browse all titles
-            </button>
-          </section>
-        ) : (
-          <div className="mt-6 grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-            <aside className="min-w-0 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
-                Browse Titles
+                ))}
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                {filteredGroups.map((group) => {
-                  const active = selectedGroup?.key === group.key;
-
-                  return (
+            </div>
+            <div className={styles.resultsHeading}>
+              <h2>Browse Titles</h2>
+              <span className={styles.count} role="status">
+                {filtered.length} {filtered.length === 1 ? "title" : "titles"}
+              </span>
+            </div>
+            {!filtered.length ? (
+              <div className={styles.empty}>
+                <h2>
+                  {!library.length
+                    ? kids
+                      ? "Your Kids library is being prepared"
+                      : "The library is syncing"
+                    : savedOnly && !savedCount
+                      ? "Your watchlist is empty"
+                      : "No matching library titles"}
+                </h2>
+                <p>
+                  {!library.length
+                    ? kids
+                      ? "Reviewed shows from your approved Kids channels appear here automatically. You can watch your Kids channels while we prepare more titles."
+                      : "Your shows, movies and music will appear here. Watch live TV in the meantime."
+                    : "Try another search or browse all titles to find your next watch."}
+                </p>
+                {library.length ? (
+                  <button className={styles.button} onClick={browseAll}>
+                    Browse all titles
+                  </button>
+                ) : (
+                  <Link className={styles.button} href="/">
+                    Watch live TV
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className={styles.grid}>
+                  {filtered.slice(0, limit).map((group) => (
+                    <article className={styles.card} key={group.key}>
+                      <button
+                        className={styles.cardButton}
+                        aria-label={`Open ${group.title}`}
+                        onClick={(event) => open(group, event.currentTarget)}
+                      >
+                        <div className={styles.poster}>
+                          <ProgrammeArtwork
+                            src={group.poster}
+                            title={group.title}
+                            kind={getTypeLabel(group.type)}
+                          />
+                        </div>
+                        <h3>{group.title}</h3>
+                        <p>
+                          {getTypeLabel(group.type)}
+                          {group.type === "show"
+                            ? ` · ${group.items.length} episodes`
+                            : ""}
+                        </p>
+                      </button>
+                      <div className={styles.cardSave}>
+                        <SaveButton
+                          id={group.key}
+                          title={group.title}
+                          kind="programme"
+                          compact
+                        />
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {filtered.length > limit && (
+                  <div className={styles.more}>
                     <button
-                      key={group.key}
-                      type="button"
-                      onClick={() => {
-                        setSelectedGroupKey(group.key);
-                        setSelectedSeason(group.seasons[0] ?? 1);
-                        setSelectedMediaId(group.items[0]?.media.id ?? "");
-                        setAutoPlayRequested(false);
-                      }}
-                      className={`grid grid-cols-[100px_minmax(0,1fr)] overflow-hidden rounded-2xl border text-left transition ${
-                        active
-                          ? "border-cyan-300/70 bg-cyan-300/10 shadow-[0_0_30px_rgba(34,211,238,0.12)]"
-                          : "border-white/10 bg-white/[0.035] hover:border-cyan-300/30 hover:bg-white/[0.06]"
-                      }`}
+                      className={styles.button}
+                      onClick={() => setLimit(limit + 30)}
                     >
-                      <div className="aspect-[4/3] min-h-full overflow-hidden bg-black">
-                        <Poster group={group} />
-                      </div>
-                      <div className="min-w-0 p-3">
-                        <div className="line-clamp-2 text-sm font-semibold">
-                          {group.title}
-                        </div>
-                        <div className="mt-2 text-xs font-semibold tracking-normal text-cyan-100/55">
-                          {getTypeLabel(group.type)} · {group.items.length} item
-                          {group.items.length === 1 ? "" : "s"}
-                        </div>
-                        <div className="mt-1 text-xs text-white/40">
-                          {formatDuration(group.totalDuration)}
-                        </div>
-                      </div>
+                      Show more titles
                     </button>
-                  );
-                })}
-              </div>
-            </aside>
-
-            <section
-              id="ttv-library-player"
-              className="min-w-0 rounded-2xl border border-cyan-300/15 bg-[#07101f]/85 p-4 sm:p-5"
-            >
-              {selectedGroup && selectedItem ? (
-                <>
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
-                        {getTypeLabel(selectedGroup.type)}
-                      </div>
-                      <h2 className="mt-1 text-2xl font-semibold sm:text-3xl">
-                        {selectedGroup.title}
-                      </h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
-                        {selectedItem.media.description ||
-                          "Choose an episode or press play to watch from the beginning, whenever you like."}
-                      </p>
-                    </div>
-
-                    {selectedGroup.seasons.length > 1 ? (
-                      <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
-                        {selectedGroup.seasons.map((season) => (
-                          <button
-                            key={season}
-                            type="button"
-                            onClick={() => {
-                              setSelectedSeason(season);
-                              const first = selectedGroup.items.find(
-                                (item) => item.season === season,
-                              );
-                              setSelectedMediaId(first?.media.id ?? "");
-                              setAutoPlayRequested(false);
-                            }}
-                            className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold tracking-normal ${
-                              season === activeSeason
-                                ? "border-cyan-300 bg-cyan-300 text-slate-950"
-                                : "border-white/10 bg-white/[0.04] text-white/60"
-                            }`}
-                          >
-                            Season {season}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
-
-                  <div className="ttv-library-save-row">
-                    <SaveButton
-                      kind="programme"
-                      id={selectedGroup.key}
-                      title={selectedGroup.title}
-                    />
-                    <span>Saved on this device</span>
-                  </div>
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
-                    <video
-                      ref={videoRef}
-                      key={selectedItem.media.id}
-                      src={selectedItem.media.file}
-                      poster={selectedItem.media.poster}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      autoPlay={autoPlayRequested}
-                      className="aspect-video h-auto w-full bg-black"
-                      onLoadedMetadata={(event) => {
-                        const entry = progress[selectedItem.media.id];
-                        const duration = event.currentTarget.duration;
-
-                        if (
-                          entry &&
-                          entry.position >= 5 &&
-                          entry.position < duration - 10
-                        ) {
-                          event.currentTarget.currentTime = entry.position;
-                        }
-                      }}
-                      onTimeUpdate={() => saveCurrentProgress(false)}
-                      onPause={() => saveCurrentProgress(true)}
-                      onPlay={() => setAutoPlayRequested(false)}
-                      onEnded={handleEnded}
-                    />
-                  </div>
-
-                  {playbackMonitor.notice && (
-                    <div className="ttv-player-notice">
-                      <span role="status">{playbackMonitor.notice}</span>
-                      <button type="button" onClick={playbackMonitor.retry}>
-                        Try again
-                      </button>
-                      <button
-                        type="button"
-                        disabled={playbackMonitor.reportDisabled}
-                        onClick={() => void playbackMonitor.report()}
-                      >
-                        Report problem
-                      </button>
-                      {playbackMonitor.reportStatus && (
-                        <span role="status">
-                          {playbackMonitor.reportStatus}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="truncate text-lg font-semibold">
-                        {selectedItem.displayTitle}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45">
-                        <span>
-                          {formatDuration(selectedItem.media.duration)}
-                        </span>
-                        {selectedChannels.map((label) => (
-                          <span key={label}>{label}</span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={!previousItem}
-                        onClick={() => moveToItem(previousItem)}
-                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-semibold tracking-normal text-white/70 transition enabled:hover:border-cyan-300/30 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!nextItem}
-                        onClick={() => moveToItem(nextItem)}
-                        className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs font-semibold tracking-normal text-cyan-100 transition enabled:hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 border-t border-white/10 pt-5">
-                    <div className="mb-3 flex items-end justify-between gap-4">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                          {selectedGroup.type === "show"
-                            ? "Episodes"
-                            : "Library Item"}
-                        </div>
-                        <h3 className="mt-1 text-xl font-semibold">
-                          {selectedGroup.type === "show"
-                            ? `Season ${activeSeason}`
-                            : selectedGroup.title}
-                        </h3>
-                      </div>
-                      <div className="text-xs text-white/40">
-                        {activeItems.length} item
-                        {activeItems.length === 1 ? "" : "s"}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                      {activeItems.map((item) => {
-                        const active = selectedItem.media.id === item.media.id;
-                        const entry = progress[item.media.id];
-
-                        return (
-                          <button
-                            key={item.media.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedMediaId(item.media.id);
-                              setAutoPlayRequested(false);
-                            }}
-                            className={`overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 ${
-                              active
-                                ? "border-cyan-300/70 bg-cyan-300/10"
-                                : "border-white/10 bg-white/[0.035] hover:border-cyan-300/30"
-                            }`}
-                          >
-                            <div className="flex gap-3 p-3">
-                              <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black/60">
-                                {item.media.poster ? (
-                                  <Image
-                                    unoptimized
-                                    width={480}
-                                    height={270}
-                                    src={item.media.poster}
-                                    alt=""
-                                    loading="lazy"
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <Image
-                                    unoptimized
-                                    width={480}
-                                    height={270}
-                                    src="/brand/ttv-neon-mini.png"
-                                    alt=""
-                                    loading="lazy"
-                                    className="h-full w-full object-cover opacity-80"
-                                  />
-                                )}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="line-clamp-2 text-sm font-semibold">
-                                  {item.displayTitle}
-                                </div>
-                                <div className="mt-1 text-xs text-white/45">
-                                  {formatDuration(item.media.duration)}
-                                </div>
-
-                                {entry ? (
-                                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                    <div
-                                      className="h-full rounded-full bg-cyan-300"
-                                      style={{
-                                        width: `${getProgressPercent(entry)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              ) : null}
-            </section>
-          </div>
-        )}
-
-        <footer className="mt-10 border-t border-white/10 py-8 text-center text-xs leading-6 text-white/35">
-          Library playback is separate from the live channel schedule. Only
-          publish media you are authorized to distribute.
-        </footer>
-      </div>
-    </main>
+                )}
+              </>
+            )}
+          </section>
+          <ComingSoon />
+        </div>
+      </main>
+      {selectedGroup && (
+        <TitleDetails
+          key={selectedGroup.key}
+          group={selectedGroup}
+          initialMediaId={selection?.mediaId}
+          playImmediately={selection?.play}
+          progress={progress}
+          onProgress={updateProgress}
+          onClose={() => setSelection(null)}
+          returnFocusRef={returnFocusRef}
+          themeStyle={themeStyle}
+        />
+      )}
+    </>
   );
 }

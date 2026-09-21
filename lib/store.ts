@@ -1,3 +1,4 @@
+import { sanitizeLibraryArtwork, sanitizeUpcomingTitles, type LibraryArtwork, type UpcomingTitle, type TitleArtwork } from "./libraryPresentation";
 import { addHalloweenChannels, moveChannelToPosition, sortChannelLineup } from "./channelLineup";
 import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
@@ -27,6 +28,10 @@ import type {
 import type { ProgrammingSnapshot } from "./programmingSnapshot";
 
 interface AppState {
+  libraryArtwork: LibraryArtwork;
+  upcomingTitles: UpcomingTitle[];
+  setTitleArtwork: (key: string, artwork: TitleArtwork | null) => void;
+  setUpcomingTitles: (titles: UpcomingTitle[]) => void;
   media: MediaItem[];
   channels: Channel[];
   currentChannelId: string;
@@ -1399,6 +1404,8 @@ function normalizeProgrammingCollections(
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      libraryArtwork: {},
+      upcomingTitles: [],
       media: defaultMedia,
       channels: defaultChannels,
       currentChannelId: "1",
@@ -1779,8 +1786,16 @@ export const useStore = create<AppState>()(
           isGuideOpen: false,
         }),
 
+      setTitleArtwork: (key, artwork) => set((state) => {
+        const next = { ...state.libraryArtwork };
+        if (artwork) next[key] = artwork; else delete next[key];
+        return { libraryArtwork: sanitizeLibraryArtwork(next) };
+      }),
+      setUpcomingTitles: (titles) => set({ upcomingTitles: sanitizeUpcomingTitles(titles) }),
       resetProgramming: () =>
         set({
+          libraryArtwork: {},
+          upcomingTitles: [],
           media: defaultMedia,
           channels: defaultChannels,
           currentChannelId: "1",
@@ -1799,6 +1814,8 @@ export const useStore = create<AppState>()(
           );
 
           return {
+            libraryArtwork: sanitizeLibraryArtwork(snapshot.libraryArtwork),
+            upcomingTitles: sanitizeUpcomingTitles(snapshot.upcomingTitles),
             media: normalized.media,
             channels: normalized.channels,
             currentChannelId: getSafeCurrentChannelId(
@@ -1840,6 +1857,8 @@ export const useStore = create<AppState>()(
         );
 
         return {
+          libraryArtwork: state.libraryArtwork,
+          upcomingTitles: state.upcomingTitles,
           media: normalized.media,
           channels: normalized.channels,
           currentChannelId: state.currentChannelId,
@@ -1887,6 +1906,8 @@ export const useStore = create<AppState>()(
         return {
           ...currentState,
           ...saved,
+          libraryArtwork: sanitizeLibraryArtwork(saved?.libraryArtwork),
+          upcomingTitles: sanitizeUpcomingTitles(saved?.upcomingTitles),
           media: normalized.media,
           channels: normalized.channels,
           currentChannelId: getSafeCurrentChannelId(
@@ -1925,6 +1946,8 @@ export const useStore = create<AppState>()(
         );
 
         return {
+          libraryArtwork: state.libraryArtwork,
+          upcomingTitles: state.upcomingTitles,
           media: normalized.media,
           channels: normalized.channels,
           currentChannelId: state.currentChannelId,

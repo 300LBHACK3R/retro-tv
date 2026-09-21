@@ -27,6 +27,7 @@ import StaticTransition from "@/components/StaticTransition";
 import ViewerHeader from "@/components/ViewerHeader";
 import ChannelBrowserDialog from "@/components/viewer/ChannelBrowserDialog";
 import ChannelTuneOverlay from "@/components/viewer/ChannelTuneOverlay";
+import ComingSoon from "@/components/library/ComingSoon";
 import ChannelRail from "@/components/viewer/ChannelRail";
 import MobileViewerNavigation from "@/components/viewer/MobileViewerNavigation";
 import ViewerFooter from "@/components/viewer/ViewerFooter";
@@ -494,6 +495,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
           </>
         )}
 
+        {!tvMode && !mobileGuideOpen && <ComingSoon compact />}
         {!tvMode ? <ViewerFooter /> : null}
       </div>
 

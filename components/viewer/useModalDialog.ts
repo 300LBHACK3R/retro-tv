@@ -28,6 +28,7 @@ interface UseModalDialogOptions {
   onClose: () => void;
   dialogRef: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -41,6 +42,7 @@ export function useModalDialog({
   onClose,
   dialogRef,
   initialFocusRef,
+  returnFocusRef,
 }: UseModalDialogOptions): boolean {
   const [mounted, setMounted] = useState(false);
   const onCloseRef = useRef(onClose);
@@ -58,10 +60,8 @@ export function useModalDialog({
       return;
     }
 
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+    const previouslyFocused = returnFocusRef?.current ?? (
+      document.activeElement instanceof HTMLElement ? document.activeElement : null);
 
     const focusTimer = window.setTimeout(() => {
       const dialog = dialogRef.current;
@@ -154,7 +154,7 @@ export function useModalDialog({
         }
       }, 0);
     };
-  }, [dialogRef, initialFocusRef, mounted, open]);
+  }, [dialogRef, initialFocusRef, returnFocusRef, mounted, open]);
 
   return mounted;
 }

@@ -258,10 +258,11 @@ test("Library filters and selects an on-demand title", async ({
   await expect(
     page.getByRole("heading", { name: "Your time. Your TV." }),
   ).toBeVisible();
-  const search = page.getByRole("textbox", {
+  const search = page.getByRole("searchbox", {
     name: "Search the Tate's TV library",
   });
   await search.fill("A Calgary Evening");
+  await page.getByRole("button", { name: "Open A Calgary Evening", exact: true }).click();
   await expect(
     page.getByRole("heading", {
       name: "A Calgary Evening",
@@ -269,6 +270,7 @@ test("Library filters and selects an on-demand title", async ({
       level: 2,
     }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close title ✕" }).click();
   await search.fill("no-such-title-123");
   await expect(
     page.getByText("No matching library titles", { exact: true }),
@@ -485,6 +487,7 @@ test("watchlist groups episodes, persists and opens linked titles", async ({
     })
     .click();
   await page.reload();
+  await page.getByRole("button", { name: "Close title ✕" }).click();
   await page
     .getByRole("button", { name: "My watchlist (1)", exact: true })
     .click();
@@ -492,7 +495,7 @@ test("watchlist groups episodes, persists and opens linked titles", async ({
     page.getByRole("heading", {
       name: "A Calgary Evening",
       exact: true,
-      level: 2,
+      level: 3,
     }),
   ).toBeVisible();
   await page
@@ -511,7 +514,7 @@ test("watchlist groups episodes, persists and opens linked titles", async ({
     page.getByRole("button", { name: "My watchlist (0)", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
   await expect(
-    page.getByRole("textbox", { name: "Search the Tate's TV library" }),
+    page.getByRole("searchbox", { name: "Search the Tate's TV library" }),
   ).toBeFocused();
   await expect(page.getByText("Browse Titles", { exact: true })).toBeVisible();
 });

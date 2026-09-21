@@ -167,6 +167,10 @@ try {
     assert.equal(response.status, 401, path);
     assert.match(response.headers["cache-control"], /no-store/);
   }
+  const artworkUnauthorized = await get("/api/admin/artwork/sign", "POST", { Origin: origin });
+  assert.equal(artworkUnauthorized.status, 401);
+  assert.match(artworkUnauthorized.headers["cache-control"], /no-store/);
+  assert.equal((await get("/api/admin/artwork/sign", "POST", { Origin: "https://untrusted.test" })).status, 403);
   assert.equal(
     (
       await get("/api/admin/login", "POST", {

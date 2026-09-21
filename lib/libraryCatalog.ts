@@ -1,3 +1,4 @@
+import { safeArtworkUrl, type LibraryArtwork } from "./libraryPresentation";
 import { cleanDisplayText } from "./textClean";
 import type { MediaItem, MediaType } from "./types";
 
@@ -224,7 +225,7 @@ export function parseLibraryItem(media: MediaItem): ParsedLibraryItem {
   };
 }
 
-export function buildLibrary(media: MediaItem[]): LibraryGroup[] {
+export function buildLibrary(media: MediaItem[], artwork: LibraryArtwork = {}, kids = false): LibraryGroup[] {
   const groups = new Map<string, LibraryGroup>();
 
   media
@@ -262,6 +263,7 @@ export function buildLibrary(media: MediaItem[]): LibraryGroup[] {
   return Array.from(groups.values())
     .map((group) => ({
       ...group,
+      poster: (artwork[group.key] && (!kids || artwork[group.key]?.kidsApproved) ? safeArtworkUrl(artwork[group.key]?.poster) : "") || safeArtworkUrl(group.poster) || undefined,
       seasons: [...group.seasons].sort((a, b) => a - b),
       items: [...group.items].sort((a, b) => {
         if (a.season !== b.season) return a.season - b.season;

@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+import { isAdminRequestAuthorized } from "@/lib/server/adminAuth";
+import { NextResponse } from "next/server";
 import {
   sanitizeProgrammingSnapshot,
   type ProgrammingApiResponse,
@@ -93,6 +94,9 @@ export async function GET() {
       );
     }
 
+    if (!(await isAdminRequestAuthorized())) {
+      snapshot.upcomingTitles = (snapshot.upcomingTitles ?? []).filter((title) => title.published);
+    }
     return jsonResponse(
       createSuccessResponse(snapshot, "database"),
     );

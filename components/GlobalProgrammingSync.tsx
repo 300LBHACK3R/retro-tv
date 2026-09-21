@@ -181,6 +181,7 @@ export default function GlobalProgrammingSync({
 
   const saveTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
+  const canSaveRef = useRef(false);
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const mountedRef = useRef(false);
@@ -213,7 +214,7 @@ export default function GlobalProgrammingSync({
 
   const saveProgramming = useCallback(
     async (reason: "auto" | "manual" = "auto") => {
-      if (!isAdminAuthorized) {
+      if (!isAdminAuthorized || !canSaveRef.current) {
         return;
       }
 
@@ -242,6 +243,7 @@ export default function GlobalProgrammingSync({
         return;
       }
 
+      let succeeded = false;
       try {
         isSavingRef.current = true;
         pendingSaveRef.current = false;
@@ -277,6 +279,7 @@ export default function GlobalProgrammingSync({
           return;
         }
 
+        succeeded = true;
         const savedAt = getSavedAtFromResponse(data, snapshot);
 
         lastSavedSignatureRef.current = signature;
@@ -305,7 +308,7 @@ export default function GlobalProgrammingSync({
       } finally {
         isSavingRef.current = false;
 
-        if (pendingSaveRef.current && mountedRef.current && window.navigator.onLine) {
+        if (succeeded && pendingSaveRef.current && mountedRef.current && window.navigator.onLine) {
           pendingSaveRef.current = false;
           void saveProgramming("auto");
         }
@@ -326,6 +329,7 @@ export default function GlobalProgrammingSync({
     let cancelled = false;
 
     const loadProgramming = async () => {
+      canSaveRef.current = false;
       setIsHydrated(false);
       setStatus("loading");
       setMessage("Loading global programming");
@@ -355,6 +359,7 @@ export default function GlobalProgrammingSync({
           lastQueuedSignatureRef.current = signature;
 
           setLastSavedAt(data.programming.updatedAt ?? null);
+          canSaveRef.current = isAdminAuthorized;
           setIsHydrated(true);
           setStatus("loaded");
           setMessage(createStatusMessage("Global loaded", data.programming));
@@ -369,6 +374,7 @@ export default function GlobalProgrammingSync({
 
         setLastSavedAt(localSnapshot.updatedAt ?? null);
         setIsHydrated(true);
+        canSaveRef.current = isAdminAuthorized;
         setStatus("fallback");
         setMessage("Using local/default programming");
       } catch (error) {
@@ -385,7 +391,7 @@ export default function GlobalProgrammingSync({
         lastQueuedSignatureRef.current = localSignature;
 
         setLastSavedAt(localSnapshot.updatedAt ?? null);
-        setIsHydrated(true);
+        setIsHydrated(!isAdminAuthorized);
         setStatus(window.navigator.onLine ? "error" : "offline");
         setMessage(
           window.navigator.onLine
@@ -401,7 +407,7 @@ export default function GlobalProgrammingSync({
       cancelled = true;
       mountedRef.current = false;
     };
-  }, [exportProgrammingSnapshot, replaceProgramming]);
+  }, [exportProgrammingSnapshot, replaceProgramming, isAdminAuthorized]);
 
   useEffect(() => {
     if (!isAdminAuthorized || !isHydrated) {
