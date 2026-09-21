@@ -519,6 +519,7 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
           "Classic rock, hard rock, alternative hits, and legendary performances from the 70s through the early 2000s.",
         accentColor: "#dc2626",
         logoText: "AMPLIFY",
+        logoUrl: "/channel-logos/ch-21-amplify.png",
       };
 
     case 22:
@@ -529,6 +530,7 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
           "Joyful songs, uplifting messages, and faith-filled music for children and families.",
         accentColor: "#a3e635",
         logoText: "LITTLE PRAISE",
+        logoUrl: "/channel-logos/ch-22-little-praise.png",
       };
 
     case 23:
@@ -539,6 +541,7 @@ function createDefaultChannelBranding(channelNumber: number): ChannelBranding {
           "Worship, praise, inspiration, and songs that strengthen faith and encourage believers.",
         accentColor: "#c084fc",
         logoText: "WORSHIP",
+        logoUrl: "/channel-logos/ch-23-worship.png",
       };
 
     default:
@@ -787,7 +790,11 @@ function normalizeCommercialCategory(value: unknown): string | undefined {
 function normalizeBrandingUrl(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
 
-  const clean = value.trim().slice(0, 1000);
+  // Upgrade only retired first-party assets; preserve custom station artwork.
+  const clean = value.trim().slice(0, 1000).replace(
+    /^(?:https?:\/\/(?:www\.)?tatestv\.ca)?(\/channel-logos\/ch-(?:21-amplify|22-little-praise|23-worship))\.svg(?=$|[?#])/i,
+    (_match, path: string) => `${path.toLowerCase()}.png`,
+  );
 
   if (!clean) return undefined;
 
