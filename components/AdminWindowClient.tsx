@@ -12,7 +12,6 @@ import {
 } from "react";
 import AdminDashboard from "@/components/AdminDashboard";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
-import ThemeButton from "@/components/ThemeButton";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themeLayouts";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
@@ -225,8 +224,6 @@ export default function AdminWindowClient() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <ThemeButton />
-
             <button
               type="button"
               onClick={returnToTv}

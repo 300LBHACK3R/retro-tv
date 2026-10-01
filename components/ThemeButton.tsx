@@ -12,9 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import afterDarkWorld from "@/public/themes/halloween-after-dark-world.webp";
-import hauntedWorld from "@/public/themes/haunted-arcade-world.webp";
-import halloween90sWorld from "@/public/themes/halloween-90s-world.webp";
+import { THEME_PREVIEWS } from "@/components/themePreviews";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
@@ -28,7 +26,6 @@ import {
   type ThemeDefinition,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
-import { THEME_LIBRARY_OPEN_EVENT } from "@/lib/themeEvents";
 
 const DIALOG_ID = "ttv-theme-library";
 
@@ -105,6 +102,7 @@ function ThemeCard({
   onSelect: (theme: ThemeDefinition) => void;
 }) {
   const category = getThemeCategoryMeta(theme.category);
+  const preview = THEME_PREVIEWS[theme.id];
   const previewStyle = {
     "--theme-preview": theme.previewGradient,
   } as CSSProperties;
@@ -124,22 +122,17 @@ function ThemeCard({
         style={previewStyle}
         aria-hidden="true"
       >
+        <Image
+          src={preview.image}
+          alt=""
+          fill
+          sizes="(max-width: 359px) 90vw, (max-width: 767px) 46vw, 380px"
+          placeholder="blur"
+          className={`theme-card__preview-art${"className" in preview ? ` ${preview.className}` : ""}`}
+        />
         {theme.id === "halloween-90s-night" ? (
-          <>
-            <Image src={halloween90sWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-halloween90-preview-art" />
-            <span className="ttv-halloween90-preview-label">HALLOWEEN &apos;95</span>
-          </>
-        ) : theme.id === "halloween-haunted-arcade" ? (
-          <Image src={hauntedWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-haunted-preview-art" />
-        ) : theme.id === "halloween-night" ? (
-          <Image src={afterDarkWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-afterdark-preview-art" />
-        ) : (
-        <span className="theme-card__preview-ui">
-          <span />
-          <span />
-          <span />
-        </span>
-        )}
+          <span className="ttv-halloween90-preview-label">HALLOWEEN &apos;95</span>
+        ) : null}
         <span className="theme-card__status">
           {isActive ? "Active" : accessLabel}
         </span>
@@ -233,20 +226,6 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
   useEffect(() => {
     setPortalReady(true);
-  }, []);
-
-  useEffect(() => {
-    const openThemeLibrary = () => {
-      setQuery("");
-      setCategoryFilter("all");
-      setIsOpen(true);
-    };
-
-    window.addEventListener(THEME_LIBRARY_OPEN_EVENT, openThemeLibrary);
-
-    return () => {
-      window.removeEventListener(THEME_LIBRARY_OPEN_EVENT, openThemeLibrary);
-    };
   }, []);
 
   const applyTheme = useCallback(

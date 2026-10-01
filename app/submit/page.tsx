@@ -1,7 +1,6 @@
 import { pageMetadata } from "@/lib/metadata";
 import Image from "next/image";
 import Link from "next/link";
-import ThemeButton from "@/components/ThemeButton";
 
 import SubmitClipForm from "./SubmitClipForm";
 
@@ -49,7 +48,6 @@ export default function SubmitClipPage() {
           className="ttv-submit-nav__actions"
           aria-label="Submission page navigation"
         >
-          <ThemeButton />
           <Link href="/library">Library</Link>
           <Link href="/">Live TV</Link>
         </nav>

@@ -114,7 +114,7 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 export const THEMES = [
   {
     id: "halloween-90s-night",
-    name: "'90s Halloween Night",
+    name: "Halloween '95: Be Kind, Rewind",
     shortName: "Halloween '95",
     description:
       "One more tape before bed. A cosy Halloween living room with VHS shelves, pumpkin lights, a green-glowing CRT and warm cable-TV colours. Be kind, rewind.",

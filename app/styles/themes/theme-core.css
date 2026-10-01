@@ -406,6 +406,8 @@
 
 .theme-card__preview {
   position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
   min-height: 8.5rem;
   overflow: hidden;
   border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
@@ -421,28 +423,14 @@
     repeating-linear-gradient(180deg, transparent 0 5px, rgba(255, 255, 255, 0.025) 5px 6px);
 }
 
-.theme-card__preview-ui {
-  position: absolute;
-  inset: 0.8rem;
-  display: grid;
-  grid-template-columns: 1.1fr 1.8fr;
-  gap: 0.55rem;
-}
-
-.theme-card__preview-ui span {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.55rem;
-  background: rgba(0, 0, 0, 0.32);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.theme-card__preview-ui span:last-child {
-  grid-column: 1 / -1;
-  min-height: 2rem;
+.theme-card__preview-art {
+  object-fit: cover;
+  object-position: center;
 }
 
 .theme-card__status {
   position: absolute;
+  z-index: 1;
   top: 0.65rem;
   right: 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -640,7 +628,6 @@
   .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
   .theme-card { border-radius: 1rem; align-content: start; }
   .theme-card__preview { min-height: 6.5rem; }
-  .theme-card__preview-ui { inset: .65rem; gap: .35rem; }
   .theme-card__content { padding: .65rem; gap: .45rem; }
   .theme-card__topline { flex-direction: column; gap: .5rem; }
   .theme-card__name { font-size: .95rem; line-height: 1.3; }

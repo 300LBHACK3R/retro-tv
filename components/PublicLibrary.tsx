@@ -10,7 +10,6 @@ import {
   type CSSProperties,
 } from "react";
 import ProfileGate, { ProfileButton } from "@/components/viewer/ProfileGate";
-import ThemeButton from "@/components/ThemeButton";
 import SaveButton from "@/components/viewer/SaveButton";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import ComingSoon from "@/components/library/ComingSoon";
@@ -206,10 +205,7 @@ function ProfileLibrary() {
               />
             </Link>
             <div className={styles.headerActions}>
-              <div className="ttv-profile-theme-actions">
-                <ThemeButton compact />
-                <ProfileButton />
-              </div>
+              <ProfileButton />
               <Link href="/" className={styles.button}>
                 Live TV
               </Link>

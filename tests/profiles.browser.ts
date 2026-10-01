@@ -512,7 +512,6 @@ test("After Dark entrance fills the viewport, remembers accessibility and resets
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await testInfo.attach("after-dark-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
-  await page.goto("/library");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");

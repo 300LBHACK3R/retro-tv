@@ -44,8 +44,3 @@
 .ttv-layout-light-cable .ttv-main-header {
   border-top: 4px solid var(--primary);
 }
-
-:root[data-ttv-layout="light-cable"] .theme-card__preview-ui span,
-.ttv-layout-light-cable .theme-card__preview-ui span {
-  border-color: rgba(255, 255, 255, 0.55);
-}

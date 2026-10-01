@@ -378,12 +378,6 @@
   text-transform: uppercase;
 }
 
-.ttv-open-theme-button {
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-}
-
 .ttv-viewer-link-grid > a {
   display: block;
   text-decoration: none;

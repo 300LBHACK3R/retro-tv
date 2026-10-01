@@ -218,8 +218,10 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
     }),
   ).toBeVisible();
   await openMore(page);
+  await expect(page.getByRole("button", { name: "Theme library Open", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await page
-    .getByRole("button", { name: "Theme library Open", exact: true })
+    .getByRole("button", { name: "Open theme library", exact: true })
     .click();
   await expect(
     page.getByRole("dialog", { name: /Theme Library/i }),
@@ -238,6 +240,7 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
   // Client navigation keeps the in-memory selection without writing it to profiles.
   await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/\/library$/);
+  await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("retro-tv-programming-v1")!).state);
   expect(stored.themeId).toBeUndefined();
@@ -309,10 +312,17 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     page.getByRole("heading", { name: "Your time. Your TV." }),
   ).toBeVisible();
   for (const theme of THEMES) {
+    await page.getByRole("link", { name: "Live TV", exact: true }).click();
     await page
       .getByRole("button", { name: "Open theme library", exact: true })
       .click();
-    await page.locator(`.theme-card[data-theme-id="${theme.id}"]`).click();
+    await expect(page.locator(".theme-card")).toHaveCount(THEMES.length);
+    const card = page.locator(`.theme-card[data-theme-id="${theme.id}"]`);
+    await card.scrollIntoViewIfNeeded();
+    await expect.poll(() => card.locator("img").evaluate((image: HTMLImageElement) =>
+      image.complete && image.naturalWidth > 0,
+    )).toBe(true);
+    await card.click();
     await expect(page.locator("html")).toHaveAttribute(
       "data-ttv-theme",
       theme.id,
@@ -320,6 +330,9 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     await expect(
       page.getByRole("dialog", { name: /Theme Library/i }),
     ).toHaveCount(0);
+    await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
+    await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);
     if (theme.category === "seasonal") {
       const afterDark = theme.id === "halloween-night";
       const nineties = theme.id === "halloween-90s-night";
@@ -788,7 +801,7 @@ test("mobile guide fits narrow screens, landscape and larger text with reachable
 test("mobile themes are free, open without the keyboard, and remember reduced motion without saving a theme", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "television");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/library");
+  await page.goto("/?ch=24");
   const trigger = page.getByRole("button", { name: "Open theme library", exact: true });
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Theme Library", exact: true });
@@ -802,7 +815,7 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);
   await expect(dialog.getByRole("group", { name: "Theme access filters" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Seasonal", exact: true }).click();
-  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter((theme) => theme.category === "seasonal").length);
   const cards = await dialog.locator(".theme-card").evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, top: rect.top, width: rect.width };
@@ -828,7 +841,6 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await page.getByRole("button", { name: "Reduce motion Off", exact: true }).click();
   await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
-  await page.goto("/library");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
   await expect(page.locator(".ttv-afterdark-witch")).toHaveCSS("animation-name", "none");

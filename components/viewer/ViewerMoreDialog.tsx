@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import { useModalDialog } from "@/components/viewer/useModalDialog";
 import OpenAdminWindowButton from "@/components/OpenAdminWindowButton";
 import { useStore } from "@/lib/store";
-import { requestThemeLibraryOpen } from "@/lib/themeEvents";
 import {
   getChannelDisplayName,
   getChannelLabel,
@@ -76,14 +75,6 @@ export default function ViewerMoreDialog({
   }
 
   const tvModeUrl = channel ? `/tv?ch=${encodeURIComponent(channel.id)}` : "/tv";
-
-  const openThemeLibrary = () => {
-    onClose();
-
-    window.requestAnimationFrame(() => {
-      requestThemeLibraryOpen();
-    });
-  };
 
   return createPortal(
     <div
@@ -157,22 +148,11 @@ export default function ViewerMoreDialog({
 
           <section className="ttv-viewer-settings-section">
             <div className="ttv-viewer-settings-heading">
-              <span>Appearance & accessibility</span>
-              <small>Themes keep the same layout and controls.</small>
+              <span>Accessibility & guide</span>
+              <small>Adjust the guide spacing and motion on this device.</small>
             </div>
 
             <div className="ttv-viewer-preference-grid">
-              {!tvMode ? (
-                <button
-                  type="button"
-                  className="ttv-preference-toggle ttv-open-theme-button"
-                  onClick={openThemeLibrary}
-                >
-                  <strong>Theme library</strong>
-                  <span>Open</span>
-                </button>
-              ) : null}
-
               <button
                 type="button"
                 className="ttv-preference-toggle"
