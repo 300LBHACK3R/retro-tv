@@ -10,6 +10,7 @@ import {
 } from "@/lib/themes";
 
 const HauntedArcadeScene = dynamic(() => import("@/components/HauntedArcadeScene"), { ssr: false });
+const Halloween90sScene = dynamic(() => import("@/components/Halloween90sScene"), { ssr: false });
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
 const THEME_CHANGE_EVENT = "ttv:theme-change";
@@ -86,5 +87,6 @@ export default function ThemeRuntime() {
 
   if (theme.id === "halloween-night") return <HalloweenAfterDark />;
   if (theme.id === "halloween-haunted-arcade") return <HauntedArcadeScene />;
+  if (theme.id === "halloween-90s-night") return <Halloween90sScene />;
   return null;
 }

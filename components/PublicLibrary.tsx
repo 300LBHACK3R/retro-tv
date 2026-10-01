@@ -206,8 +206,10 @@ function ProfileLibrary() {
               />
             </Link>
             <div className={styles.headerActions}>
-              <ProfileButton />
-              <ThemeButton />
+              <div className="ttv-profile-theme-actions">
+                <ThemeButton compact />
+                <ProfileButton />
+              </div>
               <Link href="/" className={styles.button}>
                 Live TV
               </Link>

@@ -617,13 +617,15 @@
   }
   .headerInner {
     padding: 10px;
+    flex-wrap: wrap;
   }
   .headerActions {
     gap: 4px;
+    margin-left: auto;
   }
   .headerActions :global(.ttv-profile-switch) {
-    width: 40px;
-    min-width: 40px;
+    width: 44px;
+    min-width: 44px;
     padding: 4px;
   }
   .headerActions :global(.ttv-profile-switch__name) {
@@ -665,17 +667,5 @@
   .button,
   .primary {
     border: 1px solid ButtonText;
-  }
-}
-
-@media (max-width: 760px) {
-  .headerActions :global(.theme-trigger__copy),
-  .headerActions :global(.theme-trigger__chevron) {
-    display: none;
-  }
-  .headerActions :global(.theme-trigger) {
-    width: 44px;
-    padding: 10px;
-    flex-shrink: 0;
   }
 }

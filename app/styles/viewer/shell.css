@@ -14,9 +14,6 @@
 .ttv-premium-nav > :where(button,a):hover { background: var(--button-bg); color: var(--text); }
 .ttv-premium-nav > [aria-current="page"] { color: var(--primary); background: var(--button-bg); }
 .ttv-premium-nav svg, .ttv-mobile-viewer-nav svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
-.ttv-premium-nav .theme-trigger { width: 2.75rem; min-height: 2.75rem; padding: .6rem; border-radius: .6rem; grid-template-columns: 1fr; }
-.ttv-premium-nav .theme-trigger__copy, .ttv-premium-nav .theme-trigger__chevron { display: none; }
-.ttv-premium-nav .theme-trigger__swatch { width: 1.3rem; height: 1.3rem; border-radius: 50%; }
 .ttv-premium-stage-grid { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1.5rem; align-items: stretch; }
 .ttv-premium-stage-player, .ttv-premium-stage-sidebar, .ttv-live-stage { min-width: 0; }
 .ttv-live-stage { scroll-margin-top: 1rem; }

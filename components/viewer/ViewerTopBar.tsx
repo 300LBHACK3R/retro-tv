@@ -136,8 +136,6 @@ export default function ViewerTopBar({
           <span>Library</span>
         </Link>
 
-        {!tvMode ? <ThemeButton /> : null}
-
         <button
           type="button"
           onClick={onOpenMore}
@@ -149,7 +147,10 @@ export default function ViewerTopBar({
           <span>More</span>
         </button>
       </nav>
-      <ProfileButton />
+      <div className="ttv-profile-theme-actions">
+        {!tvMode ? <ThemeButton compact /> : null}
+        <ProfileButton />
+      </div>
     </header>
   );
 }

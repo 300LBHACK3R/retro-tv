@@ -9,6 +9,7 @@ export type PlayerViewMode = "normal" | "mini" | "theater";
 export type ThemeId =
   | "halloween-night"
   | "halloween-haunted-arcade"
+  | "halloween-90s-night"
   | "ttv-neon-crt"
   | "shaw-2006"
   | "telus-2008-inspired"

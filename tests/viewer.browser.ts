@@ -242,7 +242,7 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("retro-tv-programming-v1")!).state);
   expect(stored.themeId).toBeUndefined();
   expect(stored.themeRevision).toBeUndefined();
-  await page.getByRole("link", { name: "Back to Live TV", exact: true }).click();
+  await page.getByRole("link", { name: "Live TV", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
@@ -320,8 +320,9 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     await expect(
       page.getByRole("dialog", { name: /Theme Library/i }),
     ).toHaveCount(0);
-    if (theme.id === "halloween-night" || theme.id === "halloween-haunted-arcade") {
+    if (theme.category === "seasonal") {
       const afterDark = theme.id === "halloween-night";
+      const nineties = theme.id === "halloween-90s-night";
       const world = page.locator(".ttv-seasonal-world");
       await expect(world).toHaveCount(1);
       await expect(world).toBeVisible();
@@ -340,7 +341,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       expect(Math.abs(layout.width - layout.viewportWidth)).toBeLessThanOrEqual(1);
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
       const portrait = await page.evaluate(() => matchMedia("(max-width: 760px) and (orientation: portrait)").matches);
-      const imageName = `${afterDark ? "halloween-after-dark" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
+      const imageName = `${afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
       await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
         image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
       )).toBe(true);
@@ -349,12 +350,13 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       await page.emulateMedia({ reducedMotion: "reduce" });
       for (const selector of afterDark
         ? [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"]
+        : nineties ? [".ttv-halloween90-lamplight", ".ttv-halloween90-screen-glow", ".ttv-halloween90-dust i"]
         : [".ttv-haunted-ghost", ".ttv-haunted-mist", ".ttv-haunted-cabinet-light"])
         expect(await world.locator(selector).first().evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
       await testInfo.attach(`${theme.id}-full-page`, { body: await page.screenshot(), contentType: "image/png" });
       await page.emulateMedia({ reducedMotion: "no-preference" });
       if (!afterDark) {
-        await page.getByRole("link", { name: "Back to Live TV", exact: true }).click();
+        await page.getByRole("link", { name: "Live TV", exact: true }).click();
         await expect(page.locator(".ttv-premium-viewer-shell")).toBeVisible();
         await expect(world).toHaveCount(1);
         await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", theme.id);

@@ -63,6 +63,8 @@ export function assertHalloweenStyles(css, context = "Halloween") {
   for (const name of ["world", "art", "scrim", "fog", "witch", "skeleton", "skeleton-wave", "preview-art"])
     assert.ok(css.includes(`.ttv-afterdark-${name}`), `${context}: missing full-page After Dark ${name}`);
   assert.ok(css.includes("ttv-afterdark-flight"), `${context}: missing seasonal animation`);
+  for (const name of ["world", "art", "scanlines", "screen-glow", "preview-art"])
+    assert.ok(css.includes(`.ttv-halloween90-${name}`), `${context}: missing '90s Halloween ${name}`);
 }
 
 export function assertDefaultScenery(html, context) {

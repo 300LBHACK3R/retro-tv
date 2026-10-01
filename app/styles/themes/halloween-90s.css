@@ -1,0 +1,130 @@
+/* Halloween, 1995: warm rental-night artwork and tactile cable-box chrome. */
+:root[data-ttv-theme="halloween-90s-night"] {
+  --ttv-halloween90-stripe: linear-gradient(90deg, #ffaf62 0 34%, #bd94d7 34% 68%, #c9ed94 68%);
+  --ttv-header-highlight: linear-gradient(120deg, #ffaf6214, #bd94d70d 55%, #c9ed9408);
+}
+.ttv-halloween90-world { background: #16101e; }
+:root:not([data-ttv-theme="halloween-90s-night"]) .ttv-halloween90-world { display: none; }
+.ttv-halloween90-art { object-fit: cover; object-position: center; }
+.ttv-halloween90-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, #16101e40, transparent 70%),
+    linear-gradient(180deg, #16101e20, transparent 35%, #16101e18);
+}
+.ttv-halloween90-lamplight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 5% 75%, #ffa13e30, transparent 28%),
+    radial-gradient(ellipse at 50% 0, #ffaf6218, transparent 44%);
+  animation: ttv-halloween90-warmth 12s ease-in-out infinite alternate;
+}
+.ttv-halloween90-screen-glow {
+  position: absolute;
+  right: -8%; top: 30%; width: 36%; height: 50%;
+  background: radial-gradient(ellipse, #c9ed9426, transparent 66%);
+  animation: ttv-halloween90-warmth 16s ease-in-out infinite alternate-reverse;
+}
+/* Static scanlines sit on the artwork only, never on the player or text. */
+.ttv-halloween90-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, #0b071522 3px 4px);
+  opacity: .3;
+}
+.ttv-halloween90-dust { position: absolute; inset: 0; }
+.ttv-halloween90-dust i {
+  position: absolute;
+  left: 9%; bottom: 18%; width: 3px; height: 3px;
+  border-radius: 50%; background: #ffcf89; opacity: 0;
+  animation: ttv-halloween90-drift 23s linear infinite;
+}
+.ttv-halloween90-dust i:nth-child(2) { left: 17%; bottom: 30%; animation-delay: -7s; }
+.ttv-halloween90-dust i:nth-child(3) { left: 88%; bottom: 17%; animation-delay: -13s; }
+.ttv-halloween90-dust i:nth-child(4) { left: 95%; bottom: 34%; animation-delay: -19s; }
+@keyframes ttv-halloween90-warmth { from { opacity: .4; } to { opacity: .85; } }
+@keyframes ttv-halloween90-drift {
+  0%, 100% { opacity: 0; }
+  20%, 65% { opacity: .45; }
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(12px, -90px); }
+}
+
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-premium-topbar, .ttv-library-header, .ttv-mobile-viewer-nav) {
+  background: linear-gradient(110deg, #36283bec, #211929f5 65%);
+  border-color: #796489;
+  box-shadow: inset 0 1px #fff5df17, 0 8px 24px #09051145;
+}
+:root[data-ttv-theme="halloween-90s-night"] .ttv-premium-topbar { border-bottom: 3px solid #b38469; }
+:root[data-ttv-theme="halloween-90s-night"] .ttv-premium-topbar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -3px;
+  height: 3px;
+  background: var(--ttv-halloween90-stripe);
+  pointer-events: none;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-premium-player-frame, .ttv-guide-shell) {
+  border-color: #9a879f;
+  box-shadow: 0 0 0 2px #302536, 0 0 0 3px #91798680, 0 15px 44px #08030c80;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-premium-stage-sidebar, .ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-glass-panel, .ttv-glass-panel-strong, .ttv-surface, .ttv-profile-panel) {
+  background: linear-gradient(145deg, #2d2337, #211929 72%);
+  border-color: #796489;
+  box-shadow: inset 0 1px #fff5df1c, 0 10px 28px #08030c44;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.theme-trigger, .ttv-profile-switch) {
+  border-color: #9b7c9e;
+  box-shadow: inset 0 1px #fff5df20, inset 0 -2px #120b1b55;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-section-kicker, .ttv-guide-dialog-header, .ttv-mobile-now-heading) {
+  font-family: ui-monospace, "Cascadia Code", "Courier New", monospace;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-guide-dialog-header, .ttv-mobile-now-heading, .ttv-mobile-schedule-toolbar, .ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #3b2c45, #2d2337);
+  border-color: #9b7c9e;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  border-color: #a58bac;
+  box-shadow: inset 0 3px #ffaf62, 0 24px 80px #08030cc9;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)[data-selected="true"],
+:root[data-ttv-theme="halloween-90s-night"] .ttv-mobile-channel[data-current="true"] {
+  border-color: #c9ed94;
+  box-shadow: inset 3px 0 #c9ed94;
+}
+:root[data-ttv-theme="halloween-90s-night"] :is(.ttv-profile-screen h1, .ttv-section-heading h2) {
+  text-shadow: 0 3px #241229, 0 0 25px #16101e;
+}
+:root[data-ttv-theme="halloween-90s-night"] .ttv-profile-card:focus-visible .ttv-profile-avatar {
+  box-shadow: 0 0 0 3px #c9ed94, 0 8px 26px #c9ed9433;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-ttv-theme="halloween-90s-night"] .ttv-profile-card:hover .ttv-profile-avatar {
+    box-shadow: 0 0 0 3px #ffaf62, 0 8px 26px #ffaf6233;
+  }
+}
+.ttv-halloween90-preview-art { object-fit: cover; object-position: center 68%; }
+.ttv-halloween90-preview-label {
+  position: absolute;
+  left: 12px; bottom: 12px;
+  padding: 5px 8px;
+  color: #211929; background: #fff5df;
+  border-left: 5px solid #ffaf62;
+  font: 700 .75rem/1.2 ui-monospace, monospace;
+  letter-spacing: .05em;
+  transform: rotate(-3deg);
+}
+.theme-card[data-theme-id="halloween-90s-night"] .theme-card__status { z-index: 1; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .ttv-halloween90-art { object-position: center bottom; }
+  .ttv-halloween90-screen-glow { top: 43%; right: -12%; width: 50%; height: 38%; }
+  .ttv-halloween90-dust i:nth-child(even) { display: none; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .ttv-halloween90-dust { display: none; }
+}
+@media (forced-colors: active) {
+  :root[data-ttv-theme="halloween-90s-night"] :is(.ttv-profile-screen h1, .ttv-section-heading h2) { text-shadow: none; }
+  :root[data-ttv-theme="halloween-90s-night"] .ttv-premium-topbar::after { display: none; }
+}

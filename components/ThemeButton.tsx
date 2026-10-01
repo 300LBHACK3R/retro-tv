@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import afterDarkWorld from "@/public/themes/halloween-after-dark-world.webp";
 import hauntedWorld from "@/public/themes/haunted-arcade-world.webp";
+import halloween90sWorld from "@/public/themes/halloween-90s-world.webp";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
@@ -123,7 +124,12 @@ function ThemeCard({
         style={previewStyle}
         aria-hidden="true"
       >
-        {theme.id === "halloween-haunted-arcade" ? (
+        {theme.id === "halloween-90s-night" ? (
+          <>
+            <Image src={halloween90sWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-halloween90-preview-art" />
+            <span className="ttv-halloween90-preview-label">HALLOWEEN &apos;95</span>
+          </>
+        ) : theme.id === "halloween-haunted-arcade" ? (
           <Image src={hauntedWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-haunted-preview-art" />
         ) : theme.id === "halloween-night" ? (
           <Image src={afterDarkWorld} alt="" fill sizes="(max-width: 767px) 50vw, 360px" className="ttv-afterdark-preview-art" />
@@ -189,7 +195,7 @@ function ThemeCard({
   );
 }
 
-export default function ThemeButton() {
+export default function ThemeButton({ compact = false }: { compact?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -370,7 +376,7 @@ export default function ThemeButton() {
       <button
         ref={triggerRef}
         type="button"
-        className="theme-trigger ttv-touch-target"
+        className={`theme-trigger ttv-touch-target${compact ? " theme-trigger--compact" : ""}`}
         onClick={() => {
           setQuery("");
           setCategoryFilter("all");
@@ -390,7 +396,7 @@ export default function ThemeButton() {
         />
 
         <span className="theme-trigger__copy">
-          <span className="theme-trigger__label">Theme</span>
+          <span className="theme-trigger__label">Themes</span>
           <span className="theme-trigger__name">{activeTheme.shortName}</span>
         </span>
 

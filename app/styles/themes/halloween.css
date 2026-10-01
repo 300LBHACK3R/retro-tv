@@ -15,16 +15,16 @@
   height: 100%;
 }
 /* Shells include inline backgrounds. Theme scenery replaces just that backdrop. */
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
+:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
   background: transparent !important;
 }
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after,
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) .ttv-library-ambient { display: none; }
+:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,
+:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after,
+:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) .ttv-library-ambient { display: none; }
 :root[data-ttv-page-visible="false"] .ttv-seasonal-world * { animation-play-state: paused !important; }
 :root[data-ttv-reduced-motion="true"] .ttv-seasonal-world * { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .ttv-seasonal-world * { animation: none !important; } }
 @media (forced-colors: active) {
   .ttv-seasonal-world { display: none !important; }
-  :root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) { background: Canvas !important; }
+  :root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) { background: Canvas !important; }
 }

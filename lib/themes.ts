@@ -113,6 +113,40 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 
 export const THEMES = [
   {
+    id: "halloween-90s-night",
+    name: "'90s Halloween Night",
+    shortName: "Halloween '95",
+    description:
+      "One more tape before bed. A cosy Halloween living room with VHS shelves, pumpkin lights, a green-glowing CRT and warm cable-TV colours. Be kind, rewind.",
+    priceLabel: "Free",
+    isPremium: false,
+    category: "seasonal",
+    layout: "classic-cable",
+    appearance: "dark",
+    previewGradient:
+      "radial-gradient(ellipse at 12% 85%, #d16a2755, transparent 50%), radial-gradient(ellipse at 90% 60%, #b7e58033, transparent 45%), linear-gradient(135deg, #16101e, #34243e)",
+    recommendedFor: ["Halloween", "90s", "VHS", "cosy movie night", "retro TV"],
+    colors: {
+      appBg: "#16101e",
+      panelBg: "#211929",
+      panelAltBg: "#2d2337",
+      border: "#796489",
+      text: "#fff5df",
+      textMuted: "#d0bed6",
+      buttonBg: "#362a43",
+      buttonHover: "#483754",
+      primary: "#ffaf62",
+      secondary: "#c9ed94",
+      onPrimary: "#20151c",
+      focusRing: "#d9ffac",
+      guideHeaderBg: "#2d2337",
+      guideRowBg: "#211929",
+      guideRowAltBg: "#2a2033",
+      guideActiveBg: "#c9ed94",
+      guideCurrentBg: "#ffaf62",
+    },
+  },
+  {
     id: "halloween-night",
     name: "Halloween After Dark",
     shortName: "Halloween",
