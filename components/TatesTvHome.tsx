@@ -38,7 +38,7 @@ import { useBroadcastDayAnchor } from "@/components/viewer/useBroadcastDayAnchor
 import { useNumericChannelTune } from "@/components/viewer/useNumericChannelTune";
 import { buildSchedule } from "@/lib/scheduler";
 import { useStore } from "@/lib/store";
-import { getThemeLayoutClass } from "@/lib/themeLayouts";
+import { getThemeLayoutClass } from "@/lib/themes";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import {
   getMediaForChannel,

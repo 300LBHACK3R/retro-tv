@@ -52,3 +52,20 @@ public/media/
 
 /playwright-report/
 /test-results/
+
+# Local caches and editor backup copies (never source)
+/.turbo/
+/.cache/
+**/*.before-*
+**/*.backup-*
+**/*.repair-backup-*
+**/* copy.*
+**/* Copy.*
+
+# One-time update downloads belong outside the project
+/TatesTV-*.zip
+/Update-TatesTV-*.ps1
+/Start-TatesTV-*.ps1
+/Repair-TatesTV-*.ps1
+/Resume-TatesTV-*.ps1
+/Publish-TatesTV-*.ps1

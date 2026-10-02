@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import AdminDirectUploadCard from "@/components/AdminDirectUploadCard";
+import AdminDirectUploadCard from "@/components/admin/AdminDirectUploadCard";
 import { probeVideoDuration } from "@/lib/mediaDuration";
 import {
   createMediaItemFromUrl,

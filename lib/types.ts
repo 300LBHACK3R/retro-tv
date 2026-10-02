@@ -107,56 +107,6 @@ export interface ChannelAdPolicy {
   allowHouseAds?: boolean;
 }
 
-export const TTV_PULSE_REACTIONS = [
-  {
-    id: "fire",
-    emoji: "\u{1F525}",
-    label: "Fire",
-  },
-  {
-    id: "funny",
-    emoji: "\u{1F602}",
-    label: "Funny",
-  },
-  {
-    id: "nostalgia",
-    emoji: "\u{1F4FC}",
-    label: "Nostalgia",
-  },
-  {
-    id: "classic",
-    emoji: "\u2B50",
-    label: "Classic",
-  },
-  {
-    id: "faith",
-    emoji: "\u{1F64F}",
-    label: "Faith Pick",
-  },
-] as const;
-
-export type PulseReactionId = (typeof TTV_PULSE_REACTIONS)[number]["id"];
-
-export interface PulseReactionDefinition {
-  id: PulseReactionId;
-  emoji: string;
-  label: string;
-}
-
-export type PulseReactionCounts = Partial<Record<PulseReactionId, number>>;
-
-export type PulseCountsByMedia = Record<string, PulseReactionCounts>;
-
-export type PulseUserReactions = Record<string, PulseReactionId>;
-
-export interface PulseEngagementSummary {
-  mediaKey: string;
-  total: number;
-  reactions: PulseReactionCounts;
-  userReaction?: PulseReactionId;
-  updatedAt?: string;
-}
-
 export interface ChannelBranding {
   displayName: string;
   callsign: string;

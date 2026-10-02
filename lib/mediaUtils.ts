@@ -382,37 +382,6 @@ export function sanitizeCommercialCategory(value: string): string | undefined {
   return clean || undefined;
 }
 
-/**
- * Kept for compatibility with older UI code.
- *
- * Do not apply this automatically during media creation. Slot length should only
- * be set when an admin explicitly chooses a preset or enters a slot length.
- */
-export function getDefaultSlotLengthForDuration(
-  duration: number,
-  type: MediaType,
-): number | undefined {
-  if (type !== "show") {
-    return undefined;
-  }
-
-  const safeDuration = normalizePositiveSecond(duration);
-
-  if (safeDuration <= 0) {
-    return undefined;
-  }
-
-  if (safeDuration <= 30 * 60) {
-    return 30 * 60;
-  }
-
-  if (safeDuration <= 60 * 60) {
-    return 60 * 60;
-  }
-
-  return undefined;
-}
-
 function inferMimeType(url: string): string | undefined {
   const clean = getCleanUrlPath(url);
 

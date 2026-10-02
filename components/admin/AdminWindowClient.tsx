@@ -10,10 +10,10 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
-import AdminDashboard from "@/components/AdminDashboard";
+import AdminDashboard from "@/components/admin/AdminDashboard";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import { useStore } from "@/lib/store";
-import { getThemeLayoutClass } from "@/lib/themeLayouts";
+import { getThemeLayoutClass } from "@/lib/themes";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 
 type AccessStatus = "checking" | "locked" | "authorized" | "error";

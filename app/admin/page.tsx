@@ -1,5 +1,5 @@
 import { pageMetadata } from "@/lib/metadata";
-import AdminWindowClient from "@/components/AdminWindowClient";
+import AdminWindowClient from "@/components/admin/AdminWindowClient";
 
 export const metadata = pageMetadata(
   "Station administration",

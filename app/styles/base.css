@@ -142,18 +142,6 @@
     min-width: 44px;
   }
 
-  .ttv-safe-bottom {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  }
-
-  .ttv-safe-top {
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-  }
-
-  .ttv-text-balance {
-    text-wrap: balance;
-  }
-
   .ttv-scroll-locked {
     overflow: hidden !important;
     overscroll-behavior: none !important;

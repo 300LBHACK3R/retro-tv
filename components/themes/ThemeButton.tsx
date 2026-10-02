@@ -12,7 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { THEME_PREVIEWS } from "@/components/themePreviews";
+import { THEME_PREVIEWS } from "@/components/themes/themePreviews";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,

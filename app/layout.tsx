@@ -11,9 +11,9 @@ import AnalyticsRuntime from "@/components/viewer/AnalyticsRuntime";
 import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { GoogleCastProvider } from "@/components/GoogleCastProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
-import ThemeBootstrapScript from "@/components/ThemeBootstrapScript";
+import ThemeBootstrapScript from "@/components/themes/ThemeBootstrapScript";
 import DeviceLibraryRuntime from "@/components/viewer/DeviceLibraryRuntime";
-import ThemeRuntime from "@/components/ThemeRuntime";
+import ThemeRuntime from "@/components/themes/ThemeRuntime";
 import { createThemeCssVars, getDefaultTheme } from "@/lib/themes";
 
 import { getSiteUrl } from "@/lib/metadata";

@@ -27,8 +27,6 @@ export const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 export const MOBILE_GUIDE_WINDOW_SECONDS = MOBILE_GUIDE_HOURS * 60 * 60;
 export const LIVE_TICK_MS = 15_000;
 export const GUIDE_PREPARE_BATCH_SIZE = 2;
-
-export const MIN_CELL_WIDTH = 52;
 export const MIN_BUILD_STEPS = 500;
 
 export const SLOT_INDEXES = Array.from(

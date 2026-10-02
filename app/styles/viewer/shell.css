@@ -70,22 +70,8 @@
 .ttv-skip-link { position: fixed; top: -8rem; left: 1rem; z-index: 2147483647; padding: .8rem 1rem; border-radius: .5rem; background: var(--primary); color: var(--on-primary); }
 .ttv-skip-link:focus { top: 1rem; }
 /* Shared secondary routes use the same reading rhythm as the live viewer. */
-.ttv-library-intro { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; padding: .5rem 0 1.5rem; border-bottom: 1px solid var(--border); }
-.ttv-library-intro h1 { margin: .55rem 0; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing: -.045em; font-weight: 750; line-height: 1.15; }
-.ttv-library-intro p { color: var(--text-muted); font-size: 1rem; line-height: 1.6; }
-.ttv-library-title-count { color: var(--text-muted); font-size: .875rem; white-space: nowrap; }
 .ttv-library-shell :where(input,select) { min-height: 2.75rem; font-size: 1rem; }
 .ttv-library-shell :where(button,a) { min-height: 2.75rem; }
-.ttv-library-header .theme-trigger { width: 2.75rem; min-height: 2.75rem; padding: .6rem; grid-template-columns: 1fr; }
-.ttv-library-header .theme-trigger__copy, .ttv-library-header .theme-trigger__chevron { display: none; }
-.ttv-library-header .theme-trigger__swatch { width: 1.3rem; height: 1.3rem; }
-@media (max-width: 760px) {
- .ttv-library-intro { align-items: flex-start; flex-direction: column; gap: .75rem; }
- .ttv-library-header > div { flex-wrap: nowrap; gap: .5rem; padding-inline: 1rem; }
- .ttv-library-header img { width: 5rem; height: auto; }
- .ttv-library-header a { display: flex; align-items: center; }
- .ttv-library-header a:last-child { font-size: .75rem; padding-inline: .75rem; letter-spacing: 0; }
-}
 .ttv-remote-launcher { min-height: 2.75rem; font-size: .75rem; }
 body[data-ttv-overlay-open="true"] .ttv-remote-launcher, body[data-ttv-overlay-open="true"] .ttv-remote-panel { visibility: hidden; }
 .ttv-player-shell[data-controls-visible="false"] ~ .ttv-remote-launcher:not(:focus-visible) { opacity: 0; pointer-events: none; }

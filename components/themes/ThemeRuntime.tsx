@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
-import HalloweenAfterDark from "@/components/HalloweenAfterDark";
+import HalloweenAfterDark from "@/components/themes/HalloweenAfterDark";
 import { useStore } from "@/lib/store";
 import {
   createThemeCssVars,
   getThemeById,
 } from "@/lib/themes";
 
-const HauntedArcadeScene = dynamic(() => import("@/components/HauntedArcadeScene"), { ssr: false });
-const Halloween90sScene = dynamic(() => import("@/components/Halloween90sScene"), { ssr: false });
+const HauntedArcadeScene = dynamic(() => import("@/components/themes/HauntedArcadeScene"), { ssr: false });
+const Halloween90sScene = dynamic(() => import("@/components/themes/Halloween90sScene"), { ssr: false });
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
 const THEME_CHANGE_EVENT = "ttv:theme-change";

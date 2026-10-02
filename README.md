@@ -87,6 +87,10 @@ Programming, player preferences and saved-library storage tolerate blocked reads
 
 | Location                                                          | Responsibility                                                   |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `app/`                                                           | Routes, API endpoints, metadata and shared styles                |
+| `components/admin/`                                              | Admin dashboard, programming, uploads and station management      |
+| `components/themes/`                                             | Theme picker, previews, seasonal scenery and runtime              |
+| `components/library/`                                            | Posters, title details and coming-soon presentation               |
 | `components/viewer/`                                              | Viewer controls, guide, saved items, recovery and navigation |
 | `components/MultiGuide.tsx`                                       | Responsive guide presentation and visible timeline rendering     |
 | `components/viewer/MobileGuide.tsx`                               | Mobile channel comparison and paged channel schedules            |
@@ -98,6 +102,8 @@ Programming, player preferences and saved-library storage tolerate blocked reads
 | `supabase/migrations/`                                            | Reviewed database migrations                                     |
 | `tests/`                                                          | Unit, production HTTP and browser regression checks              |
 | `scripts/dev.mjs`                                                 | Required portable Next.js development launcher                   |
+| `public/`                                                        | Stable URLs for portraits, logos, themes, icons and service worker |
+| `docs/`                                                          | Setup, launch and app-store reference documents                  |
 
 ## Phone playback
 
@@ -121,9 +127,11 @@ Use `C:\Users\techn\retro-tv` as the main Windows checkout. Apply updates there 
 
 Stop any running development or test server, then use `npm run clean` to remove generated Next.js output, build folders, TypeScript cache, coverage and browser reports. `npm ci` recreates dependencies when needed. These generated files do not belong in source archives. Keep private environment settings and local media outside shared archives.
 
-The one-time release updater also checks sibling review worktrees. It removes a review folder only when its commits are already in the main release, its working tree is clean, and any private settings or local media have identical copies in the main folder. It preserves and reports unique work, locked folders and unregistered copies. Close servers using old review folders before running the updater. Delivery helpers stay outside the repository and are removed from the temporary directory after use.
+Admin, themes, library and viewer components have dedicated subfolders inside this one project. Keep `app/`, `lib/`, `public/`, tests and configuration in their framework locations; moving everything into a flat directory would break routing and public asset URLs. Do not keep another copy of the source inside this folder.
 
-Unused legacy admin access, bulk-import and preview components, unused broadcast presets, an unused media helper and the old IndexedDB media module have been removed after checking their references. Historical review notes, the old programming backup, unused smoke script, starter artwork and duplicate manifest are also removed. The unused starter favicon and duplicate SVG icon have also been removed; old installed icon URLs still resolve to the retained artwork. The offline asset list now points to the existing station logo. Git history retains deleted source. The current admin uploader, player, guide, themes, profile storage, public assets and recovery tools remain in use.
+Old installers and release ZIPs belong in Downloads, not in the source tree. Local backup copies and one-time Tate's TV update downloads are ignored by Git. Before removing a separate Windows review folder, check `git worktree list`, its uncommitted changes, and whether it contains unique environment settings or media. `npm run clean` only removes reproducible build output; it does not remove other checkouts, source files, profiles, environment settings or uploads.
+
+The source audit removed unused scheduling and text helpers, abandoned reaction definitions, unused cookie setters, an obsolete theme stylesheet and selectors for retired screens. Theme layout lookup now lives in the theme registry. Active migrations, recovery routes, tests, artwork and installed-app icons remain necessary. Channel logos may be referenced by cloud programming even when their filenames do not appear in source code; do not delete public artwork based on import searches alone. Git history retains removed source.
 
 ## Quality gates
 

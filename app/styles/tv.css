@@ -4,13 +4,6 @@
   background: #000 !important;
 }
 
-.ttv-tv-mode > .ttv-page-frame {
-  max-width: none !important;
-  min-height: 100dvh;
-  padding: clamp(0.5rem, 1.2vw, 1rem) !important;
-}
-
-.ttv-tv-mode .ttv-main-header,
 .ttv-tv-mode footer {
   display: none !important;
 }
@@ -26,9 +19,6 @@
 }
 
 @media (min-width: 1200px) {
-  .ttv-tv-mode > .ttv-page-frame {
-    gap: 0.75rem !important;
-  }
 
   .ttv-tv-mode .ttv-tv-player-frame {
     min-height: calc(100dvh - 12rem);

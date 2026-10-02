@@ -12,14 +12,6 @@ const SESSION_BUCKET_SECONDS = SESSION_MAX_AGE_SECONDS;
 const SESSION_NONCE_BYTES = 24;
 const MAX_CLOCK_SKEW_SECONDS = 60;
 
-type AdminCookieOptions = {
-  httpOnly: true;
-  sameSite: "lax";
-  secure: boolean;
-  path: "/";
-  maxAge: number;
-};
-
 type ParsedSessionToken = {
   prefix: string;
   issuedAt: number;
@@ -230,37 +222,6 @@ export function isValidSessionToken(token: string): boolean {
     isValidSignedSessionToken(token, secret) ||
     isValidLegacyBucketedSessionToken(token, secret)
   );
-}
-
-export function getAdminCookieOptions(): AdminCookieOptions {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  };
-}
-
-export async function setAdminSessionCookie(token: string): Promise<void> {
-  const cleanToken = token.trim();
-
-  if (!cleanToken) {
-    throw new Error("Cannot set an empty admin session token.");
-  }
-
-  const cookieStore = await cookies();
-
-  cookieStore.set(ADMIN_COOKIE_NAME, cleanToken, getAdminCookieOptions());
-}
-
-export async function clearAdminSessionCookie(): Promise<void> {
-  const cookieStore = await cookies();
-
-  cookieStore.set(ADMIN_COOKIE_NAME, "", {
-    ...getAdminCookieOptions(),
-    maxAge: 0,
-  });
 }
 
 export async function isAdminRequestAuthorized(): Promise<boolean> {

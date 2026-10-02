@@ -102,9 +102,6 @@
 :root[data-ttv-theme="halloween-night"] .ttv-profile-card:hover .ttv-profile-avatar {
   box-shadow: 0 0 0 3px #ffab5c, 0 12px 38px #d87a3240;
 }
-:root[data-ttv-theme="halloween-night"] .ttv-library-header a:last-child {
-  border-color: #ffab5c70; background-color: #322039; color: #ffe0b6;
-}
 :root[data-ttv-theme="halloween-night"] .ttv-premium-footer { border-color: #996b6655; }
 
 @keyframes ttv-afterdark-glow { from { opacity: .45; } to { opacity: .95; } }

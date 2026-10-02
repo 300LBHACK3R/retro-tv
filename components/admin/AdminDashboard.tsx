@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import LibraryPresentationPanel from "@/components/LibraryPresentationPanel";
-import ChannelLineupPanel from "@/components/ChannelLineupPanel";
-import AudiencePanel from "@/components/AudiencePanel";
-import StationInsightsPanel from "@/components/StationInsightsPanel";
-import ProgrammeBlocksPanel from "@/components/ProgrammeBlocksPanel";
-import ChannelBrandingPanel from "@/components/ChannelBrandingPanel";
-import ChannelProgrammingPanel from "@/components/ChannelProgrammingPanel";
-import MediaLibraryPanel from "@/components/MediaLibraryPanel";
-import QuickMediaEditorPanel from "@/components/QuickMediaEditorPanel";
-import SubmissionInboxPanel from "@/components/SubmissionInboxPanel";
-import StationConfigPanel from "@/components/StationConfigPanel";
-import UploadPanel from "@/components/UploadPanel";
+import LibraryPresentationPanel from "@/components/admin/LibraryPresentationPanel";
+import ChannelLineupPanel from "@/components/admin/ChannelLineupPanel";
+import AudiencePanel from "@/components/admin/AudiencePanel";
+import StationInsightsPanel from "@/components/admin/StationInsightsPanel";
+import ProgrammeBlocksPanel from "@/components/admin/ProgrammeBlocksPanel";
+import ChannelBrandingPanel from "@/components/admin/ChannelBrandingPanel";
+import ChannelProgrammingPanel from "@/components/admin/ChannelProgrammingPanel";
+import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
+import QuickMediaEditorPanel from "@/components/admin/QuickMediaEditorPanel";
+import SubmissionInboxPanel from "@/components/admin/SubmissionInboxPanel";
+import StationConfigPanel from "@/components/admin/StationConfigPanel";
+import UploadPanel from "@/components/admin/UploadPanel";
 import { useStore } from "@/lib/store";
 import type { Channel, MediaItem } from "@/lib/types";
 

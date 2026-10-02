@@ -1,5 +1,4 @@
-.admin-mobile-scroll,
-.ttv-admin-scroll {
+.admin-mobile-scroll {
   min-width: 0;
   overflow-x: auto;
   overscroll-behavior: contain;

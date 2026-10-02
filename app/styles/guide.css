@@ -1,91 +1,3 @@
-.ttv-guide-shell {
-  display: flex;
-  min-height: 0;
-  height: min(82vh, 900px);
-  max-height: 100%;
-  isolation: isolate;
-  flex-direction: column;
-  overflow: hidden;
-  border: var(--ttv-border-width) solid var(--border);
-  border-radius: var(--ttv-radius-panel);
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.055), transparent 34%),
-    var(--panel-bg);
-  box-shadow: var(--ttv-shadow-elevated);
-  color: var(--text);
-}
-
-.ttv-guide-topbar {
-  flex: 0 0 auto;
-}
-
-.ttv-guide-days {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.5rem;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  background: var(--panel-alt-bg);
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
-}
-
-.ttv-guide-day {
-  display: flex;
-  min-width: 6.75rem;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.55rem 0.8rem;
-  background: var(--button-bg);
-  color: var(--text-muted);
-  text-align: left;
-  box-shadow: var(--ttv-shadow-control);
-  transition:
-    transform 150ms ease,
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.ttv-guide-day:hover {
-  transform: translateY(-1px);
-  border-color: var(--primary);
-  background: var(--button-hover);
-  color: var(--text);
-}
-
-.ttv-guide-day[data-active="true"] {
-  border-color: var(--primary);
-  background: var(--guide-current-bg);
-  color: var(--on-primary);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 0 22px color-mix(in srgb, var(--primary) 20%, transparent);
-}
-
-.ttv-guide-day span {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 950;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.ttv-guide-day small {
-  display: block;
-  margin-top: 0.15rem;
-  font-size: 0.64rem;
-  font-weight: 800;
-  opacity: 0.74;
-}
-
 .ttv-guide-scroll {
   width: 100%;
   min-height: 0;
@@ -115,53 +27,11 @@
   background-clip: padding-box;
 }
 
-.ttv-guide-sticky-corner {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 70;
-}
-
-.ttv-guide-sticky-time {
-  position: sticky;
-  top: 0;
-  z-index: 55;
-}
-
-.ttv-guide-channel-cell {
-  position: sticky;
-  left: 0;
-  z-index: 45;
-}
-
 @media (max-width: 640px) {
-  .ttv-guide-shell {
-    height: 100%;
-    border-radius: var(--ttv-radius-mobile);
-  }
-
-  .ttv-guide-topbar {
-    padding: 0.75rem;
-  }
-
-  .ttv-guide-days {
-    gap: 0.4rem;
-    padding: 0.6rem;
-  }
-
-  .ttv-guide-day {
-    min-width: 6.15rem;
-    padding: 0.5rem 0.68rem;
-  }
 
   .ttv-guide-scroll {
     height: 100%;
     max-height: none;
-  }
-
-  .ttv-guide-sticky-corner,
-  .ttv-guide-channel-cell {
-    box-shadow: 12px 0 18px rgba(0, 0, 0, 0.26);
   }
 }
 

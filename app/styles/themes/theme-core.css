@@ -647,23 +647,6 @@
 .theme-search:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 
 /* Library route inherits the selected theme instead of forcing Neon CRT. */
-.ttv-library-header {
-  border-color: var(--border) !important;
-  background: color-mix(in srgb, var(--panel-bg) 88%, transparent) !important;
-  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.18);
-}
-
-.ttv-library-ambient {
-  z-index: -1;
-}
-
-.ttv-library-ambient__primary {
-  background: color-mix(in srgb, var(--primary) 15%, transparent);
-}
-
-.ttv-library-ambient__secondary {
-  background: color-mix(in srgb, var(--secondary) 13%, transparent);
-}
 
 .ttv-library-shell :where(h1, h2, h3, h4, strong) {
   color: var(--text) !important;
@@ -681,9 +664,4 @@
 
 .ttv-library-shell :where(button, a) {
   border-color: color-mix(in srgb, var(--border) 88%, transparent);
-}
-
-.ttv-library-shell .ttv-library-player {
-  border-color: var(--border) !important;
-  box-shadow: var(--ttv-shadow-player);
 }

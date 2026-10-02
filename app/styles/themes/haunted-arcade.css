@@ -120,7 +120,6 @@
 :root[data-ttv-theme="halloween-haunted-arcade"] :is(.ttv-section-heading h2, .ttv-library-intro h1, .ttv-profile-screen h1) {
   text-shadow: 0 2px 16px #080613, 0 0 24px #c7a6ff20;
 }
-:root[data-ttv-theme="halloween-haunted-arcade"] .ttv-library-header a:last-child { color: #d9f9b5; background: #18282c; border-color: #baf77b80; }
 @media (max-width: 760px) {
   .ttv-haunted-ghost--mint { left: 2%; top: 20%; width: 44px; }
   .ttv-haunted-ghost--violet { right: 3%; top: 34%; width: 36px; }

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { runInNewContext } from "node:vm";
-import { createThemeBootstrapScript } from "../components/ThemeBootstrapScript";
+import { createThemeBootstrapScript } from "../components/themes/ThemeBootstrapScript";
 import { DEFAULT_THEME_ID, THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
 import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";

@@ -5,7 +5,7 @@ import { buildLibrary, type LibraryGroup } from "@/lib/libraryCatalog";
 import { safeArtworkUrl, type UpcomingTitle } from "@/lib/libraryPresentation";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import ArtworkEditor from "@/components/library/ArtworkEditor";
-import styles from "./library/library.module.css";
+import styles from "@/components/library/library.module.css";
 
 function TitleEditor({ group }: { group: LibraryGroup }) {
   const existing = useStore((state) => state.libraryArtwork[group.key]);

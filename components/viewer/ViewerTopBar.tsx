@@ -3,7 +3,7 @@
 import { ProfileButton } from "./ProfileGate";
 import Image from "next/image";
 import Link from "next/link";
-import ThemeButton from "@/components/ThemeButton";
+import ThemeButton from "@/components/themes/ThemeButton";
 import {
   getChannelDisplayName,
   getChannelLabel,

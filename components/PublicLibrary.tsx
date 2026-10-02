@@ -18,7 +18,7 @@ import { useViewerCatalog } from "@/lib/useViewerCatalog";
 import { useProfiles, profileProgressKey } from "@/lib/deviceProfiles";
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import { useStore } from "@/lib/store";
-import { getThemeLayoutClass } from "@/lib/themeLayouts";
+import { getThemeLayoutClass } from "@/lib/themes";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import {
   buildLibrary,

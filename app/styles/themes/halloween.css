@@ -19,8 +19,7 @@
   background: transparent !important;
 }
 :root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after,
-:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) .ttv-library-ambient { display: none; }
+:root:is([data-ttv-theme="halloween-night"], [data-ttv-theme="halloween-haunted-arcade"], [data-ttv-theme="halloween-90s-night"]) :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after { display: none; }
 :root[data-ttv-page-visible="false"] .ttv-seasonal-world * { animation-play-state: paused !important; }
 :root[data-ttv-reduced-motion="true"] .ttv-seasonal-world * { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .ttv-seasonal-world * { animation: none !important; } }

@@ -13,11 +13,6 @@
   --ttv-logo-filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.42));
 }
 
-:root[data-ttv-layout="classic-cable"] .ttv-main-header,
-.ttv-layout-classic-cable .ttv-main-header {
-  border-top: 3px solid var(--primary);
-}
-
 :root[data-ttv-layout="classic-cable"] :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button),
 .ttv-layout-classic-cable :where(.ttv-action-button, .ttv-header-actions a, .ttv-header-actions button) {
   text-transform: uppercase;
@@ -38,9 +33,4 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 28%);
   --ttv-header-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 68%);
   --ttv-logo-filter: drop-shadow(0 5px 12px rgba(37, 64, 95, 0.2));
-}
-
-:root[data-ttv-layout="light-cable"] .ttv-main-header,
-.ttv-layout-light-cable .ttv-main-header {
-  border-top: 4px solid var(--primary);
 }

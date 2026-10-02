@@ -603,18 +603,6 @@ export function getFreeThemes(): ThemeDefinition[] {
   );
 }
 
-export function getPremiumThemes(): ThemeDefinition[] {
-  return sortThemesByCategory(THEMES.filter((theme) => theme.isPremium));
-}
-
-export function getThemesByCategory(
-  category: ThemeCategory,
-): ThemeDefinition[] {
-  return sortThemesByCategory(
-    THEMES.filter((theme) => theme.category === category),
-  );
-}
-
 export function getThemeCategoryMeta(
   category: ThemeCategory,
 ): ThemeCategoryMeta {
@@ -643,20 +631,6 @@ export function canUseTheme(
   );
 }
 
-export function getSafeThemeId(
-  requestedThemeId: unknown,
-  ownedPremiumThemes: readonly ThemeId[],
-  isAdmin: boolean,
-): ThemeId {
-  if (!isThemeId(requestedThemeId)) {
-    return DEFAULT_THEME_ID;
-  }
-
-  return canUseTheme(requestedThemeId, ownedPremiumThemes, isAdmin)
-    ? requestedThemeId
-    : DEFAULT_THEME_ID;
-}
-
 export function getThemeAccessLabel(
   theme: ThemeDefinition,
   ownedPremiumThemes: readonly ThemeId[],
@@ -673,10 +647,6 @@ export function getThemePriceLabel(theme: ThemeDefinition): string {
     return "Free";
   }
 
-  return theme.priceLabel;
-}
-
-export function getThemePlannedPriceLabel(theme: ThemeDefinition): string {
   return theme.priceLabel;
 }
 
@@ -743,4 +713,8 @@ export function createThemeCssVars(theme: ThemeDefinition): ThemeCssVariables {
     "--ttv-guide-active-bg": vars["--guide-active-bg"],
     "--ttv-guide-current-bg": vars["--guide-current-bg"],
   };
+}
+
+export function getThemeLayoutClass(themeId: ThemeId): string {
+  return `ttv-layout-${getThemeById(themeId).layout}`;
 }

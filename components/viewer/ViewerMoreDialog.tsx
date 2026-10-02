@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useModalDialog } from "@/components/viewer/useModalDialog";
-import OpenAdminWindowButton from "@/components/OpenAdminWindowButton";
+import OpenAdminWindowButton from "@/components/admin/OpenAdminWindowButton";
 import { useStore } from "@/lib/store";
 import {
   getChannelDisplayName,

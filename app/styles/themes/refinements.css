@@ -183,10 +183,3 @@
 :root[data-ttv-appearance="light"] .ttv-library-shell [class*="border-white/"] {
   border-color: var(--border);
 }
-.ttv-library-poster-fallback {
-  color: var(--text);
-  background: var(--panel-alt-bg);
-}
-.ttv-library-poster-fallback [class*="text-white"] {
-  color: var(--text);
-}
