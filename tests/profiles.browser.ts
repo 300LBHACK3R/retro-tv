@@ -508,7 +508,13 @@ test("After Dark entrance fills the viewport, remembers accessibility and resets
   await expect(witch).toHaveCSS("animation-name", "ttv-afterdark-flight");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
-  await expect.poll(() => portraits.evaluateAll((items: HTMLImageElement[]) => items.every((item) => item.complete && item.naturalWidth > 0))).toBe(true);
+  // Reload can restore the earlier footer scroll position. Next/Image portraits
+  // are lazy loaded, so bring each into view before checking that it loaded.
+  for (const portrait of await portraits.all()) {
+    await portrait.scrollIntoViewIfNeeded();
+    await expect(portrait).toBeInViewport();
+    await expect.poll(() => portrait.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await testInfo.attach("after-dark-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
