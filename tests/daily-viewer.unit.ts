@@ -208,18 +208,20 @@ test("scheduled days respect both daylight-saving transitions", () => {
   const original = process.env.TZ;
   process.env.TZ = "America/Edmonton";
   try {
-    for (const [month, day, hours] of [
-      [2, 8, 23],
-      [10, 1, 25],
+    // Use historical transitions: Edmonton no longer falls back in 2026
+    // in tzdata 2026c+. Both older and newer runtimes agree on these dates.
+    for (const [year, month, day, hours] of [
+      [2025, 2, 9, 23],
+      [2025, 10, 2, 25],
     ] as const) {
-      const now = new Date(2026, month, day, 0);
+      const now = new Date(year, month, day, 0);
       const channel = {
         ...programming.channels[0]!,
         programmeBlocks: [{ ...block, days: WEEKDAYS }],
       };
       const schedule = applyProgrammeBlocks(base, channel, now, () => special);
       expect(getScheduleDuration(schedule)).toBe(hours! * 3600);
-      const end = new Date(2026, month, day! + 1, 0).getTime();
+      const end = new Date(year, month, day! + 1, 0).getTime();
       for (let at = now.getTime(); at < end; at += 137000) {
         const local = new Date(at);
         if (local.getHours() >= 8 && local.getHours() < 10) {

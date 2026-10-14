@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+const require = createRequire(import.meta.url);
+// Use the installed Next.js version's own route selection and cache naming.
+// Adapter builds store HTML in route-cache; ordinary builds use server/app.
+const { getRouteCacheKey } = require("next/dist/server/lib/route-cache-key.js");
+const { selectAppPageEntry } = require("next/dist/shared/lib/router/utils/app-paths.js");
 
 // Validate the assets referenced by each built page, rather than scanning all
 // chunks: a leftover CSS file on disk is no help to a visitor who never gets it.
@@ -75,19 +82,26 @@ export function assertDefaultScenery(html, context) {
   assert.match(html, /<img[^>]*class="ttv-afterdark-art"/, `${context}: default artwork is server-rendered`);
 }
 
-function verifyBuild() {
-  for (const route of ["index", "library", "tv"]) {
-    const html = readFileSync(`.next/server/app/${route}.html`, "utf8");
+export function verifyBuild(distDir = resolve(".next")) {
+  const { config } = JSON.parse(readFileSync(join(distDir, "required-server-files.json"), "utf8"));
+  const appPaths = Object.keys(JSON.parse(readFileSync(join(distDir, "server/app-paths-manifest.json"), "utf8")));
+  for (const route of ["/", "/library", "/tv"]) {
+    const sourceRoute = selectAppPageEntry(route, appPaths);
+    // Select the layout recorded by this build. Do not fall back to stale HTML
+    // from a different build when the current route output is missing.
+    const pagePath = config.adapterPath && config.output !== "export"
+      ? getRouteCacheKey(route, { kind: "APP_PAGE", sourceRoute })
+      : `app/${route === "/" ? "index" : route.slice(1)}`;
+    const html = readFileSync(join(distDir, "server", `${pagePath}.html`), "utf8");
     const css = stylesheetPaths(html)
       .map((path) =>
-        readFileSync(resolve(".next", path.slice("/_next/".length)), "utf8"),
+        readFileSync(resolve(distDir, path.slice("/_next/".length)), "utf8"),
       )
       .join("\n");
     assertProfileStyles(css, `Built ${route} page`);
     assertHalloweenStyles(css, `Built ${route} page`);
     assertDefaultScenery(html, `Built ${route}`);
   }
-  console.log("PASS: built viewer pages link profile portrait and Halloween styles with the seasonal first paint.");
 }
 
 async function verifySite(origin) {
@@ -152,7 +166,10 @@ if (
 ) {
   try {
     if (process.argv[2] === "--url") await verifySite(process.argv[3]);
-    else verifyBuild();
+    else {
+      verifyBuild();
+      console.log("PASS: built viewer pages link profile portrait and Halloween styles with the seasonal first paint.");
+    }
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
