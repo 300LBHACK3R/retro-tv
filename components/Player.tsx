@@ -863,7 +863,9 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       window.clearTimeout(sourceTransitionTimerRef.current);
     }
 
-    setStatus("loading");
+    const replaceSource = reload || video.getAttribute("src") !== item.file || Boolean(video.error);
+    const keepPlaying = !replaceSource && !video.paused && !video.ended;
+    setStatus(keepPlaying ? "playing" : "loading");
     setMessage("");
     setCastMessage("");
 
@@ -871,7 +873,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       configureVideoForAppPlayback(video);
       applyAudio();
 
-      if (reload || video.getAttribute("src") !== item.file || video.error) {
+      if (replaceSource) {
         video.pause();
         video.preload = "auto";
         video.src = item.file;
@@ -880,8 +882,9 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         // Adjacent segments or channels can share a file. Keep its buffer.
         hardSyncPosition({ force: true });
       }
-      // Register playback intent now, rather than waiting for metadata to arrive.
-      void tryPlay();
+      // An already-running shared file needs only a seek. A redundant play()
+      // can be aborted during that seek in WebKit, leaving a false loading state.
+      if (!keepPlaying) void tryPlay();
     } catch {
       setStatus("error");
       setMessage(

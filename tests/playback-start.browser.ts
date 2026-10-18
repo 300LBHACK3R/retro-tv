@@ -72,6 +72,14 @@ test("starts without a playback tap, enables sound, and keeps the buffer across 
   await tune(page, "Tune to CH 25 Local Cinema");
   await expect(page.locator("video")).toHaveAttribute("src", "/qa-b.webm");
   await playing(page);
+  await page.evaluate(() => {
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      // Reproduce WebKit interrupting an unnecessary play() during a live seek.
+      if (!this.paused) return Promise.reject(new DOMException("Seek interrupted play", "AbortError"));
+      return original.call(this);
+    };
+  });
   await tune(page, "Tune to CH 26 Cinema Encore");
   await playing(page);
   await expect(page.locator("video")).toHaveAttribute("data-original-player", "yes");
