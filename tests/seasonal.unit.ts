@@ -6,7 +6,7 @@ import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../l
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 
-test("every first paint starts in Halloween After Dark and ignores legacy theme choices", () => {
+test("every first paint starts in Halloween 95 and ignores legacy theme choices", () => {
   for (const saved of [
     undefined,
     { themeId: "obsidian-gold" },
@@ -19,10 +19,10 @@ test("every first paint starts in Halloween After Dark and ignores legacy theme 
       window: { localStorage: { getItem: () => JSON.stringify({ state: saved }) } },
       document: { documentElement: root },
     });
-    expect(root.dataset.ttvTheme).toBe("halloween-night");
+    expect(root.dataset.ttvTheme).toBe("halloween-90s-night");
     expect(root.dataset.ttvReducedMotion === "true").toBe(!!saved?.viewerSettings?.preferReducedMotion);
   }
-  expect(DEFAULT_THEME_ID).toBe("halloween-night");
+  expect(DEFAULT_THEME_ID).toBe("halloween-90s-night");
 });
 
 test("the default first paint works when browser storage is blocked or malformed", () => {
@@ -31,7 +31,7 @@ test("the default first paint works when browser storage is blocked or malformed
     runInNewContext(createThemeBootstrapScript(), {
       window: { localStorage: { getItem } }, document: { documentElement: root },
     });
-    expect(root.dataset.ttvTheme).toBe("halloween-night");
+    expect(root.dataset.ttvTheme).toBe("halloween-90s-night");
     expect(root.style.colorScheme).toBe("dark");
   }
 });

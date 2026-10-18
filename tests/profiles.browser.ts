@@ -466,7 +466,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   ).toBe(true);
 });
 
-test("After Dark entrance fills the viewport, remembers accessibility and resets temporary themes", async ({ page }, testInfo) => {
+test("Halloween 95 entrance fills the viewport, remembers accessibility and resets temporary themes", async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     if (localStorage.getItem("ttv-profiles-v1")) return;
     // A returning household from before the seasonal release.
@@ -479,13 +479,13 @@ test("After Dark entrance fills the viewport, remembers accessibility and resets
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
-  const scene = page.locator(".ttv-afterdark-world");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
+  const scene = page.locator(".ttv-halloween90-world");
   await expect(scene).toBeVisible();
   await expect(scene).toHaveCSS("position", "fixed");
   await expect(scene).toHaveCSS("pointer-events", "none");
   await expect(scene).toHaveAttribute("aria-hidden", "true");
-  const backdrop = scene.locator(".ttv-afterdark-art");
+  const backdrop = scene.locator(".ttv-halloween90-art");
   await expect.poll(() => backdrop.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
   const bounds = await scene.boundingBox();
   const viewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: innerHeight }));
@@ -494,18 +494,18 @@ test("After Dark entrance fills the viewport, remembers accessibility and resets
   expect(Math.abs(bounds!.width - viewport.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(bounds!.height - viewport.height)).toBeLessThanOrEqual(1);
   expect(await page.locator(".ttv-profile-screen").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-  const witch = scene.locator(".ttv-afterdark-witch");
-  await expect(witch).toHaveCSS("animation-name", "ttv-afterdark-flight");
+  const lamp = scene.locator(".ttv-halloween90-lamplight");
+  await expect(lamp).toHaveCSS("animation-name", "ttv-halloween90-warmth");
   await page.locator(".ttv-profile-footer").scrollIntoViewIfNeeded();
   expect((await scene.boundingBox())!.y).toBe(0);
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(lamp).toHaveCSS("animation-name", "none");
   await page.reload();
-  await expect(witch).toHaveCSS("animation-name", "none");
+  await expect(lamp).toHaveCSS("animation-name", "none");
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await expect(witch).toHaveCSS("animation-name", "ttv-afterdark-flight");
+  await expect(lamp).toHaveCSS("animation-name", "ttv-halloween90-warmth");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
   // Reload can restore the earlier footer scroll position. Next/Image portraits
@@ -516,21 +516,21 @@ test("After Dark entrance fills the viewport, remembers accessibility and resets
     await expect.poll(() => portrait.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  await testInfo.attach("after-dark-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
+  await testInfo.attach("halloween-95-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
   const savedProfiles = await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles);
   expect(savedProfiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await switchProfile(page);
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
   await expect(scene).toBeVisible();
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
 });

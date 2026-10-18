@@ -75,11 +75,11 @@ export function assertHalloweenStyles(css, context = "Halloween") {
 }
 
 export function assertDefaultScenery(html, context) {
-  assert.ok(html.includes('data-ttv-theme="halloween-night"'), `${context}: After Dark is the starting theme`);
+  assert.ok(html.includes('data-ttv-theme="halloween-90s-night"'), `${context}: Halloween 95 is the starting theme`);
   // Verify real server-rendered elements, not strings embedded in RSC scripts.
-  assert.match(html, /<div[^>]*class="ttv-seasonal-world ttv-afterdark-world"[^>]*aria-hidden="true"/, `${context}: default scenery exists before hydration`);
-  assert.match(html, /<source[^>]*srcSet="[^"<>]*halloween-after-dark-mobile/, `${context}: mobile composition is available on first paint`);
-  assert.match(html, /<img[^>]*class="ttv-afterdark-art"/, `${context}: default artwork is server-rendered`);
+  assert.match(html, /<div[^>]*class="ttv-seasonal-world ttv-halloween90-world"[^>]*aria-hidden="true"/, `${context}: default scenery exists before hydration`);
+  assert.match(html, /<source[^>]*srcSet="[^"<>]*halloween-90s-mobile/, `${context}: mobile composition is available on first paint`);
+  assert.match(html, /<img[^>]*class="ttv-halloween90-art"/, `${context}: default artwork is server-rendered`);
 }
 
 export function verifyBuild(distDir = resolve(".next")) {

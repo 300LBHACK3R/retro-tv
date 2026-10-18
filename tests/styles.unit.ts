@@ -11,11 +11,11 @@ const pages = [
   ["tv", "/tv/page", "d9e006d867c77151815add21e67c6551a9afb6331ad3aeae14a0ff531a1e07ea"],
 ] as const;
 
-const html = `<html data-ttv-theme="halloween-night"><head>
+const html = `<html data-ttv-theme="halloween-90s-night"><head>
 <link rel="stylesheet" href="/_next/static/chunks/viewer.css?dpl=test">
-</head><body><div class="ttv-seasonal-world ttv-afterdark-world" aria-hidden="true">
-<picture><source srcSet="/themes/halloween-after-dark-mobile.webp">
-<img class="ttv-afterdark-art" src="/themes/halloween-after-dark-world.webp"></picture>
+</head><body><div class="ttv-seasonal-world ttv-halloween90-world" aria-hidden="true">
+<picture><source srcSet="/themes/halloween-90s-mobile.webp">
+<img class="ttv-halloween90-art" src="/themes/halloween-90s-world.webp"></picture>
 </div></body></html>`;
 
 const css = `

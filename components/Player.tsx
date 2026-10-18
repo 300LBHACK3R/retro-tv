@@ -13,6 +13,7 @@ import {
 } from "@/components/GoogleCastProvider";
 import WatchOnTVModal from "@/components/WatchOnTVModal";
 import { trackAnalytics } from "@/lib/analyticsClient";
+import { playWithAutoplayFallback } from "@/lib/autoplay";
 import { usePlayerControls } from "@/lib/playerControls";
 import { useStore } from "@/lib/store";
 import { cleanDisplayText } from "@/lib/textClean";
@@ -561,6 +562,9 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const handledFullscreenRequestRef = useRef(0);
   const fullscreenBusyRef = useRef(false);
   const sourceTransitionRef = useRef(false);
+  const sourceTransitionTimerRef = useRef<number | null>(null);
+  const playbackAttemptRef = useRef(0);
+  const autoplayMutedRef = useRef(false);
   const wakeLockRef = useRef<ScreenWakeLockSentinelLike | null>(null);
   const castMessageTimerRef = useRef<number | null>(null);
   const fullscreenBusyTimerRef = useRef<number | null>(null);
@@ -594,6 +598,8 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const toggleGuide = useStore((state) => state.toggleGuide);
 
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
+  const [clockReady, setClockReady] = useState(false);
+  const [autoplayMuted, setAutoplayMuted] = useState(false);
   const [status, setStatus] = useState<PlaybackStatus>("idle");
   const [message, setMessage] = useState("");
   const [castMessage, setCastMessage] = useState("");
@@ -607,10 +613,14 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const [controlsVisible, setControlsVisible] = useState(true);
 
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
+  const hasMedia = Boolean(live.item);
   const liveRef = useRef(live);
   liveRef.current = live;
 
-  const playbackKey = useMemo(() => getPlaybackKey(live.item), [live.item]);
+  const playbackKey = useMemo(
+    () => `${currentChannelId}|${getPlaybackKey(live.item)}`,
+    [currentChannelId, live.item],
+  );
   const nativeTv = useNativeTvPlayback(videoRef, playbackKey);
   const scheduleSignature = useMemo(
     () => schedule.map((item) => getPlaybackKey(item)).join("~"),
@@ -708,7 +718,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     // Phone hardware controls loudness; an old desktop mute must not leave
     // the mobile player silent after its volume controls have been removed.
     video.volume = mobileLayout ? 1 : Math.min(Math.max(volume, 0), 1);
-    video.muted = mobileLayout ? false : muted || volume <= 0;
+    video.muted = autoplayMutedRef.current || (!mobileLayout && (muted || volume <= 0));
   }, [mobileLayout, muted, volume]);
 
   const requestWakeLock = useCallback(async () => {
@@ -758,7 +768,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const hardSyncPosition = useCallback(
     (options: { force?: boolean } = {}) => {
       const video = videoRef.current;
-      const item = live.item;
+      const { item, sourceElapsed } = liveRef.current;
 
       if (castRemote.isConnected || (nativeTv.connected && !options.force)) {
         return;
@@ -772,7 +782,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         return;
       }
 
-      const target = getSafeTargetTime(video, item, live.sourceElapsed);
+      const target = getSafeTargetTime(video, item, sourceElapsed);
       const drift = Math.abs(video.currentTime - target);
       const now = Date.now();
 
@@ -793,7 +803,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         // Seeking can be rejected briefly while metadata settles.
       }
     },
-    [castRemote.isConnected, nativeTv.connected, live.item, live.sourceElapsed],
+    [castRemote.isConnected, nativeTv.connected],
   );
 
   const tryPlay = useCallback(async () => {
@@ -810,22 +820,33 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       return;
     }
 
+    const attempt = ++playbackAttemptRef.current;
+    const isCurrent = () =>
+      attempt === playbackAttemptRef.current && videoRef.current === video;
     try {
       configureVideoForAppPlayback(video);
       applyAudio();
-
-      await video.play();
-
-      setStatus("playing");
-      setMessage("");
+      const result = await playWithAutoplayFallback(video, isCurrent, () => {
+        autoplayMutedRef.current = true;
+        setAutoplayMuted(true);
+      });
+      if (result === "playing") {
+        setStatus("playing");
+        setMessage("");
+      } else if (result === "blocked") {
+        // Some device settings block even muted autoplay. Keep a real fallback.
+        video.dispatchEvent(new Event("ttv-autoplay-blocked"));
+        setStatus("paused");
+        setMessage("Your browser needs permission to play this channel.");
+      }
     } catch {
-      video.dispatchEvent(new Event("ttv-autoplay-blocked"));
-      setStatus("paused");
-      setMessage("Tap to start playback.");
+      if (!isCurrent()) return;
+      setStatus("error");
+      setMessage(getErrorMessage(video));
     }
   }, [applyAudio, castRemote.isConnected]);
 
-  const loadCurrentSource = useCallback(() => {
+  const loadCurrentSource = useCallback((reload = false) => {
     const video = videoRef.current;
     const item = live.item;
 
@@ -835,7 +856,12 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       return;
     }
 
+    // Invalidate any play() promise belonging to the channel we just left.
+    playbackAttemptRef.current += 1;
     sourceTransitionRef.current = true;
+    if (sourceTransitionTimerRef.current !== null) {
+      window.clearTimeout(sourceTransitionTimerRef.current);
+    }
 
     setStatus("loading");
     setMessage("");
@@ -845,21 +871,29 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       configureVideoForAppPlayback(video);
       applyAudio();
 
-      video.pause();
-      video.preload = "auto";
-      video.src = item.file;
-      video.load();
+      if (reload || video.getAttribute("src") !== item.file || video.error) {
+        video.pause();
+        video.preload = "auto";
+        video.src = item.file;
+        video.load();
+      } else {
+        // Adjacent segments or channels can share a file. Keep its buffer.
+        hardSyncPosition({ force: true });
+      }
+      // Register playback intent now, rather than waiting for metadata to arrive.
+      void tryPlay();
     } catch {
       setStatus("error");
       setMessage(
         "This programme is temporarily unavailable. Tap to try again.",
       );
     } finally {
-      window.setTimeout(() => {
+      sourceTransitionTimerRef.current = window.setTimeout(() => {
         sourceTransitionRef.current = false;
+        sourceTransitionTimerRef.current = null;
       }, SOURCE_TRANSITION_RELEASE_MS);
     }
-  }, [applyAudio, live.item]);
+  }, [applyAudio, hardSyncPosition, live.item, tryPlay]);
 
   const playbackMonitor = usePlaybackMonitor(videoRef, {
     sourceKey: playbackKey,
@@ -869,11 +903,14 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     disabled: castRemote.isConnected || nativeTv.connected,
     reload: () => {
       setNowMs(Date.now());
-      loadCurrentSource();
+      loadCurrentSource(true);
     },
   });
 
   const resume = useCallback(() => {
+    // This call runs in the user's tap, preserving permission to enable sound.
+    autoplayMutedRef.current = false;
+    setAutoplayMuted(false);
     setNowMs(Date.now());
     hardSyncPosition({ force: true });
     void tryPlay();
@@ -1143,6 +1180,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
 
   useEffect(() => {
     setNowMs(Date.now());
+    setClockReady(true);
 
     const interval = window.setInterval(() => {
       setNowMs(Date.now());
@@ -1171,7 +1209,11 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     const video = videoRef.current;
     const item = live.item;
 
+    // The server's deterministic clock is for markup only, never a media URL.
+    if (!clockReady) return;
+
     if (!video || !item) {
+      lastPlaybackKeyRef.current = "";
       setStatus("idle");
       setMessage("");
       return;
@@ -1187,7 +1229,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       lastPlaybackKeyRef.current = playbackKey;
       loadCurrentSource();
     }
-  }, [castRemote.isConnected, live.item, loadCurrentSource, playbackKey]);
+  }, [castRemote.isConnected, clockReady, live.item, loadCurrentSource, playbackKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1200,7 +1242,6 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
 
     const handleLoadedMetadata = () => {
       hardSyncPosition({ force: true });
-      void tryPlay();
     };
 
     const handleCanPlay = () => {
@@ -1265,7 +1306,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       video.removeEventListener("error", handleError);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay, hasMedia]);
 
   useEffect(() => {
     if (status === "playing") {
@@ -1365,7 +1406,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         handleFullscreenChange,
       );
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay, hasMedia]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1411,7 +1452,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         handleNativeVideoFullscreenEnd,
       );
     };
-  }, [hardSyncPosition, tryPlay]);
+  }, [hardSyncPosition, tryPlay, hasMedia]);
 
   useEffect(() => {
     if ((fullscreenActive || viewportFullscreen) && status === "playing") {
@@ -1425,8 +1466,12 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   useEffect(() => {
     const video = videoRef.current;
     return () => {
+      playbackAttemptRef.current += 1;
       clearCastMessageTimer();
       clearControlsHideTimer();
+      if (sourceTransitionTimerRef.current !== null) {
+        window.clearTimeout(sourceTransitionTimerRef.current);
+      }
 
       if (fullscreenBusyTimerRef.current) {
         window.clearTimeout(fullscreenBusyTimerRef.current);
@@ -1442,7 +1487,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       video.removeAttribute("src");
       video.load();
     };
-  }, [clearCastMessageTimer, clearControlsHideTimer, releaseWakeLock]);
+  }, [clearCastMessageTimer, clearControlsHideTimer, releaseWakeLock, hasMedia]);
 
   if (!live.item) {
     return (
@@ -1495,7 +1540,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         autoPlay
         preload="auto"
         controls={false}
-        muted={!mobileLayout && (muted || volume <= 0)}
+        muted={autoplayMuted || (!mobileLayout && (muted || volume <= 0))}
         className="h-full w-full bg-black"
         style={{
           objectFit: fitMode,
@@ -1636,6 +1681,16 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         <div className="pointer-events-none absolute bottom-[5.8rem] left-1/2 z-40 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl border border-white/15 bg-black/80 px-3 py-2 text-center text-xs font-semibold text-white shadow-2xl backdrop-blur-md">
           {castMessage}
         </div>
+      ) : null}
+
+      {autoplayMuted && status === "playing" && !castRemote.isConnected && !nativeTv.connected ? (
+        <button
+          type="button"
+          onClick={resume}
+          className="absolute right-3 top-3 z-40 min-h-11 rounded-xl border border-white/20 bg-black/80 px-4 py-2 text-sm font-semibold text-white"
+        >
+          Turn on sound
+        </button>
       ) : null}
 
       {status === "loading" && !playbackMonitor.notice ? (
