@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useGoogleCast } from "@/components/GoogleCastProvider";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
 import { useStore } from "@/lib/store";
@@ -42,6 +42,8 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
   const activeId = useProfiles((state) => state.activeId);
   const revision = useProfiles((state) => state.revision);
   const [prepared, setPrepared] = useState(false);
+  const [programmingReady, setProgrammingReady] = useState(false);
+  const handleProgrammingReady = useCallback(() => setProgrammingReady(true), []);
   const { disconnect, sdkState } = useGoogleCast();
   useEffect(() => {
     initializeProfiles();
@@ -62,8 +64,12 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
   }, [activeId, disconnect, sdkState]);
   return (
     <>
-      <GlobalProgrammingSync isAdminAuthorized={false} visibility="problems" />
-      {!ready || !prepared ? (
+      <GlobalProgrammingSync
+        isAdminAuthorized={false}
+        visibility="problems"
+        onReady={handleProgrammingReady}
+      />
+      {!ready || !prepared || (activeId && !programmingReady) ? (
         <main className="ttv-profile-screen">
           <div>
             <h1>Tate’s TV</h1>

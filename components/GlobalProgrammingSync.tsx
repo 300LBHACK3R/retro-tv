@@ -10,6 +10,7 @@ import type {
 interface GlobalProgrammingSyncProps {
   isAdminAuthorized: boolean;
   visibility?: "always" | "problems" | "hidden";
+  onReady?: () => void;
 }
 
 type SyncStatus =
@@ -59,18 +60,21 @@ async function readJsonSafe<T>(response: Response): Promise<T | null> {
   }
 }
 
-async function fetchWithTimeout(
+async function fetchJsonWithTimeout<T>(
   input: RequestInfo | URL,
   init: RequestInit = {},
-): Promise<Response> {
+): Promise<{ response: Response; data: T | null }> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    return await fetch(input, {
+    const response = await fetch(input, {
       ...init,
       signal: controller.signal,
     });
+    // Keep the deadline active until the body arrives, not just the headers.
+    const data = await readJsonSafe<T>(response);
+    return { response, data };
   } finally {
     window.clearTimeout(timeout);
   }
@@ -168,6 +172,7 @@ function formatLastSaved(value: string | null): string {
 export default function GlobalProgrammingSync({
   isAdminAuthorized,
   visibility = "always",
+  onReady,
 }: GlobalProgrammingSyncProps) {
   const replaceProgramming = useStore((state) => state.replaceProgramming);
   const exportProgrammingSnapshot = useStore(
@@ -259,7 +264,7 @@ export default function GlobalProgrammingSync({
           );
         }
 
-        const response = await fetchWithTimeout("/api/admin/programming", {
+        const { response, data } = await fetchJsonWithTimeout<SaveProgrammingResponse>("/api/admin/programming", {
           method: "PUT",
           cache: "no-store",
           credentials: "same-origin",
@@ -268,8 +273,6 @@ export default function GlobalProgrammingSync({
           },
           body: JSON.stringify(snapshot),
         });
-
-        const data = await readJsonSafe<SaveProgrammingResponse>(response);
 
         if (!response.ok || !data?.ok) {
           throw new Error(data?.error || `Save failed with ${response.status}`);
@@ -335,12 +338,10 @@ export default function GlobalProgrammingSync({
       setMessage("Loading global programming");
 
       try {
-        const response = await fetchWithTimeout("/api/programming", {
+        const { response, data } = await fetchJsonWithTimeout<ProgrammingApiResponse>("/api/programming", {
           cache: "no-store",
           credentials: "same-origin",
         });
-
-        const data = await readJsonSafe<ProgrammingApiResponse>(response);
 
         if (cancelled || !mountedRef.current) {
           return;
@@ -398,6 +399,10 @@ export default function GlobalProgrammingSync({
             ? getErrorMessage(error, "Global load failed")
             : "Offline / using local programming",
         );
+      } finally {
+        // Viewer playback can start after either the fresh lineup or its
+        // existing local fallback is selected. Never start both in succession.
+        if (!cancelled && mountedRef.current) onReady?.();
       }
     };
 
@@ -407,7 +412,7 @@ export default function GlobalProgrammingSync({
       cancelled = true;
       mountedRef.current = false;
     };
-  }, [exportProgrammingSnapshot, replaceProgramming, isAdminAuthorized]);
+  }, [exportProgrammingSnapshot, replaceProgramming, isAdminAuthorized, onReady]);
 
   useEffect(() => {
     if (!isAdminAuthorized || !isHydrated) {

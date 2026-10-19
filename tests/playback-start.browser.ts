@@ -40,6 +40,8 @@ async function prepare(page: Page, policy: "sound" | "all" = "sound") {
   await page.route("https://www.gstatic.com/**", (route) => route.fulfill({ contentType: "application/javascript", body: "" }));
   await page.route("**/api/engagement", (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/_vercel/**", (route) => route.fulfill({ status: 204 }));
+  // An initial default-channel load must never escape to real media in a test.
+  await page.route("https://*.r2.dev/**", (route) => route.abort());
   await page.route(/\/qa-[abc]\.webm$/, (route) => route.fulfill({ body: clip, contentType: "video/webm" }));
 }
 
@@ -56,6 +58,72 @@ async function tune(page: Page, channel: string) {
   await page.getByRole("dialog", { name: "Channel directory", exact: true })
     .getByRole("button", { name: channel, exact: true }).click();
 }
+
+test("choosing a profile waits for the initial lineup instead of loading a stale channel", async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => sessionStorage.removeItem("ttv-profile-session-v1"));
+  let releaseLineup!: () => void;
+  const pendingLineup = new Promise<void>((resolve) => { releaseLineup = resolve; });
+  await page.route("**/api/programming", async (route) => {
+    await pendingLineup;
+    await route.fallback();
+  });
+  try {
+    await page.goto("/?ch=24");
+    await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+    await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Getting your TV ready…" })).toBeVisible();
+    expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads)).toEqual([]);
+  } finally {
+    releaseLineup();
+  }
+  await playing(page);
+  expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads))
+    .toEqual(["/qa-c.webm"]);
+});
+
+test("a failed lineup refresh still opens the cached lineup", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/?ch=24");
+  await playing(page);
+  await page.route("**/api/programming", (route) => route.fulfill({
+    status: 503, json: { ok: false, error: "Schedule temporarily unavailable" },
+  }));
+  await page.reload();
+  await playing(page);
+  await expect(page.getByText("The schedule could not refresh. Please try again shortly.")).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads))
+    .toEqual(["/qa-c.webm"]);
+});
+
+test("a lineup body that stalls after its headers times out to the cached lineup", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/?ch=24");
+  await playing(page);
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.fetch = (input, init) => {
+      if (input === "/api/programming") {
+        // Deliver headers immediately but never finish the response body.
+        return Promise.resolve(new Response(new ReadableStream({
+          start(controller) {
+            init?.signal?.addEventListener("abort", () => {
+              controller.error(new DOMException("Request timed out", "AbortError"));
+            }, { once: true });
+          },
+        }), { headers: { "Content-Type": "application/json" } }));
+      }
+      return originalFetch(input, init);
+    };
+  });
+  await page.reload();
+  await expect(page.getByRole("status").filter({ hasText: "Getting your TV ready…" })).toBeVisible();
+  await expect(page.getByText("The schedule could not refresh. Please try again shortly."))
+    .toBeVisible({ timeout: 20_000 });
+  await playing(page);
+  expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads))
+    .toEqual(["/qa-c.webm"]);
+});
 
 test("starts without a playback tap, enables sound, and keeps the buffer across shared-file channels", async ({ page }) => {
   await prepare(page);
