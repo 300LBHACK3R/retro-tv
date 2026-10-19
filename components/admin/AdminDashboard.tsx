@@ -1,22 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import LibraryPresentationPanel from "@/components/admin/LibraryPresentationPanel";
-import ChannelLineupPanel from "@/components/admin/ChannelLineupPanel";
-import AudiencePanel from "@/components/admin/AudiencePanel";
-import StationInsightsPanel from "@/components/admin/StationInsightsPanel";
-import ProgrammeBlocksPanel from "@/components/admin/ProgrammeBlocksPanel";
-import ChannelBrandingPanel from "@/components/admin/ChannelBrandingPanel";
-import ChannelProgrammingPanel from "@/components/admin/ChannelProgrammingPanel";
-import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
-import QuickMediaEditorPanel from "@/components/admin/QuickMediaEditorPanel";
-import SubmissionInboxPanel from "@/components/admin/SubmissionInboxPanel";
-import StationConfigPanel from "@/components/admin/StationConfigPanel";
-import UploadPanel from "@/components/admin/UploadPanel";
+import dynamic from "next/dynamic";
 import { useStore } from "@/lib/store";
 import type { Channel, MediaItem } from "@/lib/types";
 
+function PanelLoading() { return <div className="ttv-admin-card" role="status">Opening admin tools…</div>; }
+const LibraryPresentationPanel = dynamic(() => import("./LibraryPresentationPanel"), { loading: PanelLoading });
+const ChannelLineupPanel = dynamic(() => import("./ChannelLineupPanel"), { loading: PanelLoading });
+const AudiencePanel = dynamic(() => import("./AudiencePanel"), { loading: PanelLoading });
+const StationInsightsPanel = dynamic(() => import("./StationInsightsPanel"), { loading: PanelLoading });
+const ProgrammeBlocksPanel = dynamic(() => import("./ProgrammeBlocksPanel"), { loading: PanelLoading });
+const ChannelBrandingPanel = dynamic(() => import("./ChannelBrandingPanel"), { loading: PanelLoading });
+const ChannelProgrammingPanel = dynamic(() => import("./ChannelProgrammingPanel"), { loading: PanelLoading });
+const MediaLibraryPanel = dynamic(() => import("./MediaLibraryPanel"), { loading: PanelLoading });
+const QuickMediaEditorPanel = dynamic(() => import("./QuickMediaEditorPanel"), { loading: PanelLoading });
+const SubmissionInboxPanel = dynamic(() => import("./SubmissionInboxPanel"), { loading: PanelLoading });
+const StationConfigPanel = dynamic(() => import("./StationConfigPanel"), { loading: PanelLoading });
+const UploadPanel = dynamic(() => import("./UploadPanel"), { loading: PanelLoading });
+const CommercialsPanel = dynamic(() => import("./CommercialsPanel"), { loading: PanelLoading });
+
 type AdminTab =
+  | "commercials"
   | "artwork"
   | "lineup"
   | "audience"
@@ -55,6 +60,7 @@ const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
 const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
+  { id: "commercials", label: "Commercials", shortLabel: "Commercials", description: "Upload ads, assign campaigns, configure breaks and preview the schedule." },
   { id: "artwork", label: "Artwork & Coming Soon", shortLabel: "Artwork & Coming Soon", description: "Title posters, Kids library review and upcoming announcements." },
   { id: "lineup", label: "Channel Lineup", shortLabel: "Channels", description: "Move and renumber channels, control on-air status, and add seasonal channels." },
   { id: "audience", label: "Audience & Channels", shortLabel: "Audience", description: "Review Kids programming and organize channel categories." },
@@ -112,8 +118,8 @@ const TABS: AdminTabMeta[] = [
   },
   {
     id: "config",
-    label: "Config",
-    shortLabel: "Config",
+    label: "Backups & Restore",
+    shortLabel: "Backups",
     description: "Export, import, backup, and restore station programming.",
   },
   {
@@ -122,6 +128,12 @@ const TABS: AdminTabMeta[] = [
     shortLabel: "Launch",
     description: "Run the station readiness checklist before release.",
   },
+];
+
+const TOOL_GROUPS: { name: string; tabs: AdminTab[] }[] = [
+  { name: "Content & campaigns", tabs: ["add", "commercials", "quick-edit", "library", "artwork", "submissions"] },
+  { name: "Channels & scheduling", tabs: ["lineup", "programming", "blocks", "audience", "branding"] },
+  { name: "Station health & safety", tabs: ["insights", "launch", "config"] },
 ];
 
 function isAdminTab(value: string | null): value is AdminTab {
@@ -526,6 +538,7 @@ function LaunchReadinessPanel({
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>(getInitialAdminTab);
+  const [toolSearch, setToolSearch] = useState("");
 
   const media = useStore((state) => state.media);
   const channels = useStore((state) => state.channels);
@@ -829,16 +842,14 @@ export default function AdminDashboard() {
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-            {TABS.map((tab) => (
-              <TabButton
-                key={tab.id}
-                tab={tab}
-                active={tab.id === activeTab}
-                onClick={() => setActiveTab(tab.id)}
-              />
-            ))}
-          </div>
+          <nav className="ttv-admin-tools" aria-label="Admin tools">
+            <label>Find an admin tool<input type="search" value={toolSearch} onChange={event => setToolSearch(event.target.value)} placeholder="Try commercials, upload, Kids, posters or backup" /></label>
+            {TOOL_GROUPS.map(group => {
+              const tabs = group.tabs.map(id => TABS.find(tab => tab.id === id)!).filter(tab => `${tab.label} ${tab.description}`.toLowerCase().includes(toolSearch.trim().toLowerCase()));
+              return tabs.length ? <section key={group.name}><h3>{group.name}</h3><div className="ttv-admin-tool-grid">{tabs.map(tab => <TabButton key={tab.id} tab={tab} active={tab.id === activeTab} onClick={() => setActiveTab(tab.id)} />)}</div></section> : null;
+            })}
+            {!TABS.some(tab => `${tab.label} ${tab.description}`.toLowerCase().includes(toolSearch.trim().toLowerCase())) ? <p role="status">No matching tools. Try a shorter search or clear the search box.</p> : null}
+          </nav>
 
           <div
             className="mt-3 rounded-2xl border px-3 py-3 text-xs leading-5"
@@ -860,6 +871,7 @@ export default function AdminDashboard() {
       </section>
 
       <div className="min-w-0">
+        {activeTab === "commercials" ? <CommercialsPanel /> : null}
         {activeTab === "lineup" ? <ChannelLineupPanel onOpen={(tab, channelId) => {
           if (channelId) useStore.getState().setChannel(channelId);
           setActiveTab(tab);

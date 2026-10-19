@@ -481,15 +481,11 @@ function createAdPool(
     ? availableAds.filter(isAd)
     : [];
 
-  const context: CommercialPickContext = {
-    channel,
-    now,
-    placement: "mid-roll",
-  };
-
   return sortAdPool(
     dedupeMediaById([...directAds, ...globalAds]).filter((item) =>
-      canAdRunInContext(item, context),
+      hasPlayableDuration(item) && canAdAirToday(item, now) &&
+      isWithinClockWindow(item.adStartTime, item.adEndTime, now) &&
+      isAdTargetAllowed(item, channel) && isAdCategoryAllowed(item, channel),
     ),
   );
 }
@@ -544,7 +540,8 @@ function pickCommercial(
   context: CommercialPickContext,
 ): MediaItem | undefined {
   const eligible = getRotatedPool(ads, cursor).filter((item) =>
-    canAdRunInContext(item, context),
+    canAdRunInContext(item, context) &&
+    (getSafeDuration(item) <= targetSeconds || item.allowCommercialSlicing === true),
   );
 
   if (eligible.length === 0) {

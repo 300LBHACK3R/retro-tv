@@ -810,7 +810,7 @@ export default function ChannelProgrammingPanel() {
               className="mb-1 block text-xs"
               style={{ color: "var(--text-muted)" }}
             >
-              Automatic Breaks
+              Music-video breaks
             </label>
 
             <select
@@ -828,11 +828,12 @@ export default function ChannelProgrammingPanel() {
                 color: "var(--text)",
               }}
             >
-              <option value="none">No Automatic Breaks</option>
-              <option value="end-only">End Breaks Only</option>
-              <option value="midpoint-and-end">Midpoint + End Breaks</option>
-              <option value="classic-tv">Classic TV Breaks</option>
+              <option value="none">Off</option>
+              <option value="end-only">After every four music videos</option>
+              <option value="midpoint-and-end">Enabled (legacy midpoint setting)</option>
+              <option value="classic-tv">Enabled (legacy classic setting)</option>
             </select>
+            <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>Shows and movies use saved item breaks. Open Commercials for guided end-break setup or Quick Edit for precise mid-show breaks.</p>
           </div>
 
           <div>

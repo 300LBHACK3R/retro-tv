@@ -58,6 +58,18 @@ Programmes play in the chosen order, repeat if the window is longer, and may be 
 
 Schedules currently use each viewer’s local timezone, matching the existing station scheduler. They are not a single Calgary-time broadcast feed worldwide.
 
+## Upload and schedule commercials
+
+Admin tools are grouped by task and searchable. Panels load when opened. **Commercials** brings uploading, targeting, break setup and a schedule preview together; existing playlists and custom timing remain editable in their original tools.
+
+1. Open **Admin → Commercials → Upload a commercial**. Choose the video, select **Upload to R2**, check the detected runtime and target channel, then select **Add Media**. Uploading alone does not register the commercial. Use a browser-compatible video; uploading does not transcode it.
+2. Return to the commercial inventory. Choose the ad, select its channels and allowed breaks, optionally add advertiser/campaign details, then **Save campaign**. Selecting no channels pauses the ad without deleting the file. Network-wide targeting includes future channels that accept global ads.
+3. Choose a channel under **Channel break setup**, pick an end-break target and review the affected programmes. **Apply end breaks & enable targeted ads** configures only unconfigured shows/movies. Shared titles, custom timing and fixed air times are skipped. Use Quick Edit for those or for carefully chosen mid-show breaks. Applying a preset changes schedule timing.
+4. **Generate schedule preview** to see the scheduler's result. Whole commercials must fit the available time; remaining time is not padded with a blank screen. A longer commercial only plays partially when slicing was explicitly enabled in Quick Edit. Ads may repeat within a break. Music-video break settings remain in Playlist.
+5. Confirm **Global saved**, or use the cloud Save control, before leaving. Preview after changing campaign rules or channel permissions. Review every ad explicitly before allowing it on a Kids channel; the setup action never approves content for Kids.
+
+Campaign weekdays use each viewer's local broadcast day. Existing daily time restrictions are evaluated at that day's start, not continuously; they are retained but not presented as reliable hourly campaign scheduling. The preview starts at the generated schedule's beginning; it is not a promise of the next live item, paid impressions, frequency capping or advertiser billing. No new service, database migration or dependency is required.
+
 ## Station insights setup
 
 Apply [the station insights migration](supabase/migrations/20260911_station_insights.sql) once in the existing Supabase project’s SQL editor. It creates a separate, private playback table and three service-role-only functions. It does not modify programming or submissions. Reapplying it is safe.

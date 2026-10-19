@@ -331,7 +331,7 @@ function SummaryRow({
   );
 }
 
-export default function UploadPanel() {
+export default function UploadPanel({ initialType = "show" }: { initialType?: MediaType }) {
   const channels = useStore((state) => state.channels);
   const media = useStore((state) => state.media);
   const currentChannelId = useStore((state) => state.currentChannelId);
@@ -340,7 +340,7 @@ export default function UploadPanel() {
 
   const [title, setTitle] = useState("");
   const [file, setFile] = useState("");
-  const [type, setType] = useState<MediaType>("show");
+  const [type, setType] = useState<MediaType>(initialType);
   const [durationInput, setDurationInput] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>("seconds");
   const [isDetectingDuration, setIsDetectingDuration] = useState(false);
@@ -544,7 +544,7 @@ export default function UploadPanel() {
   const resetFormAfterAdd = () => {
     setTitle("");
     setFile("");
-    setType("show");
+    setType(initialType);
     setDurationInput("");
     setDurationMode("seconds");
     setDurationStatus(DEFAULT_DURATION_STATUS);
