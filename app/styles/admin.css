@@ -47,6 +47,14 @@
   .ttv-admin-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+.ttv-batch-import { display: grid; gap: 1.2rem; min-width: 0; }
+.ttv-batch-import textarea { width: 100%; min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: .7rem; font-size: 16px; }
+.ttv-batch-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.ttv-batch-rows { display: grid; gap: 1rem; padding: 0; list-style: none; }
+.ttv-batch-rows > li { display: grid; gap: .7rem; padding: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--panel-alt-bg); }
+.ttv-batch-row-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.ttv-batch-row-heading label { overflow-wrap: anywhere; }
+.ttv-batch-row-heading strong { color: var(--primary); text-transform: capitalize; }
 .ttv-admin-shell {
   color: var(--text);
 }

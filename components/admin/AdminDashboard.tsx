@@ -19,8 +19,10 @@ const SubmissionInboxPanel = dynamic(() => import("./SubmissionInboxPanel"), { l
 const StationConfigPanel = dynamic(() => import("./StationConfigPanel"), { loading: PanelLoading });
 const UploadPanel = dynamic(() => import("./UploadPanel"), { loading: PanelLoading });
 const CommercialsPanel = dynamic(() => import("./CommercialsPanel"), { loading: PanelLoading });
+const BatchImportPanel = dynamic(() => import("./BatchImportPanel"), { loading: PanelLoading, ssr: false });
 
 type AdminTab =
+  | "batch"
   | "commercials"
   | "artwork"
   | "lineup"
@@ -60,6 +62,7 @@ const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
 const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
+  { id: "batch", label: "Batch Import", shortLabel: "Batch Import", description: "Upload multiple episodes, reuse R2 links, detect runtimes and assign a channel in one review." },
   { id: "commercials", label: "Commercials", shortLabel: "Commercials", description: "Upload ads, assign campaigns, configure breaks and preview the schedule." },
   { id: "artwork", label: "Artwork & Coming Soon", shortLabel: "Artwork & Coming Soon", description: "Title posters, Kids library review and upcoming announcements." },
   { id: "lineup", label: "Channel Lineup", shortLabel: "Channels", description: "Move and renumber channels, control on-air status, and add seasonal channels." },
@@ -131,7 +134,7 @@ const TABS: AdminTabMeta[] = [
 ];
 
 const TOOL_GROUPS: { name: string; tabs: AdminTab[] }[] = [
-  { name: "Content & campaigns", tabs: ["add", "commercials", "quick-edit", "library", "artwork", "submissions"] },
+  { name: "Content & campaigns", tabs: ["batch", "add", "commercials", "quick-edit", "library", "artwork", "submissions"] },
   { name: "Channels & scheduling", tabs: ["lineup", "programming", "blocks", "audience", "branding"] },
   { name: "Station health & safety", tabs: ["insights", "launch", "config"] },
 ];
@@ -881,6 +884,7 @@ export default function AdminDashboard() {
         {activeTab === "insights" ? <StationInsightsPanel /> : null}
         {activeTab === "blocks" ? <ProgrammeBlocksPanel /> : null}
         {activeTab === "add" ? <UploadPanel /> : null}
+        {activeTab === "batch" ? <BatchImportPanel /> : null}
         {activeTab === "submissions" ? <SubmissionInboxPanel /> : null}
         {activeTab === "quick-edit" ? <QuickMediaEditorPanel /> : null}
         {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}

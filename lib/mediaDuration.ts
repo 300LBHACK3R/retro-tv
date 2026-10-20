@@ -101,6 +101,7 @@ function canUseBrowserVideo(): boolean {
 export function probeVideoDuration(
   src: string,
   timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  signal?: AbortSignal,
 ): Promise<DurationProbeResult> {
   return new Promise((resolve, reject) => {
     const cleanSrc = src.trim();
@@ -123,6 +124,7 @@ export function probeVideoDuration(
     let timeoutId: number | null = null;
 
     const cleanup = () => {
+      signal?.removeEventListener("abort", handleAbort);
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
         timeoutId = null;
@@ -201,6 +203,16 @@ export function probeVideoDuration(
     function handleError() {
       fail(getMediaErrorMessage(video));
     }
+
+    function handleAbort() {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DOMException("Duration check cancelled.", "AbortError"));
+    }
+
+    if (signal?.aborted) { handleAbort(); return; }
+    signal?.addEventListener("abort", handleAbort, { once: true });
 
     timeoutId = window.setTimeout(() => {
       fail(

@@ -60,6 +60,16 @@ Schedules currently use each viewer’s local timezone, matching the existing st
 
 ## Upload and schedule commercials
 
+### Batch uploads and existing R2 links
+
+Open **Admin → Batch Import** to prepare up to 200 videos together. Choose the channel, media type and upload folder once. Select multiple local videos (MP4/WebM/MOV/M4V, up to 4.9 GB each), or paste existing public HTTPS video URLs to avoid reuploading. Filenames provide editable titles; **Sort by title / episode** uses numeric ordering. **Prepare / retry selected items** reads actual runtimes and uploads local files two at a time. Unsupported or unreadable files show individual errors; they do not stop the rest of the batch. Uploading does not transcode or verify every browser's codecs.
+
+Review titles, runtimes and assignment, check the review checkbox, then **Add ready items to station**. Programmes append in queue order; commercials enter the selected channel's ad inventory without entering its programme playlist. Duplicate URLs are skipped again at commit time. Existing content and assignments are preserved. An optional end-break setting applies only to new shows/movies and enables targeted end-break ads on that channel; existing eligible ads are still required. No mid-show cuts or Kids approvals are inferred. Review new content in **Audience & Channels**, and confirm **Global saved** before leaving.
+
+Keep the browser tab open during preparation. Draft metadata is stored in that tab's session storage, never signed upload URLs or video bytes. Refreshing or switching admin tools keeps completed public URLs; reselect unfinished local files to reconnect them. Pause/retry restarts unfinished transfers, while successful uploads are retained. This is not background or multipart-resumable uploading. Removing a queue entry never deletes its R2 file. Reusing the same URL is detected as a duplicate; a new URL for the same footage is not a content-hash duplicate check.
+
+### Commercial campaigns
+
 Admin tools are grouped by task and searchable. Panels load when opened. **Commercials** brings uploading, targeting, break setup and a schedule preview together; existing playlists and custom timing remain editable in their original tools.
 
 1. Open **Admin → Commercials → Upload a commercial**. Choose the video, select **Upload to R2**, check the detected runtime and target channel, then select **Add Media**. Uploading alone does not register the commercial. Use a browser-compatible video; uploading does not transcode it.
