@@ -508,11 +508,14 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and rese
   await expect(lamp).toHaveCSS("animation-name", "ttv-halloween90-warmth");
   const portraits = page.locator(".ttv-profile-grid .ttv-profile-portrait");
   await expect(portraits).toHaveCount(2);
-  // Reload can restore the earlier footer scroll position. Next/Image portraits
-  // are lazy loaded, so bring each into view before checking that it loaded.
+  // Reload can restore the earlier footer scroll position. Portraits remain
+  // lazy loaded, so bring each into view before checking that it loaded.
   for (const portrait of await portraits.all()) {
     await portrait.scrollIntoViewIfNeeded();
     await expect(portrait).toBeInViewport();
+    // Portraits are pre-sized during the build, avoiding runtime image requests
+    // that could get stuck when the preceding navigation was interrupted.
+    await expect(portrait).toHaveAttribute("src", /^\/avatars\/portraits\/[a-z]+\.webp$/);
     await expect.poll(() => portrait.evaluate((item: HTMLImageElement) => item.complete && item.naturalWidth > 0)).toBe(true);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);

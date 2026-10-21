@@ -27,6 +27,21 @@ function get(path, method = "GET", headers = {}) {
     req.end();
   });
 }
+
+function interruptImage(path) {
+  return new Promise((resolve, reject) => {
+    const req = request(origin + path, { rejectUnauthorized: false }, (res) => {
+      res.on("error", () => {}); // Expected after intentionally closing the socket.
+      // Leave after headers, before consuming the body. This works even if the
+      // owner later replaces the portrait with a file smaller than one chunk.
+      req.destroy();
+      resolve(Number(res.headers["content-length"]));
+    });
+    req.on("error", reject);
+    req.setTimeout(8000, () => req.destroy(new Error("Interrupted image test timed out")));
+    req.end();
+  });
+}
 const server = spawn(process.execPath, ["tests/https-server.mjs"], {
   env: {
     ...process.env,
@@ -117,13 +132,18 @@ try {
   for (const [, path] of shellArray.matchAll(/"([^"\n]+)"/g)) {
     assert.equal((await get(path, "HEAD")).status, 200, `Offline precache asset ${path}`);
   }
+  const interruptedPortrait = await interruptImage("/avatars/portraits/boydragon.webp");
+  assert.ok(interruptedPortrait > 0, "Portrait response had an image body before interruption");
+  // A subsequent request for the very same asset must still complete.
+  assert.equal((await get("/avatars/portraits/boydragon.webp")).status, 200, "Portrait recovers after an interrupted transfer");
   for (const name of ["boyfox", "girlfox", "dadfox", "momfox", "girlcat", "boycat", "boyrobot", "girlrobot", "boydragon", "girldragon", "daddragon", "momdragon", "malepirate", "femalepirate", "malemechanic", "femalemechanic", "maledoctors", "femaledoctors", "maleserver", "femaleserver", "jesus", "kidsjesus"]) {
     const portrait = await get(`/avatars/${name}.png`, "HEAD");
     assert.equal(portrait.status, 200, `${name}: portrait is available`);
     assert.match(portrait.headers["content-type"], /^image\/png\b/);
-    const thumbnail = await get(`/_next/image?url=%2Favatars%2F${name}.png&w=128&q=75`);
+    const thumbnail = await get(`/avatars/portraits/${name}.webp`);
     assert.equal(thumbnail.status, 200, `${name}: optimized portrait is available`);
-    assert.match(thumbnail.headers["content-type"], /^image\//);
+    assert.match(thumbnail.headers["content-type"], /^image\/webp\b/);
+    assert.ok(Number(thumbnail.headers["content-length"]) < 80_000, `${name}: portrait stays lightweight`);
   }
   const backdrop = await get("/themes/haunted-arcade-world.webp", "HEAD");
   assert.equal(backdrop.status, 200, "Haunted Arcade backdrop is available");

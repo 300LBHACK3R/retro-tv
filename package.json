@@ -4,8 +4,11 @@
   "private": true,
   "description": "A browser-based retro cable TV simulator built with Next.js, TypeScript, Tailwind CSS, Supabase, and Cloudflare R2.",
   "scripts": {
+    "prepare:portraits": "node scripts/prepare-portraits.mjs",
+    "predev": "npm run prepare:portraits",
+    "prebuild": "npm run prepare:portraits",
     "dev": "node scripts/dev.mjs",
-    "dev:clean": "npm run clean && next dev",
+    "dev:clean": "npm run clean && npm run dev",
     "build": "next build && node tests/styles.mjs",
     "start": "next start",
     "lint": "eslint .",

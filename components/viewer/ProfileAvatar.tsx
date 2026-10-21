@@ -41,11 +41,13 @@ export function ProfileAvatar({ profile }: { profile: Pick<Profile, "avatar"> })
   return (
     <span className="ttv-profile-avatar" data-avatar={profile.avatar} aria-hidden="true">
       <Image
-        src={portrait.src}
+        // These small WebP assets are generated before development/build. Direct
+        // delivery remains retryable if a navigation interrupts an image load.
+        src={portrait.src.replace("/avatars/", "/avatars/portraits/").replace(/\.png$/, ".webp")}
         alt=""
-        width={1254}
-        height={1254}
-        sizes="(max-width: 560px) 112px, 160px"
+        width={512}
+        height={512}
+        unoptimized
         className="ttv-profile-portrait"
       />
     </span>
