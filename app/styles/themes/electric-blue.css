@@ -1,0 +1,243 @@
+/* Electric Blue: light lives behind the UI or on its edges. Animation uses
+   transforms/opacity only; no filters, canvas loops or overlays on the video. */
+:root[data-ttv-theme="electric-blue-live"],
+:root[data-ttv-theme="electric-blue-live"] .ttv-layout-electric-command {
+  --electric-energy: linear-gradient(110deg, #8af1ff, #55c6ff 52%, #92b9ff);
+  --electric-glass: linear-gradient(145deg, #3186ff26, transparent 62%), var(--panel-bg);
+  --ttv-radius-shell: 1rem;
+  --ttv-radius-panel: 0.8rem;
+  --ttv-radius-control: 0.5rem;
+  --ttv-radius-player: 0.85rem;
+  --ttv-ambient-opacity: 0.9;
+  --ttv-ambient-bg:
+    radial-gradient(ellipse at 6% 30%, #00ccff40, transparent 42%),
+    radial-gradient(ellipse at 94% 65%, #2268ff52, transparent 42%),
+    linear-gradient(125deg, transparent 20%, #31a5ff0a 25%, #43dcff26 25.1%, transparent 25.4% 72%, #266dff38 72.2%, transparent 72.5%);
+  --ttv-texture-bg:
+    linear-gradient(#4baaff80 1px, transparent 1px),
+    linear-gradient(90deg, #4baaff80 1px, transparent 1px);
+  --ttv-texture-size: 72px 72px;
+  --ttv-texture-opacity: 0.32;
+  --ttv-shadow-panel: inset 0 1px #7ddfff24, 0 10px 35px #0005, 0 0 24px #1685ff14;
+  --ttv-shadow-elevated: inset 0 1px #a5edff38, 0 24px 80px #000b, 0 0 35px #008aff28;
+  --ttv-shadow-control: inset 0 1px #78dfff25, 0 4px 12px #00142b80;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before {
+  inset: -5%;
+  animation: ttv-electric-field 18s ease-in-out infinite alternate;
+}
+
+/* A static perspective grid gives depth without repainting a moving grid. */
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after {
+  inset: 38% -10% -25%;
+  transform: perspective(600px) rotateX(55deg) scale(1.3);
+  transform-origin: center 75%;
+  -webkit-mask-image: linear-gradient(transparent, #000 30% 75%, transparent);
+  mask-image: linear-gradient(transparent, #000 30% 75%, transparent);
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-topbar {
+  border-bottom-color: #42caff;
+  box-shadow: 0 1px #b0f2ff3b, 0 14px 35px -20px #16b5ff;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 24%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c5faff, #40ceff, transparent);
+  box-shadow: 0 0 14px #35cfff;
+  pointer-events: none;
+  animation: ttv-electric-sweep 8s ease-in-out infinite alternate;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-player-frame {
+  box-shadow: 0 0 0 1px #70dfff, 0 0 0 4px #125bb533, 0 0 32px #008dff55, 0 24px 65px #0009;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-player-frame::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  width: 24%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #d5fbff, transparent);
+  pointer-events: none;
+  animation: ttv-electric-sweep 10s ease-in-out infinite alternate-reverse;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(
+  .ttv-premium-stage-sidebar,
+  .ttv-channel-rail-card,
+  .ttv-channel-browser-dialog,
+  .ttv-viewer-more-dialog,
+  .theme-dialog
+) {
+  background: var(--electric-glass);
+  box-shadow: var(--ttv-shadow-panel);
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-channel-hero {
+  background: linear-gradient(110deg, #237cff30, #00cfff0a);
+  border-bottom-color: #3db4ff77;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(
+  .ttv-section-heading h2,
+  .ttv-channel-hero h1,
+  .ttv-library-shell h1,
+  .theme-dialog__title
+) {
+  font-family: "Arial Black", "Segoe UI", sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  text-shadow: 0 2px #05132c, 0 0 24px #389fff55;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-section-kicker, .ttv-now-next-up-next > span) {
+  color: var(--primary);
+  letter-spacing: 0.13em;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-live-dot {
+  background: #9ef4ff;
+  box-shadow: 0 0 0 4px #42caff18, 0 0 16px #46d7ff;
+  animation: ttv-electric-beacon 4s ease-in-out infinite alternate;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-now-next-progress, .ttv-mobile-progress) {
+  height: 4px;
+  background: #23426a;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-now-next-progress > span, .ttv-mobile-progress > span) {
+  background: var(--electric-energy);
+  box-shadow: 0 0 10px #54cfff66;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action) {
+  border-color: var(--border);
+  background: linear-gradient(150deg, #205aa333, transparent), var(--panel-bg);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-control);
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action):hover {
+  background: var(--button-hover);
+  border-color: var(--primary);
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-nav > [aria-current="page"] {
+  border-color: #b3f5ff;
+  background: var(--electric-energy);
+  color: var(--on-primary);
+  box-shadow: inset 0 1px #fff6, 0 0 22px #00baff4d;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-player-controls {
+  background: #04142bf2;
+  border-color: #4bbfff;
+  box-shadow: 0 0 0 3px #043b6f44, 0 8px 26px #0008;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-player-controls button {
+  color: #d1f6ff;
+  background-color: #16345a;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-player-controls button:hover {
+  background-color: #245487;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-channel-rail-card::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  background:
+    linear-gradient(#7ee8ff, #7ee8ff) left top / 16px 2px no-repeat,
+    linear-gradient(#7ee8ff, #7ee8ff) left top / 2px 12px no-repeat,
+    linear-gradient(#478aff, #478aff) right bottom / 16px 2px no-repeat,
+    linear-gradient(#478aff, #478aff) right bottom / 2px 12px no-repeat;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-channel-rail-card:is(:hover, :focus-visible, [data-selected="true"]) {
+  background: linear-gradient(145deg, #168dff38, transparent 75%), var(--panel-bg);
+  border-color: var(--primary);
+  box-shadow: inset 0 -3px var(--primary), 0 0 24px #1d9aff38;
+}
+
+:root[data-ttv-theme="electric-blue-live"] :is(.ttv-guide-dialog-header, .ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #1252a044, transparent 75%), var(--panel-bg);
+  border-bottom-color: #419bd4;
+  box-shadow: inset 0 2px #73e2ff66;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-mobile-airing[aria-pressed="true"] {
+  background: linear-gradient(120deg, #087bdf3b, #1063ba12), var(--panel-bg);
+  box-shadow: inset 3px 0 var(--primary);
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-mobile-viewer-nav {
+  background: #07172ef5;
+  border-top-color: #64d6ff;
+  box-shadow: 0 -10px 30px #008bff24, inset 0 1px #9be8ff38;
+}
+
+:root[data-ttv-theme="electric-blue-live"] .ttv-premium-footer {
+  border-top-color: #419bd4;
+}
+
+.theme-card[data-theme-id="electric-blue-live"] .theme-card__preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 35%, #7feaff26 50%, transparent 65%);
+  pointer-events: none;
+}
+
+@keyframes ttv-electric-field {
+  from { transform: translate3d(-2%, -1%, 0); opacity: 0.65; }
+  to { transform: translate3d(2%, 1%, 0); opacity: 1; }
+}
+@keyframes ttv-electric-sweep {
+  from { transform: translateX(0); opacity: 0.6; }
+  to { transform: translateX(310%); opacity: 1; }
+}
+@keyframes ttv-electric-beacon {
+  from { opacity: 0.65; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  :root[data-ttv-theme="electric-blue-live"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before {
+    animation-duration: 24s;
+  }
+  :root[data-ttv-theme="electric-blue-live"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::after {
+    opacity: 0.2;
+  }
+  :root[data-ttv-theme="electric-blue-live"] .ttv-premium-player-frame {
+    box-shadow: 0 0 0 1px #70dfff, 0 0 20px #008dff40, 0 12px 30px #0008;
+  }
+}
+
+/* Shared reduced-motion and hidden-page rules stop these animations. */
+@media (forced-colors: active) {
+  :root[data-ttv-theme="electric-blue-live"] :is(.ttv-premium-topbar, .ttv-premium-player-frame, .ttv-channel-rail-card)::after {
+    display: none;
+  }
+  :root[data-ttv-theme="electric-blue-live"] .ttv-premium-player-frame {
+    box-shadow: none;
+    outline: 1px solid CanvasText;
+  }
+  :root[data-ttv-theme="electric-blue-live"] :is(.ttv-section-heading h2, .ttv-library-shell h1, .theme-dialog__title) {
+    text-shadow: none;
+  }
+}
