@@ -1,0 +1,157 @@
+/* Midas: champagne metalwork and warm, dark glass. All decoration is scoped
+   to this theme; channel artwork and the programme keep their original colour. */
+:root[data-ttv-theme="midas-gold"],
+:root[data-ttv-theme="midas-gold"] .ttv-layout-cinematic-premium {
+  --midas-metal: linear-gradient(115deg, #b28c4b, #f4e5be 38%, #d6b574 64%, #b28c4b);
+  --midas-surface: linear-gradient(145deg, #e4c6870b, transparent 55%), var(--panel-bg);
+  --ttv-radius-shell: 1.25rem;
+  --ttv-radius-panel: 1rem;
+  --ttv-radius-control: 0.65rem;
+  --ttv-radius-player: 1rem;
+  --ttv-ambient-bg:
+    radial-gradient(ellipse at 50% -15%, #d6ad5b1f, transparent 60%),
+    radial-gradient(ellipse at 100% 100%, #b28c4b12, transparent 40%);
+  --ttv-texture-bg:
+    repeating-linear-gradient(60deg, transparent 0 159px, #e4c687 160px, transparent 161px 320px),
+    repeating-linear-gradient(-60deg, transparent 0 159px, #e4c687 160px, transparent 161px 320px);
+  --ttv-texture-size: auto;
+  --ttv-texture-opacity: 0.035;
+  --ttv-shadow-panel: 0 20px 50px #0005, inset 0 1px 0 #f4e5be14;
+  --ttv-shadow-elevated: 0 30px 90px #000a, inset 0 1px 0 #f4e5be26;
+  --ttv-shadow-control: inset 0 1px 0 #f4e5be12, 0 4px 12px #0003;
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-topbar {
+  border-bottom-color: var(--border);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-topbar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #b28c4b, #f4e5be, #b28c4b, transparent);
+  pointer-events: none;
+}
+
+:root[data-ttv-theme="midas-gold"] :is(
+  .ttv-premium-stage-sidebar,
+  .ttv-channel-rail-card,
+  .ttv-channel-browser-dialog,
+  .ttv-viewer-more-dialog,
+  .theme-dialog
+) {
+  background: var(--midas-surface);
+  box-shadow: var(--ttv-shadow-panel);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-player-frame {
+  border-color: #b28c4b;
+  box-shadow: 0 0 0 1px #17130e, 0 0 0 2px #e4c6874d, 0 24px 65px #0009;
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-channel-hero {
+  background: linear-gradient(120deg, #b28c4b16, transparent 75%);
+}
+
+:root[data-ttv-theme="midas-gold"] :is(
+  .ttv-section-heading h2,
+  .ttv-channel-hero h1,
+  .ttv-now-next-current strong,
+  .ttv-library-shell h1,
+  .theme-dialog__title
+) {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-section-heading h2 {
+  font-size: clamp(1.65rem, 2.3vw, 2rem);
+}
+
+:root[data-ttv-theme="midas-gold"] :is(.ttv-section-kicker, .ttv-now-next-up-next > span) {
+  color: var(--primary);
+  letter-spacing: 0.15em;
+}
+
+:root[data-ttv-theme="midas-gold"] :is(
+  .ttv-now-next-progress > span,
+  .ttv-mobile-progress > span
+) {
+  background: var(--midas-metal);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-live-dot {
+  background: var(--midas-metal);
+  box-shadow: 0 0 0 4px #e4c68712;
+}
+
+:root[data-ttv-theme="midas-gold"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action) {
+  border-color: var(--border);
+  background: var(--midas-surface);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-control);
+}
+
+:root[data-ttv-theme="midas-gold"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action):hover {
+  border-color: var(--primary);
+  background: var(--button-hover);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-nav > [aria-current="page"] {
+  border-color: var(--primary);
+  background: var(--midas-metal);
+  color: var(--on-primary);
+  box-shadow: inset 0 1px #fff3, 0 4px 18px #0003;
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-player-controls {
+  border-color: var(--border);
+  background: #100e0bef;
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-player-controls button {
+  color: var(--secondary);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-channel-rail-card[data-selected="true"] {
+  background: linear-gradient(145deg, #e4c6871c, transparent 65%), var(--panel-bg);
+  box-shadow: inset 0 -3px var(--primary), var(--ttv-shadow-panel);
+}
+
+:root[data-ttv-theme="midas-gold"] :is(.ttv-guide-dialog-header, .theme-dialog__header, .ttv-premium-dialog-header) {
+  background: linear-gradient(120deg, #e4c6870e, transparent 70%), var(--panel-bg);
+  border-bottom-color: var(--border);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-mobile-airing[aria-pressed="true"] {
+  background: linear-gradient(120deg, #e4c6871f, transparent), var(--panel-bg);
+  box-shadow: inset 3px 0 var(--primary);
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-mobile-viewer-nav {
+  background: var(--panel-bg);
+  border-top-color: #b28c4b;
+  box-shadow: 0 -10px 35px #0007, inset 0 1px #e4c6871a;
+}
+
+:root[data-ttv-theme="midas-gold"] .theme-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary), 0 8px 24px #0005;
+}
+
+:root[data-ttv-theme="midas-gold"] .ttv-premium-footer {
+  border-top-color: var(--border);
+}
+
+@media (forced-colors: active) {
+  :root[data-ttv-theme="midas-gold"] .ttv-premium-topbar::after {
+    display: none;
+  }
+  :root[data-ttv-theme="midas-gold"] .ttv-premium-player-frame {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+}
