@@ -163,3 +163,50 @@ test("a device blocking all autoplay retains a working manual permission fallbac
   await playing(page);
   await expect(page.locator("video")).toHaveJSProperty("muted", false);
 });
+
+test("a network stall does not cover or reload video that is still buffered and playing", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/?ch=24");
+  await playing(page);
+  const initialPosition = await page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime);
+  await expect.poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(initialPosition + 0.25);
+  await page.locator("video").evaluate((video) => {
+    // `stalled` describes the download, which can stop while buffered video plays.
+    video.dispatchEvent(new Event("stalled"));
+  });
+  await expect(page.locator(".ttv-player-message")).toHaveCount(0);
+  await playing(page);
+  expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads))
+    .toEqual(["/qa-c.webm"]);
+});
+
+test("playback progress clears a stale buffering notice while a real stall still reconnects", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/?ch=24");
+  await playing(page);
+  await page.locator("video").evaluate((video: HTMLVideoElement) => {
+    // Model recovery without a second `playing` event, as can happen around a seek.
+    video.addEventListener("playing", (event) => event.stopImmediatePropagation(), { capture: true });
+    Object.defineProperty(video, "currentTime", { configurable: true, value: video.currentTime });
+    Object.defineProperty(video, "readyState", { configurable: true, value: 2 });
+    video.dispatchEvent(new Event("waiting"));
+  });
+  await expect(page.getByText("Buffering…", { exact: true })).toBeVisible();
+  await page.locator("video").evaluate((video) => {
+    Reflect.deleteProperty(video, "currentTime");
+    Reflect.deleteProperty(video, "readyState");
+  });
+  await expect(page.locator(".ttv-player-message")).toHaveCount(0);
+
+  await page.locator("video").evaluate((video: HTMLVideoElement) => {
+    // A genuinely stalled timeline must still reach the existing bounded retry.
+    Object.defineProperty(video, "currentTime", { configurable: true, value: video.currentTime });
+    Object.defineProperty(video, "readyState", { configurable: true, value: 2 });
+    video.dispatchEvent(new Event("waiting"));
+  });
+  await expect(page.getByText("Buffering…", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reconnecting… attempt 1 of 3", { exact: true })).toBeVisible({ timeout: 15_000 });
+  expect(await page.evaluate(() => (window as typeof window & { playbackProbe: PlaybackProbe }).playbackProbe.loads))
+    .toEqual(["/qa-c.webm"]);
+});

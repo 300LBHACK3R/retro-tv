@@ -143,8 +143,15 @@ export function usePlaybackMonitor(
       if (!userPaused && !video.ended) {
         stableSince = 0;
         stalledAt ||= performance.now();
+        // Only movement after this stall can prove that playback recovered.
+        previousPosition = video.currentTime;
         setNotice("Buffering…");
       }
+    };
+    const stalled = () => {
+      // A stalled download does not mean playback stopped: the next frames
+      // may already be buffered. `waiting` handles an actual buffer underrun.
+      if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) waiting();
     };
     const error = () => {
       totals.errors += 1;
@@ -200,8 +207,15 @@ export function usePlaybackMonitor(
         !video.ended &&
         advanced > 0 &&
         advanced <= elapsed * 2 + 1
-      )
+      ) {
         totals.watchSeconds += Math.min(elapsed, advanced);
+        // Some engines resume after seeking without another `playing` event.
+        // Observe real progress so a stale notice cannot cause a needless reload.
+        if (
+          stalledAt && navigator.onLine && !video.error &&
+          video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        ) playing();
+      }
       if (stalledAt && !userPaused && navigator.onLine)
         totals.bufferSeconds += elapsed;
       if (stalledAt && now - stalledAt > 12000 && !userPaused && !video.ended) {
@@ -221,7 +235,7 @@ export function usePlaybackMonitor(
     const events = {
       playing,
       waiting,
-      stalled: waiting,
+      stalled,
       error,
       pause,
       play,

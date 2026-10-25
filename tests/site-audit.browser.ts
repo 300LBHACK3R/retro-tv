@@ -37,6 +37,14 @@ test("channel branding yields to the sound prompt and returns after sound is ena
   await testInfo.attach("unobstructed-sound-prompt", { body: await page.screenshot(), contentType: "image/png" });
   await sound.click();
   await expect(page.locator("video")).toHaveJSProperty("muted", false);
+  await expect.poll(() => page.locator("video").evaluate((video: HTMLVideoElement) =>
+    !video.paused && !video.seeking && video.readyState >= 2 && video.currentTime > 0,
+  )).toBe(true);
+  const position = await page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime);
+  await expect.poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(position);
+  await expect(sound).toBeHidden();
+  await expect(page.locator(".ttv-player-message")).toHaveCount(0);
   await expect(page.locator(".ttv-channel-overlay")).toHaveCSS("visibility", "visible");
 });
 
