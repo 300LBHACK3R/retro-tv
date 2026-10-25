@@ -211,7 +211,7 @@ export function createSessionToken(password: string): string {
   return `${SESSION_TOKEN_PREFIX}.${issuedAt}.${expiresAt}.${nonce}.${signature}`;
 }
 
-export function isValidSessionToken(token: string): boolean {
+function isValidSessionToken(token: string): boolean {
   const secret = getSessionSecret();
 
   if (!secret || !token.trim()) {

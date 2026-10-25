@@ -1,8 +1,10 @@
 "use client";
 
+import { formatDurationClock } from "@/lib/mediaUtils";
+import { sortEnabledChannels } from "@/lib/viewer";
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
 import { useNativeTvPlayback } from "@/components/viewer/useNativeTvPlayback";
@@ -68,21 +70,6 @@ const FULLSCREEN_BUSY_UNLOCK_MS = 900;
 const CAST_MESSAGE_CLEAR_MS = 3500;
 const SOURCE_TRANSITION_RELEASE_MS = 150;
 const CONTROLS_HIDE_DELAY_MS = 3500;
-
-function formatTime(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const remainingSeconds = safeSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(
-      remainingSeconds,
-    ).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
 
 function getPlaybackKey(item: BroadcastItem | null): string {
   if (!item) {
@@ -413,24 +400,6 @@ function exitNativeVideoFullscreen(video: HTMLVideoElement): boolean {
   }
 }
 
-function sortChannelsByNumber(channels: Channel[]): Channel[] {
-  return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
-
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
-
-      return String(a.id).localeCompare(String(b.id), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
-}
-
 function getChannelLabel(channel: Channel | undefined): string {
   if (!channel) {
     return "CH --";
@@ -586,7 +555,9 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     errorMessage: castErrorMessage,
   } = useGoogleCast();
 
-  isCastingRef.current = castRemote.isConnected;
+  useLayoutEffect(() => {
+    isCastingRef.current = castRemote.isConnected;
+  }, [castRemote.isConnected]);
 
   const fullscreenRequestId = usePlayerControls(
     (state) => state.fullscreenRequestId,
@@ -615,7 +586,9 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const live = useMemo(() => getLiveState(schedule, nowMs), [schedule, nowMs]);
   const hasMedia = Boolean(live.item);
   const liveRef = useRef(live);
-  liveRef.current = live;
+  useLayoutEffect(() => {
+    liveRef.current = live;
+  }, [live]);
 
   const playbackKey = useMemo(
     () => `${currentChannelId}|${getPlaybackKey(live.item)}`,
@@ -628,7 +601,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   );
 
   const orderedChannels = useMemo(
-    () => sortChannelsByNumber(channels),
+    () => sortEnabledChannels(channels),
     [channels],
   );
   const currentChannel = useMemo(
@@ -1530,6 +1503,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         fallbackFullscreen ? "ttv-player-expanded" : ""
       }`}
       data-controls-visible={controlsVisible ? "true" : "false"}
+      data-player-notice={Boolean(autoplayMuted || playbackMonitor.notice || message || castRemote.isConnected || nativeTv.connected)}
       onPointerDown={revealControls}
       onPointerMove={revealControls}
       onTouchStart={revealControls}
@@ -1568,7 +1542,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
         </div>
 
         <div className="mt-1 text-xs text-white/70">
-          {formatTime(displayElapsed)} / {formatTime(itemDuration)}
+          {formatDurationClock(displayElapsed)} / {formatDurationClock(itemDuration)}
           {live.item.segmentLabel && !isBreak
             ? ` / ${live.item.segmentLabel}`
             : ""}

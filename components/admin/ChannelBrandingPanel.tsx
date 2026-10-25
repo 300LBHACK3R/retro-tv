@@ -1,5 +1,6 @@
 "use client";
 
+import { sortChannels } from "@/lib/viewer";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Channel, ChannelBranding } from "@/lib/types";
@@ -42,22 +43,6 @@ function getChannelLabel(channel: Channel): string {
 
 function getChannelName(channel: Channel): string {
   return channel.branding?.displayName ?? channel.name;
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels].sort((a, b) => {
-    const aNumber = Number(a.number ?? a.id);
-    const bNumber = Number(b.number ?? b.id);
-
-    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-      return aNumber - bNumber;
-    }
-
-    return String(a.id).localeCompare(String(b.id), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
-  });
 }
 
 function isValidHexColor(value: string): boolean {

@@ -376,10 +376,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
       <a className="ttv-skip-link" href="#ttv-live-player">
         Skip to player
       </a>
-      <MediaPreloader
-        activeSchedule={activeSchedule}
-        activeChannel={activeChannel}
-      />
+      <MediaPreloader activeSchedule={activeSchedule} />
 
       <div className="ttv-premium-frame">
         <ViewerTopBar

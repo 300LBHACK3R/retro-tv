@@ -47,7 +47,7 @@ export default function BatchImportPanel() {
   const [message, setMessage] = useState("");
   const [draftError, setDraftError] = useState(false);
   const [page, setPage] = useState(0);
-  const files = useRef(new Map<string, File>());
+  const [files, setFiles] = useState(() => new Map<string, File>());
   const signed = useRef(new Map<string, SignedBatchUpload>());
   const operation = useRef<AbortController | null>(null);
   const mounted = useRef(true);
@@ -82,19 +82,21 @@ export default function BatchImportPanel() {
   function chooseFiles(list: FileList | null) {
     if (!list || busy) return;
     const next = [...rowsRef.current];
+    const attachedFiles = new Map(files);
     let attached = 0;
     for (const file of Array.from(list).sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric: true }))) {
       const key = signature(file);
       const previous = next.find(row => row.signature === key);
-      if (previous) { files.current.set(previous.id, file); attached++; continue; }
+      if (previous) { attachedFiles.set(previous.id, file); attached++; continue; }
       if (next.length >= MAX_BATCH_ITEMS) continue;
       let error = "";
       try { batchFileType(file); } catch (e) { error = (e as Error).message; }
       const row: Row = { id: crypto.randomUUID(), name: file.name, signature: key, title: batchTitle(file.name), url: "", duration: 0,
         selected: !error, status: error ? "error" : "queued", error, progress: 0 };
-      files.current.set(row.id, file);
+      attachedFiles.set(row.id, file);
       next.push(row); attached++;
     }
+    setFiles(attachedFiles);
     update(next);
     setMessage(`${attached} files selected or reattached. Up to ${MAX_BATCH_ITEMS} items per batch; review any file errors below.`);
     if (input.current) input.current.value = "";
@@ -136,7 +138,7 @@ export default function BatchImportPanel() {
           let url = row.url;
           patch(row.id, { status: "checking", error: "" });
           if (!url) {
-            const file = files.current.get(row.id);
+            const file = files.get(row.id);
             if (!file) throw new Error("Reselect this original file with Choose videos, then retry. Completed uploads are kept.");
             batchFileType(file);
             if (!validDuration(duration)) {
@@ -224,10 +226,10 @@ export default function BatchImportPanel() {
         <div className="ttv-admin-form-grid"><label>Title for {row.name}<input value={row.title} maxLength={240} disabled={busy || done(row)} onChange={e => patch(row.id, { title: e.target.value })} /></label>
           <label>Runtime in seconds for {row.name}<input type="number" min={1} max={86400} step={1} value={row.duration || ""} disabled={busy || done(row)} onChange={e => { const duration = Number(e.target.value); patch(row.id, { duration, status: validDuration(duration) && row.url ? "ready" : "queued", error: "" }); }} /></label></div>
         {row.error ? <p className="ttv-admin-notice">{row.error}</p> : null}
-        {row.signature && !row.url && !files.current.has(row.id) ? <p>Reselect the original file to continue.</p> : null}
+        {row.signature && !row.url && !files.has(row.id) ? <p>Reselect the original file to continue.</p> : null}
         {!done(row) && media.some(item => item.originalName === row.name) ? <p>A filename matching this one is already in the library. Check before uploading a second copy.</p> : null}
         {row.url ? <details><summary>Video link</summary><p>{row.url}</p></details> : null}
-        <button type="button" disabled={busy} onClick={() => { files.current.delete(row.id); signed.current.delete(row.id); update(rows.filter(item => item.id !== row.id)); }}>Remove from queue</button>
+        <button type="button" disabled={busy} onClick={() => { setFiles(current => { const next = new Map(current); next.delete(row.id); return next; }); signed.current.delete(row.id); update(rows.filter(item => item.id !== row.id)); }}>Remove from queue</button>
       </li>)}</ol>
       <div className="ttv-batch-actions"><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous 20</button><span>Page {currentPage + 1} of {pages}</span><button type="button" disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)}>Next 20</button></div>
       <label className="ttv-admin-check"><input type="checkbox" checked={reviewed} disabled={busy || !ready.length} onChange={e => setReviewed(e.target.checked)} />I reviewed the {ready.length} ready items and their channel assignment. Add them to the station.</label>

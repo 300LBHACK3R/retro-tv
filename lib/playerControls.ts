@@ -117,8 +117,8 @@ function getPersistedState(
   return value as PersistedPlayerControlsState;
 }
 
-export const playerControlsStoreName = "retro-tv-player-controls-v1";
-export const playerControlsStoreVersion = 3;
+const playerControlsStoreName = "retro-tv-player-controls-v1";
+const playerControlsStoreVersion = 3;
 
 export const usePlayerControls = create<PlayerControlsState>()(
   persist(

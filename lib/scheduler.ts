@@ -1178,7 +1178,3 @@ export function buildSchedule(
     ),
   );
 }
-
-export function getScheduleDuration(schedule: BroadcastItem[]): number {
-  return getScheduleDurationForItems(schedule);
-}

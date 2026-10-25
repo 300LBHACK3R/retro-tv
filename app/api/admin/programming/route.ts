@@ -1,6 +1,6 @@
 import { isSameOriginRequest } from "@/lib/server/requestSecurity";
-import { readBoundedJson } from "@/lib/server/http";
-import { NextResponse } from "next/server";
+import { noStoreJson, readBoundedJson } from "@/lib/server/http";
+import type { NextResponse } from "next/server";
 import {
   sanitizeProgrammingSnapshot,
   type ProgrammingSnapshot,
@@ -24,14 +24,7 @@ function jsonResponse<T = null>(
   body: ApiResponse<T>,
   init?: ResponseInit,
 ): NextResponse<ApiResponse<T>> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 function isJsonRequest(request: Request): boolean {

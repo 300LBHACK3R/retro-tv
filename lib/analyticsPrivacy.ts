@@ -2,7 +2,7 @@
 import { useProfiles } from "./deviceProfiles";
 import { analyticsPath } from "./analyticsEvents";
 
-export const ANALYTICS_PREFERENCE = "ttv-analytics-disabled-v1";
+const ANALYTICS_PREFERENCE = "ttv-analytics-disabled-v1";
 let disabledInMemory = false;
 export function analyticsOptedOut() {
   if (typeof navigator === "undefined") return true;

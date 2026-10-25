@@ -80,7 +80,7 @@ function applyTextReplacement(
   return current.split(searchValue).join(replacement);
 }
 
-export function collapseWhitespace(value: string): string {
+function collapseWhitespace(value: string): string {
   return value
     .replace(/[ \t\r\n\f\v]+/g, " ")
     .replace(/\s+\/\s+/g, " / ")

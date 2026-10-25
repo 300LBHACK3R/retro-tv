@@ -5,7 +5,7 @@ import type { MediaItem, MediaType } from "./types";
 export type LibraryFilter = "all" | "show" | "movie" | "music-video" | "music";
 export type LibraryMediaType = Exclude<MediaType, "commercial" | "bumper">;
 
-export type ParsedLibraryItem = {
+type ParsedLibraryItem = {
   media: MediaItem;
   groupKey: string;
   groupTitle: string;
@@ -110,7 +110,7 @@ function inferTitleFromFile(file: string): string {
   }
 }
 
-export function getSafeDuration(value: number | undefined): number {
+function getSafeDuration(value: number | undefined): number {
   const duration = Math.floor(Number(value));
   return Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
@@ -143,7 +143,7 @@ function createGroupKey(type: LibraryMediaType, title: string): string {
   return `${type}:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-export function parseLibraryItem(media: MediaItem): ParsedLibraryItem {
+function parseLibraryItem(media: MediaItem): ParsedLibraryItem {
   const libraryType = media.type as LibraryMediaType;
   const rawTitle =
     cleanDisplay(media.title || inferTitleFromFile(media.file)) || "Untitled";

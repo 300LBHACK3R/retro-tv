@@ -9,6 +9,12 @@
   box-shadow: var(--ttv-shadow-player);
 }
 
+/* The player has its own stacking context. Keep sibling branding from
+   covering sound, error, or TV connection prompts inside that context. */
+.ttv-player-shell[data-player-notice="true"] ~ .ttv-channel-overlay {
+  visibility: hidden;
+}
+
 .ttv-player-shell::before,
 .ttv-tv-player-frame::before {
   content: "";

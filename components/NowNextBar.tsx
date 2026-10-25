@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDurationClock } from "@/lib/mediaUtils";
+
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
@@ -30,21 +32,6 @@ function getSafeDuration(item: BroadcastItem | null | undefined): number {
   const duration = Math.floor(Number(item.duration));
 
   return Number.isFinite(duration) && duration > 0 ? duration : 0;
-}
-
-function formatClock(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const remainingSeconds = safeSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(
-      remainingSeconds,
-    ).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 function formatLongClock(seconds: number): string {
@@ -155,7 +142,6 @@ function getPreviousVisibleItem(
 
   return null;
 }
-
 
 function getPlaybackDuration(
   item: BroadcastItem | null | undefined,
@@ -463,7 +449,7 @@ export default function NowNextBar({
           <strong title={nowTitle}>{nowTitle}</strong>
           <span>
             {getDisplayTypeLabel(publicCurrentItem)} ·{" "}
-            {formatClock(currentElapsed)} / {formatClock(currentDuration)}
+            {formatDurationClock(currentElapsed)} / {formatDurationClock(currentDuration)}
           </span>
         </div>
 
@@ -487,7 +473,6 @@ export default function NowNextBar({
               : "Nothing else is queued"}
           </small>
         </div>
-
 
       </section>
     );
@@ -581,7 +566,7 @@ export default function NowNextBar({
               </>
             ) : (
               <span style={{ color: "var(--text-muted)" }}>
-                {formatClock(currentElapsed)} / {formatClock(currentDuration)}
+                {formatDurationClock(currentElapsed)} / {formatDurationClock(currentDuration)}
               </span>
             )}
           </div>

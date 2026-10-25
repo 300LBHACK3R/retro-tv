@@ -3,7 +3,7 @@ import type { Channel, MediaItem, MediaType } from "./types";
 
 export const MAX_BATCH_ITEMS = 200;
 export const BATCH_TYPES = ["show", "movie", "music-video", "commercial", "bumper"] as const;
-export type BatchType = typeof BATCH_TYPES[number];
+type BatchType = typeof BATCH_TYPES[number];
 export type BatchEntry = { id: string; title: string; url: string; duration: number; originalName?: string };
 export type BatchSettings = { channelId: string; type: BatchType; endBreak: number; folder: string };
 

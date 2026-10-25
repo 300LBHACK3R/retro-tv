@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { useStore } from '../lib/store';
 import { programming } from './programming-fixture';
-import { createBroadcastDayAnchor, findChannelByNumber, sortEnabledChannels } from '../lib/viewer';
+import { createBroadcastDayAnchor, findChannelByNumber, sortChannels, sortEnabledChannels } from '../lib/viewer';
 
 test('cloud refresh preserves viewer choices; explicit restore restores the snapshot', () => {
   useStore.getState().replaceProgramming(programming);
@@ -47,6 +47,17 @@ test('numeric tuning ignores disabled channels and accepts leading zeroes', () =
   const now = new Date(2026, 8, 9, 23, 59);
   expect(createBroadcastDayAnchor(now).getHours()).toBe(0);
   expect(now.getHours()).toBe(23);
+});
+
+test('admin and viewer channel order agree without losing disabled stations or mutating the lineup', () => {
+  const channels = [
+    { id: 'station-10', name: 'Ten', mediaIds: [] },
+    { id: 'station-2', name: 'Two', mediaIds: [], isEnabled: false },
+    { id: 'station-1', name: 'One', mediaIds: [] },
+  ];
+  expect(sortChannels(channels).map(channel => channel.id)).toEqual(['station-1', 'station-2', 'station-10']);
+  expect(sortEnabledChannels(channels).map(channel => channel.id)).toEqual(['station-1', 'station-10']);
+  expect(channels.map(channel => channel.id)).toEqual(['station-10', 'station-2', 'station-1']);
 });
 
 test('service worker excludes private pages, live HTML, API, media, and RSC requests', () => {

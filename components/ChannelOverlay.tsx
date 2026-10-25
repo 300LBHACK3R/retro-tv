@@ -275,7 +275,7 @@ export default function ChannelOverlay({
   return (
     <div
       className={[
-        "pointer-events-none absolute inset-0 z-20 transition-opacity",
+        "ttv-channel-overlay pointer-events-none absolute inset-0 z-20 transition-opacity",
         preferReducedMotion ? "" : "duration-500",
         visible ? "opacity-100" : "opacity-0",
       ].join(" ")}

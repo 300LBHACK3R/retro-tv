@@ -1,5 +1,6 @@
+import { noStoreJson } from "@/lib/server/http";
 import { isAdminRequestAuthorized } from "@/lib/server/adminAuth";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import {
   sanitizeProgrammingSnapshot,
   type ProgrammingApiResponse,
@@ -22,14 +23,7 @@ function jsonResponse(
   body: ProgrammingApiResponse,
   init?: ResponseInit,
 ): NextResponse<ProgrammingApiResponse> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 function createSuccessResponse(

@@ -5,14 +5,14 @@ import { cleanDisplayText } from "./textClean";
 import type { BroadcastItem, Channel, MediaItem } from "./types";
 
 export const GUIDE_HOURS = 72;
-export const MOBILE_GUIDE_HOURS = 24;
+const MOBILE_GUIDE_HOURS = 24;
 export const MOBILE_GUIDE_MEDIA_QUERY =
   "(max-width: 1024px), (pointer: coarse) and (max-width: 1366px)";
 export const MOBILE_GUIDE_BREAKPOINT_PX = 1024;
 export const TOUCH_GUIDE_BREAKPOINT_PX = 1366;
 export const MOBILE_USER_AGENT_PATTERN =
   /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i;
-export const SLOT_MINUTES = 30;
+const SLOT_MINUTES = 30;
 export const SLOT_COUNT = GUIDE_HOURS * 2;
 
 export const CHANNEL_COLUMN_WIDTH = 164;
@@ -27,7 +27,7 @@ export const GUIDE_WINDOW_SECONDS = GUIDE_HOURS * 60 * 60;
 export const MOBILE_GUIDE_WINDOW_SECONDS = MOBILE_GUIDE_HOURS * 60 * 60;
 export const LIVE_TICK_MS = 15_000;
 export const GUIDE_PREPARE_BATCH_SIZE = 2;
-export const MIN_BUILD_STEPS = 500;
+const MIN_BUILD_STEPS = 500;
 
 export const SLOT_INDEXES = Array.from(
   { length: SLOT_COUNT },
@@ -59,7 +59,7 @@ export type GuideMarker = {
   offsetSec: number;
 };
 
-export type SchedulePosition = {
+type SchedulePosition = {
   index: number;
   offsetInsideItem: number;
   previousVisibleItem?: BroadcastItem;
@@ -109,7 +109,7 @@ export function startOfLocalDay(date: Date): Date {
   return nextDate;
 }
 
-export function startOfNextLocalDay(date: Date): Date {
+function startOfNextLocalDay(date: Date): Date {
   const nextDate = startOfLocalDay(date);
 
   nextDate.setDate(nextDate.getDate() + 1);
@@ -117,7 +117,7 @@ export function startOfNextLocalDay(date: Date): Date {
   return nextDate;
 }
 
-export function getBroadcastDayStartForDate(date: Date): Date {
+function getBroadcastDayStartForDate(date: Date): Date {
   const next = new Date(date);
   next.setHours(0, 0, 0, 0);
   return next;
@@ -135,11 +135,7 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function getSecondsSinceBroadcastEpoch(dateMs: number): number {
-  return Math.floor((dateMs - BROADCAST_EPOCH_MS) / 1000);
-}
-
-export function getItemDuration(item: BroadcastItem): number {
+function getItemDuration(item: BroadcastItem): number {
   /*
     Critical:
     This must use real playback duration only.
@@ -153,17 +149,17 @@ export function getItemDuration(item: BroadcastItem): number {
   return Number.isFinite(duration) && duration > 0 ? duration : 1;
 }
 
-export function getScheduleDuration(schedule: BroadcastItem[]): number {
+function getScheduleDuration(schedule: BroadcastItem[]): number {
   return schedule.reduce((sum, item) => sum + getItemDuration(item), 0);
 }
 
-export function isGuideVisibleItem(item: BroadcastItem): boolean {
+function isGuideVisibleItem(item: BroadcastItem): boolean {
   return (
     Boolean(item.file) && getItemDuration(item) > 0 && !isHiddenGuideItem(item)
   );
 }
 
-export function isProgramMediaItem(item: MediaItem): boolean {
+function isProgramMediaItem(item: MediaItem): boolean {
   return (
     item.type === "show" ||
     item.type === "movie" ||
@@ -172,17 +168,17 @@ export function isProgramMediaItem(item: MediaItem): boolean {
   );
 }
 
-export function isAdInventoryItem(item: MediaItem): boolean {
+function isAdInventoryItem(item: MediaItem): boolean {
   return item.type === "commercial" || item.type === "bumper";
 }
 
-export function getProgramMediaItems(
+function getProgramMediaItems(
   media: MediaItem[] | undefined,
 ): MediaItem[] {
   return (media ?? []).filter(isProgramMediaItem);
 }
 
-export function getAvailableAdItems(
+function getAvailableAdItems(
   media: MediaItem[] | undefined,
 ): MediaItem[] {
   return (media ?? []).filter(isAdInventoryItem);
@@ -197,7 +193,7 @@ export function getDisplayType(item: BroadcastItem): string {
   return item.type.toUpperCase();
 }
 
-export function getStableItemKey(item: BroadcastItem): string {
+function getStableItemKey(item: BroadcastItem): string {
   if (item.isVirtualSegment && item.parentMediaId) {
     return cleanDisplayText(item.parentMediaId);
   }
@@ -219,7 +215,7 @@ export function getChannelCallsign(channel: Channel): string {
   );
 }
 
-export function isValidHexColor(value: string): boolean {
+function isValidHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value.trim());
 }
 
@@ -255,7 +251,7 @@ export function sortRows(data: GuideRowInput[]): GuideRowInput[] {
     });
 }
 
-export function getScheduleOffset(
+function getScheduleOffset(
   schedule: BroadcastItem[],
   broadcastSeconds: number,
 ): number {
@@ -268,7 +264,7 @@ export function getScheduleOffset(
   return ((broadcastSeconds % totalDuration) + totalDuration) % totalDuration;
 }
 
-export function findPreviousVisibleItem(
+function findPreviousVisibleItem(
   schedule: BroadcastItem[],
   startIndex: number,
 ): BroadcastItem | undefined {
@@ -291,7 +287,7 @@ export function findPreviousVisibleItem(
   return undefined;
 }
 
-export function findSchedulePosition(
+function findSchedulePosition(
   schedule: BroadcastItem[],
   broadcastSeconds: number,
 ): SchedulePosition {
@@ -326,7 +322,7 @@ export function findSchedulePosition(
   };
 }
 
-export function canMergeVisibleGuideSegment(
+function canMergeVisibleGuideSegment(
   previous: GuideCell | undefined,
   item: BroadcastItem,
 ): boolean {
@@ -370,7 +366,7 @@ export function canMergeVisibleGuideSegment(
   return currentSourceStart > previousSourceStart;
 }
 
-export function pushCell(
+function pushCell(
   cells: GuideCell[],
   item: BroadcastItem,
   startSec: number,
@@ -402,7 +398,7 @@ export function pushCell(
   });
 }
 
-export function getMaxBuildSteps(
+function getMaxBuildSteps(
   schedule: BroadcastItem[],
   totalDuration: number,
   windowDurationSeconds: number,
@@ -413,13 +409,13 @@ export function getMaxBuildSteps(
   return Math.max(MIN_BUILD_STEPS, schedule.length * (cycleCount + 2));
 }
 
-export function getProgramKey(item: BroadcastItem): string {
+function getProgramKey(item: BroadcastItem): string {
   return String(
     item.parentMediaId ?? item.sourceTitle ?? item.engagementKey ?? item.id,
   );
 }
 
-export function getGuideDurationSeconds(item: BroadcastItem): number {
+function getGuideDurationSeconds(item: BroadcastItem): number {
   const rawGuideDuration = Number(item.guideDuration);
   const rawSlotDuration = Number(item.slotLengthSeconds);
   const rawDuration = Number(item.duration);
@@ -436,7 +432,7 @@ export function getGuideDurationSeconds(item: BroadcastItem): number {
   return Math.max(1, Math.floor(duration));
 }
 
-export function getVisibleGuideItem(item: BroadcastItem): BroadcastItem {
+function getVisibleGuideItem(item: BroadcastItem): BroadcastItem {
   const title =
     cleanDisplayText(item.sourceTitle?.trim() || "") ||
     cleanDisplayText(item.title?.trim() || "") ||
@@ -450,7 +446,7 @@ export function getVisibleGuideItem(item: BroadcastItem): BroadcastItem {
   };
 }
 
-export function itemsShareGuideProgram(
+function itemsShareGuideProgram(
   previous: BroadcastItem | undefined,
   next: BroadcastItem | undefined,
 ): boolean {
@@ -461,7 +457,7 @@ export function itemsShareGuideProgram(
   return getProgramKey(previous) === getProgramKey(next);
 }
 
-export function findNextVisibleGuideItem(
+function findNextVisibleGuideItem(
   schedule: BroadcastItem[],
   startIndex: number,
 ): BroadcastItem | undefined {
@@ -480,7 +476,7 @@ export function findNextVisibleGuideItem(
   return undefined;
 }
 
-export function buildDisplayCellsForWindow(
+function buildDisplayCellsForWindow(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
   windowDurationSeconds: number,
@@ -616,7 +612,7 @@ export function buildDisplayCellsForWindow(
 
   return cells;
 }
-export function getScheduleForSlice(
+function getScheduleForSlice(
   row: GuideRowInput,
   sliceStart: Date,
   currentDayReference: Date,
@@ -642,7 +638,7 @@ export function getScheduleForSlice(
   });
 }
 
-export function appendCells(
+function appendCells(
   target: GuideCell[],
   sourceCells: GuideCell[],
   offsetSeconds: number,

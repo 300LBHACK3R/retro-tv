@@ -1,4 +1,15 @@
 import "server-only";
+import { NextResponse } from "next/server";
+
+/** JSON for live state and authentication must never be cached. */
+export function noStoreJson<T>(body: T, init?: ResponseInit): NextResponse<T> {
+  const response = NextResponse.json(body, init);
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "same-origin");
+  return response;
+}
 
 export function privateJson(body: unknown, status = 200) {
   return Response.json(body, {

@@ -1,6 +1,6 @@
 "use client";
 
-import { findChannelByNumber } from "@/lib/viewer";
+import { findChannelByNumber, getChannelLabel, getChannelNumber, isTypingTarget, sortEnabledChannels } from "@/lib/viewer";
 
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
 
@@ -13,14 +13,6 @@ import type { Channel, PlayerViewMode } from "@/lib/types";
 const CHANNEL_ENTRY_AUTO_TUNE_MS = 1150;
 const MAX_TUNE_DIGITS = 3;
 
-function getChannelLabel(channel: Channel | undefined): string {
-  if (!channel) {
-    return "CH --";
-  }
-
-  return `CH ${channel.number ?? channel.id}`;
-}
-
 function getChannelName(channel: Channel | undefined): string {
   if (!channel) {
     return "No Channel";
@@ -29,31 +21,8 @@ function getChannelName(channel: Channel | undefined): string {
   return channel.branding?.displayName ?? channel.name;
 }
 
-function getChannelNumberText(channel: Channel | undefined): string {
-  if (!channel) {
-    return "--";
-  }
-
-  return String(channel.number ?? channel.id);
-}
-
 function normalizeChannelEntry(value: string): string {
   return value.replace(/\D/g, "").slice(0, MAX_TUNE_DIGITS);
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-
-  return (
-    tagName === "input" ||
-    tagName === "textarea" ||
-    tagName === "select" ||
-    target.isContentEditable
-  );
 }
 
 function shouldIgnoreKeyboardShortcut(event: KeyboardEvent): boolean {
@@ -66,24 +35,6 @@ function shouldIgnoreKeyboardShortcut(event: KeyboardEvent): boolean {
     event.metaKey ||
     event.altKey
   );
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
-
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
-
-      return String(a.id).localeCompare(String(b.id), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
 }
 
 function getViewModeLabel(mode: PlayerViewMode): string {
@@ -206,7 +157,7 @@ export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
   const [channelEntry, setChannelEntry] = useState("");
   const [statusMessage, setStatusMessage] = useState("Remote ready.");
 
-  const enabledChannels = useMemo(() => sortChannels(channels), [channels]);
+  const enabledChannels = useMemo(() => sortEnabledChannels(channels), [channels]);
 
   const currentIndex = enabledChannels.findIndex(
     (channel) => channel.id === currentChannelId,
@@ -539,7 +490,7 @@ export default function Remote({ tvMode = false }: { tvMode?: boolean }) {
             </div>
 
             <div className="mt-1 text-lg font-black tabular-nums tracking-[0.12em]">
-              {channelEntry || getChannelNumberText(currentChannel)}
+              {channelEntry || getChannelNumber(currentChannel)}
             </div>
           </div>
 

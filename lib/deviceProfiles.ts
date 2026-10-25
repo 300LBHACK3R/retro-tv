@@ -6,7 +6,7 @@ import { DEFAULT_THEME_ID } from "./themes";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
 export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
-export const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
+const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
 // Preserve Fox, Robot and Cat IDs. Retired Dinosaur profiles migrate to
 // Boy dragon, and Space explorer profiles fall back to Boy fox.
 export const AVATARS = [

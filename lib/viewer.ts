@@ -26,19 +26,24 @@ export function createBroadcastDayAnchor(now = new Date()): Date {
   return anchor;
 }
 
-export function sortEnabledChannels(channels: readonly Channel[]): Channel[] {
-  return [...channels]
-    .filter((channel) => channel.isEnabled !== false)
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
+export function sortChannels(channels: readonly Channel[]): Channel[] {
+  return [...channels].sort((a, b) => {
+    const aNumber = Number(a.number ?? a.id);
+    const bNumber = Number(b.number ?? b.id);
 
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
+    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+      return aNumber - bNumber;
+    }
 
-      return String(a.id).localeCompare(String(b.id));
+    return String(a.id).localeCompare(String(b.id), undefined, {
+      numeric: true,
+      sensitivity: "base",
     });
+  });
+}
+
+export function sortEnabledChannels(channels: readonly Channel[]): Channel[] {
+  return sortChannels(channels.filter((channel) => channel.isEnabled !== false));
 }
 
 export function getChannelNumber(channel: Channel | undefined): string {

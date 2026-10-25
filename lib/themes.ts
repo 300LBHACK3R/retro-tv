@@ -1,6 +1,6 @@
 import type { ThemeId } from "./types";
 
-export type ThemeColorToken =
+type ThemeColorToken =
   | "appBg"
   | "panelBg"
   | "panelAltBg"
@@ -19,12 +19,12 @@ export type ThemeColorToken =
   | "guideActiveBg"
   | "guideCurrentBg";
 
-export type ThemeColors = Record<ThemeColorToken, string>;
+type ThemeColors = Record<ThemeColorToken, string>;
 
 export type ThemeCategory =
   "classic" | "console" | "premium" | "cartoon" | "arcade" | "seasonal";
 
-export type ThemeLayoutMode =
+type ThemeLayoutMode =
   | "neon-crt-broadcast"
   | "classic-cable"
   | "light-cable"
@@ -34,7 +34,7 @@ export type ThemeLayoutMode =
   | "neon-arcade"
   | "cartoon-pop";
 
-export type ThemeAppearance = "dark" | "light";
+type ThemeAppearance = "dark" | "light";
 
 export type ThemeDefinition = {
   id: ThemeId;
@@ -527,7 +527,7 @@ export const THEMES = [
   },
 ] as const satisfies readonly ThemeDefinition[];
 
-export const THEME_IDS = THEMES.map((theme) => theme.id) as ThemeId[];
+const THEME_IDS = THEMES.map((theme) => theme.id) as ThemeId[];
 
 const THEME_BY_ID = new Map<ThemeId, ThemeDefinition>(
   THEMES.map((theme) => [theme.id, theme] as const),
@@ -650,7 +650,7 @@ export function getThemePriceLabel(theme: ThemeDefinition): string {
   return theme.priceLabel;
 }
 
-export type ThemeCssVariableName =
+type ThemeCssVariableName =
   | "--app-bg"
   | "--panel-bg"
   | "--panel-alt-bg"

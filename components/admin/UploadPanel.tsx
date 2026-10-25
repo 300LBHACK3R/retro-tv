@@ -1,5 +1,6 @@
 "use client";
 
+import { sortChannels } from "@/lib/viewer";
 import { useEffect, useMemo, useState } from "react";
 import AdminDirectUploadCard from "@/components/admin/AdminDirectUploadCard";
 import { probeVideoDuration } from "@/lib/mediaDuration";
@@ -97,23 +98,6 @@ function getDurationHelperText(value: string, mode: DurationMode): string {
   }
 
   return `${formatDuration(seconds)} • ${formatDurationClock(seconds)}`;
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels]
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
-
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
-
-      return String(a.id).localeCompare(String(b.id), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
 }
 
 function getChannelLabel(channel: Channel | undefined): string {

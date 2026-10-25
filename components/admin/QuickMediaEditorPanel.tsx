@@ -1,5 +1,6 @@
 "use client";
 
+import { sortChannels } from "@/lib/viewer";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   formatBreakpoints,
@@ -67,23 +68,6 @@ function getMediaTypeLabel(type: MediaType): string {
   if (type === "bumper") return "Bumper";
 
   return "Show";
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels]
-    .sort((a, b) => {
-      const aNumber = Number(a.number ?? a.id);
-      const bNumber = Number(b.number ?? b.id);
-
-      if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-        return aNumber - bNumber;
-      }
-
-      return String(a.id).localeCompare(String(b.id), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
 }
 
 function sortMedia(media: MediaItem[]): MediaItem[] {

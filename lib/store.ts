@@ -285,7 +285,7 @@ function createDefaultAdPolicy(): ChannelAdPolicy {
   };
 }
 
-export const defaultMedia: MediaItem[] = [
+const defaultMedia: MediaItem[] = [
   {
     id: "martin-mystery-s01e01",
     title: "Martin Mystery S01E01",

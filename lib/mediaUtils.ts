@@ -15,7 +15,7 @@ export const WEEKDAYS: Array<{ id: Weekday; label: string }> = [
   { id: "saturday", label: "Sat" },
 ];
 
-export const SUPPORTED_VIDEO_EXTENSIONS = [
+const SUPPORTED_VIDEO_EXTENSIONS = [
   ".mp4",
   ".webm",
   ".mov",
@@ -23,7 +23,7 @@ export const SUPPORTED_VIDEO_EXTENSIONS = [
   ".mkv",
 ] as const;
 
-export const BROWSER_SAFE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v"] as const;
+const BROWSER_SAFE_VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v"] as const;
 
 type DurationMode = "seconds" | "minutes";
 

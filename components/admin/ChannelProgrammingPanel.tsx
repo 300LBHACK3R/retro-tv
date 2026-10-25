@@ -1,5 +1,7 @@
 "use client";
 
+import { EmptyState, StatCard, type PanelStat } from "@/components/admin/PanelFeedback";
+import { sortChannels } from "@/lib/viewer";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   formatBreakpoints,
@@ -22,13 +24,6 @@ type ProgrammedItem = {
   index: number;
 };
 
-type PlaylistStat = {
-  label: string;
-  value: string | number;
-  helper: string;
-  tone?: "default" | "good" | "warn" | "danger";
-};
-
 type PlaylistFilter = "all" | "programs" | "embedded-ads" | "missing" | "duplicates";
 
 const MAX_PLAYLIST_HEIGHT = 620;
@@ -47,22 +42,6 @@ function getChannelName(channel: Channel | undefined): string {
   }
 
   return channel.branding?.displayName ?? channel.name;
-}
-
-function sortChannels(channels: Channel[]): Channel[] {
-  return [...channels].sort((a, b) => {
-    const aNumber = Number(a.number ?? a.id);
-    const bNumber = Number(b.number ?? b.id);
-
-    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-      return aNumber - bNumber;
-    }
-
-    return String(a.id).localeCompare(String(b.id), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
-  });
 }
 
 function getChannelOptionLabel(channel: Channel): string {
@@ -220,7 +199,7 @@ function getItemBadges(item: MediaItem): string[] {
   return badges;
 }
 
-function createPlaylistStats({
+function createPanelStats({
   programmedItems,
   visibleItems,
   validProgrammedItems,
@@ -240,7 +219,7 @@ function createPlaylistStats({
   embeddedAdCount: number;
   playableProgramCount: number;
   totalProgramRuntime: number;
-}): PlaylistStat[] {
+}): PanelStat[] {
   return [
     {
       label: "Slots",
@@ -284,85 +263,6 @@ function createPlaylistStats({
       tone: validProgrammedItems.length > 0 ? "default" : "warn",
     },
   ];
-}
-
-function getStatStyles(tone: PlaylistStat["tone"] = "default") {
-  if (tone === "good") {
-    return {
-      borderColor: "rgba(34, 197, 94, 0.32)",
-      background: "rgba(34, 197, 94, 0.08)",
-      valueColor: "#86efac",
-    };
-  }
-
-  if (tone === "warn") {
-    return {
-      borderColor: "rgba(250, 204, 21, 0.32)",
-      background: "rgba(250, 204, 21, 0.08)",
-      valueColor: "#fde68a",
-    };
-  }
-
-  if (tone === "danger") {
-    return {
-      borderColor: "rgba(248, 113, 113, 0.35)",
-      background: "rgba(248, 113, 113, 0.09)",
-      valueColor: "#fecaca",
-    };
-  }
-
-  return {
-    borderColor: "var(--border)",
-    background: "var(--panel-bg)",
-    valueColor: "var(--text)",
-  };
-}
-
-function StatCard({ stat }: { stat: PlaylistStat }) {
-  const styles = getStatStyles(stat.tone);
-
-  return (
-    <div
-      className="rounded-2xl border p-3"
-      style={{
-        background: styles.background,
-        borderColor: styles.borderColor,
-      }}
-    >
-      <div className="text-lg font-black tracking-tight" style={{ color: styles.valueColor }}>
-        {stat.value}
-      </div>
-
-      <div
-        className="mt-1 text-[10px] font-black uppercase tracking-[0.14em]"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {stat.label}
-      </div>
-
-      <div
-        className="mt-2 line-clamp-2 text-[11px] leading-4"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {stat.helper}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div
-      className="rounded-2xl border px-3 py-8 text-center text-xs"
-      style={{
-        background: "var(--panel-alt-bg)",
-        borderColor: "var(--border)",
-        color: "var(--text-muted)",
-      }}
-    >
-      {message}
-    </div>
-  );
 }
 
 function ActionButton({
@@ -527,7 +427,7 @@ export default function ChannelProgrammingPanel() {
 
   const playlistStats = useMemo(
     () =>
-      createPlaylistStats({
+      createPanelStats({
         programmedItems,
         visibleItems,
         validProgrammedItems,

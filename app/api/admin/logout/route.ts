@@ -1,6 +1,7 @@
+import { noStoreJson } from "@/lib/server/http";
 import { isSameOriginRequest } from "@/lib/server/requestSecurity";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import { ADMIN_COOKIE_NAME } from "@/lib/server/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +17,7 @@ function jsonResponse(
   body: LogoutResponseBody,
   init?: ResponseInit,
 ): NextResponse<LogoutResponseBody> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 export async function POST(request: Request) {

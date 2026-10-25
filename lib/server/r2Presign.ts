@@ -119,7 +119,7 @@ function buildPublicUrl(baseUrl: string | undefined, objectKey: string): string 
   return `${baseUrl.replace(/\/$/, "")}/${encodeObjectPath(objectKey)}`;
 }
 
-export function sanitizeObjectKeyPart(value: string, fallback = "video"): string {
+function sanitizeObjectKeyPart(value: string, fallback = "video"): string {
   const withoutPath = value.split(/[\\/]/).pop() ?? "";
   const cleaned = withoutPath
     .normalize("NFKD")

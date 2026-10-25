@@ -72,11 +72,7 @@ export function getScheduleDuration(schedule: BroadcastItem[]): number {
   return schedule.reduce((sum, item) => sum + safeDuration(item), 0);
 }
 
-export function getSecondsSinceBroadcastEpoch(nowMs = Date.now()): number {
-  return Math.floor((nowMs - BROADCAST_EPOCH_MS) / 1000);
-}
-
-export function getOffsetInLoop(
+function getOffsetInLoop(
   totalDuration: number,
   nowMs = Date.now(),
   anchorMs = BROADCAST_EPOCH_MS,
@@ -95,11 +91,11 @@ export function getOffsetInLoop(
   );
 }
 
-export function getItemSourceStart(item: BroadcastItem): number {
+function getItemSourceStart(item: BroadcastItem): number {
   return normalizePositiveSecond(item.sourceStart ?? 0);
 }
 
-export function getItemSourceEnd(item: BroadcastItem): number | null {
+function getItemSourceEnd(item: BroadcastItem): number | null {
   const sourceEnd = normalizePositiveSecond(item.sourceEnd);
 
   return sourceEnd > 0 ? sourceEnd : null;

@@ -1,10 +1,10 @@
-import { privateJson } from "@/lib/server/http";
+import { noStoreJson, privateJson } from "@/lib/server/http";
 import {
   consumeRateLimit,
   getClientAddress,
 } from "@/lib/server/requestSecurity";
 import { readStationProgramming, probeMedia } from "@/lib/server/stationHealth";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +22,7 @@ function jsonResponse(
   body: HealthResponse,
   init?: ResponseInit,
 ): NextResponse<HealthResponse> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 function getVersion(): string {

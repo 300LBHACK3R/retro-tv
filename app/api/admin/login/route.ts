@@ -3,9 +3,9 @@ import {
   getClientAddress,
   isSameOriginRequest,
 } from "@/lib/server/requestSecurity";
-import { readBoundedJson } from "@/lib/server/http";
+import { noStoreJson, readBoundedJson } from "@/lib/server/http";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import {
   ADMIN_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
@@ -32,14 +32,7 @@ function jsonResponse(
   body: LoginResponseBody,
   init?: ResponseInit,
 ): NextResponse<LoginResponseBody> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 async function readLoginBody(

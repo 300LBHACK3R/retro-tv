@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { noStoreJson } from "@/lib/server/http";
+import type { NextResponse } from "next/server";
 import { isAdminRequestAuthorized } from "@/lib/server/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +14,7 @@ function jsonResponse(
   body: AdminSessionResponse,
   init?: ResponseInit,
 ): NextResponse<AdminSessionResponse> {
-  const response = NextResponse.json(body, init);
-
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "same-origin");
-
-  return response;
+  return noStoreJson(body, init);
 }
 
 export async function GET() {

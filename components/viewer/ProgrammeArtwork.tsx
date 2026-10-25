@@ -14,7 +14,7 @@ export default function ProgrammeArtwork({
   kind?: string;
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
-  src = safeArtworkUrl(src) || undefined;
+  const artworkUrl = safeArtworkUrl(src) || undefined;
   const hue = Array.from(title).reduce(
     (sum, char) => (sum * 31 + char.charCodeAt(0)) % 360,
     0,
@@ -24,15 +24,15 @@ export default function ProgrammeArtwork({
       className="ttv-programme-art"
       style={{ "--art-hue": hue } as CSSProperties}
     >
-      {src && src !== failedSource ? (
+      {artworkUrl && artworkUrl !== failedSource ? (
         <Image
           unoptimized
-          src={src}
+          src={artworkUrl}
           alt=""
           width={640}
           height={360}
           loading="lazy"
-          onError={() => setFailedSource(src)}
+          onError={() => setFailedSource(artworkUrl)}
         />
       ) : (
         <div className="ttv-programme-art__type" aria-hidden="true">
