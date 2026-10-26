@@ -1,13 +1,14 @@
 # Christmas '96: Living Room — artwork
 
-Original artwork and edits made with the built-in image-generation tool. The owner approved the final landscape image on October 25, 2026. Its pixels match the selected image exactly before WebP encoding. The portrait is a separate composition of the same room.
+Original artwork and edits made with the built-in image-generation tool. The owner approved the original landscape image on October 25, 2026, then requested a sharper, less zoomed-in background on October 26. The current landscape reframes that same room for a widescreen display. The portrait remains the separately composed original room and now applies to portrait tablets as well as phones.
 
 Project assets:
 
-- `public/themes/christmas-96-world.webp`: 1536 × 1024, 223,410 bytes.
+- `public/themes/christmas-96-world.webp`: 1672 × 941, 456,380 bytes; WebP quality 92, without upscaling.
 - `public/themes/christmas-96-mobile.webp`: 768 × 1152, 162,960 bytes.
+- `public/themes/christmas-96-light-string.svg`: reusable code-drawn vintage bulbs and wire for the navigation and guide headers.
 
-Sharp performs only resizing and WebP encoding; visual edits are generated. The theme preview reuses the landscape artwork. No source PNGs, discarded variants, personal data or browser screenshots are shipped.
+Sharp performs only resizing and WebP encoding; visual edits are generated. The full-screen scene serves the pre-encoded WebP directly through hashed static imports to avoid a second lossy optimization pass. The theme preview reuses the landscape artwork with the same edge-to-edge crop as other theme cards. No source PNGs, discarded variants, personal data or browser screenshots are shipped.
 
 The scene includes the requested floral wallpaper, oak trim, Christmas tree, lights, CRT and VCR, PS1 and game cases, Rubik's Cube, gifts and cocoa. Decorations sit behind the interface and never cover programme video or capture pointer input. Only opacity and transforms animate; shared seasonal CSS disables motion and hides decoration in forced-colour mode.
 
@@ -83,3 +84,12 @@ Keep the wallpaper, trim, Christmas tree, lamps, garland, CRT, window, gifts, tr
 Use case: precise-object-edit
 Image 1 is the PORTRAIT edit target. Image 2 is a supporting reference for the small additions only.
 Add a short stack of 3-4 thin original PlayStation CD jewel game cases beside the grey PS1 on its existing lower cabinet shelf, and add one small 3x3 Rubik's Cube on the coffee table near the existing cocoa mug. Match the CD cases and cube arrangement shown in image 2, fitted naturally into the narrower portrait room. Preserve the existing black VCR on its upper shelf, grey PS1/controller on lower shelf, cocoa mug, cookies, tree, wallpaper, trim and ALL other details of image 1. Do not replace or remove anything. No composition changes or resizing/cropping; keep 1024x1536 portrait. Match the original hand-painted warm golden lighting and realistic scale. Cube has nine squares per visible face, black grid. Game cases are thin clear plastic square CD jewel cases, not VHS. No new text, captions or interface.
+
+### 10 — Widescreen framing and detail (October 26)
+
+Use case: compositing
+Asset type: Production widescreen background artwork for the existing Christmas '96 Living Room website theme.
+Input image 1 is the EXACT approved room and must remain recognizably the same. Reframe this scene as a wider, pulled-back 16:9 landscape at 3840x2160 if supported. The current 3:2 image is cropped and looks too close on desktop. Make the tree, CRT cabinet and foreground furnishings about 20% smaller within the overall frame, keeping them at the far left/right edges. Reveal more of the complete room, garland across the top and hardwood/rug below, using consistent natural perspective. The broad central area must remain empty cream floral wallpaper and oak wainscoting for website content. Sharp, finely resolved traditional illustration, no soft-focus, no haze, no blur, no excessive bloom.
+Preserve the precise warm 1996 Christmas art direction, original cream rose-and-sage floral wallpaper, oak chair rail and wood panels, red plaid sofa and crochet blanket, tree with star, tinsel and vintage red/green/blue/amber bulbs, presents and wooden toy train. Preserve the snowy night window, existing CRT television with amber screen, black VCR on upper shelf, grey full-size original PS1 with wired controller and thin game CD jewel cases on lower shelf. Preserve the physically correct 3x3 Rubik's Cube, marshmallow cocoa mug and cookie plate on the coffee table. Preserve the small scale of these personal details, not foreground hero props. No new furnishings, no people, no text, no UI, no logos, no missing or replaced objects. Fill the whole 16:9 canvas edge to edge; no borders or letterboxing. This is a framing and resolution improvement, not a redesign.
+
+The built-in tool returned 1672 × 941, not the requested 3840 × 2160. This native output is shipped without artificial enlargement.

@@ -1,7 +1,7 @@
 /* Christmas '96: wallpaper, oak trim and incandescent light around tactile TV controls. */
 :root[data-ttv-theme="christmas-96-living-room"],
 :root[data-ttv-theme="christmas-96-living-room"] .ttv-layout-classic-cable {
-  --christmas-ribbon: repeating-linear-gradient(120deg, #822b3a 0 12px, #f6e4bb 12px 15px, #24503b 15px 27px, #f6e4bb 27px 30px);
+  --christmas-light-string: url("/themes/christmas-96-light-string.svg");
   --christmas-brass: linear-gradient(110deg, #b9894e, #f8dfa4 40%, #d4ae6b 70%, #b9894e);
   --ttv-radius-shell: 1rem;
   --ttv-radius-panel: .85rem;
@@ -75,13 +75,22 @@
   border-color: #b58d56;
   box-shadow: inset 0 1px #fff0ca26, 0 8px 25px #16090466;
 }
-:root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-topbar::after {
+/* Steady incandescent bulbs sit in their own strip, clear of labels and controls. */
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-topbar { padding-bottom: 1.5rem; }
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-guide-dialog-header { padding-bottom: 2rem; }
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-topbar, .ttv-guide-dialog-header)::after,
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-viewer-nav::before {
   content: "";
   position: absolute;
-  inset: auto 0 -2px;
-  height: 3px;
-  background: var(--christmas-ribbon);
+  inset: auto 0 0;
+  height: 28px;
+  background: var(--christmas-light-string) center top / 240px 28px repeat-x;
   pointer-events: none;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-viewer-nav::before {
+  inset: -15px 0 auto;
+  height: 23px;
+  background-size: 200px 23px;
 }
 :root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-player-frame, .ttv-guide-shell) {
   border-color: #d0a469;
@@ -137,7 +146,6 @@
   box-shadow: inset 0 3px #d3ae6c, 0 24px 80px #180b07b3;
 }
 :root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-footer { padding: 1rem; background: #142a23f5; border-color: #b5915b; border-radius: .85rem; }
-.ttv-christmas96-preview-art { object-fit: contain; background: #24170f; }
 :root[data-ttv-theme="christmas-96-living-room"] .ttv-christmas96-brand {
   display: grid;
   align-content: center;
@@ -152,13 +160,14 @@
 .ttv-christmas96-brand__name { font: italic 700 clamp(1.6rem, 3vw, 2.2rem)/1 Georgia, serif; white-space: nowrap; }
 .ttv-christmas96-brand__name b { color: #f1ca83; font-style: normal; }
 .ttv-christmas96-brand__edition { font: 700 .65rem/1.3 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-@media (max-width: 760px) and (orientation: portrait) {
+@media (orientation: portrait) {
   .ttv-christmas96-art { object-position: center bottom; }
   .ttv-christmas96-tv-glow { right: -3%; top: 44%; width: 30%; height: 20%; }
   .ttv-christmas96-snow { right: 1%; top: 11%; width: 12%; height: 27%; }
   .ttv-christmas96-lights i:nth-child(even) { display: none; }
 }
 @media (forced-colors: active) {
-  :root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-topbar::after { display: none; }
+  :root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-topbar, .ttv-guide-dialog-header)::after,
+  :root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-viewer-nav::before { display: none; }
   :root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-player-frame, .ttv-guide-shell, .ttv-section-heading, .ttv-library-intro) { border-color: CanvasText; box-shadow: none; }
 }

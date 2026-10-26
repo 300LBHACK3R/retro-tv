@@ -354,7 +354,9 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       expect(layout.y).toBe(0);
       expect(Math.abs(layout.width - layout.viewportWidth)).toBeLessThanOrEqual(1);
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
-      const portrait = await page.evaluate(() => matchMedia("(max-width: 760px) and (orientation: portrait)").matches);
+      const portrait = await page.evaluate((christmas) => matchMedia(christmas
+        ? "(orientation: portrait)"
+        : "(max-width: 760px) and (orientation: portrait)").matches, christmas);
       const imageName = `${christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
       await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
         image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
