@@ -108,6 +108,37 @@ test("unavailable analytics backs off without rejecting or immediately retrying"
   }
 });
 
+test("pagehide playback uses a beacon even before visibility changes", async () => {
+  const requests: RequestInit[] = [];
+  const t = telemetry(async (_url, options) => {
+    requests.push(options!);
+    return new Response(null, { status: 200 });
+  });
+  expect(await t.player.sendPlaybackSample(sample, true)).toBe(false);
+  expect(requests).toHaveLength(0);
+  await t.player.sendPlaybackSample(sample);
+  expect(t.document.visibilityState).toBe("visible");
+  expect(await t.player.sendPlaybackSample(sample, true)).toBe(true);
+  expect(requests).toHaveLength(2);
+  expect(t.beacons).toHaveLength(1);
+  expect(JSON.parse(await t.beacons[0]!.body.text())).toMatchObject({ channelId: "24" });
+});
+
+test("a session completing after a tab is hidden does not start a teardown fetch", async () => {
+  let finish!: (response: Response) => void;
+  let requests = 0;
+  const t = telemetry(async () => {
+    requests++;
+    return new Promise<Response>((resolve) => { finish = resolve; });
+  });
+  const sending = t.player.sendPlaybackSample(sample);
+  t.document.visibilityState = "hidden";
+  finish(new Response(null, { status: 200 }));
+  expect(await sending).toBe(true);
+  expect(requests).toBe(1);
+  expect(t.beacons).toHaveLength(1);
+});
+
 test("privacy changes discard queued events and prevent playback samples", async () => {
   let count = 0;
   const t = telemetry(async () => {
