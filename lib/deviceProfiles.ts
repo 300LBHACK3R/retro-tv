@@ -2,11 +2,12 @@
 import { create } from "zustand";
 import { useDeviceLibrary } from "./deviceLibrary";
 import { useStore } from "./store";
-import { DEFAULT_THEME_ID } from "./themes";
+import { isThemeId } from "./themes";
+import type { ThemeId } from "./types";
+import { getEntranceThemeId, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "./themePreferences";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
-export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
-const PROFILE_SESSION_KEY = "ttv-profile-session-v1";
+export { PROFILE_STORAGE_KEY } from "./themePreferences";
 // Preserve Fox, Robot and Cat IDs. Retired Dinosaur profiles migrate to
 // Boy dragon, and Space explorer profiles fall back to Boy fox.
 export const AVATARS = [
@@ -20,6 +21,7 @@ export type Profile = {
   name: string;
   kids: boolean;
   avatar: (typeof AVATARS)[number];
+  theme?: ThemeId;
 };
 type Pin = { salt: string; hash: string };
 type Data = {
@@ -51,6 +53,7 @@ export function sanitizeProfiles(value: unknown): Profile[] {
       name,
       kids: entry.id === "main" ? false : entry.kids === true,
       avatar: entry.avatar === "star" ? "boydragon" : AVATARS.includes(entry.avatar) ? entry.avatar : "sun",
+      ...(isThemeId(entry.theme) ? { theme: entry.theme } : {}),
     });
   }
   if (!unique.has("main")) unique.set("main", { ...defaults[0]! });
@@ -75,7 +78,7 @@ function readData(): Data {
       ? data.pin
       : null;
   return {
-    // Drop legacy theme fields while preserving household profiles and PINs.
+    // Keep valid saved choices, including choices from older profile versions.
     profiles: sanitizeProfiles(data.profiles),
     pin,
     failures: Number.isInteger(data.failures)
@@ -149,20 +152,32 @@ export function initializeProfiles() {
     useProfiles.setState({ storageAvailable: false });
   }
   useProfiles.setState({ ...data, activeId, ready: true });
-  useStore.getState().setTheme(DEFAULT_THEME_ID);
+  useStore.getState().setTheme(data.profiles.find((profile) => profile.id === activeId)?.theme ?? getEntranceThemeId());
   if (activeId) {
     useDeviceLibrary.getState().selectProfile(activeId);
   }
 }
 export function lockProfiles() {
-  useStore.getState().setTheme(DEFAULT_THEME_ID);
+  useStore.getState().setTheme(getEntranceThemeId());
   useProfiles.setState({ activeId: null });
   saveSession(null);
 }
 export function refreshProfiles() {
+  const data = readData();
+  const current = useProfiles.getState();
+  const withoutThemes = (profiles: Profile[]) => profiles.map(({ id, name, kids, avatar }) => ({ id, name, kids, avatar }));
+  // A theme change in another tab must not interrupt playback or sign out the
+  // household. Profile/PIN changes still invalidate the current session.
+  if (JSON.stringify({ ...data, profiles: withoutThemes(data.profiles) }) ===
+      JSON.stringify({ profiles: withoutThemes(current.profiles), pin: current.pin, failures: current.failures, lockedUntil: current.lockedUntil })) {
+    useProfiles.setState({ profiles: data.profiles });
+    const theme = data.profiles.find((profile) => profile.id === current.activeId)?.theme;
+    if (theme) useStore.getState().setTheme(theme);
+    return;
+  }
   lockProfiles();
   useProfiles.setState((state) => ({
-    ...readData(),
+    ...data,
     revision: state.revision + 1,
   }));
 }
@@ -173,7 +188,7 @@ export function activateProfile(id: string) {
   if (!profile || (profile.kids && !useProfiles.getState().pin)) return;
   useDeviceLibrary.getState().selectProfile(id);
   const state = useStore.getState();
-  state.setTheme(DEFAULT_THEME_ID);
+  state.setTheme(profile.theme ?? getEntranceThemeId());
   state.setChannel(
     state.channels.find((channel) => Number(channel.number ?? channel.id) === 1)
       ?.id ?? "1",
@@ -187,9 +202,19 @@ export function activateProfile(id: string) {
 export function saveProfile(profile: Profile) {
   const state = useProfiles.getState();
   const profiles = state.profiles.some((item) => item.id === profile.id)
-    ? state.profiles.map((item) => (item.id === profile.id ? profile : item))
+    ? state.profiles.map((item) => (item.id === profile.id ? { ...item, ...profile } : item))
     : [...state.profiles, profile];
   useProfiles.setState({ profiles: sanitizeProfiles(profiles) });
+  saveData();
+}
+export function setProfileTheme(theme: ThemeId) {
+  if (!isThemeId(theme)) return;
+  const { activeId } = useProfiles.getState();
+  if (!activeId) return;
+  useProfiles.setState((state) => ({
+    profiles: state.profiles.map((profile) => profile.id === activeId ? { ...profile, theme } : profile),
+  }));
+  useStore.getState().setTheme(theme);
   saveData();
 }
 export function deleteProfile(id: string) {

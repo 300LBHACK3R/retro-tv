@@ -1939,7 +1939,8 @@ export const useStore = create<AppState>()(
            */
           appMode: "viewer",
           isSettingsOpen: false,
-          themeId: DEFAULT_THEME_ID,
+          // Profiles own theme preferences; programming hydration must not reset them.
+          themeId: currentState.themeId,
           ownedPremiumThemes: getValidOwnedThemes(saved?.ownedPremiumThemes),
           deletedMediaIds,
           viewerSettings: normalizeViewerSettings(saved?.viewerSettings),

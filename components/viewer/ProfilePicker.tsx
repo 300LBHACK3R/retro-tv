@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   activateProfile,
@@ -540,16 +540,12 @@ export default function ProfilePicker() {
             className="ttv-profile-chooser"
             aria-labelledby="profile-heading"
           >
-            <Image
-              src="/tatestv-logo.png"
-              alt="Tate's TV"
+            <TatesTvLogo
               width={1536}
               height={1024}
               sizes="min(560px, 82vw, 60vh)"
               className="ttv-profile-logo"
-              loading="eager"
-              fetchPriority="high"
-              draggable={false}
+              priority
             />
             <h1 id="profile-heading" tabIndex={-1}>
               {screen.kind === "manage" ? "Your household" : "Who’s watching?"}

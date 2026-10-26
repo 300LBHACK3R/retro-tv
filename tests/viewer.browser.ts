@@ -207,7 +207,7 @@ test("guide stays readable and keyboard input stays inside the dialog", async ({
   await noPageOverflow(page);
 });
 
-test("theme changes follow navigation during a visit, are not saved, and reset on reload", async ({
+test("theme choices persist across navigation and reloads for the active profile", async ({
   page,
 }) => {
   await page.goto("/?ch=24");
@@ -237,12 +237,13 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
     page.getByRole("region", { name: "Live Tate's TV player" }),
   ).toBeVisible();
   await noPageOverflow(page);
-  // Client navigation keeps the in-memory selection without writing it to profiles.
+  // Navigation and reloads preserve the active profile’s explicit choice.
   await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/\/library$/);
   await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("retro-tv-programming-v1")!).state);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles.find((profile: { id: string }) => profile.id === "main").theme)).toBe("obsidian-gold");
   expect(stored.themeId).toBeUndefined();
   expect(stored.themeRevision).toBeUndefined();
   await page.getByRole("link", { name: "Live TV", exact: true }).click();
@@ -250,7 +251,7 @@ test("theme changes follow navigation during a visit, are not saved, and reset o
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "halloween-90s-night",
+    "obsidian-gold",
   );
 });
 
@@ -404,7 +405,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "halloween-90s-night",
+    THEMES[THEMES.length - 1]!.id,
   );
 });
 
@@ -803,7 +804,7 @@ test("mobile guide fits narrow screens, landscape and larger text with reachable
   await expect(dialog).toHaveCount(0);
 });
 
-test("mobile themes are free, open without the keyboard, and remember reduced motion without saving a theme", async ({ page }, testInfo) => {
+test("mobile themes are free, open without the keyboard, and remember both the selected theme and reduced motion", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "television");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/?ch=24");
@@ -814,7 +815,7 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   const search = dialog.getByRole("searchbox", { name: "Search Tate's TV themes" });
   await expect(close).toBeFocused();
   await expect(search).not.toBeFocused();
-  await expect(dialog.getByText("All themes are free. Pick a look for this visit.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("All themes are free. Your choice is saved for this profile on this device.", { exact: true })).toBeVisible();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(dialog.locator(".theme-card:disabled")).toHaveCount(0);
   await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);
@@ -865,8 +866,8 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
-  await expect(page.locator(".ttv-halloween90-lamplight")).toHaveCSS("animation-name", "none");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
+  await expect(page.locator(".ttv-haunted-moonlight")).toHaveCSS("animation-name", "none");
   await trigger.click();
   await page.setViewportSize({ width: 568, height: 320 });
   await expect(close).toBeInViewport();
@@ -876,7 +877,7 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   await close.click();
   await page.goto("/?ch=24");
   await expect(page.getByRole("region", { name: "Live Tate's TV player", exact: true })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
   await expect(page.locator(".ttv-seasonal-world")).toHaveCSS("position", "fixed");
   await expect(page.locator(".ttv-premium-viewer-shell .ttv-halloween-scene")).toHaveCount(0);
 });

@@ -81,7 +81,7 @@ export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
 export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
 
-// Theme selection lasts for the current page visit only. Every new visit starts here.
+// Static rendering fallback. Runtime entrance dates live in themePreferences.
 export const DEFAULT_THEME_ID: ThemeId = "halloween-90s-night";
 
 /** Zustand persistence key used by the pre-hydration theme bootstrap. */

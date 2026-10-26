@@ -20,9 +20,10 @@ import {
   lockProfiles,
   refreshProfiles,
   saveProfile,
+  setProfileTheme,
   PROFILE_STORAGE_KEY,
 } from "../lib/deviceProfiles";
-import { DEFAULT_THEME_ID } from "../lib/themes";
+import { getEntranceThemeId } from "../lib/themePreferences";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 const programme: MediaItem = { ...programming.media[0]!, kidsApproved: true };
@@ -203,13 +204,14 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
     "kids",
   ]);
   const profiles = sanitizeProfiles([
-    { id: "main", name: " Parent ", kids: true },
+    { id: "main", name: " Parent ", kids: true, theme: "not-a-theme" },
     { id: "bad!", name: "Bad" },
     { id: "p-1", name: "Child", kids: true },
     { id: 12, name: "Bad" },
   ]);
   expect(profiles).toHaveLength(2);
   expect(profiles[0]).toMatchObject({ name: "Parent", kids: false });
+  expect(profiles[0]!.theme).toBeUndefined();
   expect(
     sanitizeProfiles(
       Array.from({ length: 20 }, (_, i) => ({ id: `p-${i}`, name: `P${i}` })),
@@ -241,7 +243,7 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
     { id: "child", name: "Child", avatar: "boydragon", kids: true },
   ]);
 });
-test("legacy theme preferences are removed without losing profiles or PIN; every profile starts with the default", () => {
+test("profile themes survive reloads and edits without changing PINs or another profile", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const session = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
   function memory() {
@@ -272,8 +274,8 @@ test("legacy theme preferences are removed without losing profiles or PIN; every
     }));
     useProfiles.setState({ ready: false });
     initializeProfiles();
-    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
-    expect(useProfiles.getState().profiles.every((profile) => !("theme" in profile))).toBe(true);
+    expect(useStore.getState().themeId).toBe(getEntranceThemeId());
+    expect(useProfiles.getState().profiles.map((profile) => profile.theme)).toEqual(["obsidian-gold", "shaw-2006"]);
     expect(useProfiles.getState().pin).toEqual(pin);
     expect(useProfiles.getState().failures).toBe(2);
     expect(useProfiles.getState().profiles[0]).toMatchObject({ name: "Tate", avatar: "sun" });
@@ -281,20 +283,32 @@ test("legacy theme preferences are removed without losing profiles or PIN; every
     expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).themeRevision).toBeUndefined();
     activateProfile("main");
     expect(useStore.getState().currentChannelId).toBe("1");
-    useStore.getState().setTheme("obsidian-gold");
+    expect(useStore.getState().themeId).toBe("obsidian-gold");
+    setProfileTheme("midas-gold");
     saveProfile({ ...useProfiles.getState().profiles[0]!, name: "Tate updated" });
-    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).profiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
+    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).profiles.map((profile: Record<string, unknown>) => profile.theme)).toEqual(["midas-gold", "shaw-2006"]);
     useProfiles.setState({ ready: false });
     initializeProfiles();
+    expect(useStore.getState().themeId).toBe("midas-gold");
     lockProfiles();
+    expect(useStore.getState().themeId).toBe(getEntranceThemeId());
     useStore.getState().setTheme("electric-blue-live");
     activateProfile("main");
-    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
+    expect(useStore.getState().themeId).toBe("midas-gold");
     expect(useProfiles.getState().profiles[0]!.name).toBe("Tate updated");
     useStore.getState().setTheme("shaw-2006");
     activateProfile("kids");
-    expect(useStore.getState().themeId).toBe(DEFAULT_THEME_ID);
+    expect(useStore.getState().themeId).toBe("shaw-2006");
     const revision = useProfiles.getState().revision;
+    const remote = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!);
+    remote.profiles[1].theme = "electric-blue-live";
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(remote));
+    refreshProfiles();
+    expect(useProfiles.getState().activeId).toBe("kids");
+    expect(useStore.getState().themeId).toBe("electric-blue-live");
+    expect(useProfiles.getState().revision).toBe(revision);
+    remote.pin.hash = "c".repeat(64);
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(remote));
     refreshProfiles();
     expect(useProfiles.getState().activeId).toBeNull();
     expect(useProfiles.getState().revision).toBe(revision + 1);

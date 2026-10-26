@@ -4,6 +4,8 @@ import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Halloween90sScene from "@/components/themes/Halloween90sScene";
 import { useStore } from "@/lib/store";
+import { useProfiles } from "@/lib/deviceProfiles";
+import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId } from "@/lib/themePreferences";
 import {
   createThemeCssVars,
   getThemeById,
@@ -19,10 +21,11 @@ const THEME_CHANGE_EVENT = "ttv:theme-change";
 /**
  * Keeps the active Tate's TV theme synchronized across every route. The
  * pre-hydration bootstrap handles first paint; this runtime handles live theme
- * changes and metadata after React mounts. Theme choices stay in memory.
+ * changes and metadata after profiles restore their saved theme.
  */
 export default function ThemeRuntime() {
   const themeId = useStore((state) => state.themeId);
+  const profilesReady = useProfiles((state) => state.ready);
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
@@ -30,6 +33,8 @@ export default function ThemeRuntime() {
   const cssVars = useMemo(() => createThemeCssVars(theme), [theme]);
 
   useEffect(() => {
+    // Keep the bootstrap's saved choice intact until profiles finish loading.
+    if (!profilesReady) return;
     const root = document.documentElement;
 
     root.dataset.ttvTheme = theme.id;
@@ -57,7 +62,27 @@ export default function ThemeRuntime() {
         },
       }),
     );
-  }, [cssVars, theme]);
+  }, [cssVars, theme, profilesReady]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const updateEntrance = () => {
+      clearTimeout(timer);
+      const profiles = useProfiles.getState();
+      if (profiles.ready && !profiles.activeId)
+        useStore.getState().setTheme(getEntranceThemeId());
+      const remaining = CHRISTMAS_ENTRANCE_START - Date.now();
+      if (remaining > 0) timer = setTimeout(updateEntrance, Math.min(remaining, 2_147_483_647));
+    };
+    updateEntrance();
+    document.addEventListener("visibilitychange", updateEntrance);
+    window.addEventListener("pageshow", updateEntrance);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", updateEntrance);
+      window.removeEventListener("pageshow", updateEntrance);
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;

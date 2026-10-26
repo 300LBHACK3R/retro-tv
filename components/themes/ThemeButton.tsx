@@ -28,6 +28,7 @@ import {
   type ThemeSeason,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
+import { setProfileTheme, useProfiles } from "@/lib/deviceProfiles";
 
 const DIALOG_ID = "ttv-theme-library";
 
@@ -211,7 +212,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
   const themeId = useStore((state) => state.themeId);
   const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
-  const setTheme = useStore((state) => state.setTheme);
+  const storageAvailable = useProfiles((state) => state.storageAvailable);
 
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
   const themes = useMemo(() => getAllThemes(), []);
@@ -253,10 +254,10 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         return;
       }
 
-      setTheme(theme.id);
+      setProfileTheme(theme.id);
       setIsOpen(false);
     },
-    [ownedPremiumThemes, setTheme],
+    [ownedPremiumThemes],
   );
 
   useEffect(() => {
@@ -436,8 +437,11 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       className="theme-dialog__description"
                     >
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
-                        ? "All themes are free. Pick a look for this visit."
-                        : "Pick a look for this visit."}
+                        ? "All themes are free. "
+                        : ""}
+                      {storageAvailable
+                        ? "Your choice is saved for this profile on this device."
+                        : "Browser storage is unavailable. Your choice lasts for this visit."}
                     </p>
                   </div>
 

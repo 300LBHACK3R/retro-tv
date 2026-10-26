@@ -31,7 +31,7 @@ const fixture = {
     { ...programming.channels[1]!, kidsApproved: false, category: "Movies" },
   ],
 };
-test.beforeEach(async ({ page }) => {
+async function mockViewer(page: Page) {
   await page.route("**/api/programming", (route) =>
     route.fulfill({
       json: { ok: true, programming: fixture, source: "database" },
@@ -47,7 +47,8 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/qa-media.webm", (route) =>
     route.fulfill({ body: video, contentType: "video/webm" }),
   );
-});
+}
+test.beforeEach(async ({ page }) => mockViewer(page));
 async function switchProfile(page: Page) {
   await page.getByRole("button", { name: /^Switch profile:/ }).click();
   await expect(
@@ -466,7 +467,8 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   ).toBe(true);
 });
 
-test("Halloween 95 entrance fills the viewport, remembers accessibility and resets temporary themes", async ({ page }, testInfo) => {
+test("Halloween 95 entrance fills the viewport, remembers accessibility and preserves saved profile themes", async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T18:00:00Z"));
   await page.addInitScript(() => {
     if (localStorage.getItem("ttv-profiles-v1")) return;
     // A returning household from before the seasonal release.
@@ -526,14 +528,109 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and rese
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   const savedProfiles = await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles);
-  expect(savedProfiles.every((profile: Record<string, unknown>) => !("theme" in profile))).toBe(true);
+  expect(savedProfiles.find((profile: { id: string }) => profile.id === "main").theme).toBe("obsidian-gold");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await switchProfile(page);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
   await expect(scene).toBeVisible();
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+});
+
+test("Christmas entrance starts November 1 while each profile keeps its chosen theme", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.clock.setFixedTime(new Date("2026-11-01T06:00:00Z"));
+  await page.addInitScript(() => {
+    if (localStorage.getItem("ttv-profiles-v1")) return;
+    localStorage.setItem("ttv-profiles-v1", JSON.stringify({ profiles: [
+      { id: "main", name: "Main", kids: false, avatar: "sun", theme: "midas-gold" },
+      { id: "taylor", name: "Taylor", kids: false, avatar: "boycat", theme: "electric-blue-live" },
+    ] }));
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await expect(page.locator(".ttv-christmas96-world")).toBeVisible();
+  await expect(page.locator(".ttv-profile-logo")).toContainText("Christmas '96");
+  await page.locator(".ttv-christmas96-art").evaluate((image: HTMLImageElement) => image.decode());
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("christmas-entrance.png") });
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="christmas-96-living-room"]').click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await switchProfile(page);
+  await page.getByRole("button", { name: "Watch as Taylor", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  // End the tab session; choices remain in the browser for the next visit.
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await page.getByRole("button", { name: "Watch as Taylor", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  expect(errors).toEqual([]);
+});
+
+test("an open entrance changes at midnight and returning tabs refresh the seasonal date", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-01T05:58:00Z") });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
+  await page.clock.pauseAt(new Date("2026-11-01T05:59:00Z"));
+  await page.clock.fastForward(60_001);
+  await page.clock.resume();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await expect(page.locator(".ttv-profile-logo")).toContainText("Christmas '96");
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pageshow"));
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+});
+
+test("blocked storage still allows theme changes during the current visit", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { get() { throw new Error("Storage blocked"); } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await expect(page.getByText("Browser storage is unavailable. Your choice lasts for this visit.", { exact: false })).toBeVisible();
+  await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
+});
+
+test("new tabs restore saved choices and theme updates do not sign out an existing viewer", async ({ page, context }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
+  const other = await context.newPage();
+  await mockViewer(other);
+  await other.goto("/");
+  await other.getByRole("button", { name: "Watch as Main", exact: true }).click();
+  await expect(other.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
+  await other.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await other.locator('.theme-card[data-theme-id="electric-blue-live"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  await other.close();
 });

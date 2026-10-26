@@ -1,38 +1,63 @@
 import { test, expect } from "@playwright/test";
 import { runInNewContext } from "node:vm";
 import { createThemeBootstrapScript } from "../components/themes/ThemeBootstrapScript";
-import { DEFAULT_THEME_ID, THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
+import { THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
 import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";
+import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "../lib/themePreferences";
 import type { Channel, MediaItem } from "../lib/types";
 
-test("every first paint starts in Halloween 95 and ignores legacy theme choices", () => {
-  for (const saved of [
-    undefined,
-    { themeId: "obsidian-gold" },
-    { themeId: "halloween-haunted-arcade" },
-    { themeId: "shaw-2006", themeRevision: "halloween-2026" },
-    { themeId: "unknown", viewerSettings: { preferReducedMotion: true } },
-  ]) {
-    const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
-    runInNewContext(createThemeBootstrapScript(), {
-      window: { localStorage: { getItem: () => JSON.stringify({ state: saved }) } },
-      document: { documentElement: root },
-    });
-    expect(root.dataset.ttvTheme).toBe("halloween-90s-night");
-    expect(root.dataset.ttvReducedMotion === "true").toBe(!!saved?.viewerSettings?.preferReducedMotion);
+function bootstrap(now: number, profiles?: unknown, session?: unknown, blocked: boolean | "malformed" = false) {
+  const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
+  const local = {
+    getItem: (key: string) => {
+      if (blocked === "malformed") return "{";
+      if (blocked) throw new Error("Storage blocked");
+      return key === PROFILE_STORAGE_KEY ? JSON.stringify(profiles) : JSON.stringify({ state: { viewerSettings: { preferReducedMotion: true } } });
+    },
+  };
+  runInNewContext(createThemeBootstrapScript(), {
+    Date: { now: () => now },
+    window: { localStorage: local, sessionStorage: { getItem: (key: string) => key === PROFILE_SESSION_KEY ? JSON.stringify(session) : null } },
+    document: { documentElement: root },
+  });
+  return root;
+}
+
+test("the entrance changes at Calgary midnight on November 1, independently of saved choices", () => {
+  expect(new Date(CHRISTMAS_ENTRANCE_START).toISOString()).toBe("2026-11-01T06:00:00.000Z");
+  for (const [now, expected] of [
+    [CHRISTMAS_ENTRANCE_START - 1, "halloween-90s-night"],
+    [CHRISTMAS_ENTRANCE_START, "christmas-96-living-room"],
+    [CHRISTMAS_ENTRANCE_START + 86400000, "christmas-96-living-room"],
+  ] as const) {
+    expect(getEntranceThemeId(now)).toBe(expected);
+    expect(bootstrap(now).dataset.ttvTheme).toBe(expected);
+    expect(bootstrap(now, { profiles: [{ id: "main", theme: "midas-gold" }] }).dataset.ttvTheme).toBe(expected);
+    expect(bootstrap(now, undefined, undefined, true).dataset.ttvTheme).toBe(expected);
+    expect(bootstrap(now, undefined, undefined, "malformed").dataset.ttvTheme).toBe(expected);
+    expect(bootstrap(now, "malformed profiles", "bad session").dataset.ttvTheme).toBe(expected);
   }
-  expect(DEFAULT_THEME_ID).toBe("halloween-90s-night");
 });
 
-test("the default first paint works when browser storage is blocked or malformed", () => {
-  for (const getItem of [() => { throw new Error("Storage blocked"); }, () => "bad-json"]) {
-    const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
-    runInNewContext(createThemeBootstrapScript(), {
-      window: { localStorage: { getItem } }, document: { documentElement: root },
-    });
-    expect(root.dataset.ttvTheme).toBe("halloween-90s-night");
-    expect(root.style.colorScheme).toBe("dark");
+test("first paint restores every valid profile choice and reduced motion before or after the switch", () => {
+  for (const theme of THEMES) {
+    for (const now of [CHRISTMAS_ENTRANCE_START - 1, CHRISTMAS_ENTRANCE_START]) {
+      const root = bootstrap(now, { profiles: [{ id: "main", theme: theme.id }] }, { id: "main", pinHash: null });
+      expect(root.dataset.ttvTheme).toBe(theme.id);
+      expect(root.dataset.ttvReducedMotion).toBe("true");
+    }
+  }
+});
+
+test("invalid themes and expired profile sessions safely use the seasonal entrance", () => {
+  for (const [data, session] of [
+    [{ profiles: [{ id: "main", theme: "unknown" }] }, { id: "main", pinHash: null }],
+    [{ profiles: [{ id: "main", theme: "midas-gold" }] }, { id: "deleted", pinHash: null }],
+    [{ profiles: [{ id: "kids", kids: true, theme: "midas-gold" }] }, { id: "kids", pinHash: null }],
+    [{ profiles: [{ id: "main", theme: "midas-gold" }], pin: { hash: "changed" } }, { id: "main", pinHash: "old" }],
+  ]) {
+    expect(bootstrap(CHRISTMAS_ENTRANCE_START, data, session).dataset.ttvTheme).toBe("christmas-96-living-room");
   }
 });
 
