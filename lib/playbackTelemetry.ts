@@ -16,6 +16,7 @@ export interface PlaybackSample {
 
 export async function sendPlaybackSample(
   sample: Omit<PlaybackSample, "id">,
+  closing = false,
 ): Promise<boolean> {
   try {
     return await postTelemetry({
@@ -24,7 +25,7 @@ export async function sendPlaybackSample(
       bufferSeconds: Math.min(65, sample.bufferSeconds),
       errors: Math.min(20, sample.errors),
       id: crypto.randomUUID(),
-    });
+    }, closing);
   } catch {
     return false;
   }

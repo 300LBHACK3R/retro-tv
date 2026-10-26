@@ -185,9 +185,28 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     await route.fulfill({ json: { ok: true, programming: saved } });
   });
   let uploaded = false;
+  // WebKit's intercepted requests omit Blob bodies. Inspect the actual bytes
+  // in the browser as well as the request method/type at the route boundary.
+  let posterBytes: number[] = [];
+  let posterSize = 0;
+  await page.exposeFunction("recordPosterUpload", (size: number, prefix: number[]) => {
+    posterSize = size;
+    posterBytes = prefix;
+  });
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (input, options) => {
+      if (input === "/api/admin/artwork" && options?.body instanceof Blob) {
+        const bytes = new Uint8Array(await options.body.arrayBuffer());
+        await (window as unknown as { recordPosterUpload: (size: number, prefix: number[]) => Promise<void> })
+          .recordPosterUpload(bytes.length, Array.from(bytes.slice(0, 12)));
+      }
+      return originalFetch(input, options);
+    };
+  });
   await page.route("**/api/admin/artwork", (route) => {
     expect(route.request().headers()["content-type"]).toMatch(/^image\/(webp|png|jpeg)$/);
-    uploaded = route.request().method() === "POST" && (route.request().postDataBuffer()?.length ?? 0) > 0;
+    uploaded = route.request().method() === "POST";
     return route.fulfill({ json: { ok: true, publicUrl: "/avatars/boyrobot.png" } });
   });
   await page.goto("/admin");
@@ -205,6 +224,14 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     page.getByText("Poster ready. Save your artwork changes below."),
   ).toBeVisible();
   expect(uploaded).toBe(true);
+  expect(posterSize).toBeGreaterThan(0);
+  expect(posterSize).toBeLessThanOrEqual(3 * 1024 * 1024);
+  const signature = Buffer.from(posterBytes);
+  expect(
+    signature.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ||
+    signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+    (signature.subarray(0, 4).toString() === "RIFF" && signature.subarray(8, 12).toString() === "WEBP"),
+  ).toBe(true);
   await page
     .getByRole("checkbox", { name: "I reviewed this poster for Kids profiles" })
     .check();

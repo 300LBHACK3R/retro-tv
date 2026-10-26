@@ -64,7 +64,7 @@ export function usePlaybackMonitor(
     setReportStatus("");
     setNeedsHelp(false);
     setReportDisabled(false);
-    const flush = () => {
+    const flush = (closing = false) => {
       if (
         !totals.watchSeconds &&
         !totals.bufferSeconds &&
@@ -73,7 +73,7 @@ export function usePlaybackMonitor(
         !totals.reports
       )
         return;
-      void sendPlaybackSample({ channelId, mediaId, mode, ...totals });
+      void sendPlaybackSample({ channelId, mediaId, mode, ...totals }, closing);
       totals = {
         watchSeconds: 0,
         bufferSeconds: 0,
@@ -229,9 +229,11 @@ export function usePlaybackMonitor(
     const hidden = () => {
       if (document.visibilityState === "hidden") {
         tick();
-        flush();
+        flush(true);
       }
     };
+    // pagehide can fire while WebKit still reports the document as visible.
+    const leaving = () => flush(true);
     const events = {
       playing,
       waiting,
@@ -247,7 +249,7 @@ export function usePlaybackMonitor(
     const interval = window.setInterval(tick, 1000);
     window.addEventListener("offline", offline);
     window.addEventListener("online", online);
-    window.addEventListener("pagehide", flush);
+    window.addEventListener("pagehide", leaving);
     document.addEventListener("visibilitychange", hidden);
     return () => {
       disposed = true;
@@ -258,7 +260,7 @@ export function usePlaybackMonitor(
         video.removeEventListener(name, handler);
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", online);
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pagehide", leaving);
       document.removeEventListener("visibilitychange", hidden);
       retryRef.current = () => {};
     };

@@ -87,7 +87,7 @@ test("admin tools load their separate panels without changing saved programming"
     ["Backups & Restore", "Station Config"],
   ] as const;
   for (const [label, heading] of panels) {
-    const button = page.getByRole("button", { name: label, exact: true });
+    const button = page.getByRole("navigation", { name: "Admin tools" }).getByRole("button", { name: label, exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();

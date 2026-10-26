@@ -41,6 +41,10 @@ export async function postTelemetry(body: unknown, closing = false): Promise<boo
       return false;
     }
     if (!analyticsAllowed()) return false;
+    // A session request may finish after the tab became hidden.
+    if (document.visibilityState !== "visible") {
+      return navigator.sendBeacon("/api/engagement", new Blob([JSON.stringify(body)], { type: "application/json" }));
+    }
     const response = await fetch("/api/engagement", {
       method: "POST",
       mode: "same-origin",
