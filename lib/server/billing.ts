@@ -7,6 +7,8 @@ import { accountOrigin } from "./accountAuth";
 import {
   EMPTY_ACCOUNT,
   THEME_PRICE_CENTS,
+  MEMBERSHIP_PLANS,
+  type MembershipPlanId,
   type AccountView,
 } from "../accountModel";
 import { getThemeById, isThemeId } from "../themes";
@@ -22,6 +24,14 @@ export function stripeClient() {
   });
 }
 let priceCache: { until: number; value: AccountView["commerce"] } | null = null;
+function membershipPriceId(plan: MembershipPlanId) {
+  const prices = {
+    monthly: process.env.STRIPE_MEMBERSHIP_PRICE_ID,
+    "six-month": process.env.STRIPE_MEMBERSHIP_6MONTH_PRICE_ID,
+    annual: process.env.STRIPE_MEMBERSHIP_ANNUAL_PRICE_ID,
+  };
+  return prices[plan];
+}
 export async function commerceCatalog(): Promise<AccountView["commerce"]> {
   if (
     !billingEnabled() ||
@@ -32,11 +42,12 @@ export async function commerceCatalog(): Promise<AccountView["commerce"]> {
     return EMPTY_ACCOUNT.commerce;
   if (priceCache && priceCache.until > Date.now()) return priceCache.value;
   const stripe = stripeClient();
-  const [theme, membership] = await Promise.all([
+  const [theme, memberships] = await Promise.all([
     stripe.prices.retrieve(process.env.STRIPE_THEME_PRICE_ID),
-    process.env.STRIPE_MEMBERSHIP_PRICE_ID
-      ? stripe.prices.retrieve(process.env.STRIPE_MEMBERSHIP_PRICE_ID)
-      : null,
+    Promise.all(MEMBERSHIP_PLANS.map(async (plan) => {
+      const id = membershipPriceId(plan.id);
+      return id ? { plan, price: await stripe.prices.retrieve(id) } : null;
+    })),
   ]);
   if (
     !theme.active ||
@@ -45,21 +56,20 @@ export async function commerceCatalog(): Promise<AccountView["commerce"]> {
     theme.unit_amount !== THEME_PRICE_CENTS
   )
     throw new Error("Theme price configuration is invalid");
-  if (
-    membership &&
-    (!membership.active ||
-      membership.type !== "recurring" ||
-      membership.currency !== "cad" ||
-      membership.recurring?.interval !== "month" ||
-      membership.recurring.interval_count !== 1 ||
-      !membership.unit_amount)
-  )
-    throw new Error("Membership price configuration is invalid");
   const format = (amount: number) => `C$${(amount / 100).toFixed(2)}`;
+  const membershipPlans = memberships.flatMap((entry) => {
+    if (!entry) return [];
+    const { plan, price } = entry;
+    if (!price.active || price.type !== "recurring" || price.currency !== "cad" ||
+        price.unit_amount !== plan.amount || price.recurring?.interval !== plan.interval ||
+        price.recurring.interval_count !== plan.intervalCount)
+      throw new Error("Membership price configuration is invalid");
+    return [{ id: plan.id, price: format(price.unit_amount) }];
+  });
   const value = {
     enabled: true,
     themePrice: format(theme.unit_amount),
-    membershipPrice: membership ? format(membership.unit_amount!) : null,
+    membershipPlans,
   };
   priceCache = { until: Date.now() + 300_000, value };
   return value;
@@ -86,11 +96,12 @@ export async function createCheckout(
   product: "theme" | "membership",
   themeId: string | undefined,
   requestId: string,
+  planId: MembershipPlanId = "monthly",
 ) {
   const catalog = await commerceCatalog();
   if (
     !catalog.enabled ||
-    (product === "membership" && !catalog.membershipPrice)
+    (product === "membership" && !catalog.membershipPlans.some(plan => plan.id === planId))
   )
     throw new Error("Purchases are not available yet.");
   if (
@@ -127,6 +138,7 @@ export async function createCheckout(
     user_id: user.id,
     product,
     theme_id: product === "theme" ? themeId! : "",
+    plan_id: product === "membership" ? planId : "",
   };
   const pending = await stripe.checkout.sessions.list({
     customer,
@@ -137,18 +149,26 @@ export async function createCheckout(
     (session) =>
       session.metadata?.application === "tates-tv" &&
       session.metadata.product === product &&
-      session.metadata.theme_id === metadata.theme_id,
+      session.metadata.theme_id === metadata.theme_id &&
+      (product !== "membership" || session.metadata.plan_id === planId),
   );
   if (existing?.url) return existing.url;
+  if (product === "membership") {
+    for (const session of pending.data) {
+      if (session.metadata?.application === "tates-tv" && session.metadata.product === "membership")
+        await stripe.checkout.sessions.expire(session.id);
+    }
+  }
   const session = await stripe.checkout.sessions.create(
     {
       mode: product === "membership" ? "subscription" : "payment",
+      integration_identifier: "tates_tv_hosted_qmnrwzjk",
       customer,
       line_items: [
         {
           price:
             product === "membership"
-              ? process.env.STRIPE_MEMBERSHIP_PRICE_ID!
+              ? membershipPriceId(planId)!
               : process.env.STRIPE_THEME_PRICE_ID!,
           quantity: 1,
         },
@@ -168,13 +188,13 @@ export async function createCheckout(
         submit: {
           message:
             product === "membership"
-              ? "Membership supports Tate’s TV and includes all premium themes. Viewing stays free. Cancel future renewals in your account."
+              ? `Membership is billed upfront ${MEMBERSHIP_PLANS.find(plan => plan.id === planId)!.renewal} and renews automatically. Cancel future renewals in your account. Viewing stays free.`
               : `One-time purchase: ${getThemeById(themeId).name}. Viewing stays free.`,
         },
       },
     },
     {
-      idempotencyKey: `ttv-checkout:${user.id}:${product}:${themeId ?? "all"}:${requestId}`,
+      idempotencyKey: `ttv-checkout:${user.id}:${product}:${product === "membership" ? planId : themeId}:${requestId}`,
     },
   );
   if (!session.url) throw new Error("Checkout unavailable");
@@ -326,7 +346,7 @@ export async function applyBillingEvent(event: Stripe.Event) {
     )
       return;
     const item = subscription.items.data.find(
-      (item) => item.price.id === process.env.STRIPE_MEMBERSHIP_PRICE_ID,
+      (item) => MEMBERSHIP_PLANS.some(plan => item.price.id === membershipPriceId(plan.id)),
     );
     const invoice = subscription.latest_invoice as Stripe.Invoice | null;
     let paid = invoice?.status === "paid";

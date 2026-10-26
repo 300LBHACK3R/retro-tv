@@ -6,6 +6,7 @@ import { accountView } from "@/lib/server/accountData";
 import { createCheckout } from "@/lib/server/billing";
 import { privateJson, readBoundedJson } from "@/lib/server/http";
 import { isThemeId } from "@/lib/themes";
+import { isMembershipPlanId } from "@/lib/accountModel";
 export async function POST(request: Request) {
   try {
     const denied = await accountMutationGuard(request, "checkout", 15);
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
       !/^[a-zA-Z0-9-]{20,80}$/.test(input.requestId)
     )
       return privateJson({ error: "Invalid checkout request." }, 400);
+    if (input.product === "membership" && !isMembershipPlanId(input.planId))
+      return privateJson({ error: "Choose a membership plan." }, 400);
     const state = await accountView(user);
     if (
       input.product === "theme" &&
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
       input.product as "theme" | "membership",
       typeof input.themeId === "string" ? input.themeId : undefined,
       input.requestId,
+      isMembershipPlanId(input.planId) ? input.planId : undefined,
     );
     return privateJson({ url });
   } catch (error) {

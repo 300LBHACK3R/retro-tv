@@ -58,6 +58,7 @@ export async function accountView(user: User): Promise<AccountView> {
     member,
     profileLimit: member ? MEMBER_PROFILE_LIMIT : FREE_PROFILE_LIMIT,
     ownedThemeIds: allowedThemeIds(owned, member),
+    purchasedThemeIds: [...new Set(owned)],
     household: sanitizeHousehold(row.household),
     revision: Number(row.revision),
   };

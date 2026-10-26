@@ -26,7 +26,11 @@ export default function TermsPage() {
       </p>
       <h2>Tate’s TV Membership</h2>
       <p>
-        Membership renews monthly at the price shown at checkout. While active,
+        Membership is billed upfront and renews automatically every month, every
+        six months or every year, depending on the plan selected at checkout.
+        The full CAD charge and any applicable tax are shown before you pay.
+        Any monthly equivalent for a longer plan is a comparison, not a monthly
+        instalment charge. While active,
         it includes all premium themes, up to ten household profiles and an
         optional member badge. Membership does not remove ads or change access
         to programmes.

@@ -5,6 +5,15 @@ import type { ThemeId } from "./types";
 export const FREE_PROFILE_LIMIT = 5;
 export const MEMBER_PROFILE_LIMIT = 10;
 export const THEME_PRICE_CENTS = 300;
+export const MEMBERSHIP_PLANS = [
+  { id: "monthly", label: "Monthly", amount: 499, months: 1, interval: "month", intervalCount: 1, renewal: "every month" },
+  { id: "six-month", label: "6 months", amount: 2499, months: 6, interval: "month", intervalCount: 6, renewal: "every 6 months" },
+  { id: "annual", label: "Yearly", amount: 4499, months: 12, interval: "year", intervalCount: 1, renewal: "every year" },
+] as const;
+export type MembershipPlanId = (typeof MEMBERSHIP_PLANS)[number]["id"];
+export function isMembershipPlanId(value: unknown): value is MembershipPlanId {
+  return MEMBERSHIP_PLANS.some(plan => plan.id === value);
+}
 export type Household = {
   profiles: Profile[];
   pin: Pin | null;
@@ -15,6 +24,9 @@ export type AccountView = {
   enabled: boolean;
   user: { id: string; email: string } | null;
   ownedThemeIds: ThemeId[];
+  // Purchases are separate from the effective access list above, which also
+  // includes free themes and time-limited membership access.
+  purchasedThemeIds: ThemeId[];
   member: boolean;
   profileLimit: number;
   household: Household | null;
@@ -22,18 +34,19 @@ export type AccountView = {
   commerce: {
     enabled: boolean;
     themePrice: string;
-    membershipPrice: string | null;
+    membershipPlans: { id: MembershipPlanId; price: string }[];
   };
 };
 export const EMPTY_ACCOUNT: AccountView = {
   enabled: false,
   user: null,
   ownedThemeIds: [],
+  purchasedThemeIds: [],
   member: false,
   profileLimit: FREE_PROFILE_LIMIT,
   household: null,
   revision: 0,
-  commerce: { enabled: false, themePrice: "C$3", membershipPrice: null },
+  commerce: { enabled: false, themePrice: "C$3", membershipPlans: [] },
 };
 export function allowedThemeIds(
   owned: readonly ThemeId[],

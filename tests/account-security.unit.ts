@@ -498,3 +498,81 @@ test("checkout fixes the price on the server and reuses an open session for the 
   priceAmount = 1;
   expect(await load().commerceCatalog!().then(() => null, (error: Error) => error.message)).toContain("configuration");
 });
+
+test("membership checkout validates all three prepaid intervals and expires a different unfinished plan", async () => {
+  const created: Record<string, unknown>[] = [];
+  const expired: string[] = [];
+  let badInterval = false;
+  const stripe = {
+    prices: { retrieve: async (id: string) => {
+      if (id === "price_theme") return { active: true, type: "one_time", currency: "cad", unit_amount: 300 };
+      const plan = model.MEMBERSHIP_PLANS.find(plan => `price_${plan.id}` === id)!;
+      return { active: true, type: "recurring", currency: "cad", unit_amount: plan.amount,
+        recurring: { interval: plan.interval, interval_count: badInterval ? 2 : plan.intervalCount } };
+    } },
+    subscriptions: { list: async () => ({ data: [] }) },
+    checkout: { sessions: {
+      list: async () => ({ data: [{ id: "cs_old", url: "https://checkout.stripe.com/old", metadata: { application: "tates-tv", product: "membership", theme_id: "", plan_id: "monthly" } }] }),
+      expire: async (id: string) => { expired.push(id); },
+      create: async (input: Record<string, unknown>) => { created.push(input); return { url: "https://checkout.stripe.com/new" }; },
+    } },
+  };
+  const load = () => serverModule("lib/server/billing.ts", {
+    stripe: { default: class { constructor() { return stripe; } } },
+    "./supabaseAdmin": {},
+    "./accountData": { ensureAccount: async () => ({ stripe_customer_id: "cus_alice" }) },
+    "./accountAuth": { accountOrigin: () => "https://www.tatestv.ca" },
+    "../accountModel": model, "../themes": themes,
+  }, {
+    NEXT_PUBLIC_THEME_BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_synthetic", STRIPE_WEBHOOK_SECRET: "whsec_test",
+    STRIPE_THEME_PRICE_ID: "price_theme", STRIPE_MEMBERSHIP_PRICE_ID: "price_monthly",
+    STRIPE_MEMBERSHIP_6MONTH_PRICE_ID: "price_six-month", STRIPE_MEMBERSHIP_ANNUAL_PRICE_ID: "price_annual",
+  });
+  const billing = load();
+  expect((await billing.commerceCatalog!()).membershipPlans).toEqual([
+    { id: "monthly", price: "C$4.99" }, { id: "six-month", price: "C$24.99" }, { id: "annual", price: "C$44.99" },
+  ]);
+  expect(await billing.createCheckout!({ id: "alice" }, "membership", undefined, "request_a", "monthly")).toBe("https://checkout.stripe.com/old");
+  expect(expired).toHaveLength(0);
+  for (const id of ["six-month", "annual"]) {
+    await billing.createCheckout!({ id: "alice" }, "membership", undefined, `request_${id}`, id);
+    expect(created.at(-1)).toMatchObject({ mode: "subscription", line_items: [{ price: `price_${id}`, quantity: 1 }],
+      metadata: { user_id: "alice", plan_id: id }, subscription_data: { metadata: { plan_id: id } } });
+  }
+  expect(expired).toEqual(["cs_old", "cs_old"]);
+  badInterval = true;
+  expect(await load().commerceCatalog!().then(() => null, (error: Error) => error.message)).toContain("configuration");
+});
+
+test("membership fulfillment honors each plan's paid end date and revokes refunded access", async () => {
+  const writes: Record<string, any>[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const charge = { refunded: false, disputed: false };
+  const item = { price: { id: "price_monthly" }, current_period_end: 1800000000 };
+  const subscription = { id: "sub_alice", customer: "cus_alice", status: "active",
+    metadata: { application: "tates-tv", user_id: "alice" }, items: { data: [item] }, latest_invoice: { id: "in_paid", status: "paid" } };
+  const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: { user_id: "alice" }, error: null }) };
+  const stripe = {
+    subscriptions: { retrieve: async () => subscription },
+    invoicePayments: { list: async () => ({ data: [{ payment: { payment_intent: "pi_paid" } }] }) },
+    paymentIntents: { retrieve: async () => ({ status: "succeeded", latest_charge: charge }) },
+  };
+  const billing = serverModule("lib/server/billing.ts", {
+    stripe: { default: class { constructor() { return stripe; } } },
+    "./supabaseAdmin": { createSupabaseAdminClient: () => ({ from: () => query, rpc: async (_: string, data: Record<string, unknown>) => { writes.push(data); return { error: null }; } }) },
+    "./accountData": {}, "./accountAuth": {}, "../accountModel": model, "../themes": themes,
+  }, { STRIPE_SECRET_KEY: "sk_test_synthetic", STRIPE_MEMBERSHIP_PRICE_ID: "price_monthly",
+    STRIPE_MEMBERSHIP_6MONTH_PRICE_ID: "price_six-month", STRIPE_MEMBERSHIP_ANNUAL_PRICE_ID: "price_annual" });
+  const event = { id: "evt_membership", created: 1793045809, type: "customer.subscription.updated", data: { object: { id: "sub_alice" } } };
+  for (const plan of model.MEMBERSHIP_PLANS) {
+    item.price.id = `price_${plan.id}`;
+    item.current_period_end += plan.months * 2600000;
+    await billing.applyBillingEvent!(event);
+    expect(writes.at(-1)?.membership).toMatchObject({ paid: true, status: "active", current_period_end: new Date(item.current_period_end * 1000).toISOString() });
+  }
+  charge.refunded = true;
+  await billing.applyBillingEvent!(event);
+  expect(writes.at(-1)?.membership.paid).toBe(false);
+  item.price.id = "price_unrelated";
+  await billing.applyBillingEvent!(event);
+  expect(writes.at(-1)?.membership.status).toBe("canceled");
+});

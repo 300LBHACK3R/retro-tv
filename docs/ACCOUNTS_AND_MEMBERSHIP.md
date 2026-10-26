@@ -1,13 +1,14 @@
 # Accounts and membership activation
 
-The code is staged behind explicit flags. Free live TV, the guide and the library never require an account or payment. Keep billing disabled until the provider checks below pass. No recurring price is selected in this release.
+The code is staged behind explicit flags. Free live TV, the guide and the library never require an account or payment. Keep billing disabled until the provider checks below pass. The approved plans are C$4.99 monthly, C$24.99 prepaid for six months, and C$44.99 prepaid yearly; each renews at its selected interval.
 
 ## What ships
 
 - Optional Supabase email/password accounts, confirmation resend, password recovery, sign-out and password-confirmed deletion.
 - HttpOnly sessions; server-verified users, same-origin mutations and database rate limits. Email/password tokens are never stored in localStorage.
 - Cloud household profiles, favourites, watchlists, parent-PIN hashes and per-profile themes. Optional import of existing device data. Guest data remains local. Resume positions stay on each device and are scoped to the signed-in account.
-- Six premium themes at C$3 each. Membership includes all current/future premium themes, ten profiles instead of five and an optional member badge. Membership's monthly amount must be chosen by Tate.
+- Six premium themes at C$3 each. Membership includes all current/future premium themes, ten profiles instead of five and an optional member badge. The three plans have identical benefits; longer prepaid periods cost less than paying month by month.
+- The theme library filters by All, Free, Paid and Owned, then by style, holiday and search. Members also get a Membership filter. Owned shows verified individual purchases; membership access is labelled separately. While billing is disabled, all themes appear under Free and Paid is empty.
 - Stripe-hosted Checkout and billing management. Access is granted only from signed, verified payment webhooks. Redirects, browser storage and station backup metadata cannot grant purchases.
 - Membership expiry retains extra profiles and saved theme choices. They become usable again after renewal; individually owned themes remain available. Refunds and unresolved disputes revoke the affected purchase.
 
@@ -19,7 +20,7 @@ All five new tables have RLS enabled, no anonymous or authenticated browser gran
 
 Public Auth settings confirm email sign-up is enabled and email confirmation is required. SMTP delivery, custom templates, redirect URLs, password limits and hosting secrets still need configuration/verification before account launch. This database migration does not enable accounts or payments on the website.
 
-The advisor's no-policy information is expected for server-only tables with browser grants revoked. An existing, unrelated [mutable search path warning](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) remains on `set_programming_state_updated_at`; this release does not alter that programming trigger.
+The advisor's no-policy information is expected for server-only tables. The existing [mutable search path warning](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) was fixed by migration `20261026202330_harden_programming_trigger_search_path`, which sets an empty search path on the programming timestamp trigger without changing its body or station data. A temporary-table test verified the trigger still updates timestamps and was rolled back; the security advisor now reports no warnings or errors. Apply this follow-up only after the base programming schema exists on a new preview project.
 
 Enable email/password sign-up and **Confirm Email**. Set the minimum password length to 12. Configure custom SMTP with a verified sender domain, SPF/DKIM and suitable email limits. Supabase's default email service is not a public production delivery service. Disable email-provider link tracking for authentication messages.
 
@@ -51,19 +52,35 @@ Add secrets through the hosting provider's environment settings; never paste the
 | `SUPABASE_SERVICE_ROLE_KEY` | Existing server key; also signs short-lived recovery proof |
 | `NEXT_PUBLIC_SITE_URL` | Exact canonical HTTPS origin for this environment |
 | `NEXT_PUBLIC_THEME_BILLING_ENABLED` | Unset/`false`: all themes stay free and checkout is disabled. `true`: enforce paid themes and allow configured checkout. This is a build-time flag; rebuild after changing it. |
-| `STRIPE_SECRET_KEY` | Server test key for preview; live key only for an approved production launch |
+| `STRIPE_SECRET_KEY` | Server restricted sandbox key for preview, with only the API permissions required below; live key only for an approved production launch |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for this environment's endpoint |
 | `STRIPE_THEME_PRICE_ID` | Active CAD **300-cent one-time** price |
-| `STRIPE_MEMBERSHIP_PRICE_ID` | Active CAD **monthly** recurring price at Tate's chosen amount; leave unset until chosen |
+| `STRIPE_MEMBERSHIP_PRICE_ID` | Active CAD **499-cent monthly** recurring price |
+| `STRIPE_MEMBERSHIP_6MONTH_PRICE_ID` | Active CAD **2499-cent**, recurring every **6 months** |
+| `STRIPE_MEMBERSHIP_ANNUAL_PRICE_ID` | Active CAD **4499-cent yearly** recurring price |
 | `STRIPE_AUTOMATIC_TAX_ENABLED` | `true` only after Stripe Tax is configured for the business; otherwise unset |
 
 Do not use live Stripe credentials in preview or test keys against the production account database. Webhooks reject test/live mismatches. Changing price IDs later requires a migration/reconciliation plan for existing purchases and subscriptions.
 
 ## 3. Stripe
 
-Create a product named “Tate’s TV premium theme” with one C$3 CAD one-time price. The selected theme is recorded in server-generated checkout metadata and checkout text. Do not enable adjustable quantities, promotion codes or free trials for this release.
+The separate **Tate’s TV sandbox** (`acct_1UUtyIA0btNGn6C0`, test mode) now has product `ttv_premium_theme` and the verified C$3 CAD one-time price `price_1UUuF2A0btNGn6C0So9EgJpI` (lookup key `ttv_premium_theme_cad_300`). This test price must only be used with that sandbox's credentials and an isolated preview database. No live prices or charges were created. The selected theme is recorded in server-generated checkout metadata and checkout text. Do not enable adjustable quantities, promotion codes or free trials for this release.
 
-Create “Tate’s TV Membership” only after the owner chooses a monthly CAD amount. Configure customer portal payment-method updates, invoice history and subscription cancellation **at the end of the paid period**. Leave subscription price switching disabled. Add the site's `/privacy` and `/terms` URLs, merchant support contact information and business details. Enable customer receipts and configure tax treatment appropriate to the business before live payments.
+The sandbox's default customer portal configuration is `bpc_1UUuI4A0btNGn6C0DZfJhcTl`. It enables payment-method updates, invoice history and cancellation at the end of the paid period. Price switching and public portal login are disabled. Portal sessions are created by the signed-in account's server route. A test webhook endpoint still needs an authorised preview deployment URL, and provider credentials still need hosting configuration.
+
+Use a server-only restricted key with Checkout Sessions/customer creation and reads, Prices reads, Billing Portal sessions, and the subscription, invoice, PaymentIntent, charge and dispute reads used by fulfillment. Account deletion also needs customer deletion and subscription cancellation. Validate its precise permissions against the test flows before launch; never expose the key to the browser.
+
+The approved sandbox membership product is `ttv_membership`:
+
+| Plan | Upfront CAD charge | Renewal | Sandbox price ID |
+| --- | --- | --- | --- |
+| Monthly | C$4.99 | Every month | `price_1UUuJMA0btNGn6C0Ib1RBklC` |
+| 6 months | C$24.99 | Every 6 months | `price_1UUuJoA0btNGn6C0eyOhUPly` |
+| Yearly | C$44.99 | Every year | `price_1UUuK5A0btNGn6C0wM4hHG0d` |
+
+The comparison amounts (about C$4.17/month and C$3.75/month) are not instalments. All plans renew automatically unless cancelled; cancellation keeps access through the already-paid period. A change of plan before payment expires the different unfinished membership checkout. The server validates CAD amounts and exact intervals and never accepts a client-provided price.
+
+Configure customer portal payment-method updates, invoice history and subscription cancellation **at the end of the paid period**. Leave subscription price switching disabled. Add the site's `/privacy` and `/terms` URLs, merchant support contact information and business details. Enable customer receipts and configure tax treatment appropriate to the business before live payments.
 
 Webhook endpoint: `https://www.tatestv.ca/api/billing/webhook` (use the preview origin for test mode). Use the Stripe API version `2026-09-30.endive` matching the installed Stripe 23 SDK, not a legacy subscription/invoice event schema. Select:
 
@@ -88,11 +105,15 @@ Use a real preview deployment and Stripe test mode to verify:
 2. A confirmed account signs in on two devices. Themes, favourites and watchlists sync; another account cannot read or write them. Overlapping preference writes show a conflict rather than overwriting newer changes.
 3. Guest data can be explicitly imported, remains available after sign-out, and is never silently overwritten. Password reset invalidates refresh sessions. Deletion requires the password and removes cloud household data.
 4. A C$3 test payment unlocks only its selected theme. Cancelled/failed payment and manually visiting the success URL do not unlock anything. Duplicate/out-of-order webhooks do not duplicate access. A full refund revokes it.
-5. A test membership unlocks all premium themes and ten profiles. Cancellation retains access to the paid period's end; expiration falls back to five without deleting the other profiles. Individually bought themes still work.
+5. Each of the three test membership plans unlocks all premium themes and ten profiles for its correct paid interval. Cancellation retains access to the paid period's end; expiration falls back to five without deleting the other profiles. Individually bought themes still work.
 6. Billing portal cancellation, receipts and account deletion work. Run a failed-renewal and dispute/refund test. Verify a won dispute restores eligible access.
 7. Guest live TV, guide, library and free themes remain usable throughout. Children’s profile controls still work. Enable production only once these checks pass with the owner's chosen prices and business settings.
 
 Automated local tests use controlled provider responses and Postgres (PGlite). They verify implementation boundaries but do not establish live email delivery, Stripe merchant readiness or production credentials. `npm run test:unit`, `npm run build`, `npm run test:http` and `npm run test:browser` are the regular gates. To test the paid theme UI, clear the generated `.next` build directory, build with `NEXT_PUBLIC_THEME_BILLING_ENABLED=true`, then run browser tests with that same flag and `--grep @billing`. CI uses a fresh build when changing this flag so a previous free-theme bundle cannot be reused.
+
+Run #83 exposed a playback-report pagehide path that still used fetch before WebKit updated document visibility. Playback now passes an explicit closing flag and uses a beacon with an established session; an in-flight session also rechecks visibility before posting. Unit tests cover both lifecycle races. The artwork browser check inspects the actual prepared image bytes before sending, since WebKit's interception omits Blob bodies. The admin panel test scopes buttons to the Admin tools navigation to avoid a same-named form button.
+
+The follow-up passed type checking, lint, production builds with billing both disabled and enabled, HTTP checks, 104 unit checks across the suite and focused follow-up, and 23 targeted browser cases across desktop Chrome, Android and TV layouts. These include the new filters, ownership after refund/expiry, all plan buttons and the affected upload/refresh/admin workflows. Local WebKit execution remains unavailable in this environment; GitHub's seven-browser run still needs to pass on the new commit. Do not treat the previous #83 failure or local Chromium passes as a completed Safari verification.
 
 ## Storage and recovery notes
 

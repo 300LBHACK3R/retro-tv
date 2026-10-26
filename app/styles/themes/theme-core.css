@@ -277,6 +277,11 @@
   color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 
+.theme-access-browser { grid-column: 1 / -1; min-width: 0; }
+.theme-access-filters { display: flex; flex-wrap: wrap; gap: .45rem; }
+.theme-access-filters .theme-filter { flex: 1 1 3.5rem; font-size: .8rem; letter-spacing: normal; text-transform: none; }
+.theme-access-copy { margin: .55rem 0 0; color: var(--text-muted); font-size: .8rem; line-height: 1.5; }
+
 .theme-filter-row {
   display: flex;
   gap: 0.45rem;

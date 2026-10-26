@@ -2,9 +2,11 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   EMPTY_ACCOUNT,
   allowedThemeIds,
+  MEMBERSHIP_PLANS,
   type AccountView,
 } from "../lib/accountModel";
 import { programming } from "./programming-fixture";
+import { THEMES } from "../lib/themes";
 import { readFileSync } from "node:fs";
 const video = Buffer.from(
   readFileSync("tests/fixtures/test-video.webm.base64", "utf8"),
@@ -36,9 +38,9 @@ function account(member = false): AccountView {
     commerce: {
       enabled: true,
       themePrice: "C$3.00",
-      membershipPrice: "C$6.00",
+      membershipPlans: MEMBERSHIP_PLANS.map(plan => ({ id: plan.id, price: `C$${(plan.amount / 100).toFixed(2)}` })),
     },
-  }; // Synthetic test price; production price remains unset.
+  };
 }
 async function fixture(page: Page, initial: AccountView) {
   let state = structuredClone(initial);
@@ -320,7 +322,7 @@ test("membership badge syncs, payment redirects cannot grant themes, and prefere
     "Buy · C$3.00",
   );
   await expect(
-    page.getByRole("button", { name: "Join for C$6.00/month" }),
+    page.getByRole("button", { name: "Choose monthly · C$4.99", exact: true }),
   ).toBeEnabled();
 });
 
@@ -394,6 +396,7 @@ test("@billing premium access comes from verified purchases, not local saved own
   );
   const state = f.state();
   state.ownedThemeIds.push("midas-gold");
+  state.purchasedThemeIds.push("midas-gold");
   f.setState(state);
   await page.reload();
   await expect(page.locator('[data-theme-buy="midas-gold"]')).toHaveText(
@@ -418,6 +421,7 @@ test("@billing premium access comes from verified purchases, not local saved own
     "midas-gold",
   );
   state.ownedThemeIds = allowedThemeIds([], false);
+  state.purchasedThemeIds = [];
   f.setState({ ...state, household: f.state().household });
   await page.reload();
   await expect(page.locator("html")).not.toHaveAttribute(
@@ -428,4 +432,89 @@ test("@billing premium access comes from verified purchases, not local saved own
   await expect(
     page.getByRole("button", { name: "Open theme library", exact: true }),
   ).toBeVisible();
+});
+
+test("theme access filters combine with styles, holidays and search while free access remains clear", async ({ page }) => {
+  await fixture(page, account());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Theme Library", exact: true });
+  const access = dialog.getByRole("group", { name: "Theme access", exact: true });
+  const paidBuild = process.env.NEXT_PUBLIC_THEME_BILLING_ENABLED === "true";
+  await access.getByRole("button", { name: "Free", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter(theme => !paidBuild || !theme.isPremium).length);
+  await dialog.getByRole("group", { name: "Theme categories" }).getByRole("button", { name: "Seasonal", exact: true }).click();
+  await dialog.getByRole("button", { name: "Christmas", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "christmas-96-living-room");
+  await dialog.getByRole("searchbox").fill("not-a-theme");
+  await expect(dialog.locator(".theme-card")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();
+  await expect(access.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
+  await access.getByRole("button", { name: "Paid", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(paidBuild ? THEMES.filter(theme => theme.isPremium).length : 0);
+  if (!paidBuild) await expect(dialog.getByText("All themes are currently free.")).toBeVisible();
+  await access.getByRole("button", { name: "Owned", exact: true }).click();
+  await expect(dialog.getByText("No purchased themes yet.")).toBeVisible();
+  await noOverflow(page);
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+});
+
+test("@billing Owned keeps purchases distinct from membership and reflects refunds after refresh", async ({ page }) => {
+  test.skip(process.env.NEXT_PUBLIC_THEME_BILLING_ENABLED !== "true", "Requires the billing-enabled build.");
+  const state = account(true);
+  state.purchasedThemeIds = ["midas-gold"];
+  const f = await fixture(page, state);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  const open = async () => {
+    await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+    return page.getByRole("dialog", { name: "Theme Library", exact: true });
+  };
+  let dialog = await open();
+  await dialog.getByRole("group", { name: "Theme access" }).getByRole("button", { name: "Owned", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "midas-gold");
+  await dialog.getByRole("group", { name: "Theme access" }).getByRole("button", { name: "Membership", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter(theme => theme.isPremium).length);
+  await expect(dialog.locator('[data-theme-id="midas-gold"] .theme-card__status')).toHaveText("Owned");
+  await expect(dialog.locator('[data-theme-id="obsidian-gold"] .theme-card__status')).toHaveText("Membership");
+  await page.screenshot({ path: test.info().outputPath("theme-access-filters.png") });
+  f.setState({ ...state, member: false, profileLimit: 5, ownedThemeIds: allowedThemeIds(["midas-gold"], false) });
+  await page.reload();
+  dialog = await open();
+  await expect(dialog.getByRole("group", { name: "Theme access" }).getByRole("button", { name: "Membership", exact: true })).toHaveCount(0);
+  await dialog.getByRole("group", { name: "Theme access" }).getByRole("button", { name: "Owned", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  f.setState({ ...f.state(), purchasedThemeIds: [], ownedThemeIds: allowedThemeIds([], false) });
+  await page.reload();
+  dialog = await open();
+  await dialog.getByRole("group", { name: "Theme access" }).getByRole("button", { name: "Owned", exact: true }).click();
+  await expect(dialog.getByText("No purchased themes yet.")).toBeVisible();
+});
+
+test("membership plans show the upfront charge and send only the selected plan to checkout", async ({ page }) => {
+  await fixture(page, account());
+  const requests: Record<string, unknown>[] = [];
+  await page.route("**/api/billing/checkout", route => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ status: 503, json: { error: "Test checkout unavailable" } });
+  });
+  await page.goto("/account");
+  await expect(page.locator(".ttv-membership-plans article")).toHaveCount(3);
+  for (const plan of MEMBERSHIP_PLANS) {
+    const card = page.locator(`[data-membership-plan="${plan.id}"]`);
+    await expect(card).toContainText(`Billed upfront ${plan.renewal}.`);
+    const received = page.waitForResponse(response => response.url().endsWith("/api/billing/checkout"));
+    await card.getByRole("button").click();
+    await received;
+    expect(requests.at(-1)).toMatchObject({ product: "membership", planId: plan.id });
+    expect(requests.at(-1)).not.toHaveProperty("amount");
+    await expect(page.locator("main").getByRole("alert")).toHaveText("Test checkout unavailable");
+  }
+  await expect(page.locator('[data-membership-plan="six-month"]')).toContainText("C$4.17/month");
+  await expect(page.locator('[data-membership-plan="annual"]')).toContainText("C$3.75/month");
+  await noOverflow(page);
 });

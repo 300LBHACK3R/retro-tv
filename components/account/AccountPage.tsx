@@ -18,7 +18,7 @@ import { isThemeId, THEMES } from "@/lib/themes";
 import { THEME_PREVIEWS } from "@/components/themes/themePreviews";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import { PROGRESS_STORAGE_KEY } from "@/lib/libraryCatalog";
-import { EMPTY_ACCOUNT } from "@/lib/accountModel";
+import { EMPTY_ACCOUNT, MEMBERSHIP_PLANS, type MembershipPlanId } from "@/lib/accountModel";
 
 type Mode = "signin" | "signup" | "recover" | "resend" | "reset" | "confirm";
 function stripeRedirect(value: unknown) {
@@ -158,7 +158,7 @@ export default function AccountPage({
       window.location.assign("/");
     });
   }
-  async function buy(product: "theme" | "membership", themeId?: string) {
+  async function buy(product: "theme" | "membership", themeId?: string, planId?: MembershipPlanId) {
     await task(async () => {
       await flushAccountChanges();
       if (useAccount.getState().syncError)
@@ -170,6 +170,7 @@ export default function AccountPage({
           await accountRequest("/api/billing/checkout", {
             product,
             themeId,
+            planId,
             requestId: crypto.randomUUID(),
           })
         ).url,
@@ -494,23 +495,28 @@ export default function AccountPage({
                     Show my member badge
                   </label>
                 ) : (
-                  <button
-                    className="ttv-account-primary"
-                    disabled={
-                      busy ||
-                      !account.commerce.enabled ||
-                      !account.commerce.membershipPrice
-                    }
-                    onClick={() => void buy("membership")}
-                  >
-                    {account.commerce.membershipPrice
-                      ? `Join for ${account.commerce.membershipPrice}/month`
-                      : "Membership opens soon"}
-                  </button>
+                  account.commerce.membershipPlans.length ? (
+                    <div className="ttv-membership-plans" aria-label="Membership plans">
+                      {account.commerce.membershipPlans.map(({ id, price }) => {
+                        const plan = MEMBERSHIP_PLANS.find(option => option.id === id)!;
+                        const savings = MEMBERSHIP_PLANS[0].amount * plan.months - plan.amount;
+                        return <article key={id} data-membership-plan={id}>
+                          <h3>{plan.label}</h3>
+                          <p className="ttv-membership-total">{price}</p>
+                          <p>Billed upfront {plan.renewal}.</p>
+                          {plan.months > 1 ? <small>About C${(plan.amount / plan.months / 100).toFixed(2)}/month · save C${(savings / 100).toFixed(2)} compared with monthly billing.</small> : <small>Pay one month at a time.</small>}
+                          <button className="ttv-account-primary" disabled={busy || !account.commerce.enabled}
+                            onClick={() => void buy("membership", undefined, id)}>
+                            Choose {plan.label.toLowerCase()} · {price}
+                          </button>
+                        </article>;
+                      })}
+                    </div>
+                  ) : <button disabled>Membership opens soon</button>
                 )}
                 <p>
                   <small>
-                    Membership renews monthly. Cancel future renewals through
+                    Prices are in CAD, plus any applicable tax. Each plan renews automatically at its selected interval. Cancel future renewals through
                     Manage billing. Individually purchased themes stay yours
                     when membership ends.
                   </small>
@@ -560,10 +566,10 @@ export default function AccountPage({
                         }
                         onClick={() => void buy("theme", theme.id)}
                       >
-                        {account.ownedThemeIds.includes(theme.id)
-                          ? account.member
+                        {account.purchasedThemeIds.includes(theme.id)
+                          ? "Owned"
+                          : account.member
                             ? "Included with membership"
-                            : "Owned"
                           : `Buy · ${account.commerce.themePrice}`}
                       </button>
                     </article>

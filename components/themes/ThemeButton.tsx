@@ -18,7 +18,6 @@ import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
   getAllThemes,
-  getThemeAccessLabel,
   getThemeById,
   getThemeCategoryMeta,
   PREMIUM_THEMES_TEMPORARILY_UNLOCKED,
@@ -36,6 +35,7 @@ import { setProfileTheme, useProfiles } from "@/lib/deviceProfiles";
 const DIALOG_ID = "ttv-theme-library";
 
 type CategoryFilter = "all" | ThemeCategory;
+type AccessFilter = "all" | "free" | "paid" | "owned" | "membership";
 
 type FilterOption<T extends string> = {
   id: T;
@@ -48,6 +48,13 @@ const CATEGORY_FILTERS: readonly FilterOption<CategoryFilter>[] = [
     id: category.id,
     label: category.label,
   })),
+];
+
+const ACCESS_FILTERS: readonly FilterOption<AccessFilter>[] = [
+  { id: "all", label: "All" },
+  { id: "free", label: "Free" },
+  { id: "paid", label: "Paid" },
+  { id: "owned", label: "Owned" },
 ];
 
 function themeMatchesQuery(theme: ThemeDefinition, query: string): boolean {
@@ -86,13 +93,6 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
   ).filter((element) => {
     return !element.hasAttribute("hidden") && element.offsetParent !== null;
   });
-}
-
-function getAccessCopy(
-  theme: ThemeDefinition,
-  ownedThemeIds: readonly ThemeDefinition["id"][],
-): string {
-  return getThemeAccessLabel(theme, ownedThemeIds, false);
 }
 
 function ThemeCard({
@@ -140,7 +140,7 @@ function ThemeCard({
           <span className="ttv-halloween90-preview-label">HALLOWEEN &apos;95</span>
         ) : null}
         <span className="theme-card__status">
-          {isActive ? "Active" : accessLabel}
+          {isActive ? `Active · ${accessLabel}` : accessLabel}
         </span>
       </span>
 
@@ -203,6 +203,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [seasonFilter, setSeasonFilter] = useState<"all" | ThemeSeason>("all");
   const [portalReady, setPortalReady] = useState(false);
 
@@ -216,6 +217,10 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const preferredTheme = useStore((state) => state.themeId);
   const ownedPremiumThemes = useAccount((state) => state.ownedThemeIds);
   const accountUser = useAccount((state) => state.user);
+  const accountsEnabled = useAccount((state) => state.enabled);
+  const purchasedThemes = useAccount((state) => state.purchasedThemeIds);
+  const isMember = useAccount((state) => state.member);
+  const themePrice = useAccount((state) => state.commerce.themePrice);
   const themeId = canUseTheme(preferredTheme, ownedPremiumThemes, false) ? preferredTheme : getEntranceThemeId();
   const storageAvailable = useProfiles((state) => state.storageAvailable);
 
@@ -233,11 +238,26 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
       return (
         categoryMatches &&
+        (accessFilter === "all" ||
+          (accessFilter === "free" && (PREMIUM_THEMES_TEMPORARILY_UNLOCKED || !theme.isPremium)) ||
+          (accessFilter === "paid" && !PREMIUM_THEMES_TEMPORARILY_UNLOCKED && theme.isPremium) ||
+          (accessFilter === "owned" && purchasedThemes.includes(theme.id)) ||
+          (accessFilter === "membership" && isMember && theme.isPremium)) &&
         (categoryFilter !== "seasonal" || seasonFilter === "all" || theme.season === seasonFilter) &&
         themeMatchesQuery(theme, query)
       );
     });
-  }, [categoryFilter, seasonFilter, query, themes]);
+  }, [categoryFilter, accessFilter, seasonFilter, query, themes, purchasedThemes, isMember]);
+
+  const accessCopy = accessFilter === "owned"
+    ? accountUser ? "Your purchased themes stay with your account, with or without membership." : "Sign in to see themes you have purchased."
+    : accessFilter === "membership"
+      ? "Included while your membership is active. Purchased themes remain yours."
+      : accessFilter === "paid"
+        ? PREMIUM_THEMES_TEMPORARILY_UNLOCKED ? "All themes are currently free." : `${themePrice} per theme, or included with membership.`
+        : accessFilter === "free"
+          ? "Ready to apply. No purchase needed."
+          : "Browse by access, then narrow by style or holiday.";
 
   const collectionLabel = categoryFilter === "all"
     ? "All styles"
@@ -385,6 +405,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         onClick={() => {
           setQuery("");
           setCategoryFilter("all");
+          setAccessFilter("all");
           setSeasonFilter("all");
           setIsOpen(true);
         }}
@@ -465,6 +486,22 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
                 <div className="theme-dialog__scroll">
                   <div className="theme-dialog__toolbar">
+                    <div className="theme-access-browser">
+                      <div className="theme-access-filters" role="group" aria-label="Theme access">
+                        {[...ACCESS_FILTERS, ...(isMember ? [{ id: "membership" as const, label: "Membership" }] : [])].map((filter) => (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            className="theme-filter"
+                            aria-pressed={accessFilter === filter.id}
+                            onClick={() => setAccessFilter(filter.id)}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="theme-access-copy">{accessCopy}</p>
+                    </div>
                     <input
                       ref={searchRef}
                       className="theme-search"
@@ -539,7 +576,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       </section>
                     ) : null}
                     <div className="theme-results-heading" role="status" aria-live="polite" aria-atomic="true">
-                      {visibleThemes.length ? <><h3>{collectionLabel}</h3><span>{visibleThemes.length} {visibleThemes.length === 1 ? "theme" : "themes"}</span></> : "No themes match. Try another holiday, style or search."}
+                      {visibleThemes.length ? <><h3>{collectionLabel}</h3><span>{visibleThemes.length} {visibleThemes.length === 1 ? "theme" : "themes"}</span></> : accessFilter === "owned" && !query && categoryFilter === "all" ? "No purchased themes yet." : "No themes match these filters."}
                     </div>
                     {visibleThemes.length > 0 ? (
                       <div className={`theme-grid${visibleThemes.length === 1 ? " theme-grid--single" : ""}`}>
@@ -553,7 +590,11 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                               ownedPremiumThemes,
                               false,
                             )}
-                            accessLabel={getAccessCopy(theme, ownedPremiumThemes)}
+                            accessLabel={purchasedThemes.includes(theme.id)
+                              ? "Owned"
+                              : !theme.isPremium || PREMIUM_THEMES_TEMPORARILY_UNLOCKED
+                                ? "Free"
+                                : isMember ? "Membership" : `${themePrice} · Paid`}
                             onSelect={applyTheme}
                           />
                         ))}
@@ -561,12 +602,18 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                     ) : (
                       <div className="theme-empty-state">
                         <p>Clear your filters to see the full collection.</p>
+                        {accessFilter === "owned" && !accountUser && accountsEnabled ? (
+                          <button type="button" className="theme-dialog__done" onClick={() => { closeDialog(); router.push("/account"); }}>
+                            Sign in
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="theme-dialog__done"
                           onClick={() => {
                             setQuery("");
                             setCategoryFilter("all");
+                            setAccessFilter("all");
                             setSeasonFilter("all");
                             window.requestAnimationFrame(() => {
                               dialogRef.current?.querySelector<HTMLButtonElement>(".theme-card:not([disabled])")

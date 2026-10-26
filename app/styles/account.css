@@ -166,6 +166,13 @@
 .ttv-account-membership {
   border-color: var(--primary);
 }
+.ttv-membership-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .8rem; margin: 1.5rem 0; }
+.ttv-membership-plans article { display: flex; flex-direction: column; gap: .6rem; padding: 1rem; border: 1px solid var(--border); border-radius: .9rem; background: var(--panel-alt-bg); }
+.ttv-membership-plans h3 { font-size: 1.1rem; font-weight: 800; }
+.ttv-membership-plans p { margin: 0; }
+.ttv-membership-plans .ttv-membership-total { font-size: 1.9rem; font-weight: 850; }
+.ttv-membership-plans small { flex: 1; line-height: 1.5; }
+.ttv-membership-plans button { margin-top: .5rem; }
 .ttv-account-membership li {
   margin: 0.5rem 0 0.5rem 1.1rem;
   list-style: disc;
