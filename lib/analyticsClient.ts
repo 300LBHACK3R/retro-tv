@@ -9,10 +9,19 @@ import {
 import { useProfiles } from "./deviceProfiles";
 
 let session: Promise<boolean> | null = null;
+let sessionReady = false;
 let retryAt = 0;
 // Analytics must never hold up startup, playback, or a native TV picker.
-export async function postTelemetry(body: unknown): Promise<boolean> {
+export async function postTelemetry(body: unknown, closing = false): Promise<boolean> {
   if (!analyticsAllowed() || Date.now() < retryAt) return false;
+  // WebKit can reject a fetch started during page teardown even with keepalive.
+  // Beacon is designed for this lifecycle; never create a session while leaving.
+  if (closing || document.visibilityState !== "visible") {
+    if (!sessionReady) return false;
+    try {
+      return navigator.sendBeacon("/api/engagement", new Blob([JSON.stringify(body)], { type: "application/json" }));
+    } catch { return false; }
+  }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 7000);
   try {
@@ -23,10 +32,11 @@ export async function postTelemetry(body: unknown): Promise<boolean> {
       mode: "same-origin",
       signal: controller.signal,
     })
-      .then((response) => response.ok)
+      .then((response) => { sessionReady = response.ok; return response.ok; })
       .catch(() => false);
     if (!(await session)) {
       session = null;
+      sessionReady = false;
       retryAt = Date.now() + 60000;
       return false;
     }
@@ -40,7 +50,7 @@ export async function postTelemetry(body: unknown): Promise<boolean> {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    if (response.status === 401) session = null;
+    if (response.status === 401) { session = null; sessionReady = false; }
     return response.ok;
   } catch {
     return false;
@@ -58,7 +68,7 @@ export function clearAnalyticsQueue() {
   window.clearTimeout(flushTimer);
   flushTimer = undefined;
 }
-export async function flushAnalytics() {
+export async function flushAnalytics(closing = false) {
   window.clearTimeout(flushTimer);
   flushTimer = undefined;
   const profileId = useProfiles.getState().activeId;
@@ -68,7 +78,7 @@ export async function flushAnalytics() {
     .map((entry) => entry.event);
   pending = [];
   if (!events.length || !analyticsAllowed()) return;
-  if (!(await postTelemetry({ type: "events", events })))
+  if (!(await postTelemetry({ type: "events", events }, closing)))
     eventRetryAt = Date.now() + 60000;
 }
 export function trackAnalytics(name: AnalyticsName, detail = "", value = 0) {

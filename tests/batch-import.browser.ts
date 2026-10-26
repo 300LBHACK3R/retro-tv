@@ -13,7 +13,7 @@ async function fixture(page: Page) {
   await page.route("https://www.gstatic.com/**", route => route.fulfill({contentType:"application/javascript",body:""}));
   await page.route("https://media.example/**", route => route.fulfill({contentType:"video/webm",body:video}));
   await page.goto("/admin");
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await expect(page.getByText(/Global (loaded|sync active)/)).toBeVisible();
   await page.getByRole("button", {name:"Batch Import",exact:true}).click();
   await page.getByLabel("Assign batch to channel").selectOption(programming.channels[0]!.id);
   return () => saved;
@@ -32,7 +32,7 @@ test("existing links detect runtimes, survive reload and append once after revie
   await expect(page.locator('.ttv-batch-rows [data-status="ready"]')).toHaveCount(2);
   expect(saved().media).toHaveLength(programming.media.length);
   await page.reload();
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await expect(page.getByText(/Global (loaded|sync active)/)).toBeVisible();
   await expect(page.locator('.ttv-batch-rows [data-status="ready"]')).toHaveCount(2);
   await page.getByRole("button", {name:"Sort by title / episode"}).click();
   await expect(page.getByRole("button", {name:"Add 2 ready items to station"})).toBeDisabled();

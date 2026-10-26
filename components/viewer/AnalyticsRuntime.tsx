@@ -63,10 +63,10 @@ export default function AnalyticsRuntime() {
         trackAnalytics("theme_change", next.themeId);
     });
     const visibility = () => {
-      if (document.visibilityState === "hidden") void flushAnalytics();
+      if (document.visibilityState === "hidden") void flushAnalytics(true);
     };
     const flush = () => {
-      void flushAnalytics();
+      void flushAnalytics(true);
     };
     const privacy = () => {
       setEnabled(analyticsAllowed());

@@ -13,11 +13,11 @@ async function prepareImage(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const image = new Image();
-    image.src = url;
     await new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
       image.onerror = () =>
         reject(new Error("This image could not be opened."));
+      image.src = url;
     });
     const scale = Math.min(1, 1500 / Math.max(image.width, image.height));
     const canvas = document.createElement("canvas");
@@ -75,34 +75,21 @@ export default function ArtworkEditor({
       const blob = await prepareImage(file);
       if (!mounted.current) return;
       setMessage("Uploading artwork…");
-      const response = await fetch("/api/admin/artwork/sign", {
+      const response = await fetch("/api/admin/artwork", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: blob.type, size: blob.size }),
-        signal: abort.signal,
-      });
-      const signed = await response.json();
-      if (!response.ok || !signed.ok)
-        throw new Error(signed.error || "Artwork upload could not start.");
-      if (
-        !safeArtworkUrl(signed.publicUrl) ||
-        typeof signed.uploadUrl !== "string"
-      )
-        throw new Error("Storage returned an invalid artwork link.");
-      const put = await fetch(signed.uploadUrl, {
-        method: "PUT",
         headers: { "Content-Type": blob.type },
         body: blob,
         signal: abort.signal,
       });
-      if (!put.ok)
-        throw new Error(
-          "Storage did not accept the artwork. Check the R2 upload configuration.",
-        );
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok)
+        throw new Error(result?.error || "Artwork upload could not finish. Please try again.");
+      if (!safeArtworkUrl(result.publicUrl))
+        throw new Error("Storage returned an invalid artwork link.");
       if (mounted.current) {
-        onChange(signed.publicUrl);
-        setUrl(signed.publicUrl);
+        onChange(result.publicUrl);
+        setUrl(result.publicUrl);
         setMessage("Poster ready. Save your artwork changes below.");
       }
     } catch (error) {

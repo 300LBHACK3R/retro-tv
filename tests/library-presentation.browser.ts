@@ -185,21 +185,10 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     await route.fulfill({ json: { ok: true, programming: saved } });
   });
   let uploaded = false;
-  await page.route("**/api/admin/artwork/sign", (route) => {
-    expect(route.request().postDataJSON().contentType).toMatch(
-      /^image\/(webp|png|jpeg)$/,
-    );
-    return route.fulfill({
-      json: {
-        ok: true,
-        uploadUrl: "https://storage.example/poster",
-        publicUrl: "/avatars/boyrobot.png",
-      },
-    });
-  });
-  await page.route("https://storage.example/poster", (route) => {
-    uploaded = route.request().method() === "PUT";
-    return route.fulfill({ status: 200 });
+  await page.route("**/api/admin/artwork", (route) => {
+    expect(route.request().headers()["content-type"]).toMatch(/^image\/(webp|png|jpeg)$/);
+    uploaded = route.request().method() === "POST" && (route.request().postDataBuffer()?.length ?? 0) > 0;
+    return route.fulfill({ json: { ok: true, publicUrl: "/avatars/boyrobot.png" } });
   });
   await page.goto("/admin");
   await expect(page.getByText(/Global loaded/)).toBeVisible();
@@ -211,7 +200,7 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     .selectOption("show:studio-sessions");
   await page
     .getByLabel("Upload poster", { exact: true })
-    .setInputFiles("public/avatars/boyrobot.png");
+    .setInputFiles(process.env.TTV_TEST_POSTER_FILE || "public/avatars/boyrobot.png");
   await expect(
     page.getByText("Poster ready. Save your artwork changes below."),
   ).toBeVisible();

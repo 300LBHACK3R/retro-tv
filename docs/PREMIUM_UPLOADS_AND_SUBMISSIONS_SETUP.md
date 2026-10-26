@@ -62,3 +62,9 @@ The direct browser uploader is intentionally a single-request convenience path.
 For large movies, unreliable connections, or resumable uploads, keep using the
 existing `rclone` workflow. Multipart browser uploads can be added as a later
 media-pipeline upgrade without changing the public submission records.
+
+## Library posters
+
+Small prepared posters upload through the authenticated same-origin `POST /api/admin/artwork` endpoint. It accepts JPG, PNG and WebP up to 3 MB after browser resizing, checks the image format and actual byte count, then writes to the existing R2 media bucket. Poster uploads no longer depend on browser-to-R2 CORS. Direct video uploads still require the bucket's existing CORS setup.
+
+The R2 token must have object write access to `R2_MEDIA_BUCKET_NAME` (or `R2_BUCKET_NAME`), with `R2_MEDIA_PUBLIC_BASE_URL` (or `R2_PUBLIC_BASE_URL`) pointing to the public HTTPS media domain. The UI distinguishes an expired admin session, missing storage configuration and a storage permission failure. After the preview changes, select **Save title artwork** and wait for **Global saved** to publish the cover.

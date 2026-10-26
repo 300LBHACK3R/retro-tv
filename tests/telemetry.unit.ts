@@ -8,6 +8,7 @@ import type * as playback from "../lib/playbackTelemetry";
 
 function telemetry(fetch: typeof globalThis.fetch) {
   const document = { visibilityState: "visible", referrer: "" };
+  const beacons: { url: string; body: Blob }[] = [];
   let allowed = true;
   const exports = {} as typeof client;
   const run = (
@@ -28,6 +29,8 @@ function telemetry(fetch: typeof globalThis.fetch) {
         document,
         crypto,
         fetch,
+        Blob,
+        navigator: { sendBeacon: (url: string, body: Blob) => { beacons.push({ url, body }); return true; } },
         AbortController,
         window: {
           setTimeout,
@@ -47,6 +50,7 @@ function telemetry(fetch: typeof globalThis.fetch) {
   run("lib/playbackTelemetry.ts", player, { "./analyticsClient": exports });
   return {
     document,
+    beacons,
     client: exports,
     player,
     exclude: () => {
@@ -79,13 +83,15 @@ test("hidden pages defer new analytics sessions and preserve established deliver
   expect(await t.player.sendPlaybackSample(sample)).toBe(true);
   t.document.visibilityState = "hidden";
   expect(await t.player.sendPlaybackSample(sample)).toBe(true);
-  expect(requests).toHaveLength(3);
-  expect(requests[2]).toMatchObject({
-    method: "POST",
-    keepalive: true,
-    mode: "same-origin",
-    credentials: "same-origin",
-  });
+  expect(requests).toHaveLength(2);
+  expect(t.beacons).toHaveLength(1);
+  expect(t.beacons[0]!.url).toBe("/api/engagement");
+  expect(t.beacons[0]!.body.type).toBe("application/json");
+  expect(JSON.parse(await t.beacons[0]!.body.text())).toMatchObject({ channelId: "24" });
+  t.document.visibilityState = "visible";
+  expect(await t.client.postTelemetry({ type: "events", events: [] }, true)).toBe(true);
+  expect(requests).toHaveLength(2);
+  expect(t.beacons).toHaveLength(2);
 });
 
 test("unavailable analytics backs off without rejecting or immediately retrying", async () => {
