@@ -24,6 +24,13 @@ type ThemeColors = Record<ThemeColorToken, string>;
 export type ThemeCategory =
   "classic" | "console" | "premium" | "cartoon" | "arcade" | "seasonal";
 
+export type ThemeSeason = "christmas" | "halloween";
+
+export const THEME_SEASON_META: readonly { id: ThemeSeason; label: string; description: string }[] = [
+  { id: "christmas", label: "Christmas", description: "Warm lights & winter nights" },
+  { id: "halloween", label: "Halloween", description: "Haunted nights & cosy frights" },
+];
+
 type ThemeLayoutMode =
   | "neon-crt-broadcast"
   | "classic-cable"
@@ -43,13 +50,15 @@ export type ThemeDefinition = {
   description: string;
   priceLabel: string;
   isPremium: boolean;
-  category: ThemeCategory;
   layout: ThemeLayoutMode;
   appearance: ThemeAppearance;
   previewGradient: string;
   recommendedFor: string[];
   colors: ThemeColors;
-};
+} & (
+  | { category: "seasonal"; season: ThemeSeason }
+  | { category: Exclude<ThemeCategory, "seasonal">; season?: never }
+);
 
 export type ThemeAccessMode = "all-unlocked" | "premium-locked";
 
@@ -113,6 +122,41 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 
 export const THEMES = [
   {
+    id: "christmas-96-living-room",
+    name: "Christmas '96: Living Room",
+    shortName: "Christmas '96",
+    description:
+      "A cosy '90s Christmas living room. Floral wallpaper, oak trim, a glowing tree, VHS tapes and a PS1 ready to play. Cocoa, presents and a snowy night outside.",
+    priceLabel: "Free",
+    isPremium: false,
+    category: "seasonal",
+    season: "christmas",
+    layout: "classic-cable",
+    appearance: "dark",
+    previewGradient:
+      "radial-gradient(ellipse at 12% 80%, #e8ad5266, transparent 48%), linear-gradient(135deg, #10251e, #5a202c)",
+    recommendedFor: ["Christmas", "90s", "living room", "PS1", "VHS"],
+    colors: {
+      appBg: "#0d1c17",
+      panelBg: "#142a23",
+      panelAltBg: "#203b31",
+      border: "#6e7e60",
+      text: "#fff4db",
+      textMuted: "#c9cfb9",
+      buttonBg: "#284738",
+      buttonHover: "#355b47",
+      primary: "#f1ca83",
+      secondary: "#a6d8ac",
+      onPrimary: "#18261b",
+      focusRing: "#ffe1a3",
+      guideHeaderBg: "#522430",
+      guideRowBg: "#142a23",
+      guideRowAltBg: "#1d342b",
+      guideActiveBg: "#a6d8ac",
+      guideCurrentBg: "#f1ca83",
+    },
+  },
+  {
     id: "halloween-90s-night",
     name: "Halloween '95: Be Kind, Rewind",
     shortName: "Halloween '95",
@@ -121,6 +165,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",
+    season: "halloween",
     layout: "classic-cable",
     appearance: "dark",
     previewGradient:
@@ -155,6 +200,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",
+    season: "halloween",
     layout: "cinematic-premium",
     appearance: "dark",
     previewGradient:
@@ -189,6 +235,7 @@ export const THEMES = [
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",
+    season: "halloween",
     layout: "neon-arcade",
     appearance: "dark",
     previewGradient:

@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 import {
   useCallback,
@@ -195,9 +195,7 @@ function ProfileLibrary() {
         <header className={styles.header}>
           <div className={styles.headerInner}>
             <Link href="/" aria-label="Back to Tate's TV live channels">
-              <Image
-                src="/tatestv-logo.png"
-                alt="Tate’s TV"
+              <TatesTvLogo
                 width={210}
                 height={110}
                 className={styles.logo}
@@ -213,7 +211,7 @@ function ProfileLibrary() {
           </div>
         </header>
         <div className={styles.content}>
-          <section className={styles.intro}>
+          <section className={`ttv-library-intro ${styles.intro}`}>
             <div>
               <span className={styles.eyebrow}>
                 {kids ? "Just for Kids" : "On demand · Always free"}

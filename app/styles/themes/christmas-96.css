@@ -1,0 +1,164 @@
+/* Christmas '96: wallpaper, oak trim and incandescent light around tactile TV controls. */
+:root[data-ttv-theme="christmas-96-living-room"],
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-layout-classic-cable {
+  --christmas-ribbon: repeating-linear-gradient(120deg, #822b3a 0 12px, #f6e4bb 12px 15px, #24503b 15px 27px, #f6e4bb 27px 30px);
+  --christmas-brass: linear-gradient(110deg, #b9894e, #f8dfa4 40%, #d4ae6b 70%, #b9894e);
+  --ttv-radius-shell: 1rem;
+  --ttv-radius-panel: .85rem;
+  --ttv-radius-control: .6rem;
+  --ttv-radius-player: 1rem;
+  --ttv-header-highlight: linear-gradient(120deg, #f1ca831a, transparent 55%);
+  --ttv-shadow-panel: inset 0 1px #fff4db1a, 0 12px 30px #10080365;
+  --ttv-shadow-control: inset 0 1px #fff4db20, inset 0 -2px #071c1855, 0 3px 10px #0004;
+}
+.ttv-christmas96-world { background: #30241a; }
+:root:not([data-ttv-theme="christmas-96-living-room"]) .ttv-christmas96-world { display: none; }
+.ttv-christmas96-art { object-fit: cover; object-position: center; }
+.ttv-christmas96-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #24160b12, transparent 32%, #170d061c);
+}
+.ttv-christmas96-tree-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 9% 48%, #ffc36126, transparent 26%), radial-gradient(ellipse at 50% 0, #ffaf5422, transparent 44%);
+  animation: ttv-christmas96-warmth 12s ease-in-out infinite alternate;
+}
+.ttv-christmas96-tv-glow {
+  position: absolute;
+  right: -3%; top: 32%; width: 25%; height: 28%;
+  background: radial-gradient(ellipse, #f7c46b20, transparent 68%);
+  animation: ttv-christmas96-warmth 16s ease-in-out infinite alternate-reverse;
+}
+/* A handful of slow, diffuse light pools; no flashing and no animation over the video. */
+.ttv-christmas96-lights { position: absolute; inset: 0; }
+.ttv-christmas96-lights i {
+  position: absolute;
+  top: 0; left: 18%;
+  width: 72px; height: 90px;
+  background: radial-gradient(ellipse, #ff674640, transparent 65%);
+  animation: ttv-christmas96-warmth 7s ease-in-out infinite alternate;
+}
+.ttv-christmas96-lights i:nth-child(2n) { background: radial-gradient(ellipse, #ffd78c40, transparent 65%); animation-delay: -4s; }
+.ttv-christmas96-lights i:nth-child(3n) { background: radial-gradient(ellipse, #93edba33, transparent 65%); animation-duration: 10s; }
+.ttv-christmas96-lights i:nth-child(2) { left: 28%; }
+.ttv-christmas96-lights i:nth-child(3) { left: 38%; }
+.ttv-christmas96-lights i:nth-child(4) { left: 49%; }
+.ttv-christmas96-lights i:nth-child(5) { left: 62%; animation-delay: -2s; }
+.ttv-christmas96-lights i:nth-child(6) { left: 74%; }
+.ttv-christmas96-lights i:nth-child(7) { left: 8%; top: 28%; animation-delay: -5s; }
+.ttv-christmas96-lights i:nth-child(8) { left: 14%; top: 47%; }
+/* Snow is clipped to the outdoor window in each artwork composition. */
+.ttv-christmas96-snow { position: absolute; right: 1%; top: 7%; width: 13%; height: 26%; overflow: hidden; }
+.ttv-christmas96-snow i {
+  position: absolute;
+  left: 15%; top: -8px;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: #fff9e5; opacity: 0;
+  animation: ttv-christmas96-snowfall 14s linear infinite;
+}
+.ttv-christmas96-snow i:nth-child(2) { left: 38%; animation-delay: -6s; }
+.ttv-christmas96-snow i:nth-child(3) { left: 62%; animation-delay: -10s; }
+.ttv-christmas96-snow i:nth-child(4) { left: 81%; animation-delay: -3s; }
+.ttv-christmas96-snow i:nth-child(5) { left: 25%; animation-delay: -12s; }
+.ttv-christmas96-snow i:nth-child(6) { left: 54%; animation-delay: -8s; }
+@keyframes ttv-christmas96-warmth { from { opacity: .35; } to { opacity: .85; } }
+@keyframes ttv-christmas96-snowfall {
+  0% { transform: translate(0, 0); opacity: 0; }
+  12%, 80% { opacity: .55; }
+  100% { transform: translate(15px, 28vh); opacity: 0; }
+}
+
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-topbar, .ttv-mobile-viewer-nav) {
+  background: linear-gradient(110deg, #54232c, #172d25 70%);
+  border-color: #b58d56;
+  box-shadow: inset 0 1px #fff0ca26, 0 8px 25px #16090466;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-topbar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -2px;
+  height: 3px;
+  background: var(--christmas-ribbon);
+  pointer-events: none;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-player-frame, .ttv-guide-shell) {
+  border-color: #d0a469;
+  box-shadow: 0 0 0 2px #50301e, 0 0 0 3px #d0a469b3, 0 18px 48px #180b0780;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-stage-sidebar, .ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-glass-panel, .ttv-glass-panel-strong, .ttv-surface, .ttv-profile-panel) {
+  background: linear-gradient(145deg, #294035, #142a23 70%);
+  border-color: #7f8969;
+  box-shadow: var(--ttv-shadow-panel);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-section-heading, .ttv-library-intro) {
+  padding: 1rem;
+  background: #142a23f5;
+  border: 1px solid #7f8969;
+  border-radius: .85rem;
+  box-shadow: var(--ttv-shadow-panel);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-section-heading h2, .ttv-channel-hero h1, .ttv-library-intro h1, .theme-dialog__title) {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: #fff4db;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-section-kicker, .ttv-now-next-up-next > span) {
+  font-family: ui-monospace, "Courier New", monospace;
+  color: #f1ca83;
+  letter-spacing: .1em;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action) {
+  background: linear-gradient(145deg, #35513f, #20392e);
+  border-color: #b5915b;
+  color: #fff4db;
+  box-shadow: var(--ttv-shadow-control);
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-nav > [aria-current="page"] {
+  color: #fff4db;
+  background: linear-gradient(145deg, #883847, #602331);
+  border-color: #e6b879;
+  box-shadow: inset 0 1px #fff4db30, 0 3px 12px #16090455;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-player-controls { background: #10251ef5; border-color: #b5915b; }
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-player-controls button { color: #ffe2a8; }
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-now-next-progress > span, .ttv-mobile-progress > span) { background: var(--christmas-brass); }
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)[data-selected="true"],
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-channel[data-current="true"] { border-color: #f1ca83; box-shadow: inset 3px 0 #f1ca83, var(--ttv-shadow-panel); }
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-guide-dialog-header, .ttv-mobile-now-heading, .ttv-mobile-schedule-toolbar, .ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #522430, #23392c);
+  border-color: #b5915b;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  background: #142a23;
+  border-color: #b5915b;
+  box-shadow: inset 0 3px #d3ae6c, 0 24px 80px #180b07b3;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-footer { padding: 1rem; background: #142a23f5; border-color: #b5915b; border-radius: .85rem; }
+.ttv-christmas96-preview-art { object-fit: contain; background: #24170f; }
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-christmas96-brand {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: .3rem;
+  padding: .5rem .2rem;
+  color: #fff2cf;
+  text-align: center;
+  text-shadow: 0 2px #471b22;
+}
+.ttv-christmas96-brand__stars { color: #f1ca83; font-size: .85rem; letter-spacing: .2em; }
+.ttv-christmas96-brand__name { font: italic 700 clamp(1.6rem, 3vw, 2.2rem)/1 Georgia, serif; white-space: nowrap; }
+.ttv-christmas96-brand__name b { color: #f1ca83; font-style: normal; }
+.ttv-christmas96-brand__edition { font: 700 .65rem/1.3 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .ttv-christmas96-art { object-position: center bottom; }
+  .ttv-christmas96-tv-glow { right: -3%; top: 44%; width: 30%; height: 20%; }
+  .ttv-christmas96-snow { right: 1%; top: 11%; width: 12%; height: 27%; }
+  .ttv-christmas96-lights i:nth-child(even) { display: none; }
+}
+@media (forced-colors: active) {
+  :root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-topbar::after { display: none; }
+  :root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-premium-player-frame, .ttv-guide-shell, .ttv-section-heading, .ttv-library-intro) { border-color: CanvasText; box-shadow: none; }
+}

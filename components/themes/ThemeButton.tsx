@@ -22,8 +22,10 @@ import {
   getThemeCategoryMeta,
   PREMIUM_THEMES_TEMPORARILY_UNLOCKED,
   THEME_CATEGORY_META,
+  THEME_SEASON_META,
   type ThemeCategory,
   type ThemeDefinition,
+  type ThemeSeason,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
 
@@ -56,6 +58,7 @@ function themeMatchesQuery(theme: ThemeDefinition, query: string): boolean {
     theme.shortName,
     theme.description,
     getThemeCategoryMeta(theme.category).label,
+    theme.season ?? "",
     theme.layout,
     theme.recommendedFor.join(" "),
   ]
@@ -141,7 +144,11 @@ function ThemeCard({
       <span className="theme-card__content">
         <span className="theme-card__topline">
           <span>
-            <span className="theme-card__category">{category.label}</span>
+            <span className="theme-card__category">
+              {theme.season
+                ? `${category.label} · ${THEME_SEASON_META.find((season) => season.id === theme.season)?.label}`
+                : category.label}
+            </span>
             <span className="theme-card__name">{theme.name}</span>
           </span>
 
@@ -192,6 +199,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [seasonFilter, setSeasonFilter] = useState<"all" | ThemeSeason>("all");
   const [portalReady, setPortalReady] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -207,6 +215,10 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
   const themes = useMemo(() => getAllThemes(), []);
+  const seasons = useMemo(() => THEME_SEASON_META.flatMap((season) => {
+    const matching = themes.filter((theme) => theme.season === season.id);
+    return matching.length ? [{ ...season, count: matching.length }] : [];
+  }), [themes]);
 
   const visibleThemes = useMemo(() => {
     return themes.filter((theme) => {
@@ -215,10 +227,17 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
       return (
         categoryMatches &&
+        (categoryFilter !== "seasonal" || seasonFilter === "all" || theme.season === seasonFilter) &&
         themeMatchesQuery(theme, query)
       );
     });
-  }, [categoryFilter, query, themes]);
+  }, [categoryFilter, seasonFilter, query, themes]);
+
+  const collectionLabel = categoryFilter === "all"
+    ? "All styles"
+    : categoryFilter === "seasonal" && seasonFilter !== "all"
+      ? THEME_SEASON_META.find((season) => season.id === seasonFilter)?.label
+      : getThemeCategoryMeta(categoryFilter).label;
 
   const closeDialog = useCallback(() => {
     setIsOpen(false);
@@ -359,6 +378,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         onClick={() => {
           setQuery("");
           setCategoryFilter("all");
+          setSeasonFilter("all");
           setIsOpen(true);
         }}
         aria-label="Open theme library"
@@ -462,7 +482,10 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                           type="button"
                           className="theme-filter"
                           aria-pressed={categoryFilter === filter.id}
-                          onClick={() => setCategoryFilter(filter.id)}
+                          onClick={() => {
+                            setCategoryFilter(filter.id);
+                            setSeasonFilter("all");
+                          }}
                         >
                           {filter.label}
                         </button>
@@ -471,8 +494,45 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                   </div>
 
                   <div className="theme-dialog__body">
+                    {categoryFilter === "seasonal" ? (
+                      <section className="theme-season-browser" aria-labelledby={`${DIALOG_ID}-seasons`}>
+                        <div className="theme-season-browser__heading">
+                          <h3 id={`${DIALOG_ID}-seasons`}>Choose a holiday</h3>
+                          <button
+                            type="button"
+                            className="theme-filter"
+                            aria-pressed={seasonFilter === "all"}
+                            onClick={() => setSeasonFilter("all")}
+                          >
+                            All holidays
+                          </button>
+                        </div>
+                        <div className="theme-season-options" role="group" aria-label="Seasonal holidays">
+                          {seasons.map((season) => (
+                            <button
+                              key={season.id}
+                              type="button"
+                              className={`theme-season-option theme-season-option--${season.id}`}
+                              aria-label={season.label}
+                              aria-pressed={seasonFilter === season.id}
+                              onClick={() => setSeasonFilter(season.id)}
+                            >
+                              <span className="theme-season-option__icon" aria-hidden="true">{season.id === "christmas" ? "✦" : "☾"}</span>
+                              <span>
+                                <strong>{season.label}</strong>
+                                <small>{season.description}</small>
+                              </span>
+                              <span className="theme-season-option__count" aria-hidden="true">{season.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+                    <div className="theme-results-heading" role="status" aria-live="polite" aria-atomic="true">
+                      {visibleThemes.length ? <><h3>{collectionLabel}</h3><span>{visibleThemes.length} {visibleThemes.length === 1 ? "theme" : "themes"}</span></> : "No themes match. Try another holiday, style or search."}
+                    </div>
                     {visibleThemes.length > 0 ? (
-                      <div className="theme-grid">
+                      <div className={`theme-grid${visibleThemes.length === 1 ? " theme-grid--single" : ""}`}>
                         {visibleThemes.map((theme) => (
                           <ThemeCard
                             key={theme.id}
@@ -490,13 +550,14 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       </div>
                     ) : (
                       <div className="theme-empty-state">
-                        <p role="status">No themes match. Try another style or start again.</p>
+                        <p>Clear your filters to see the full collection.</p>
                         <button
                           type="button"
                           className="theme-dialog__done"
                           onClick={() => {
                             setQuery("");
                             setCategoryFilter("all");
+                            setSeasonFilter("all");
                             window.requestAnimationFrame(() => {
                               dialogRef.current?.querySelector<HTMLButtonElement>(".theme-card:not([disabled])")
                                 ?.focus();

@@ -7,6 +7,7 @@ export type AppMode = "viewer" | "admin";
 export type PlayerViewMode = "normal" | "mini" | "theater";
 
 export type ThemeId =
+  | "christmas-96-living-room"
   | "halloween-night"
   | "halloween-haunted-arcade"
   | "halloween-90s-night"

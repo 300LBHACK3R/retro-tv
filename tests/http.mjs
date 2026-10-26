@@ -157,12 +157,12 @@ try {
   const arcadeThumbnail = await get("/_next/image?url=%2Fthemes%2Fhaunted-arcade-mobile.webp&w=640&q=75");
   assert.equal(arcadeThumbnail.status, 200, "Haunted Arcade portrait optimization works");
   assert.match(arcadeThumbnail.headers["content-type"], /^image\//);
-  for (const name of ["world", "mobile"]) {
-    const artwork = await get(`/themes/halloween-after-dark-${name}.webp`, "HEAD");
-    assert.equal(artwork.status, 200, `After Dark ${name}: artwork is available`);
+  for (const name of ["halloween-after-dark-world", "halloween-after-dark-mobile", "christmas-96-world", "christmas-96-mobile"]) {
+    const artwork = await get(`/themes/${name}.webp`, "HEAD");
+    assert.equal(artwork.status, 200, `${name}: artwork is available`);
     assert.match(artwork.headers["content-type"], /^image\/webp\b/);
-    const optimized = await get(`/_next/image?url=%2Fthemes%2Fhalloween-after-dark-${name}.webp&w=640&q=75`);
-    assert.equal(optimized.status, 200, `After Dark ${name}: image optimization works`);
+    const optimized = await get(`/_next/image?url=%2Fthemes%2F${name}.webp&w=640&q=75`);
+    assert.equal(optimized.status, 200, `${name}: image optimization works`);
     assert.match(optimized.headers["content-type"], /^image\//);
   }
   for (const path of [

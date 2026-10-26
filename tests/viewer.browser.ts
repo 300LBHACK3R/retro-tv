@@ -336,6 +336,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     if (theme.category === "seasonal") {
       const afterDark = theme.id === "halloween-night";
       const nineties = theme.id === "halloween-90s-night";
+      const christmas = theme.id === "christmas-96-living-room";
       const world = page.locator(".ttv-seasonal-world");
       await expect(world).toHaveCount(1);
       await expect(world).toBeVisible();
@@ -354,14 +355,16 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       expect(Math.abs(layout.width - layout.viewportWidth)).toBeLessThanOrEqual(1);
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
       const portrait = await page.evaluate(() => matchMedia("(max-width: 760px) and (orientation: portrait)").matches);
-      const imageName = `${afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
+      const imageName = `${christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
       await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
         image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
       )).toBe(true);
       await expect(page.locator(".ttv-halloween-scene")).toHaveCount(0);
       expect(await page.locator(".ttv-library-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
       await page.emulateMedia({ reducedMotion: "reduce" });
-      for (const selector of afterDark
+      for (const selector of christmas
+        ? [".ttv-christmas96-tree-glow", ".ttv-christmas96-tv-glow", ".ttv-christmas96-lights i", ".ttv-christmas96-snow i"]
+        : afterDark
         ? [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"]
         : nineties ? [".ttv-halloween90-lamplight", ".ttv-halloween90-screen-glow", ".ttv-halloween90-dust i"]
         : [".ttv-haunted-ghost", ".ttv-haunted-mist", ".ttv-haunted-cabinet-light"])
@@ -822,6 +825,24 @@ test("mobile themes are free, open without the keyboard, and remember reduced mo
   }));
   expect(Math.abs(cards[0]!.top - cards[1]!.top)).toBeLessThan(2);
   expect(cards[1]!.left).toBeGreaterThan(cards[0]!.left + cards[0]!.width);
+  const holidays = dialog.getByRole("group", { name: "Seasonal holidays" });
+  await holidays.getByRole("button", { name: "Christmas", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "christmas-96-living-room");
+  await expect(holidays.getByRole("button", { name: "Christmas", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await search.fill("Haunted Arcade");
+  await expect(dialog.getByRole("status")).toContainText("No themes match");
+  await holidays.getByRole("button", { name: "Halloween", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "halloween-haunted-arcade");
+  await search.fill("");
+  await expect(dialog.locator(".theme-card")).toHaveCount(3);
+  await dialog.getByRole("button", { name: "Cinematic", exact: true }).click();
+  await expect(holidays).toHaveCount(0);
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter((theme) => theme.category === "premium").length);
+  await dialog.getByRole("button", { name: "Seasonal", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "All holidays", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.locator(".theme-card")).toHaveCount(4);
   await search.fill("no-such-theme");
   await expect(dialog.getByRole("status")).toContainText("No themes match");
   await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();

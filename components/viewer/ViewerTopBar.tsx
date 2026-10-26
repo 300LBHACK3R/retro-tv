@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileButton } from "./ProfileGate";
-import Image from "next/image";
+import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 import ThemeButton from "@/components/themes/ThemeButton";
 import {
@@ -73,15 +73,12 @@ export default function ViewerTopBar({
         onClick={onScrollToLive}
         aria-label="Return to the live player"
       >
-        <Image
-          src="/tatestv-logo.png"
-          alt="Tate's TV"
+        <TatesTvLogo
           width={1536}
           height={1024}
           sizes="(max-width: 760px) 176px, 224px"
           className="ttv-premium-brand-logo"
           priority
-          draggable={false}
         />
       </button>
 
