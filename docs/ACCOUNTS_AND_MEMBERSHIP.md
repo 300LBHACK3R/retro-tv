@@ -13,7 +13,13 @@ The code is staged behind explicit flags. Free live TV, the guide and the librar
 
 ## 1. Supabase
 
-Use the existing project's isolated preview/test environment first. Apply `supabase/migrations/20261026_accounts_and_billing.sql` using the SQL editor or your migration process. It creates new account/billing tables and functions; it does not change station programming. Browser roles have no direct access to these tables. Only verified server handlers use the service role.
+The account schema was installed on the existing `tates-tv` project on October 26, 2026 as migration `20261026194109_accounts_and_billing`. The repository filename matches the version returned by Supabase migration history. Do not reapply the older migration from the initial bundle. For a separate preview database, apply `supabase/migrations/20261026194109_accounts_and_billing.sql` using the migration process.
+
+All five new tables have RLS enabled, no anonymous or authenticated browser grants, and explicit service-role permissions. Both RPC functions use invoker privileges and are executable only by the service role. Live database checks verified rate limiting, duplicate-payment rejection and older-event ordering in a transaction that was rolled back; no test purchases or accounts were retained. The existing programming row was preserved.
+
+Public Auth settings confirm email sign-up is enabled and email confirmation is required. SMTP delivery, custom templates, redirect URLs, password limits and hosting secrets still need configuration/verification before account launch. This database migration does not enable accounts or payments on the website.
+
+The advisor's no-policy information is expected for server-only tables with browser grants revoked. An existing, unrelated [mutable search path warning](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) remains on `set_programming_state_updated_at`; this release does not alter that programming trigger.
 
 Enable email/password sign-up and **Confirm Email**. Set the minimum password length to 12. Configure custom SMTP with a verified sender domain, SPF/DKIM and suitable email limits. Supabase's default email service is not a public production delivery service. Disable email-provider link tracking for authentication messages.
 

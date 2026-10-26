@@ -105,7 +105,7 @@ test("Postgres enforces private account tables, atomic rate limits, payment repl
     );
     await db.exec(
       readFileSync(
-        "supabase/migrations/20261026_accounts_and_billing.sql",
+        "supabase/migrations/20261026194109_accounts_and_billing.sql",
         "utf8",
       ),
     );

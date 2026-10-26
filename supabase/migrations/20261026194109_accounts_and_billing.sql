@@ -1,4 +1,4 @@
--- Apply once through Supabase migrations/SQL editor. Existing programming is untouched.
+-- Recorded as 20261026194109 on the tates-tv project. Existing programming is untouched.
 begin;
 create table if not exists public.ttv_accounts (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -30,17 +30,18 @@ create table if not exists public.ttv_memberships (
 create index if not exists ttv_memberships_user on public.ttv_memberships(user_id);
 create table if not exists public.ttv_billing_events (event_id text primary key, processed_at timestamptz not null default now());
 create table if not exists public.ttv_account_limits (key text primary key, attempts integer not null, resets_at timestamptz not null);
+create index if not exists ttv_account_limits_expiry on public.ttv_account_limits(resets_at);
 -- All access goes through verified server routes. No browser role can grant itself a purchase.
 alter table public.ttv_accounts enable row level security;
 alter table public.ttv_theme_orders enable row level security;
 alter table public.ttv_memberships enable row level security;
 alter table public.ttv_billing_events enable row level security;
 alter table public.ttv_account_limits enable row level security;
-revoke all on public.ttv_accounts, public.ttv_theme_orders, public.ttv_memberships, public.ttv_billing_events, public.ttv_account_limits from anon, authenticated;
+revoke all on public.ttv_accounts, public.ttv_theme_orders, public.ttv_memberships, public.ttv_billing_events, public.ttv_account_limits from public, anon, authenticated;
 grant all on public.ttv_accounts, public.ttv_theme_orders, public.ttv_memberships, public.ttv_billing_events, public.ttv_account_limits to service_role;
 
 create or replace function public.ttv_account_rate_limit(bucket_key text, max_requests integer, window_seconds integer)
-returns boolean language plpgsql security definer set search_path = '' as $$
+returns boolean language plpgsql security invoker set search_path = '' as $$
 declare attempts_used integer;
 begin
   delete from public.ttv_account_limits where resets_at < now() - interval '1 day';
@@ -55,7 +56,7 @@ end $$;
 
 -- The event receipt and entitlement update commit together. Retries and older events are safe.
 create or replace function public.ttv_apply_billing_event(event_id text, event_created bigint, theme_order jsonb default null, membership jsonb default null)
-returns boolean language plpgsql security definer set search_path = '' as $$
+returns boolean language plpgsql security invoker set search_path = '' as $$
 begin
   insert into public.ttv_billing_events(event_id) values(ttv_apply_billing_event.event_id) on conflict do nothing;
   if not found then return false; end if;
