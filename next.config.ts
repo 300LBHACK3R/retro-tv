@@ -107,7 +107,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/:path(admin|backup|recovery|readiness|health|launch)",
+        source: "/:path(admin|backup|recovery|readiness|health|launch|account)",
         headers: [
           { key: "Cache-Control", value: "private, no-store, max-age=0" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
@@ -116,6 +116,10 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/auth/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }, { key: "Referrer-Policy", value: "no-referrer" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
       {
         source: "/:all*(svg|jpg|jpeg|png|webp|avif|ico|woff|woff2)",

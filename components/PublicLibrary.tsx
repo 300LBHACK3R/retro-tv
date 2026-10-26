@@ -1,4 +1,5 @@
 "use client";
+import AccountLink from "@/components/account/AccountLink";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 import {
@@ -203,6 +204,7 @@ function ProfileLibrary() {
               />
             </Link>
             <div className={styles.headerActions}>
+              <AccountLink />
               <ProfileButton />
               <Link href="/" className={styles.button}>
                 Live TV

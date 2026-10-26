@@ -172,6 +172,8 @@ try {
     "/readiness",
     "/health",
     "/launch",
+    "/account",
+    "/auth/confirm",
   ]) {
     const response = await get(path);
     assert.equal(response.status, 200, path);
@@ -187,6 +189,11 @@ try {
     assert.equal(response.status, 401, path);
     assert.match(response.headers["cache-control"], /no-store/);
   }
+  assert.equal((await get("/auth/confirm")).headers["referrer-policy"], "no-referrer");
+  const account = await get("/api/account");
+  assert.equal(account.status, 200);
+  assert.match(account.headers["cache-control"], /private.*no-store/);
+  assert.equal(JSON.parse(account.body).user, null);
   const artworkUnauthorized = await get("/api/admin/artwork", "POST", { Origin: origin });
   assert.equal(artworkUnauthorized.status, 401);
   assert.match(artworkUnauthorized.headers["cache-control"], /no-store/);

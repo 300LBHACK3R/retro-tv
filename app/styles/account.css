@@ -1,0 +1,231 @@
+.ttv-account-page {
+  min-height: 100svh;
+  padding: clamp(1rem, 4vw, 3rem);
+  color: var(--text);
+}
+.ttv-account-page > header {
+  max-width: 68rem;
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ttv-account-page a {
+  text-underline-offset: 0.2em;
+}
+.ttv-account-brand {
+  width: 15rem;
+  max-width: 65vw;
+  margin: 1rem auto;
+  min-height: 6rem;
+  display: grid;
+  place-items: center;
+}
+.ttv-account-brand img {
+  width: 100%;
+  height: auto;
+}
+.ttv-account-card,
+.ttv-account-notice {
+  width: 100%;
+  max-width: 62rem;
+  margin: 1rem auto;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--panel-bg);
+  box-shadow: 0 14px 60px #0005;
+}
+.ttv-account-auth {
+  max-width: 29rem;
+}
+.ttv-account-card h1 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 1.1;
+  margin: 0.6rem 0 1rem;
+}
+.ttv-account-card h2 {
+  font-size: 1.6rem;
+  margin: 0.3rem 0 1rem;
+}
+.ttv-account-card p {
+  line-height: 1.6;
+  margin: 0.8rem 0;
+}
+.ttv-account-card small {
+  color: var(--text-muted);
+}
+.ttv-account-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+.ttv-account-page button,
+.ttv-account-actions > a {
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 0.7rem 1rem;
+  min-height: 44px;
+  background: var(--button-bg);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ttv-account-page button:hover {
+  background: var(--button-hover);
+}
+.ttv-account-page button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ttv-account-page :focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.ttv-account-page .ttv-account-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  width: 100%;
+}
+.ttv-account-page .ttv-account-danger {
+  background: #861d2b;
+  color: #fff;
+}
+.ttv-account-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+.ttv-account-tabs button[aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.ttv-account-card form {
+  display: grid;
+  gap: 1rem;
+}
+.ttv-account-card label {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.ttv-account-card input:not([type="checkbox"]) {
+  border: 1px solid var(--border);
+  background: var(--panel-alt-bg);
+  color: var(--text);
+  border-radius: 0.65rem;
+  padding: 0.85rem;
+  width: 100%;
+  min-width: 0;
+  font-size: 16px;
+}
+.ttv-account-password {
+  display: flex;
+  gap: 0.35rem;
+}
+.ttv-account-card .ttv-account-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.ttv-account-check input {
+  margin-top: 0.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+.ttv-account-page .ttv-account-text {
+  background: none;
+  border: 0;
+  display: block;
+  padding: 0.7rem 0;
+  text-decoration: underline;
+}
+.ttv-account-guest {
+  display: block;
+  margin: 1.2rem 0 0;
+  text-align: center;
+}
+.ttv-account-email {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+}
+.ttv-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.ttv-account-membership {
+  border-color: var(--primary);
+}
+.ttv-account-membership li {
+  margin: 0.5rem 0 0.5rem 1.1rem;
+  list-style: disc;
+}
+.ttv-account-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.ttv-account-themes article {
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 0.75rem;
+  background: var(--panel-alt-bg);
+}
+.ttv-account-themes article.is-selected {
+  outline: 2px solid var(--primary);
+}
+.ttv-account-themes h3 {
+  font-size: 1rem;
+  margin: 0.8rem 0;
+}
+.ttv-account-themes button {
+  width: 100%;
+}
+.ttv-account-theme-art {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+.ttv-account-theme-art img {
+  object-fit: cover;
+}
+.ttv-account-error {
+  border-color: #f18a8a;
+}
+.ttv-account-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  color: var(--text);
+  background: var(--panel-bg);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ttv-profile-theme-actions {
+  flex-wrap: wrap;
+}
+.ttv-member-badge {
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.ttv-profile-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

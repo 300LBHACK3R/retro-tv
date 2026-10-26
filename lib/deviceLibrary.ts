@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { useAccount } from "./accountStore";
 import { browserStorage } from "./browserStorage";
 
 export const DEVICE_LIBRARY_KEY = "ttv-device-library-v1";
@@ -90,7 +91,11 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
     }),
     {
       name: DEVICE_LIBRARY_KEY,
-      storage: createJSONStorage(() => browserStorage),
+      storage: createJSONStorage(() => ({
+        getItem: (key) => useAccount.getState().user ? null : browserStorage.getItem(key),
+        setItem: (key, value) => { if (!useAccount.getState().user) browserStorage.setItem(key, value); },
+        removeItem: (key) => { if (!useAccount.getState().user) browserStorage.removeItem(key); },
+      })),
       skipHydration: true,
       partialize: (state) => ({
         profiles: state.profiles,
@@ -103,7 +108,7 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
         const profiles: DeviceLibrary["profiles"] = {};
         for (const [id, data] of Object.entries(value.profiles ?? {}).slice(
           0,
-          5,
+          10,
         )) {
           if (/^[a-z0-9-]{1,60}$/.test(id) && data && typeof data === "object")
             profiles[id] = {

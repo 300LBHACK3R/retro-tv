@@ -89,7 +89,6 @@ interface AppState {
   setGuideHeight: (height: number) => void;
   setAppMode: (mode: AppMode) => void;
   setTheme: (themeId: ThemeId) => void;
-  unlockTheme: (themeId: ThemeId) => void;
 
   setPlayerViewMode: (mode: PlayerViewMode) => void;
   isSettingsOpen: boolean;
@@ -1729,17 +1728,6 @@ export const useStore = create<AppState>()(
       setTheme: (themeId) =>
         set({
           themeId: getValidThemeId(themeId),
-        }),
-
-      unlockTheme: (themeId) =>
-        set((state) => {
-          if (!isThemeId(themeId)) return state;
-
-          return {
-            ownedPremiumThemes: state.ownedPremiumThemes.includes(themeId)
-              ? state.ownedPremiumThemes
-              : [...state.ownedPremiumThemes, themeId],
-          };
         }),
 
       setPlayerViewMode: (mode) =>

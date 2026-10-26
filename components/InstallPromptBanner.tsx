@@ -220,6 +220,8 @@ const SUPPRESSED_INSTALL_PROMPT_PREFIXES = [
   "/tv",
   "/backup",
   "/recovery",
+  "/account",
+  "/auth",
   "/health",
   "/readiness",
   "/offline",

@@ -21,14 +21,17 @@
     "test:http": "node tests/http.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.87.0",
     "@vercel/analytics": "^2.0.1",
     "next": "16.4.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "stripe": "^23.0.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^20",

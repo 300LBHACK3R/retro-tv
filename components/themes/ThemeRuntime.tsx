@@ -4,9 +4,11 @@ import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Halloween90sScene from "@/components/themes/Halloween90sScene";
 import { useStore } from "@/lib/store";
+import { useAccount } from "@/lib/accountStore";
 import { useProfiles } from "@/lib/deviceProfiles";
 import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId } from "@/lib/themePreferences";
 import {
+  canUseTheme,
   createThemeCssVars,
   getThemeById,
 } from "@/lib/themes";
@@ -29,12 +31,14 @@ export default function ThemeRuntime() {
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
-  const theme = useMemo(() => getThemeById(themeId), [themeId]);
+  const owned = useAccount((state) => state.ownedThemeIds);
+  const theme = useMemo(() => getThemeById(canUseTheme(themeId, owned, false) ? themeId : getEntranceThemeId()), [themeId, owned]);
   const cssVars = useMemo(() => createThemeCssVars(theme), [theme]);
 
   useEffect(() => {
     // Keep the bootstrap's saved choice intact until profiles finish loading.
     if (!profilesReady) return;
+    if (themeId !== theme.id) useStore.getState().setTheme(theme.id);
     const root = document.documentElement;
 
     root.dataset.ttvTheme = theme.id;
@@ -62,7 +66,7 @@ export default function ThemeRuntime() {
         },
       }),
     );
-  }, [cssVars, theme, profilesReady]);
+  }, [cssVars, theme, profilesReady, themeId]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;

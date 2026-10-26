@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { THEME_PREVIEWS } from "@/components/themes/themePreviews";
@@ -28,6 +29,8 @@ import {
   type ThemeSeason,
 } from "@/lib/themes";
 import { useStore } from "@/lib/store";
+import { useAccount } from "@/lib/accountStore";
+import { getEntranceThemeId } from "@/lib/themePreferences";
 import { setProfileTheme, useProfiles } from "@/lib/deviceProfiles";
 
 const DIALOG_ID = "ttv-theme-library";
@@ -117,8 +120,7 @@ function ThemeCard({
       className="theme-card"
       data-theme-id={theme.id}
       aria-pressed={isActive}
-      aria-label={`${isActive ? "Current theme" : isAvailable ? "Apply theme" : "Locked theme"}: ${theme.name}`}
-      disabled={!isAvailable}
+      aria-label={`${isActive ? "Current theme" : isAvailable ? "Apply theme" : "Get theme"}: ${theme.name}`}
       onClick={() => onSelect(theme)}
     >
       <span
@@ -197,6 +199,7 @@ function ThemeCard({
 }
 
 export default function ThemeButton({ compact = false }: { compact?: boolean }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -210,8 +213,10 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
 
   useDialogViewport(dialogRef, portalReady && isOpen);
 
-  const themeId = useStore((state) => state.themeId);
-  const ownedPremiumThemes = useStore((state) => state.ownedPremiumThemes);
+  const preferredTheme = useStore((state) => state.themeId);
+  const ownedPremiumThemes = useAccount((state) => state.ownedThemeIds);
+  const accountUser = useAccount((state) => state.user);
+  const themeId = canUseTheme(preferredTheme, ownedPremiumThemes, false) ? preferredTheme : getEntranceThemeId();
   const storageAvailable = useProfiles((state) => state.storageAvailable);
 
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
@@ -251,13 +256,14 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const applyTheme = useCallback(
     (theme: ThemeDefinition) => {
       if (!canUseTheme(theme.id, ownedPremiumThemes, false)) {
+        router.push(`/account?theme=${theme.id}`);
         return;
       }
 
       setProfileTheme(theme.id);
       setIsOpen(false);
     },
-    [ownedPremiumThemes],
+    [ownedPremiumThemes, router],
   );
 
   useEffect(() => {
@@ -438,8 +444,8 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                     >
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
                         ? "All themes are free. "
-                        : ""}
-                      {storageAvailable
+                        : "Free themes, individual purchases and membership. "}
+                      {accountUser ? "Your choice is saved to your account." : storageAvailable
                         ? "Your choice is saved for this profile on this device."
                         : "Browser storage is unavailable. Your choice lasts for this visit."}
                     </p>

@@ -1,5 +1,6 @@
 import "./globals.css";
 import "./styles/profiles.css";
+import "./styles/account.css";
 import "./styles/themes/seasonal.css";
 import "./styles/themes/haunted-arcade.css";
 import "./styles/themes/halloween-after-dark.css";

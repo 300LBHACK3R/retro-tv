@@ -3,6 +3,7 @@
 import { ProfileButton } from "./ProfileGate";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
+import AccountLink from "@/components/account/AccountLink";
 import ThemeButton from "@/components/themes/ThemeButton";
 import {
   getChannelDisplayName,
@@ -146,6 +147,7 @@ export default function ViewerTopBar({
       </nav>
       <div className="ttv-profile-theme-actions">
         {!tvMode ? <ThemeButton compact /> : null}
+        <AccountLink />
         <ProfileButton />
       </div>
     </header>

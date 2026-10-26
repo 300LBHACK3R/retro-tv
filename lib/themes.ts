@@ -76,7 +76,7 @@ export type ThemeCategoryMeta = {
  * only after accounts, checkout, payment verification, and entitlement sync
  * are implemented and tested.
  */
-export const THEME_ACCESS_MODE: ThemeAccessMode = "all-unlocked";
+export const THEME_ACCESS_MODE: ThemeAccessMode = process.env.NEXT_PUBLIC_THEME_BILLING_ENABLED === "true" ? "premium-locked" : "all-unlocked";
 
 export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
@@ -367,7 +367,7 @@ export const THEMES = [
     shortName: "Obsidian",
     description:
       "A restrained black-and-gold cinema interface with precise borders, elegant highlights, and premium movie-night presentation.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "premium",
     layout: "cinematic-premium",
@@ -402,7 +402,7 @@ export const THEMES = [
     shortName: "Midas",
     description:
       "Your private screening room. Champagne-gold metalwork, deep espresso glass, Art Deco details and elegant cinema typography.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "premium",
     layout: "cinematic-premium",
@@ -438,7 +438,7 @@ export const THEMES = [
     shortName: "Console Green",
     description:
       "A Tate's TV original console dashboard with black glass, electric-green blades, sci-fi focus rings, and gaming-first controls.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "console",
     layout: "console-dashboard",
@@ -473,7 +473,7 @@ export const THEMES = [
     shortName: "Neon Arcade",
     description:
       "A high-energy arcade interface with cyan rails, toxic-green highlights, purple ambience, and animated late-night depth.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "arcade",
     layout: "neon-arcade",
@@ -508,7 +508,7 @@ export const THEMES = [
     shortName: "Saturday Max",
     description:
       "A joyful cartoon-TV interface with chunky cards, bright colour blocks, playful depth, and early-2000s weekend energy.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "cartoon",
     layout: "cartoon-pop",
@@ -543,7 +543,7 @@ export const THEMES = [
     shortName: "Electric Blue",
     description:
       "Step inside a blue-lit arcade. Cobalt glass, cyan energy rails, a luminous game grid and slow-moving light bring your television to life.",
-    priceLabel: "$2.99",
+    priceLabel: "C$3",
     isPremium: true,
     category: "premium",
     layout: "electric-command",

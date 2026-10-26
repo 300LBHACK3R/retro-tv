@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useGoogleCast } from "@/components/GoogleCastProvider";
 import GlobalProgrammingSync from "@/components/GlobalProgrammingSync";
+import { useAccount } from "@/lib/accountStore";
 import { useStore } from "@/lib/store";
 import {
-  initializeProfiles,
   lockProfiles,
   useProfiles,
 } from "@/lib/deviceProfiles";
@@ -12,6 +12,7 @@ import { ProfileAvatar } from "./ProfileAvatar";
 import ProfilePicker from "./ProfilePicker";
 
 export function ProfileButton() {
+  const badge = useAccount((state) => state.member && state.showMemberBadge);
   const profile = useProfiles((state) =>
     state.profiles.find((item) => item.id === state.activeId),
   );
@@ -32,6 +33,7 @@ export function ProfileButton() {
       <ProfileAvatar profile={profile ?? { avatar: "sun" }} />
       <span>
         {profile?.name ?? "Profiles"}
+        {badge && !profile?.kids ? <span className="ttv-member-badge">★ Member</span> : null}
         <small>{profile?.kids ? "Kids profile" : "Switch profile"}</small>
       </span>
     </button>
@@ -46,7 +48,6 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
   const handleProgrammingReady = useCallback(() => setProgrammingReady(true), []);
   const { disconnect, sdkState } = useGoogleCast();
   useEffect(() => {
-    initializeProfiles();
     const state = useStore.getState();
     state.setChannel(
       state.channels.find(

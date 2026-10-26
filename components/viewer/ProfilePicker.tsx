@@ -1,5 +1,7 @@
 "use client";
 
+import AccountLink from "@/components/account/AccountLink";
+import { useAccount } from "@/lib/accountStore";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -441,6 +443,8 @@ function ProfileEditor({
 }
 
 export default function ProfilePicker() {
+  const profileLimit = useAccount((state) => state.profileLimit);
+  const accountUser = useAccount((state) => state.user);
   useSpatialNavigation(true);
   const profiles = useProfiles((state) => state.profiles);
   const parentPin = useProfiles((state) => state.pin);
@@ -505,6 +509,7 @@ export default function ProfilePicker() {
     >
       <header className="ttv-profile-header">
         <span className="ttv-profile-device">Your TV. Your people.</span>
+        <AccountLink />
       </header>
       <div className="ttv-profile-content">
         {screen.kind === "pin" ? (
@@ -556,11 +561,13 @@ export default function ProfilePicker() {
                 : "Pick your profile. Settle into something good."}
             </p>
             <div className="ttv-profile-grid">
-              {profiles.map((profile) => (
+              {profiles.map((profile, index) => (
                 <button
                   type="button"
                   className="ttv-profile-card"
                   key={profile.id}
+                  disabled={screen.kind !== "manage" && index >= profileLimit}
+                  title={index >= profileLimit ? "Renew membership to use this extra profile. Its saved items are kept." : undefined}
                   data-profile-focus={profile.id}
                   aria-label={
                     screen.kind === "manage"
@@ -600,7 +607,7 @@ export default function ProfilePicker() {
                   </small>
                 </button>
               ))}
-              {profiles.length < 5 && (
+              {profiles.length < profileLimit && (
                 <button
                   type="button"
                   className="ttv-profile-card"
@@ -671,7 +678,7 @@ export default function ProfilePicker() {
       </div>
       <footer className="ttv-profile-footer">
         {storageAvailable ? (
-          <p>Profiles are saved on this device. No signup needed.</p>
+          <p>{accountUser ? "Profiles and saved items sync with your account." : "Profiles are saved on this device. No signup needed."}</p>
         ) : (
           <p role="status">
             Browser storage is unavailable. Profiles and saved items will only

@@ -54,6 +54,8 @@ public/media/
 
 /playwright-report/
 /test-results/
+/test-results-billing/
+/playwright-report-billing/
 
 # Local caches and editor backup copies (never source)
 /.turbo/

@@ -2,66 +2,15 @@
 import { create } from "zustand";
 import { useDeviceLibrary } from "./deviceLibrary";
 import { useStore } from "./store";
-import { isThemeId } from "./themes";
+import { useAccount } from "./accountStore";
+import { canUseTheme, isThemeId } from "./themes";
 import type { ThemeId } from "./types";
 import { getEntranceThemeId, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "./themePreferences";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
 export { PROFILE_STORAGE_KEY } from "./themePreferences";
-// Preserve Fox, Robot and Cat IDs. Retired Dinosaur profiles migrate to
-// Boy dragon, and Space explorer profiles fall back to Boy fox.
-export const AVATARS = [
-  "sun", "girlfox", "dadfox", "momfox", "flower", "boycat", "bolt",
-  "girlrobot", "boydragon", "girldragon", "daddragon", "momdragon",
-  "malepirate", "femalepirate", "malemechanic", "femalemechanic",
-  "maledoctors", "femaledoctors", "maleserver", "femaleserver", "jesus", "kidsjesus",
-] as const;
-export type Profile = {
-  id: string;
-  name: string;
-  kids: boolean;
-  avatar: (typeof AVATARS)[number];
-  theme?: ThemeId;
-};
-type Pin = { salt: string; hash: string };
-type Data = {
-  profiles: Profile[];
-  pin: Pin | null;
-  failures: number;
-  lockedUntil: number;
-};
-const defaults: Profile[] = [
-  { id: "main", name: "Main", kids: false, avatar: "sun" },
-  { id: "kids", name: "Kids", kids: true, avatar: "boydragon" },
-];
-export function sanitizeProfiles(value: unknown): Profile[] {
-  if (!Array.isArray(value)) return defaults.map((profile) => ({ ...profile }));
-  const unique = new Map<string, Profile>();
-  for (const entry of value.slice(0, 5)) {
-    if (
-      !entry ||
-      typeof entry !== "object" ||
-      typeof entry.id !== "string" ||
-      !/^[a-z0-9-]{1,60}$/.test(entry.id) ||
-      typeof entry.name !== "string"
-    )
-      continue;
-    const name = entry.name.trim().slice(0, 24);
-    if (!name) continue;
-    unique.set(entry.id, {
-      id: entry.id,
-      name,
-      kids: entry.id === "main" ? false : entry.kids === true,
-      avatar: entry.avatar === "star" ? "boydragon" : AVATARS.includes(entry.avatar) ? entry.avatar : "sun",
-      ...(isThemeId(entry.theme) ? { theme: entry.theme } : {}),
-    });
-  }
-  if (!unique.has("main")) unique.set("main", { ...defaults[0]! });
-  return [
-    unique.get("main")!,
-    ...[...unique.values()].filter((profile) => profile.id !== "main"),
-  ].slice(0, 5);
-}
+import { defaults, sanitizeProfiles, type Profile, type ProfileData as Data } from "./profiles";
+export { AVATARS, sanitizeProfiles, type Profile } from "./profiles";
 function readData(): Data {
   let data: Partial<Data> = {};
   try {
@@ -79,7 +28,7 @@ function readData(): Data {
       : null;
   return {
     // Keep valid saved choices, including choices from older profile versions.
-    profiles: sanitizeProfiles(data.profiles),
+    profiles: sanitizeProfiles(data.profiles, 10),
     pin,
     failures: Number.isInteger(data.failures)
       ? Math.min(5, Math.max(0, data.failures!))
@@ -107,6 +56,7 @@ export const useProfiles = create<
   revision: 0,
 }));
 function saveData() {
+  if (useAccount.getState().user) return;
   const { profiles, pin, failures, lockedUntil } = useProfiles.getState();
   try {
     localStorage.setItem(
@@ -132,27 +82,28 @@ function saveSession(id: string | null) {
     /* This tab remains usable. */
   }
 }
-export function initializeProfiles() {
-  if (useProfiles.getState().ready) return;
-  const data = readData();
+export function initializeProfiles(accountData?: Data) {
+  if (useProfiles.getState().ready && !accountData) return;
+  const data = accountData ?? readData();
   let activeId: string | null = null;
   try {
     const session = JSON.parse(
       sessionStorage.getItem(PROFILE_SESSION_KEY) || "null",
     );
-    const profile = data.profiles.find((profile) => profile.id === session?.id);
+    const profile = data.profiles.slice(0, useAccount.getState().profileLimit).find((profile) => profile.id === session?.id);
     if (
       profile &&
       session.pinHash === (data.pin?.hash ?? null) &&
       (!profile.kids || data.pin)
     )
       activeId = profile.id;
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data));
+    if (!accountData) localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data));
   } catch {
     useProfiles.setState({ storageAvailable: false });
   }
   useProfiles.setState({ ...data, activeId, ready: true });
-  useStore.getState().setTheme(data.profiles.find((profile) => profile.id === activeId)?.theme ?? getEntranceThemeId());
+  const theme = data.profiles.find((profile) => profile.id === activeId)?.theme ?? getEntranceThemeId();
+  useStore.getState().setTheme(canUseTheme(theme, useAccount.getState().ownedThemeIds, false) ? theme : getEntranceThemeId());
   if (activeId) {
     useDeviceLibrary.getState().selectProfile(activeId);
   }
@@ -163,6 +114,7 @@ export function lockProfiles() {
   saveSession(null);
 }
 export function refreshProfiles() {
+  if (useAccount.getState().user) return;
   const data = readData();
   const current = useProfiles.getState();
   const withoutThemes = (profiles: Profile[]) => profiles.map(({ id, name, kids, avatar }) => ({ id, name, kids, avatar }));
@@ -184,11 +136,12 @@ export function refreshProfiles() {
 export function activateProfile(id: string) {
   const profile = useProfiles
     .getState()
-    .profiles.find((profile) => profile.id === id);
+    .profiles.slice(0, useAccount.getState().profileLimit).find((profile) => profile.id === id);
   if (!profile || (profile.kids && !useProfiles.getState().pin)) return;
   useDeviceLibrary.getState().selectProfile(id);
   const state = useStore.getState();
-  state.setTheme(profile.theme ?? getEntranceThemeId());
+  const theme = profile.theme ?? getEntranceThemeId();
+  state.setTheme(canUseTheme(theme, useAccount.getState().ownedThemeIds, false) ? theme : getEntranceThemeId());
   state.setChannel(
     state.channels.find((channel) => Number(channel.number ?? channel.id) === 1)
       ?.id ?? "1",
@@ -201,14 +154,15 @@ export function activateProfile(id: string) {
 }
 export function saveProfile(profile: Profile) {
   const state = useProfiles.getState();
+  if (!state.profiles.some((item) => item.id === profile.id) && state.profiles.length >= useAccount.getState().profileLimit) return;
   const profiles = state.profiles.some((item) => item.id === profile.id)
     ? state.profiles.map((item) => (item.id === profile.id ? { ...item, ...profile } : item))
     : [...state.profiles, profile];
-  useProfiles.setState({ profiles: sanitizeProfiles(profiles) });
+  useProfiles.setState({ profiles: sanitizeProfiles(profiles, 10) });
   saveData();
 }
 export function setProfileTheme(theme: ThemeId) {
-  if (!isThemeId(theme)) return;
+  if (!isThemeId(theme) || !canUseTheme(theme, useAccount.getState().ownedThemeIds, false)) return;
   const { activeId } = useProfiles.getState();
   if (!activeId) return;
   useProfiles.setState((state) => ({
@@ -233,7 +187,8 @@ export function deleteProfile(id: string) {
 export function profileProgressKey(
   id = useProfiles.getState().activeId ?? "main",
 ) {
-  return id === "main" ? PROGRESS_STORAGE_KEY : `${PROGRESS_STORAGE_KEY}:${id}`;
+  const owner = useAccount.getState().user?.id;
+  return owner ? `${PROGRESS_STORAGE_KEY}:account:${owner}:${id}` : id === "main" ? PROGRESS_STORAGE_KEY : `${PROGRESS_STORAGE_KEY}:${id}`;
 }
 function hex(bytes: Uint8Array) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(

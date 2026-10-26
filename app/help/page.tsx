@@ -10,6 +10,16 @@ import Link from "next/link";
 
 const helpSections = [
   {
+    title: "Accounts and purchases",
+    items: [
+      "Watching stays free. A free account syncs household profiles, favourite channels, watchlists and theme choices.",
+      "Confirm your email before signing in. The Account page can resend confirmation links and password reset emails.",
+      "Theme purchases and membership appear after payment verification. Use Account → Refresh purchases if a completed payment has not appeared yet.",
+      "Use Account → Manage billing for payment history, payment details and cancelling future membership renewals. For a payment review, use the merchant contact details provided with your Stripe receipt.",
+      "Clearing browser data does not delete an account or cancel a membership. Use Account settings for those actions.",
+    ],
+  },
+  {
     title: "Watching Tate's TV",
     items: [
       "Open the main app and let the current channel load.",
