@@ -22,6 +22,18 @@ let pending: Promise<void> | null = null;
 let paused = false;
 let start: Promise<void> | null = null;
 let timer: ReturnType<typeof setTimeout>;
+const HOUSEHOLD_CHANGE = "ttv-household-change";
+let changeChannel: BroadcastChannel | null = null;
+
+function announceHouseholdSave(userId: string, revision: number) {
+  const change = { userId, revision };
+  try {
+    if (changeChannel) changeChannel.postMessage(change);
+    else localStorage.setItem(HOUSEHOLD_CHANGE, JSON.stringify(change));
+  } catch {
+    // Saving to the account still works when cross-tab messaging is unavailable.
+  }
+}
 function snapshot(): Household {
   const { profiles, pin } = useProfiles.getState();
   return {
@@ -147,6 +159,7 @@ export async function flushAccountChanges() {
         if (useAccount.getState().user?.id !== ownerId) return;
         lastSaved = value;
         useAccount.setState({ revision: result.revision, household });
+        announceHouseholdSave(ownerId, result.revision);
       } catch (error) {
         if (useAccount.getState().user?.id !== ownerId) return;
         paused = true;
@@ -165,6 +178,31 @@ export async function flushAccountChanges() {
   return pending;
 }
 export function watchAccountChanges() {
+  const receiveChange = (change: unknown) => {
+    if (!change || typeof change !== "object") return;
+    const { userId, revision } = change as { userId?: unknown; revision?: unknown };
+    const account = useAccount.getState();
+    if (!account.user || userId !== account.user.id ||
+        typeof revision !== "number" || !Number.isSafeInteger(revision) ||
+        revision <= account.revision) return;
+    // A message is only a refresh hint. Preferences and access always come from
+    // the authenticated server, and refreshAccount preserves unsaved local edits.
+    void refreshAccount().catch(() => {
+      useAccount.setState({ error: "Account connection interrupted. Your current viewing session can continue." });
+    });
+  };
+  let channel: BroadcastChannel | null = null;
+  try {
+    channel = new BroadcastChannel(HOUSEHOLD_CHANGE);
+    channel.onmessage = (event) => receiveChange(event.data);
+    changeChannel = channel;
+  } catch {
+    // Older or restricted browsers can still use storage events.
+  }
+  const storageChanged = (event: StorageEvent) => {
+    if (event.key !== HOUSEHOLD_CHANGE || !event.newValue) return;
+    try { receiveChange(JSON.parse(event.newValue)); } catch { /* Ignore invalid hints. */ }
+  };
   const changed = () => {
     if (
       applying ||
@@ -193,10 +231,14 @@ export function watchAccountChanges() {
     }
   };
   window.addEventListener("beforeunload", beforeUnload);
+  window.addEventListener("storage", storageChanged);
   return () => {
     clearTimeout(timer);
     unsubscribers.forEach((unsubscribe) => unsubscribe());
     window.removeEventListener("beforeunload", beforeUnload);
+    window.removeEventListener("storage", storageChanged);
+    channel?.close();
+    if (changeChannel === channel) changeChannel = null;
   };
 }
 export async function retryAccountSave() {

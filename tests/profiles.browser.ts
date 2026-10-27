@@ -118,6 +118,7 @@ async function chooseKids(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Welcome to your TV", exact: true }),
   ).toBeVisible();
+  await waitForHouseholdSave(page);
 }
 test("profiles start on Channel 1, support names and avatars, and fit every configured viewport", async ({
   page,
@@ -610,15 +611,19 @@ test("an open entrance changes at midnight and returning tabs refresh the season
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
 });
 
-test("blocked storage still allows theme changes during the current visit", async ({ page }) => {
+test("blocked local storage still saves account themes across reloads", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "localStorage", { get() { throw new Error("Storage blocked"); } });
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
-  await expect(page.getByText("Browser storage is unavailable. Your choice lasts for this visit.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Your choice is saved to your account.", { exact: false })).toBeVisible();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
+  await waitForHouseholdSave(page);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
 });
 
@@ -627,6 +632,7 @@ test("new tabs restore saved choices and theme updates do not sign out an existi
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
+  await waitForHouseholdSave(page);
   const other = await context.newPage();
   await mockViewer(other);
   await other.goto("/");
@@ -634,6 +640,7 @@ test("new tabs restore saved choices and theme updates do not sign out an existi
   await expect(other.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
   await other.getByRole("button", { name: "Open theme library", exact: true }).click();
   await other.locator('.theme-card[data-theme-id="electric-blue-live"]').click();
+  await waitForHouseholdSave(other);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
   await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
-import type {
-  ProgrammingApiResponse,
-  ProgrammingSnapshot,
+import {
+  programmingSignature as createSnapshotSignature,
+  type ProgrammingApiResponse,
+  type ProgrammingSnapshot,
 } from "@/lib/programmingSnapshot";
 
 interface GlobalProgrammingSyncProps {
@@ -89,13 +90,6 @@ function createStatusMessage(
   }
 
   return `${prefix} / ${snapshot.media.length} media / ${snapshot.channels.length} channels`;
-}
-
-function createSnapshotSignature(snapshot: ProgrammingSnapshot): string {
-  return JSON.stringify({
-    ...snapshot,
-    updatedAt: "",
-  });
 }
 
 function getSavedAtFromResponse(
@@ -352,9 +346,9 @@ export default function GlobalProgrammingSync({
         }
 
         if (data.programming) {
-          const signature = createSnapshotSignature(data.programming);
-
           replaceProgramming(data.programming, { preserveViewer: true });
+          // Normalizing the loaded data is hydration, not an admin edit.
+          const signature = createSnapshotSignature(exportProgrammingSnapshot());
 
           lastSavedSignatureRef.current = signature;
           lastQueuedSignatureRef.current = signature;

@@ -817,7 +817,7 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   const search = dialog.getByRole("searchbox", { name: "Search Tate's TV themes" });
   await expect(close).toBeFocused();
   await expect(search).not.toBeFocused();
-  await expect(dialog.getByText("All themes are free. Your choice is saved for this profile on this device.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("All themes are free. Your choice is saved to your account.", { exact: true })).toBeVisible();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(dialog.locator(".theme-card:disabled")).toHaveCount(0);
   await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);

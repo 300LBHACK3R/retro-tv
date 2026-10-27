@@ -23,11 +23,12 @@ test("admin reorders, saves and programmes separate Halloween channels", async (
   });
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
   await page.goto("/admin");
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await expect(page.locator(".ttv-global-sync-status button")).toBeEnabled();
   await page.getByRole("button", { name: "Channel Lineup", exact: true }).click();
   await expect(page.getByRole("list", { name: "Station channel order" })).toHaveCSS("display", "grid");
   const rowThree = page.locator('.ttv-lineup-list > [data-channel-id="3"]');
   const rowFour = page.locator('.ttv-lineup-list > [data-channel-id="4"]');
+  await expect(rowThree.locator(".ttv-lineup-number")).toHaveText("CH 3");
   await rowThree.getByRole("button", { name: /^Move .* down$/ }).click();
   await expect(rowThree.locator(".ttv-lineup-number")).toHaveText("CH 4");
   await expect(rowFour.locator(".ttv-lineup-number")).toHaveText("CH 3");

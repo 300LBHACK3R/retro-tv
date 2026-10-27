@@ -31,6 +31,33 @@ Run #85, attempt 2, on `c813bc7` subsequently finished with 364 browser cases pa
 
 ## Cleanup boundaries
 
+### Parent/admin release follow-up — October 27
+
+Run #90 on `0833cb0` passed the build, 109 unit tests and HTTP checks, but failed
+45 browser cases (363 passed, 2 flaky). The paid-theme browser stage did not run.
+This follow-up addresses the observed causes:
+
+- Household saves notify other tabs through BroadcastChannel, with a storage-event
+  fallback. Receivers reload authenticated server data; messages cannot supply
+  preferences or entitlements. Unsaved local edits retain revision-conflict checks.
+- Loading and normalizing station data establishes the autosave baseline. Account
+  theme restoration and channel tuning no longer count as station edits.
+- Authenticated browser fixtures preserve partial seeded PIN data, wait for account
+  saves before reload/new-tab checks, and assert account persistence messages.
+- Account outage assertions exclude Next.js's route announcer. Channel-lineup
+  readiness checks use enabled controls and rendered data instead of transient text.
+
+Local verification: 114 unit tests, type checking, lint, production build/style
+checks, HTTP/security checks and `git diff --check` passed. Local browser execution
+remains unavailable for the environment reasons above. The complete browser matrix
+and paid-theme stage must pass on this new revision before production promotion.
+The existing Kids content/PIN assertions remain in the suite.
+
+Live Stripe products, three membership prices, portal and webhook are configured.
+Production Vercel now contains the sensitive `STRIPE_SECRET_KEY`, webhook secret
+and the four price variables. Presence does not verify the new restricted key's
+permissions. Purchases remain disabled pending provider-flow verification.
+
 Keep one project folder with separate pages, interfaces, shared logic, server services, assets and tests. Combining server credentials, browser code and styles in one source file would make the application harder to maintain and compromise framework boundaries.
 
 Channel-logo paths may exist in cloud programming rather than source literals. Original portrait PNGs generate optimized WebP images during the build. Database migrations preserve deployment history. None of those were deleted merely because a text search did not find a direct reference.

@@ -149,7 +149,7 @@ test("an account outage never falls back to the old device-only viewer", async (
   await fixture(page, { ...EMPTY_ACCOUNT, enabled: true });
   await page.route("**/api/account", route => route.fulfill({ status: 503, json: { error: "Account service unavailable" } }));
   await page.goto("/");
-  await expect(page.getByRole("alert")).toContainText("Account services are unavailable");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Account services are unavailable");
   await expect(page.locator("video")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Watch as Guest", exact: true })).toHaveCount(0);
 });

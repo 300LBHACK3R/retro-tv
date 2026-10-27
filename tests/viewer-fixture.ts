@@ -26,7 +26,7 @@ export const test = base.extend<{ householdSession: void }>({
           ...structuredClone(EMPTY_ACCOUNT), enabled: true,
           user: { id: "qa-parent", email: "parent@example.test" },
           ownedThemeIds: allowedThemeIds([], false),
-          household: sanitizeHousehold(device ?? { profiles: defaults }),
+          household: sanitizeHousehold({ profiles: defaults, ...device }),
         };
       }
       await route.fulfill({ json: state });

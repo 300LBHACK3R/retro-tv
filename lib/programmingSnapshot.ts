@@ -40,6 +40,18 @@ export interface ProgrammingApiResponse {
   error?: string;
 }
 
+/** Only station edits trigger publishing; account themes and tuning are private. */
+export function programmingSignature(snapshot: ProgrammingSnapshot): string {
+  return JSON.stringify({
+    media: snapshot.media,
+    channels: snapshot.channels,
+    libraryArtwork: snapshot.libraryArtwork ?? {},
+    upcomingTitles: snapshot.upcomingTitles ?? [],
+    sidebarWidth: snapshot.sidebarWidth,
+    guideHeight: snapshot.guideHeight,
+  });
+}
+
 const VALID_MEDIA_TYPES: MediaType[] = [
   "show",
   "commercial",
