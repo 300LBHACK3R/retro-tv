@@ -136,15 +136,12 @@ test("unavailable station insights do not interrupt tuning", async ({
     }),
   ).toBeVisible();
   const directory = await openDirectory(page);
-  // Wait for the monitor to attach, then exercise its media-event/flush path.
-  // Observe responses before navigation so an earlier flush cannot be missed.
-  await expect
-    .poll(async () => {
-      await page.locator("video").first().dispatchEvent("playing");
-      await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-      return unavailableResponses;
-    })
-    .toBeGreaterThan(0);
+  // Let the normal visible-page timer establish the telemetry session and
+  // encounter the outage. Repeated pagehide events drain that queue before its
+  // timer fires, while teardown correctly refuses to start a new session.
+  // The unit suite separately covers pagehide/beacon behavior.
+  await page.locator("video").first().dispatchEvent("playing");
+  await expect.poll(() => unavailableResponses).toBeGreaterThan(0);
   await directory
     .getByRole("button", { name: "Tune to CH 25 Local Cinema", exact: true })
     .click();

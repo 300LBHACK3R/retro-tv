@@ -31,8 +31,13 @@ test("admin reorders, saves and programmes separate Halloween channels", async (
   await expect(rowThree.locator(".ttv-lineup-number")).toHaveText("CH 4");
   await expect(rowFour.locator(".ttv-lineup-number")).toHaveText("CH 3");
   await expect.poll(() => saved.channels.find(channel => channel.id === "3")?.number).toBe(4);
+  await expect(page.getByText(/Global saved/)).toBeVisible();
+  const reloaded = page.waitForResponse(response =>
+    response.url().endsWith("/api/programming") && response.ok(),
+  );
   await page.reload();
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  const cloud = await (await reloaded).json();
+  expect(cloud.programming.channels.find((channel: { id: string }) => channel.id === "3").number).toBe(4);
   await page.getByRole("button", { name: "Channel Lineup", exact: true }).click();
   await expect(rowThree.locator(".ttv-lineup-number")).toHaveText("CH 4");
 
