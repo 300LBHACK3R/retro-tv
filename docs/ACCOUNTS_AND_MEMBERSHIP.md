@@ -109,13 +109,41 @@ Use a real preview deployment and Stripe test mode to verify:
 4. A C$3 test payment unlocks only its selected theme. Cancelled/failed payment and manually visiting the success URL do not unlock anything. Duplicate/out-of-order webhooks do not duplicate access. A full refund revokes it.
 5. Each of the three test membership plans unlocks all premium themes and ten profiles for its correct paid interval. Cancellation retains access to the paid period's end; expiration falls back to five without deleting the other profiles. Individually bought themes still work.
 6. Billing portal cancellation, receipts and account deletion work. Run a failed-renewal and dispute/refund test. Verify a won dispute restores eligible access.
-7. Guest live TV, guide, library and free themes remain usable throughout. Children’s profile controls still work. Enable production only once these checks pass with the owner's chosen prices and business settings.
+7. Free parent accounts retain live TV, guide, library and free themes after sign-in. Children’s profile controls still work. Enable production only once these checks pass with the owner's chosen prices and business settings.
 
 Automated local tests use controlled provider responses and Postgres (PGlite). They verify implementation boundaries but do not establish live email delivery, Stripe merchant readiness or production credentials. `npm run test:unit`, `npm run build`, `npm run test:http` and `npm run test:browser` are the regular gates. To test the paid theme UI, clear the generated `.next` build directory, build with `NEXT_PUBLIC_THEME_BILLING_ENABLED=true`, then run browser tests with that same flag and `--grep @billing`. CI uses a fresh build when changing this flag so a previous free-theme bundle cannot be reused.
 
-Run #83 exposed a playback-report pagehide path that still used fetch before WebKit updated document visibility. Playback now passes an explicit closing flag and uses a beacon with an established session; an in-flight session also rechecks visibility before posting. Unit tests cover both lifecycle races. The artwork browser check inspects the actual prepared image bytes before sending, since WebKit's interception omits Blob bodies. The admin panel test scopes buttons to the Admin tools navigation to avoid a same-named form button.
+Current browser verification and remaining live-provider checks are recorded in [the launch audit](LAUNCH_AUDIT.md).
 
-The follow-up passed type checking, lint, production builds with billing both disabled and enabled, HTTP checks, 104 unit checks across the suite and focused follow-up, and 23 targeted browser cases across desktop Chrome, Android and TV layouts. These include the new filters, ownership after refund/expiry, all plan buttons and the affected upload/refresh/admin workflows. Local WebKit execution remains unavailable in this environment; GitHub's seven-browser run still needs to pass on the new commit. Do not treat the previous #83 failure or local Chromium passes as a completed Safari verification.
+## Repair rejected production Stripe credentials
+
+An October 27 production check returned StripeAuthenticationError for all four
+price requests. The production billing flag and required settings were present,
+but the configured API key was rejected.
+
+1. Open [Stripe API keys](https://dashboard.stripe.com/apikeys), select the
+   **Tate’s TV** account and **live mode**.
+2. Roll the existing Tate’s TV server restricted key to retain its permissions,
+   or create a new restricted key with the permissions below. Copy the complete
+   new key beginning with **rk_live_** when Stripe displays it.
+3. In Vercel, open the Tate’s TV project → Settings → Environment Variables.
+   Replace **STRIPE_SECRET_KEY** for **Production**, keeping it sensitive.
+   Paste only the full key, without quotes or spaces. Do not change the webhook
+   signing secret or the price IDs.
+4. Save, then rebuild the reviewed release with the updated environment.
+   Check /api/account: commerce.enabled must be true and all three plans present.
+   Complete an authenticated Checkout check before advertising sales.
+
+| Permission | Resources |
+| --- | --- |
+| Write | Customers; Checkout Sessions; Subscriptions; Customer portal/Billing portal sessions |
+| Read | Prices; Products; Charges; Disputes; Payment Intents; Invoices; Invoice Payments |
+
+Leave unrelated permissions disabled. A publishable key (pk_live_), webhook
+secret (whsec_) or sandbox key cannot replace the live server key. Put the key
+directly into Vercel; never include it in chat or Git.
+
+Reference: [Stripe restricted API keys](https://docs.stripe.com/keys/restricted-api-keys).
 
 ## Storage and recovery notes
 
