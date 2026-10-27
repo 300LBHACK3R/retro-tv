@@ -70,6 +70,11 @@ credentials were copied into it, and reports/screenshots were not added to Git.
    GitHub integration rejected repository writes with HTTP 403; a bundle is
    supplied for the owner to push. Production was deployed directly from the
    reviewed existing feature commit.
+5. Configure and verify R2 uploads. The accessible Vercel project environment
+   list contains no R2 credential or public-media-URL variables and reports zero
+   hidden production variables. Live artwork/video uploads were not verified.
+   See [upload configuration](PREMIUM_UPLOADS_AND_SUBMISSIONS_SETUP.md) for the
+   exact settings. Existing playback URLs do not establish upload permission.
 
 Kids profiles share the parent's household session and use PIN and approved-
 content controls. They are not separate authenticated child identities.

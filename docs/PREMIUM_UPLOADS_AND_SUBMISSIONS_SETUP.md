@@ -12,7 +12,24 @@ service-role client.
 
 ## 2. Configure Cloudflare R2 credentials in Vercel
 
-Add the variables shown in `.env.example`.
+Add these server-only variables to the Vercel project's Production environment:
+
+| Variable | Value |
+| --- | --- |
+| R2_ACCOUNT_ID | Cloudflare account ID owning the buckets |
+| R2_ACCESS_KEY_ID | R2 S3 access-key ID with object access to the intended buckets |
+| R2_SECRET_ACCESS_KEY | Matching R2 S3 secret access key; keep sensitive |
+| R2_MEDIA_BUCKET_NAME | Existing media bucket name; the code defaults to tates-tv-media |
+| R2_MEDIA_PUBLIC_BASE_URL | Public HTTPS URL serving that media bucket |
+| R2_SUBMISSIONS_BUCKET_NAME | Private submissions bucket name |
+
+Keep credentials in Vercel, never in chat or Git. The media credential needs
+object write permission for uploads, and submission review needs object read
+permission. Rebuild after saving the environment variables. Verify a real
+small poster upload and publish it using **Save title artwork**.
+
+The October 27 project environment review did not find these R2 settings;
+production upload readiness remains unverified until they are supplied and tested.
 
 Create a separate private bucket named
 `tates-tv-submissions`. The admin moderation API creates temporary signed GET
