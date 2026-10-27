@@ -124,42 +124,44 @@ export function startAccount() {
 }
 export async function flushAccountChanges() {
   clearTimeout(timer);
-  if (pending) await pending;
-  const account = useAccount.getState();
-  if (!account.user || applying || paused) return;
-  const household = snapshot();
-  const value = JSON.stringify(household);
-  if (value === lastSaved) return;
-  const ownerId = account.user.id;
-  useAccount.setState({ saving: true, syncError: "" });
+  // Every caller joins one writer, including edits made while a save is in flight.
+  // Awaiting a writer and then starting independently lets several callers submit
+  // the same revision, producing a false cross-device conflict.
+  if (pending) return pending;
   pending = (async () => {
-    try {
-      const result = await accountRequest(
-        "/api/account/household",
-        { household, revision: account.revision },
-        "PUT",
-      );
-      if (useAccount.getState().user?.id !== ownerId) return;
-      lastSaved = value;
-      useAccount.setState({ revision: result.revision, household });
-    } catch (error) {
-      if (useAccount.getState().user?.id !== ownerId) return;
-      paused = true;
-      useAccount.setState({
-        syncError:
-          error instanceof Error
-            ? error.message
-            : "Preferences could not be saved.",
-      });
-    } finally {
-      if (useAccount.getState().user?.id === ownerId)
-        useAccount.setState({ saving: false });
-      pending = null;
+    while (true) {
+      const account = useAccount.getState();
+      if (!account.user || applying || paused) return;
+      const household = snapshot();
+      const value = JSON.stringify(household);
+      if (value === lastSaved) return;
+      const ownerId = account.user.id;
+      useAccount.setState({ saving: true, syncError: "" });
+      try {
+        const result = await accountRequest(
+          "/api/account/household",
+          { household, revision: account.revision },
+          "PUT",
+        );
+        if (useAccount.getState().user?.id !== ownerId) return;
+        lastSaved = value;
+        useAccount.setState({ revision: result.revision, household });
+      } catch (error) {
+        if (useAccount.getState().user?.id !== ownerId) return;
+        paused = true;
+        useAccount.setState({
+          syncError:
+            error instanceof Error
+              ? error.message
+              : "Preferences could not be saved.",
+        });
+      } finally {
+        if (useAccount.getState().user?.id === ownerId)
+          useAccount.setState({ saving: false });
+      }
     }
-  })();
-  await pending;
-  if (!paused && JSON.stringify(snapshot()) !== lastSaved)
-    await flushAccountChanges();
+  })().finally(() => { pending = null; });
+  return pending;
 }
 export function watchAccountChanges() {
   const changed = () => {

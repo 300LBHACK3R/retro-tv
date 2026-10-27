@@ -15,6 +15,14 @@ Keep the existing environment configuration private in `.env.local`. Required se
 
 Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A source checkout without environment values still builds; cloud programming and protected services require the configured environment.
 
+## Project organization
+
+Keep this repository as one project folder. `app/` owns pages, API routes and styles; `components/` owns viewer/admin interfaces; `lib/` owns shared behavior, with privileged services in `lib/server/`. `public/` contains published assets, `supabase/migrations/` contains database history, `tests/` contains verification, and `docs/` contains operating instructions.
+
+Use `npm run clean` to remove generated builds, browser reports and caches. It preserves source, original artwork, environment files and database migrations. Historical channel-logo paths can be referenced by saved cloud programming even when they have no literal source-code reference.
+
+See [launch audit and remaining activation work](docs/LAUNCH_AUDIT.md) before advertising paid memberships.
+
 ## Viewer features
 
 - Live playback with bounded connection retries, offline recovery, autoplay prompts and programme reporting.
@@ -22,7 +30,7 @@ Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A s
 - The live page stays focused on playback and channel controls; browse programmes in the Guide or the on-demand Library.
 - Channels attempt playback as soon as their source is selected. If the browser blocks sound, playback retries muted with a **Turn on sound** button; a Play permission prompt remains only for devices that also block muted playback. Source interruptions do not produce false autoplay warnings, and channel changes sharing a media file reuse its buffer. Startup waits for the real live clock before choosing a programme.
 - Favourite channels, a programme watchlist and on-demand resume saved on the current browser. They are separate from cloud programming updates. Storage being blocked must not prevent playback.
-- Thirteen themes, free during launch until billing is explicitly enabled, including premium Midas Gold, Electric Blue and **Christmas ’96: Living Room**. Open **Themes** beside the profile on the homepage. Seasonal themes are grouped by Christmas and Halloween, with full-card previews and desktop/portrait artwork. Each profile’s chosen theme is saved in this browser and survives refreshes, navigation, new visits and profile switching. The entrance uses Halloween ’95 until **November 1, 2026 at midnight in Calgary (America/Edmonton)**, then switches automatically to Christmas ’96, including its wordmark. This calendar change never replaces a saved profile choice. The pre-hydration script restores the correct colours before React loads. More > Reduce motion and device accessibility preferences remove motion; hidden tabs pause animations. If browser storage is blocked, choices last only for the current visit. Accounts and payments remain deferred.
+- Thirteen themes, free during launch until billing is explicitly enabled, including premium Midas Gold, Electric Blue and **Christmas ’96: Living Room**. Open **Themes** beside the profile on the homepage. Seasonal themes are grouped by Christmas and Halloween, with full-card previews and desktop/portrait artwork. Each profile’s chosen theme is saved in this browser and survives refreshes, navigation, new visits and profile switching. The entrance uses Halloween ’95 until **November 1, 2026 at midnight in Calgary (America/Edmonton)**, then switches automatically to Christmas ’96, including its wordmark. This calendar change never replaces a saved profile choice. The pre-hydration script restores the correct colours before React loads. More > Reduce motion and device accessibility preferences remove motion; hidden tabs pause animations. If browser storage is blocked, choices last only for the current visit. Optional accounts sync these preferences; paid access remains disabled until the provider setup and launch checks are complete.
 - Mobile theme selection opens without focusing search, uses one scrollable library and keeps Close/Done above the keyboard. The mobile guide has a sticky On now bar with Find/Your channel shortcuts, a sticky schedule Back bar and compact filters. Full-page seasonal artwork adapts to phones and stays behind the viewer controls.
 - Poster artwork with a title-based fallback when artwork is absent or cannot load.
 
@@ -42,7 +50,7 @@ Use the profile button to switch viewers. The chooser offers Add profile directl
 
 **No existing programming is automatically approved.** Until Channel 1 qualifies, Kids sees a welcome slate with no media or ads. Faith and cartoon categories are browsing labels, not age ratings. Categories filter the guide and directory without changing channel numbers or playlists.
 
-Guest profiles require no signup or database migration and stay on the device. Optional email/password accounts sync household profiles, favourites, watchlists and themes across devices; see [account and membership activation](docs/ACCOUNTS_AND_MEMBERSHIP.md). The parent PIN is salted and hashed with PBKDF2, with a delay after repeated wrong attempts. These are household convenience controls: clearing browser data resets them, and public video/programming URLs remain public. Guest PINs have no email recovery. Registered accounts support email confirmation and password recovery; media remains public. Stripe theme purchases and monthly membership are staged behind configuration flags and require provider setup before activation.
+Guest profiles require no signup or database migration and stay on the device. Optional email/password accounts sync household profiles, favourites, watchlists and themes across devices; see [account and membership activation](docs/ACCOUNTS_AND_MEMBERSHIP.md). The parent PIN is salted and hashed with PBKDF2, with a delay after repeated wrong attempts. These are household convenience controls: clearing browser data resets them, and public video/programming URLs remain public. Guest PINs have no email recovery. Registered accounts support email confirmation and password recovery; media remains public. Stripe theme purchases and monthly, six-month and annual memberships are staged behind configuration flags and require provider setup before activation.
 
 ## Schedule recurring blocks
 
