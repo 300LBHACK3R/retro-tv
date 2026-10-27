@@ -862,7 +862,9 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await expect(scene).toHaveCSS("position", "fixed");
   await expect(scene).toHaveAttribute("aria-hidden", "true");
   await expect(scene.getByRole("button")).toHaveCount(0);
+  await waitForHouseholdSave(page);
   await page.goto("/?ch=24");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
   await openMore(page);
   await page.getByRole("button", { name: "Reduce motion Off", exact: true }).click();
   await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
