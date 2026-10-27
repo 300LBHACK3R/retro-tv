@@ -12,7 +12,7 @@ const helpSections = [
   {
     title: "Accounts and purchases",
     items: [
-      "Watching stays free. A free account syncs household profiles, favourite channels, watchlists and theme choices.",
+      "Watching stays free. A parent creates and verifies a free account, then adds household profiles. Paid membership is optional. Kids profiles use approved channels and titles; set a parent PIN before their first watch.",
       "Confirm your email before signing in. The Account page can resend confirmation links and password reset emails.",
       "Theme purchases and membership appear after payment verification. Use Account → Refresh purchases if a completed payment has not appeared yet.",
       "Use Account → Manage billing for payment history, payment details and cancelling future membership renewals. For a payment review, use the merchant contact details provided with your Stripe receipt.",
@@ -22,7 +22,7 @@ const helpSections = [
   {
     title: "Watching Tate's TV",
     items: [
-      "Open the main app and let the current channel load.",
+      "Sign in to your parent account, choose a household profile and let the current channel load.",
       "Use the channel controls to move between channels.",
       "Open the guide to see what is currently playing. On a phone, tap a live programme to tune while you keep browsing.",
       "Use your phone's volume buttons. Turn it sideways to fill the screen, then upright to return.",

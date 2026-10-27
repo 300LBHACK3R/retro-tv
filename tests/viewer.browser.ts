@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { programming } from "./programming-fixture";
 import { THEMES } from "../lib/themes";
 import { readFileSync } from "node:fs";
@@ -240,11 +241,12 @@ test("theme choices persist across navigation and reloads for the active profile
   await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("retro-tv-programming-v1")!).state);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles.find((profile: { id: string }) => profile.id === "main").theme)).toBe("obsidian-gold");
+  await expect.poll(() => page.evaluate(async () => (await (await fetch("/api/account")).json()).household.profiles.find((profile: { id: string }) => profile.id === "main").theme)).toBe("obsidian-gold");
   expect(stored.themeId).toBeUndefined();
   expect(stored.themeRevision).toBeUndefined();
   await page.getByRole("link", { name: "Live TV", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
@@ -399,6 +401,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
         (element) => getComputedStyle(element, "::before").animationName,
       ),
   ).toBe("none");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
@@ -406,7 +409,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
   );
 });
 
-test("favourite channels and guide filtering persist without accounts", async ({
+test("free household favourite channels and guide filtering persist", async ({
   page,
 }) => {
   await page.goto("/?ch=24");
@@ -430,6 +433,7 @@ test("favourite channels and guide filtering persist without accounts", async ({
     }),
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   const desktop = page.getByRole("button", {
@@ -504,6 +508,7 @@ test("watchlist groups episodes, persists and opens linked titles", async ({
       exact: true,
     })
     .click();
+  await waitForHouseholdSave(page);
   await page.reload();
   await page.getByRole("button", { name: "Close title ✕" }).click();
   await page
@@ -862,6 +867,7 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await page.getByRole("button", { name: "Reduce motion Off", exact: true }).click();
   await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-reduced-motion", "true");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-haunted-arcade");
   await expect(page.locator(".ttv-haunted-moonlight")).toHaveCSS("animation-name", "none");

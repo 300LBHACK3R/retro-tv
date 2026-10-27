@@ -34,7 +34,7 @@ function snapshot(): Household {
 function applyHousehold(household: Household | null) {
   applying = true;
   const data: Household = household ?? {
-    profiles: defaults.map((profile) => ({ ...profile })),
+    profiles: defaults.filter((profile) => !profile.kids).map((profile) => ({ ...profile })),
     pin: null,
     library: {},
     showMemberBadge: false,
@@ -96,9 +96,9 @@ export async function refreshAccount(replacePreferences = false) {
     if (dirty && !replacePreferences && !ownerChanged)
       useAccount.setState({ revision: previous.revision });
   } else if (ownerChanged || !useProfiles.getState().ready) {
-    useProfiles.setState({ ready: false });
-    await useDeviceLibrary.persist.rehydrate();
-    initializeProfiles();
+    lockProfiles();
+    useProfiles.setState({ profiles: [], pin: null, ready: true });
+    useDeviceLibrary.setState({ profiles: {}, favouriteChannels: [], watchlist: [] });
   }
   const activeIndex = useProfiles
     .getState()
@@ -110,15 +110,16 @@ export async function refreshAccount(replacePreferences = false) {
 }
 export function startAccount() {
   if (!start)
-    start = refreshAccount().catch(async () => {
+    start = refreshAccount().catch(() => {
       useAccount.setState({
         ...EMPTY_ACCOUNT,
         ready: true,
         error:
-          "Account services are unavailable. Free viewing still works; account changes are not syncing.",
+          "Account services are unavailable. Please try again shortly to sign in.",
       });
-      await useDeviceLibrary.persist.rehydrate();
-      initializeProfiles();
+      lockProfiles();
+      useProfiles.setState({ profiles: [], pin: null, ready: true });
+      useDeviceLibrary.setState({ profiles: {}, favouriteChannels: [], watchlist: [] });
     });
   return start;
 }

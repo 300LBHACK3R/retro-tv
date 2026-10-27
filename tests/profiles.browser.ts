@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 const video = Buffer.from(
@@ -170,6 +171,7 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
     )
     .toBe("20260909-premium-viewer-v3");
   expect(documentLoads).toBe(1);
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(
     current.getByRole("heading", { name: "Welcome TV", exact: true }),
@@ -240,6 +242,7 @@ test("Kids blocks unapproved deep links, directory and library titles, and requi
     "wasn't right",
   );
   await expect(page.locator("video")).toHaveCount(0);
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Who’s watching?" }),
@@ -372,7 +375,7 @@ test("PIN setup can be corrected or cancelled and the direct Add shortcut cannot
   ).toBeFocused();
   expect(
     await page.evaluate(
-      () => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).pin,
+      async () => (await (await fetch("/api/account")).json()).household.pin,
     ),
   ).toBeNull();
   await chooseKids(page);
@@ -503,6 +506,7 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and pres
   await expect(scene.getByRole("button")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(lamp).toHaveCSS("animation-name", "none");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(lamp).toHaveCSS("animation-name", "none");
   await expect(scene.getByRole("button")).toHaveCount(0);
@@ -527,9 +531,10 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and pres
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
-  const savedProfiles = await page.evaluate(() => JSON.parse(localStorage.getItem("ttv-profiles-v1")!).profiles);
+  const savedProfiles = await page.evaluate(async () => (await (await fetch("/api/account")).json()).household.profiles);
   expect(savedProfiles.find((profile: { id: string }) => profile.id === "main").theme).toBe("obsidian-gold");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
@@ -563,17 +568,20 @@ test("Christmas entrance starts November 1 while each profile keeps its chosen t
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="christmas-96-living-room"]').click();
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await switchProfile(page);
   await page.getByRole("button", { name: "Watch as Taylor", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
   // End the tab session; choices remain in the browser for the next visit.
   await page.evaluate(() => sessionStorage.clear());
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
@@ -629,6 +637,7 @@ test("new tabs restore saved choices and theme updates do not sign out an existi
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
   await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("button", { name: /^Switch profile: Main/ })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");

@@ -11,8 +11,8 @@ export default function TermsPage() {
       <Link href="/">← Back to free TV</Link>
       <h1>Accounts & purchases</h1>
       <p>
-        Live channels, the guide and the on-demand library remain free. An
-        account, theme purchase or membership is optional. Adults create and
+        Live channels, the guide and the on-demand library remain free with a
+        verified parent account. Theme purchases and membership are optional. Adults create and
         manage household accounts, including profiles used by children. Keep
         your sign-in details private.
       </p>

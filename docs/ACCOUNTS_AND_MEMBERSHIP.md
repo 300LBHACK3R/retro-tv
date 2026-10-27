@@ -1,3 +1,5 @@
+> Parent-account update: the viewer, library and TV mode now require a verified free account. Historical references below to guest viewing describe the earlier rollout. Guest data is retained only for explicit import after sign-in. A new household starts with the parent profile; parents add Kids profiles and set a PIN before Kids viewing. Billing remains optional. See `PARENT_ACCOUNTS.md` for the current release boundaries.
+
 # Accounts and membership activation
 
 The code is staged behind explicit flags. Free live TV, the guide and the library never require an account or payment. Keep billing disabled until the provider checks below pass. The approved plans are C$4.99 monthly, C$24.99 prepaid for six months, and C$44.99 prepaid yearly; each renews at its selected interval.

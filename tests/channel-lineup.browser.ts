@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect } from "./viewer-fixture";
 import { defaultChannels } from "../lib/store";
 import { programming } from "./programming-fixture";
 import type { ProgrammingSnapshot } from "../lib/programmingSnapshot";
@@ -35,6 +36,7 @@ test("admin reorders, saves and programmes separate Halloween channels", async (
   const reloaded = page.waitForResponse(response =>
     response.url().endsWith("/api/programming") && response.ok(),
   );
+  await waitForHouseholdSave(page);
   await page.reload();
   const cloud = await (await reloaded).json();
   expect(cloud.programming.channels.find((channel: { id: string }) => channel.id === "3").number).toBe(4);

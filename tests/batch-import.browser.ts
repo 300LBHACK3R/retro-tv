@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 import type { ProgrammingSnapshot } from "../lib/programmingSnapshot";
@@ -31,6 +32,7 @@ test("existing links detect runtimes, survive reload and append once after revie
   await page.getByRole("button", {name:"Prepare / retry selected items"}).click();
   await expect(page.locator('.ttv-batch-rows [data-status="ready"]')).toHaveCount(2);
   expect(saved().media).toHaveLength(programming.media.length);
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByText(/Global (loaded|sync active)/)).toBeVisible();
   await expect(page.locator('.ttv-batch-rows [data-status="ready"]')).toHaveCount(2);

@@ -3,6 +3,33 @@ import { serverModule } from "./server-harness";
 import * as model from "../lib/accountModel";
 import * as profiles from "../lib/profiles";
 
+test("an auth outage clears active device profiles instead of restoring guest viewing", async () => {
+  let account = { ...model.EMPTY_ACCOUNT, ready: false, error: "" };
+  let local = { profiles: profiles.defaults, pin: null, activeId: "main" as string | null, ready: false };
+  let initialized = false;
+  const sync = serverModule("lib/accountSync.ts", {
+    "./profiles": profiles,
+    "./accountModel": model,
+    "./accountStore": {
+      useAccount: { getState: () => account, setState: (patch: Partial<typeof account>) => { account = { ...account, ...patch }; } },
+    },
+    "./deviceProfiles": {
+      useProfiles: { getState: () => local, setState: (patch: Partial<typeof local>) => { local = { ...local, ...patch }; } },
+      lockProfiles: () => { local.activeId = null; },
+      initializeProfiles: () => { initialized = true; },
+    },
+    "./deviceLibrary": { useDeviceLibrary: { setState: () => {} } },
+    "./themePreferences": {}, "./themes": {},
+  }, {}, { fetch: async () => { throw new Error("Offline"); }, clearTimeout, setTimeout });
+  await sync.startAccount!();
+  expect(account.user).toBeNull();
+  expect(account.ready).toBe(true);
+  expect(account.error).toContain("sign in");
+  expect(local.activeId).toBeNull();
+  expect(local.profiles).toEqual([]);
+  expect(initialized).toBe(false);
+});
+
 test("overlapping save callers serialize edits and never submit the same revision twice", async () => {
   let account = { ...model.EMPTY_ACCOUNT, user: { id: "alice", email: "alice@example.test" }, saving: false, syncError: "", showMemberBadge: false };
   const local = { profiles: profiles.defaults, pin: null };

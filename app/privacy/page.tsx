@@ -14,25 +14,25 @@ export default function PrivacyPage() {
       <Link href="/">← Back to live TV</Link>
       <h1>Privacy & saved preferences</h1>
       <p>
-        Your profile names and avatars, favourites, watchlist and library
-        playback progress are saved in your browser. They do not require an
-        account and do not follow you to another device. Clearing this site’s
-        browser storage removes them. Your selected theme is also saved until you change it.
+        Your household profiles, favourites, watchlist and theme choices sync
+        with your parent account. Playback settings and resume positions stay
+        on the current device. Clearing browser storage removes those local
+        settings but does not delete your account or its saved parent PIN.
       </p>
-      <h2>Optional accounts and purchases</h2>
-      <p>Creating an account is optional. Email addresses and password authentication are managed by Supabase. We do not store your plaintext password. Account sessions use secure HttpOnly cookies. When signed in, your household profiles, salted parent-PIN hash, favourites, watchlist and theme choices are stored with your account and sync across devices. Device-only profiles are imported only when you choose to import them. Playback resume positions remain on the current device.</p>
+      <h2>Parent accounts and optional purchases</h2>
+      <p>A verified parent account is required to use the viewer and library. Paid membership is optional. Children use Kids profiles inside a parent’s household rather than separate email accounts. Email addresses and password authentication are managed by Supabase. We do not store your plaintext password. Account sessions use secure HttpOnly cookies. When signed in, your household profiles, salted parent-PIN hash, favourites, watchlist and theme choices are stored with your account and sync across devices. Device-only profiles are imported only when you choose to import them. Playback resume positions remain on the current device.</p>
       <p>Stripe handles checkout, payment details, receipts and subscription billing. Tate’s TV keeps purchase and membership identifiers and status to provide access. Card details are not stored by Tate’s TV. Cancelling membership stops future renewals; individually purchased themes remain available. Signed-in purchases and account pages are excluded from optional viewing analytics.</p>
       <p>You can sign out, request a password reset or delete your account from Account settings. Account deletion removes synced household data and cancels membership. Payment providers may retain transaction records for their own legal and accounting requirements. Clearing browser storage alone does not delete a registered account or cancel a subscription.</p>
       <h2>Profiles & Kids mode</h2>
       <p>
-        Each profile has separate saved items, on this browser for guests or in the signed-in household account. The parent PIN is
+        Each profile has separate saved items, in the signed-in household account. The parent PIN is
         stored as a salted hash. Kids mode uses programming explicitly approved
         by the station, including eligible ads. Opening full-lineup profiles and
         managing profiles requires the PIN once it is set.
       </p>
       <p>
         Household profiles are separate from account sign-in and are not age verification.
-        Clearing browser data resets guest profiles and their PIN. Public video links
+        Clearing browser data does not remove the parent PIN saved to your account. Public video links
         remain public. Profile names and PINs are not sent to station insights.
       </p>
       <h2>Understanding playback</h2>

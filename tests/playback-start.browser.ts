@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 
@@ -89,6 +90,7 @@ test("a failed lineup refresh still opens the cached lineup", async ({ page }) =
   await page.route("**/api/programming", (route) => route.fulfill({
     status: 503, json: { ok: false, error: "Schedule temporarily unavailable" },
   }));
+  await waitForHouseholdSave(page);
   await page.reload();
   await playing(page);
   await expect(page.getByText("The schedule could not refresh. Please try again shortly.")).toBeVisible();
@@ -116,6 +118,7 @@ test("a lineup body that stalls after its headers times out to the cached lineup
       return originalFetch(input, init);
     };
   });
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("status").filter({ hasText: "Getting your TV ready…" })).toBeVisible();
   await expect(page.getByText("The schedule could not refresh. Please try again shortly."))

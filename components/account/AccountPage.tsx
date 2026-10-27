@@ -38,6 +38,8 @@ export default function AccountPage({
   confirmation?: boolean;
 }) {
   const account = useAccount();
+  const parentPin = useProfiles((state) => state.pin);
+  const activeProfileId = useProfiles((state) => state.activeId);
   const kids = useProfiles(
     (state) =>
       state.profiles.find((profile) => profile.id === state.activeId)?.kids,
@@ -182,14 +184,14 @@ export default function AccountPage({
     <main className="ttv-account-page">
       <header>
         <Link href="/" className="ttv-account-back">
-          ← Back to free TV
+          {account.user ? "← Back to free TV" : "← Tate’s TV"}
         </Link>
         <Link href="/privacy">Privacy</Link>
       </header>
       <div className="ttv-account-brand">
         <TatesTvLogo width={240} height={160} sizes="240px" />
       </div>
-      {kids && mode !== "confirm" && mode !== "reset" ? (
+      {account.user && (kids || (parentPin && !activeProfileId)) && mode !== "confirm" && mode !== "reset" ? (
         <section className="ttv-account-card">
           <h1>Ask a parent</h1>
           <p>
@@ -240,7 +242,7 @@ export default function AccountPage({
           ) : null}
           {authForm ? (
             <section className="ttv-account-card ttv-account-auth">
-              <p className="ttv-account-eyebrow">Free account · Free TV</p>
+              <p className="ttv-account-eyebrow">Free parent account · Free TV</p>
               <h1>
                 {mode === "signup"
                   ? "Make yourself at home."
@@ -257,12 +259,11 @@ export default function AccountPage({
               <p>
                 {mode === "confirm"
                   ? "Confirm this email link to continue securely."
-                  : "Save your household profiles, favourite channels, watchlist and themes across devices."}
+                  : "Create a free parent account or sign in to watch. Add Kids profiles inside your household with a parent PIN and approved channels and titles. No paid membership required."}
               </p>
               {!account.enabled ? (
                 <p role="status">
-                  Account registration is getting ready. You can keep watching
-                  free TV.
+                  Account services are temporarily unavailable. Please try again shortly.
                 </p>
               ) : (
                 <>
@@ -415,9 +416,7 @@ export default function AccountPage({
                   )}
                 </>
               )}
-              <Link className="ttv-account-guest" href="/">
-                Continue watching for free →
-              </Link>
+              <p className="ttv-account-guest">Free account. Free viewing. Membership is optional.</p>
             </section>
           ) : (
             <div className="ttv-account-dashboard">

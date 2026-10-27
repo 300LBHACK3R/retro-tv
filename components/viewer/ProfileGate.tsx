@@ -10,6 +10,7 @@ import {
 } from "@/lib/deviceProfiles";
 import { ProfileAvatar } from "./ProfileAvatar";
 import ProfilePicker from "./ProfilePicker";
+import AccountPage from "@/components/account/AccountPage";
 
 export function ProfileButton() {
   const badge = useAccount((state) => state.member && state.showMemberBadge);
@@ -40,6 +41,8 @@ export function ProfileButton() {
   );
 }
 export default function ProfileGate({ children }: { children: ReactNode }) {
+  const accountReady = useAccount((state) => state.ready);
+  const user = useAccount((state) => state.user?.id);
   const ready = useProfiles((state) => state.ready);
   const activeId = useProfiles((state) => state.activeId);
   const revision = useProfiles((state) => state.revision);
@@ -58,11 +61,14 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     disconnect();
-    if (!activeId)
+    if (!user || !activeId)
       document
         .querySelectorAll<HTMLMediaElement>("video, audio")
         .forEach((media) => media.pause());
-  }, [activeId, disconnect, sdkState]);
+  }, [user, activeId, disconnect, sdkState]);
+  // Device profiles are preferences, never proof of account authentication.
+  // Do not mount the viewer or programming sync until the verified account loads.
+  if (!accountReady || !user) return <AccountPage />;
   return (
     <>
       <GlobalProgrammingSync

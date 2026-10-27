@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 import type { ProgrammingSnapshot } from "../lib/programmingSnapshot";
@@ -146,6 +147,7 @@ test("Kids library blocks unapproved deep links, inherits reviewed channels and 
       },
     ],
   };
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Open Studio Sessions" }),
@@ -158,6 +160,7 @@ test("Kids library blocks unapproved deep links, inherits reviewed channels and 
     page.getByRole("dialog", { name: "A Calgary Evening" }),
   ).toHaveCount(0);
   source.media = source.media.map((item) => ({ ...item, kidsApproved: false }));
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Your Kids library is being prepared" }),

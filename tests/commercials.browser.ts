@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { waitForHouseholdSave } from "./viewer-fixture";
+import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 import type { ProgrammingSnapshot } from "../lib/programmingSnapshot";
@@ -39,6 +40,7 @@ test("commercial campaign saves, configures breaks, previews and pauses without 
   await expect(workspace.locator('[data-commercial="true"]')).toHaveCount(4);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await testInfo.attach("commercials-workspace", { body: await page.screenshot({ path: testInfo.outputPath("commercials.png"), fullPage: true }), contentType: "image/png" });
+  await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByText(/Global loaded/)).toBeVisible();
   await page.getByRole("button", { name: "Commercials", exact: true }).click();

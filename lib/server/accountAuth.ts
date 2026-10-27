@@ -61,7 +61,7 @@ export async function accountMutationGuard(
     return privateJson({ error: "Request origin rejected." }, 403);
   if (!accountsEnabled())
     return privateJson(
-      { error: "Accounts are not available yet. Free viewing is still open." },
+      { error: "Account services are temporarily unavailable. Please try again shortly." },
       503,
     );
   // Signing out must still clear credentials during a database outage.
