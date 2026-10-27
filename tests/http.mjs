@@ -46,7 +46,6 @@ const server = spawn(process.execPath, ["tests/https-server.mjs"], {
   env: {
     ...process.env,
     NODE_ENV: "production",
-    ADMIN_PASSWORD: "synthetic-test-password",
     ADMIN_SESSION_SECRET: "synthetic-test-signing-secret-for-local-tests",
     SUPABASE_URL: "https://invalid.test",
     SUPABASE_SERVICE_ROLE_KEY: "synthetic-not-a-service-key",

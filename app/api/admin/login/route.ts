@@ -1,137 +1,30 @@
-import {
-  consumeRateLimit,
-  getClientAddress,
-  isSameOriginRequest,
-} from "@/lib/server/requestSecurity";
-import { noStoreJson, readBoundedJson } from "@/lib/server/http";
-import { cookies } from "next/headers";
-import type { NextResponse } from "next/server";
-import {
-  ADMIN_COOKIE_NAME,
-  SESSION_MAX_AGE_SECONDS,
-  createSessionToken,
-  getAdminPassword,
-  safeCompare,
-} from "@/lib/server/adminAuth";
+import { accountMutationGuard } from "@/lib/server/accountAuth";
+import { adminAccountClient, adminAccountsEnabled, clearAdminCookies, isAdminUser } from "@/lib/server/adminAuth";
+import { privateJson, readBoundedJson } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type LoginRequestBody = {
-  password?: unknown;
-};
-
-type LoginResponseBody = {
-  ok: boolean;
-  error?: string;
-};
-
-const MAX_PASSWORD_LENGTH = 512;
-
-function jsonResponse(
-  body: LoginResponseBody,
-  init?: ResponseInit,
-): NextResponse<LoginResponseBody> {
-  return noStoreJson(body, init);
-}
-
-async function readLoginBody(
-  request: Request,
-): Promise<LoginRequestBody | null> {
-  const contentType = request.headers.get("content-type") ?? "";
-
-  if (!contentType.toLowerCase().includes("application/json")) {
-    return null;
-  }
-
-  try {
-    const body = await readBoundedJson(request, 2048);
-
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      return null;
-    }
-
-    return body as LoginRequestBody;
-  } catch {
-    return null;
-  }
-}
-
-function getPasswordFromBody(body: LoginRequestBody | null): string {
-  if (!body || typeof body.password !== "string") {
-    return "";
-  }
-
-  return body.password.trim();
-}
-
 export async function POST(request: Request) {
-  if (!isSameOriginRequest(request))
-    return jsonResponse(
-      { ok: false, error: "Request not allowed." },
-      { status: 403 },
-    );
-  const limit = consumeRateLimit({
-    key: `admin-login:${getClientAddress(request)}`,
-    limit: 8,
-    windowMs: 15 * 60 * 1000,
-  });
-  if (!limit.allowed)
-    return jsonResponse(
-      { ok: false, error: "Too many attempts. Please try again later." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(limit.retryAfterSeconds) },
-      },
-    );
-  const adminPassword = getAdminPassword();
-
-  if (!adminPassword) {
-    return jsonResponse(
-      {
-        ok: false,
-        error:
-          "ADMIN_PASSWORD is missing or too short. Set it in environment variables.",
-      },
-      { status: 500 },
-    );
+  const rejected = await accountMutationGuard(request, "admin-signin", 8);
+  if (rejected) return rejected;
+  if (!adminAccountsEnabled()) return privateJson({ ok: false, error: "Admin sign-in is not configured yet." }, 503);
+  try {
+    const body = await readBoundedJson(request, 4096) as { email?: unknown; password?: unknown } | null;
+    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    const password = typeof body?.password === "string" ? body.password : "";
+    if (!email || email.length > 254 || !password || password.length > 512) {
+      return privateJson({ ok: false, error: "Enter your admin email and password." }, 400);
+    }
+    const client = await adminAccountClient();
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error || !isAdminUser(data.user)) {
+      try { await client.auth.signOut({ scope: "local" }); } finally { await clearAdminCookies(); }
+      return privateJson({ ok: false, error: "Unable to sign in with these admin credentials." }, 401);
+    }
+    return privateJson({ ok: true });
+  } catch {
+    await clearAdminCookies();
+    return privateJson({ ok: false, error: "Admin sign-in is temporarily unavailable. Please try again." }, 503);
   }
-
-  const body = await readLoginBody(request);
-  const password = getPasswordFromBody(body);
-
-  if (password.length === 0 || password.length > MAX_PASSWORD_LENGTH) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: "Invalid admin password.",
-      },
-      { status: 401 },
-    );
-  }
-
-  if (!safeCompare(password, adminPassword)) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: "Invalid admin password.",
-      },
-      { status: 401 },
-    );
-  }
-
-  const cookieStore = await cookies();
-
-  cookieStore.set({
-    name: ADMIN_COOKIE_NAME,
-    value: createSessionToken(adminPassword),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-    priority: "high",
-  });
-
-  return jsonResponse({ ok: true });
 }

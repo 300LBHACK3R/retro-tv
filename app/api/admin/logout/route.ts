@@ -1,43 +1,19 @@
-import { noStoreJson } from "@/lib/server/http";
+import { privateJson } from "@/lib/server/http";
 import { isSameOriginRequest } from "@/lib/server/requestSecurity";
-import { cookies } from "next/headers";
-import type { NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/server/adminAuth";
+import { adminAccountClient, clearAdminCookies } from "@/lib/server/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type LogoutResponseBody = {
-  ok: boolean;
-};
-
-const EXPIRED_DATE = new Date(0);
-
-function jsonResponse(
-  body: LogoutResponseBody,
-  init?: ResponseInit,
-): NextResponse<LogoutResponseBody> {
-  return noStoreJson(body, init);
-}
-
 export async function POST(request: Request) {
-  if (!isSameOriginRequest(request))
-    return jsonResponse({ ok: false }, { status: 403 });
-  const cookieStore = await cookies();
-
-  cookieStore.set({
-    name: ADMIN_COOKIE_NAME,
-    value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 0,
-    expires: EXPIRED_DATE,
-    priority: "high",
-  });
-
-  return jsonResponse({
-    ok: true,
-  });
+  if (!isSameOriginRequest(request)) return privateJson({ ok: false }, 403);
+  try {
+    const client = await adminAccountClient();
+    await client.auth.signOut({ scope: "local" });
+  } catch {
+    // Local credentials must still be removed during a provider outage.
+  } finally {
+    await clearAdminCookies();
+  }
+  return privateJson({ ok: true });
 }

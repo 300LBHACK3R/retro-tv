@@ -1,238 +1,58 @@
 import "server-only";
-
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import crypto from "node:crypto";
+import type { User } from "@supabase/supabase-js";
 
-export const ADMIN_COOKIE_NAME = "ttv_admin_session";
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
+export const ADMIN_COOKIE_NAME = "ttv-admin-auth";
+const LEGACY_COOKIE_NAME = "ttv_admin_session";
 
-const SESSION_TOKEN_PREFIX = "ttv_admin_v3";
-const LEGACY_SESSION_TOKEN_PREFIX = "ttv_admin_v2";
-const SESSION_BUCKET_SECONDS = SESSION_MAX_AGE_SECONDS;
-const SESSION_NONCE_BYTES = 24;
-const MAX_CLOCK_SKEW_SECONDS = 60;
-
-type ParsedSessionToken = {
-  prefix: string;
-  issuedAt: number;
-  expiresAt: number;
-  nonce: string;
-  signature: string;
-};
-
-function getUnixTime(nowMs = Date.now()): number {
-  return Math.floor(nowMs / 1000);
+/** Deployment-controlled IDs grant access, never profiles or editable metadata. */
+export function isAdminUser(user: Pick<User, "id" | "email_confirmed_at"> | null) {
+  const ids = (process.env.TTV_ADMIN_USER_IDS ?? "").split(",").map(id => id.trim()).filter(Boolean);
+  return !!user?.email_confirmed_at && ids.includes(user.id);
 }
 
-export function getAdminPassword(): string | null {
-  const password = process.env.ADMIN_PASSWORD?.trim();
-
-  return password && password.length >= 8 ? password : null;
+export function adminAccountsEnabled() {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_PUBLISHABLE_KEY && process.env.TTV_ADMIN_USER_IDS?.trim());
 }
 
-function getSessionSecret(): string | null {
-  const explicitSecret = process.env.ADMIN_SESSION_SECRET?.trim();
-
-  if (explicitSecret && explicitSecret.length >= 16) {
-    return explicitSecret;
-  }
-
-  return getAdminPassword();
+/** A separate cookie name isolates admin login from household sessions. */
+export async function adminAccountClient() {
+  if (!adminAccountsEnabled()) throw new Error("Admin accounts unavailable");
+  const jar = await cookies();
+  return createServerClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+    cookieOptions: {
+      name: ADMIN_COOKIE_NAME,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    },
+    cookies: {
+      getAll: () => jar.getAll().filter(({ name }) => name === ADMIN_COOKIE_NAME || name.startsWith(`${ADMIN_COOKIE_NAME}.`)),
+      setAll: values => values.forEach(({ name, value, options }) => jar.set(name, value, options)),
+    },
+  });
 }
 
-function getSessionBucket(nowMs = Date.now()): number {
-  return Math.floor(getUnixTime(nowMs) / SESSION_BUCKET_SECONDS);
-}
-
-function hashValue(value: string): Buffer {
-  return crypto.createHash("sha256").update(value).digest();
-}
-
-function createSignaturePayload(
-  prefix: string,
-  issuedAt: number,
-  expiresAt: number,
-  nonce: string,
-): string {
-  return `${prefix}:${issuedAt}:${expiresAt}:${nonce}`;
-}
-
-function createTokenSignature(
-  secret: string,
-  issuedAt: number,
-  expiresAt: number,
-  nonce: string,
-): string {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(createSignaturePayload(SESSION_TOKEN_PREFIX, issuedAt, expiresAt, nonce))
-    .digest("hex");
-}
-
-function createBucketedSessionToken(secret: string, bucket: number): string {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${LEGACY_SESSION_TOKEN_PREFIX}:${bucket}`)
-    .digest("hex");
-}
-
-function parseSessionToken(token: string): ParsedSessionToken | null {
-  const clean = token.trim();
-
-  if (!clean) {
-    return null;
+export async function clearAdminCookies() {
+  const jar = await cookies();
+  for (const { name } of jar.getAll()) {
+    if (name === LEGACY_COOKIE_NAME || name === ADMIN_COOKIE_NAME || name.startsWith(`${ADMIN_COOKIE_NAME}.`)) {
+      jar.set(name, "", { path: "/", maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
+    }
   }
-
-  const parts = clean.split(".");
-
-  if (parts.length !== 5) {
-    return null;
-  }
-
-  const prefix = parts[0] ?? "";
-  const issuedAtRaw = parts[1] ?? "";
-  const expiresAtRaw = parts[2] ?? "";
-  const nonce = parts[3] ?? "";
-  const signature = parts[4] ?? "";
-
-  if (prefix !== SESSION_TOKEN_PREFIX) {
-    return null;
-  }
-
-  const issuedAt = Number(issuedAtRaw);
-  const expiresAt = Number(expiresAtRaw);
-
-  if (
-    !Number.isInteger(issuedAt) ||
-    !Number.isInteger(expiresAt) ||
-    issuedAt <= 0 ||
-    expiresAt <= 0 ||
-    expiresAt <= issuedAt
-  ) {
-    return null;
-  }
-
-  if (!/^[a-f0-9]{32,128}$/i.test(nonce)) {
-    return null;
-  }
-
-  if (!/^[a-f0-9]{64}$/i.test(signature)) {
-    return null;
-  }
-
-  return {
-    prefix,
-    issuedAt,
-    expiresAt,
-    nonce,
-    signature,
-  };
-}
-
-function isValidSignedSessionToken(
-  token: string,
-  secret: string,
-  nowMs = Date.now(),
-): boolean {
-  const parsed = parseSessionToken(token);
-
-  if (!parsed) {
-    return false;
-  }
-
-  const now = getUnixTime(nowMs);
-  const maxAllowedExpiry =
-    parsed.issuedAt + SESSION_MAX_AGE_SECONDS + MAX_CLOCK_SKEW_SECONDS;
-
-  if (parsed.issuedAt > now + MAX_CLOCK_SKEW_SECONDS) {
-    return false;
-  }
-
-  if (parsed.expiresAt < now) {
-    return false;
-  }
-
-  if (parsed.expiresAt > maxAllowedExpiry) {
-    return false;
-  }
-
-  const expectedSignature = createTokenSignature(
-    secret,
-    parsed.issuedAt,
-    parsed.expiresAt,
-    parsed.nonce,
-  );
-
-  return safeCompare(parsed.signature, expectedSignature);
-}
-
-function isValidLegacyBucketedSessionToken(
-  token: string,
-  secret: string,
-): boolean {
-  const clean = token.trim();
-
-  if (!/^[a-f0-9]{64}$/i.test(clean)) {
-    return false;
-  }
-
-  const currentBucket = getSessionBucket();
-
-  const validTokens = [
-    createBucketedSessionToken(secret, currentBucket),
-    createBucketedSessionToken(secret, currentBucket - 1),
-  ];
-
-  return validTokens.some((validToken) => safeCompare(clean, validToken));
-}
-
-export function safeCompare(a: string, b: string): boolean {
-  const aHash = hashValue(a);
-  const bHash = hashValue(b);
-
-  return crypto.timingSafeEqual(aHash, bHash);
-}
-
-export function createSessionToken(password: string): string {
-  const fallbackPassword = password.trim();
-  const secret =
-    getSessionSecret() ??
-    (fallbackPassword.length >= 8 ? fallbackPassword : null);
-
-  if (!secret) {
-    throw new Error("Admin session secret is not configured.");
-  }
-
-  const issuedAt = getUnixTime();
-  const expiresAt = issuedAt + SESSION_MAX_AGE_SECONDS;
-  const nonce = crypto.randomBytes(SESSION_NONCE_BYTES).toString("hex");
-  const signature = createTokenSignature(secret, issuedAt, expiresAt, nonce);
-
-  return `${SESSION_TOKEN_PREFIX}.${issuedAt}.${expiresAt}.${nonce}.${signature}`;
-}
-
-function isValidSessionToken(token: string): boolean {
-  const secret = getSessionSecret();
-
-  if (!secret || !token.trim()) {
-    return false;
-  }
-
-  return (
-    isValidSignedSessionToken(token, secret) ||
-    isValidLegacyBucketedSessionToken(token, secret)
-  );
 }
 
 export async function isAdminRequestAuthorized(): Promise<boolean> {
-  const adminPassword = getAdminPassword();
-
-  if (!adminPassword) {
+  if (!adminAccountsEnabled()) return false;
+  try {
+    const client = await adminAccountClient();
+    // Verify with Auth on every request, not a cached role or browser claims.
+    const { data, error } = await client.auth.getUser();
+    return !error && isAdminUser(data.user);
+  } catch {
     return false;
   }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value ?? "";
-
-  return isValidSessionToken(token);
 }
