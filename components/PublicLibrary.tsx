@@ -24,6 +24,7 @@ import { getThemeLayoutClass } from "@/lib/themes";
 import { createThemeCssVars, getThemeById } from "@/lib/themes";
 import {
   buildLibrary,
+  isSavedGroup,
   FILTERS,
   formatClock,
   formatDuration,
@@ -36,6 +37,7 @@ import {
 } from "@/lib/libraryCatalog";
 import { libraryCollections, groupRuntime, sortLibrary, titleLetter, watchStatus } from "@/lib/libraryBrowse";
 import { CHANNEL_CATEGORIES } from "@/lib/audience";
+import { seasonSummary } from "@/lib/seriesMetadata";
 import styles from "./library/library.module.css";
 
 function readProgress(key: string): ProgressMap {
@@ -136,7 +138,7 @@ function ProfileLibrary() {
     const groups = library.filter(
       (group) =>
         (filter === "all" || group.type === filter) &&
-        (!savedOnly || watchlist.includes(group.key)) &&
+        (!savedOnly || isSavedGroup(group, watchlist)) &&
         (category === "all" || collections.get(group.key)?.categories.some(value => value === category)) &&
         (channel === "all" || collections.get(group.key)?.channels.some(value => value.id === channel)) &&
         (letter === "all" || titleLetter(group.title) === letter) &&
@@ -202,7 +204,7 @@ function ProfileLibrary() {
     ...(runtime !== "all" ? [{ label: runtime === "short" ? "Under 30 minutes" : runtime === "medium" ? "30–60 minutes" : "60+ minutes", clear: () => setRuntime("all") }] : []),
   ];
   const savedCount = library.filter((group) =>
-    watchlist.includes(group.key),
+    isSavedGroup(group, watchlist),
   ).length;
   return (
     <>
@@ -245,6 +247,7 @@ function ProfileLibrary() {
             </div>
             <span className={styles.count}>{library.length} titles</span>
           </section>
+          {!kids ? <div className={styles.requestBanner}><div><strong>Missing a favourite show?</strong><p>Paid members can suggest shows and track their requests.</p></div><Link href="/account#show-requests" className={styles.button}>Request a Show</Link></div> : null}
           {availableCategories.length > 0 && <section className={styles.collectionSection} aria-label="Explore collections">
             <div className={styles.sectionHead}><h2>Find your kind of TV</h2><p className={styles.muted}>Browse the collections from your channels.</p></div>
             <div className={styles.collectionGrid}>{availableCategories.map(value => <button key={value} className={styles.collectionCard} aria-label={`Explore ${value}`} aria-pressed={category === value} onClick={() => { setCategory(value); setFilter("all"); setQuery(""); setSavedOnly(false); setChannel("all"); setLetter("all"); setWatchFilter("all"); setRuntime("all"); setLimit(30); searchRef.current?.scrollIntoView({ block: "center", behavior: "auto" }); searchRef.current?.focus({ preventScroll: true }); }}><span className={styles.eyebrow}>Collection</span><strong>{value}</strong><small>{library.filter(group => collections.get(group.key)?.categories.includes(value)).length} titles <span aria-hidden="true">↗</span></small></button>)}</div>
@@ -392,7 +395,7 @@ function ProfileLibrary() {
                       >
                         <div className={styles.poster}>
                           <ProgrammeArtwork
-                            src={group.poster}
+                            src={group.poster || group.seasons.map(value => group.seasonPosters[value]).find(Boolean)}
                             title={group.title}
                             kind={getTypeLabel(group.type)}
                           />
@@ -401,7 +404,7 @@ function ProfileLibrary() {
                         <p>
                           {getTypeLabel(group.type)}
                           {group.type === "show"
-                            ? ` · ${group.seasons.length} ${group.seasons.length === 1 ? "season" : "seasons"} · ${group.items.length} episodes`
+                            ? ` · ${seasonSummary(group.seasons)} · ${group.items.length} episodes`
                             : ` · ${formatDuration(group.totalDuration)}`}
                         </p>
                         <p className={styles.cardCategory}>{collections.get(group.key)?.categories.join(" · ") || "On demand"}</p>
@@ -411,6 +414,7 @@ function ProfileLibrary() {
                       <div className={styles.cardSave}>
                         <SaveButton
                           id={group.key}
+                          aliases={group.aliasKeys}
                           title={group.title}
                           kind="programme"
                           compact

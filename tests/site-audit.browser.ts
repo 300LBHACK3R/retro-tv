@@ -67,6 +67,7 @@ test("admin tools load their separate panels without changing saved programming"
     return route.fulfill({ json: { ok: true, programming } });
   });
   await page.route("**/api/admin/submissions", route => route.fulfill({ json: { ok: true, submissions: [] } }));
+  await page.route("**/api/admin/show-requests?*", route => route.fulfill({ json: { requests: [], total: 0, page: 0 } }));
   await page.route("**/api/admin/station", route => route.fulfill({ status: 503, json: { ok: false, error: "Insights temporarily unavailable" } }));
   await page.route("**/api/engagement", route => route.fulfill({ json: { ok: true } }));
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
@@ -80,6 +81,8 @@ test("admin tools load their separate panels without changing saved programming"
     ["Playlist", "Channel Programming"],
     ["Branding", "Channel Branding"],
     ["Library", "Media Manager"],
+    ["Show Organization", "Show Organization"],
+    ["Show Requests", "Show Requests"],
     ["Programme Blocks", "Signature programming"],
     ["Submissions", "Submissions Inbox"],
     ["Station Insights", "Station insights"],

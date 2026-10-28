@@ -6,15 +6,28 @@ import { safeArtworkUrl, type UpcomingTitle } from "@/lib/libraryPresentation";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import ArtworkEditor from "@/components/library/ArtworkEditor";
 import styles from "@/components/library/library.module.css";
+import { seasonArtworkKey, seasonLabel } from "@/lib/seriesMetadata";
 
 function TitleEditor({ group }: { group: LibraryGroup }) {
-  const existing = useStore((state) => state.libraryArtwork[group.key]);
+  const [scope, setScope] = useState("show");
+  const season = scope === "show" ? null : Number(scope);
+  const artworkKey = season === null ? group.key : seasonArtworkKey(group.key, season);
+  return <>
+    {group.type === "show" ? <label className={styles.artworkScope}>Artwork scope<select className={styles.select} value={scope} onChange={event => setScope(event.target.value)}><option value="show">Whole show · Default poster</option>{group.seasons.map(value => <option key={value} value={value}>{seasonLabel(value)} · All episodes</option>)}</select></label> : null}
+    <TitleArtworkEditor key={artworkKey} group={group} artworkKey={artworkKey} season={season} />
+  </>;
+}
+function TitleArtworkEditor({ group, artworkKey, season }: { group: LibraryGroup; artworkKey: string; season: number | null }) {
+  const artwork = useStore((state) => state.libraryArtwork);
+  const keys = [artworkKey, ...group.aliasKeys.map(key => season === null ? key : seasonArtworkKey(key, season))];
+  const existing = keys.map(key => artwork[key]).find(Boolean);
   const setArtwork = useStore((state) => state.setTitleArtwork);
   const updateMedia = useStore((state) => state.updateMedia);
   const [poster, setPoster] = useState(existing?.poster ?? group.poster ?? "");
   const [approved, setApproved] = useState(existing?.kidsApproved ?? false);
   const [message, setMessage] = useState("");
   const [limit, setLimit] = useState(20);
+  const scopeItems = group.items.filter(item => season === null || item.season === season);
   return (
     <>
       <div className={styles.editorGrid}>
@@ -22,7 +35,7 @@ function TitleEditor({ group }: { group: LibraryGroup }) {
           <ProgrammeArtwork src={poster} title={group.title} />
         </div>
         <div className={styles.fields}>
-          <h3>{group.title}</h3>
+          <h3>{group.title}{season !== null ? ` · ${seasonLabel(season)}` : ""}</h3>
           <ArtworkEditor
             value={poster}
             onChange={(url) => {
@@ -43,21 +56,21 @@ function TitleEditor({ group }: { group: LibraryGroup }) {
               className={styles.primary}
               disabled={!safeArtworkUrl(poster)}
               onClick={() => {
-                setArtwork(group.key, { poster, kidsApproved: approved });
+                setArtwork(artworkKey, { poster, kidsApproved: approved });
                 setMessage(
                   "Artwork saved locally. Wait for Global saved before leaving.",
                 );
               }}
             >
-              Save title artwork
+              {season === null ? "Save title artwork" : "Save season artwork"}
             </button>
             <button
               className={styles.button}
               disabled={!existing}
               onClick={() => {
-                setArtwork(group.key, null);
+                for (const key of new Set(keys)) if (artwork[key]) setArtwork(key, null);
                 setPoster(
-                  group.items.find((item) => item.media.poster)?.media.poster ??
+                  (season !== null ? group.poster : group.items.find((item) => item.media.poster)?.media.poster) ??
                     "",
                 );
                 setApproved(false);
@@ -66,15 +79,14 @@ function TitleEditor({ group }: { group: LibraryGroup }) {
                 );
               }}
             >
-              Use episode artwork
+              {season === null ? "Use episode artwork" : "Use show artwork"}
             </button>
           </div>
           <p className={styles.status} role="status">
             {message}
           </p>
           <p className={styles.muted}>
-            One shared poster covers this title and future episodes. Kids
-            artwork approval is separate from video approval.
+            {season === null ? "One shared poster covers this show and future episodes. A season poster takes priority for that season." : `One upload covers every episode in ${seasonLabel(season)}, including future episodes added to that season.`} Kids artwork approval is separate from video approval.
           </p>
         </div>
       </div>
@@ -87,7 +99,7 @@ function TitleEditor({ group }: { group: LibraryGroup }) {
           Kids live programming. New uploads still need review.
         </p>
         <div className={styles.reviewList}>
-          {group.items.slice(0, limit).map((item) => (
+          {scopeItems.slice(0, limit).map((item) => (
             <label key={item.media.id}>
               <input
                 type="checkbox"
@@ -102,7 +114,7 @@ function TitleEditor({ group }: { group: LibraryGroup }) {
             </label>
           ))}
         </div>
-        {group.items.length > limit && (
+        {scopeItems.length > limit && (
           <button
             className={styles.button}
             onClick={() => setLimit(limit + 20)}

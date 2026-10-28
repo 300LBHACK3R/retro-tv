@@ -19,6 +19,7 @@ import {
   type ProgressMap,
 } from "@/lib/libraryCatalog";
 import styles from "./library.module.css";
+import { seasonLabel, seasonSummary } from "@/lib/seriesMetadata";
 
 type Props = {
   group: LibraryGroup;
@@ -46,6 +47,8 @@ export default function TitleDetails({
   const selected =
     group.items.find((item) => item.media.id === mediaId) ?? group.items[0];
   const [season, setSeason] = useState(selected?.season ?? 1);
+  const [episodeSearch, setEpisodeSearch] = useState("");
+  const [episodeStatus, setEpisodeStatus] = useState("all");
   const [playing, setPlaying] = useState(!!playImmediately);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +145,13 @@ export default function TitleDetails({
     );
   };
   const resume = progress[selected.media.id];
+  const visibleEpisodes = group.items.filter(item => {
+    const entry = progress[item.media.id];
+    const watched = entry && entry.position >= entry.duration - 10;
+    const status = watched ? "watched" : entry && entry.position >= 10 ? "started" : "new";
+    const text = `${item.displayTitle} ${item.media.title} ${item.episode || ""}`.toLowerCase();
+    return item.season === season && episodeSearch.toLowerCase().trim().split(/\s+/).every(word => text.includes(word)) && (episodeStatus === "all" || episodeStatus === status);
+  });
   return createPortal(
     <div
       className={styles.backdrop}
@@ -166,7 +176,7 @@ export default function TitleDetails({
         <div className={styles.detailHead}>
           <div className={styles.poster}>
             <ProgrammeArtwork
-              src={group.poster}
+              src={group.seasonPosters[season] || group.poster}
               title={group.title}
               kind={getTypeLabel(group.type)}
             />
@@ -176,7 +186,7 @@ export default function TitleDetails({
               <span className={styles.eyebrow}>
                 {getTypeLabel(group.type)} ·{" "}
                 {group.type === "show"
-                  ? `${group.items.length} episodes`
+                  ? `${seasonSummary(group.seasons)} · ${group.items.length} episodes`
                   : formatDuration(selected.media.duration)}
               </span>
               <h2 id="library-title-heading">{group.title}</h2>
@@ -202,7 +212,7 @@ export default function TitleDetails({
                     ? "▶ Resume"
                     : "▶ Watch now"}
               </button>
-              <SaveButton id={group.key} title={group.title} kind="programme" />
+              <SaveButton id={group.key} aliases={group.aliasKeys} title={group.title} kind="programme" />
             </div>
           </div>
         </div>
@@ -212,7 +222,7 @@ export default function TitleDetails({
               ref={videoRef}
               key={selected.media.id}
               src={selected.media.file}
-              poster={group.poster}
+              poster={group.seasonPosters[selected.season] || group.poster}
               controls
               playsInline
               autoPlay
@@ -259,18 +269,27 @@ export default function TitleDetails({
                 <select
                   className={styles.select}
                   value={season}
-                  onChange={(e) => setSeason(Number(e.target.value))}
+                  onChange={(e) => {
+                    const nextSeason = Number(e.target.value);
+                    setSeason(nextSeason); setEpisodeSearch("");
+                    if (!playing) setMediaId(group.items.find(item => item.season === nextSeason)?.media.id);
+                  }}
                 >
                   {group.seasons.map((value) => (
                     <option key={value} value={value}>
-                      {value}
+                      {seasonLabel(value)} · {group.items.filter(item => item.season === value).length} episodes
                     </option>
                   ))}
                 </select>
               </label>
             </div>
-            {group.items
-              .filter((item) => item.season === season)
+            <div className={styles.episodeTools}>
+              <label>Find an episode<input type="search" className={styles.input} value={episodeSearch} onChange={event => setEpisodeSearch(event.target.value)} placeholder="Episode name or number" /></label>
+              <label>Episode progress<select className={styles.select} value={episodeStatus} onChange={event => setEpisodeStatus(event.target.value)}><option value="all">All episodes</option><option value="new">Not started</option><option value="started">In progress</option><option value="watched">Watched</option></select></label>
+            </div>
+            <p className={styles.muted} role="status">{visibleEpisodes.length} episodes shown · {seasonLabel(season)}</p>
+            {!visibleEpisodes.length ? <p>No episodes match. Try another season or clear your search and progress filter.</p> : null}
+            {visibleEpisodes
               .map((item) => (
                 <button
                   className={styles.episode}
@@ -278,9 +297,11 @@ export default function TitleDetails({
                   aria-current={playing && selected.media.id === item.media.id}
                   onClick={() => start(item.media.id)}
                 >
+                  <span className={styles.episodePoster} aria-hidden="true"><ProgrammeArtwork src={group.seasonPosters[item.season] || group.poster} title={group.title} /></span>
                   <span>
                     <strong>{item.displayTitle}</strong>
                     <small>{formatDuration(item.media.duration)}</small>
+                    {progress[item.media.id] ? <small>{progress[item.media.id]!.position >= progress[item.media.id]!.duration - 10 ? "Watched" : "In progress"}</small> : null}
                   </span>
                   <span aria-hidden="true" style={{ flex: 0 }}>
                     ▶

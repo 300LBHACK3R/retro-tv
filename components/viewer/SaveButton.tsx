@@ -7,16 +7,16 @@ export default function SaveButton({
   title,
   kind,
   compact = false,
+  aliases = [],
 }: {
   id: string;
   title: string;
   kind: "channel" | "programme";
   compact?: boolean;
+  aliases?: readonly string[];
 }) {
   const saved = useDeviceLibrary((state) =>
-    (kind === "channel" ? state.favouriteChannels : state.watchlist).includes(
-      id,
-    ),
+    (kind === "channel" ? state.favouriteChannels : state.watchlist).some(value => value === id || (kind === "programme" && aliases.includes(value))),
   );
   const toggle = useDeviceLibrary((state) =>
     kind === "channel" ? state.toggleChannel : state.toggleWatchlist,
@@ -29,7 +29,7 @@ export default function SaveButton({
       aria-pressed={saved}
       aria-label={`${saved ? "Remove" : "Save"} ${title} ${saved ? "from" : "to"} ${destination}`}
       title={`${saved ? "Remove from" : "Save to"} ${destination}`}
-      onClick={() => toggle(id)}
+      onClick={() => toggle(id, aliases)}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path

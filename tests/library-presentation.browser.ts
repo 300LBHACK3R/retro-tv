@@ -51,6 +51,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
         poster: "/avatars/boyrobot.png",
         kidsApproved: true,
       },
+      "show:studio-sessions:season:2": { poster: "/avatars/boycat.png", kidsApproved: true },
     },
   };
   source.media.push({
@@ -86,6 +87,10 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
   await expect(page.locator("video")).toHaveCount(0);
   await dialog.getByRole("combobox", { name: "Season" }).selectOption("2");
   await expect(dialog.getByRole("button", { name: /S02E01/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /S02E01/ }).locator("img")).toHaveAttribute("src", /\/avatars\/boycat\.png$/);
+  await dialog.getByRole("searchbox", { name: "Find an episode" }).fill("missing episode");
+  await expect(dialog.getByRole("button", { name: /S02E01/ })).toHaveCount(0);
+  await dialog.getByRole("searchbox", { name: "Find an episode" }).fill("01");
   await testInfo.attach("library-title", {
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
@@ -95,6 +100,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
     "src",
     /\/qa-media\.webm$/,
   );
+  await expect(dialog.locator("video")).toHaveAttribute("poster", "/avatars/boycat.png");
   await dialog.getByRole("button", { name: "Close title ✕" }).click();
   await expect(card).toBeFocused();
   await expect(search).toHaveValue("Studio");
@@ -246,6 +252,12 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     .toBe("/avatars/boyrobot.png");
   await page.getByRole("checkbox", { name: "S01E01", exact: true }).check();
   await expect.poll(() => saved.media[0]?.kidsApproved).toBe(true);
+  await page.getByRole("combobox", { name: "Artwork scope", exact: true }).selectOption("1");
+  await page.getByRole("textbox", { name: "Artwork URL", exact: true }).fill("/avatars/boycat.png");
+  await page.getByRole("button", { name: "Use artwork URL", exact: true }).click();
+  await page.getByRole("button", { name: "Save season artwork", exact: true }).click();
+  await expect.poll(() => saved.libraryArtwork?.["show:studio-sessions:season:1"]?.poster).toBe("/avatars/boycat.png");
+  expect(saved.libraryArtwork?.["show:studio-sessions"]?.poster).toBe("/avatars/boyrobot.png");
   await page
     .getByRole("button", { name: "Add upcoming title", exact: true })
     .click();

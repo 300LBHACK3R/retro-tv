@@ -57,6 +57,7 @@ async function fixture(page: Page, initial: AccountView) {
       );
   });
   await page.route("**/api/account", (route) => route.fulfill({ json: state }));
+  await page.route("**/api/account/show-requests?*", route => route.fulfill({ json: { requests: [], total: 0, page: 0 } }));
   await page.route("**/api/account/auth", async (route) => {
     const body = route.request().postDataJSON();
     actions.push(body);
@@ -159,6 +160,7 @@ test("a locked household cannot open billing through the profile chooser", async
   await expect(page.getByRole("heading", { name: "Ask a parent" })).toBeVisible();
   await expect(page.locator("[data-membership-plan]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete account", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "What would you love to watch?" })).toHaveCount(0);
 });
 
 test("free account registration, confirmation resend, recovery and sign-in remain straightforward", async ({
@@ -554,4 +556,43 @@ test("membership plans show the upfront charge and send only the selected plan t
   await expect(page.locator('[data-membership-plan="six-month"]')).toContainText("C$4.17/month");
   await expect(page.locator('[data-membership-plan="annual"]')).toContainText("C$3.75/month");
   await noOverflow(page);
+});
+
+test("paid members can request a show, recover from an error and see their saved status", async ({ page }) => {
+  await fixture(page, account(true));
+  let stored = false;
+  let fail = true;
+  await page.route("**/api/account/show-requests?*", route => route.fulfill({ json: {
+    requests: stored ? [{ id: "request-1", title: "The Test Show", release_year: 1996, seasons: "Season 1", details: "The original version", status: "reviewing", member_reply: "We’re checking availability.", created_at: "2026-10-28T12:00:00Z", updated_at: "2026-10-28T12:00:00Z" }] : [], total: stored ? 1 : 0, page: 0,
+  } }));
+  await page.route("**/api/account/show-requests", async route => {
+    expect(route.request().postDataJSON()).toEqual({ title: "The Test Show", releaseYear: "1996", seasons: "Season 1", details: "The original version" });
+    if (fail) { fail = false; return route.fulfill({ status: 503, json: { error: "Please retry your request." } }); }
+    const duplicate = stored;
+    stored = true;
+    await route.fulfill({ json: { ok: true, duplicate, id: "request-1" } });
+  });
+  await page.goto("/account#show-requests");
+  const form = page.locator("#show-requests");
+  await form.getByLabel("Show title").fill("The Test Show");
+  await form.getByLabel("Release year (optional)").fill("1996");
+  await form.getByLabel("Seasons or episodes (optional)").fill("Season 1");
+  await form.getByLabel("Anything else? (optional)").fill("The original version");
+  await form.getByRole("button", { name: "Send show request", exact: true }).click();
+  await expect(form.getByRole("alert")).toHaveText("Please retry your request.");
+  await expect(form.getByLabel("Show title")).toHaveValue("The Test Show");
+  await form.getByRole("button", { name: "Send show request", exact: true }).click();
+  await expect(form.getByRole("heading", { name: "The Test Show (1996)" })).toBeVisible();
+  await expect(form.getByText("Under review", { exact: true })).toBeVisible();
+  await expect(form.getByText("We’re checking availability.")).toBeVisible();
+  await expect(form.getByLabel("Show title")).toHaveValue("");
+  await noOverflow(page);
+});
+
+test("free accounts see the membership explanation without a show request form", async ({ page }) => {
+  await fixture(page, account(false));
+  await page.goto("/account#show-requests");
+  await expect(page.getByText("A perk for paid members", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send show request", exact: true })).toHaveCount(0);
+  await expect(page.locator("#show-requests").getByRole("link", { name: "View membership" })).toHaveAttribute("href", "#membership");
 });

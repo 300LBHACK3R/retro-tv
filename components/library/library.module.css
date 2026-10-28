@@ -671,6 +671,14 @@
 }
 
 /* Catalogue tools stay in normal flow so they never obstruct browsing. */
+.artworkScope { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 20px 0; }
+.episode .episodePoster { width: 44px; flex: 0 0 44px; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 5px; position: relative; }
+.episodeTools { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px; }
+.episodeTools label { min-width: 0; display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+.episodeTools input, .episodeTools select { min-width: 0; width: 100%; }
+@media (max-width: 560px) { .episodeTools { grid-template-columns: minmax(0, 1fr); } }
+.requestBanner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; margin-bottom: 28px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel-bg); }
+.requestBanner p { color: var(--text-muted); font-size: 13px; margin-top: 6px; line-height: 1.6; }
 .refine { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 20px 0; border-top: 1px solid var(--border); }
 .refine label { min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 750; color: var(--text-muted); }
 .refine select { width: 100%; min-width: 0; color: var(--text); }

@@ -17,6 +17,7 @@ import { useProfiles } from "@/lib/deviceProfiles";
 import { isThemeId, THEMES } from "@/lib/themes";
 import { THEME_PREVIEWS } from "@/components/themes/themePreviews";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
+import ShowRequests from "./ShowRequests";
 import { PROGRESS_STORAGE_KEY } from "@/lib/libraryCatalog";
 import { EMPTY_ACCOUNT, MEMBERSHIP_PLANS, type MembershipPlanId } from "@/lib/accountModel";
 
@@ -469,7 +470,7 @@ export default function AccountPage({
                 </p>
               ) : null}
               <nav className="ttv-account-sections" aria-label="Account sections">
-                <a href="#membership">Membership</a><a href="#theme-shop">Theme collection</a><a href="#account-settings">Settings</a>
+                <a href="#membership">Membership</a><a href="#theme-shop">Theme collection</a><a href="#show-requests">Request a Show</a><a href="#account-settings">Settings</a>
               </nav>
               <section id="membership" className="ttv-account-card ttv-account-membership">
                 <p className="ttv-account-eyebrow">Tate’s TV Membership</p>
@@ -483,6 +484,7 @@ export default function AccountPage({
                   <li><span aria-hidden="true">✦</span><strong>Every premium theme</strong><span>Current and future designs, while your membership is active.</span></li>
                   <li><span aria-hidden="true">◈</span><strong>Room for everyone</strong><span>Up to 10 household profiles, instead of 5.</span></li>
                   <li><span aria-hidden="true">★</span><strong>A little recognition</strong><span>An optional member badge beside your profile.</span></li>
+                  <li><span aria-hidden="true">▤</span><strong>Request a show</strong><span>Suggest shows for the library and follow their progress in your account.</span></li>
                 </ul>
                 {account.member ? (
                   <label className="ttv-account-check">
@@ -582,6 +584,7 @@ export default function AccountPage({
                   ))}
                 </div>
               </section>
+              <ShowRequests key={account.user!.id} member={account.member} />
               <section id="account-settings" className="ttv-account-card">
                 <p className="ttv-account-eyebrow">You’re in control</p>
                 <h2>Account settings</h2>

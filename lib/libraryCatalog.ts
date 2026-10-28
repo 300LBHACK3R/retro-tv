@@ -1,4 +1,5 @@
 import { safeArtworkUrl, type LibraryArtwork } from "./libraryPresentation";
+import { seriesMetadata, seriesIdentity, seriesGroupKey, seasonArtworkKey } from "./seriesMetadata";
 import { cleanDisplayText } from "./textClean";
 import type { MediaItem, MediaType } from "./types";
 
@@ -24,6 +25,8 @@ export type LibraryGroup = {
   totalDuration: number;
   poster?: string;
   searchText: string;
+  aliasKeys: string[];
+  seasonPosters: Record<number, string>;
 };
 
 export type ProgressEntry = {
@@ -143,7 +146,9 @@ function createGroupKey(type: LibraryMediaType, title: string): string {
   return `${type}:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-function parseLibraryItem(media: MediaItem): ParsedLibraryItem {
+// Retain the old grouping solely to carry existing saved posters/watchlists
+// into corrected series cards. New season parsing does not use this result.
+function parseLegacyLibraryItem(media: MediaItem): ParsedLibraryItem {
   const libraryType = media.type as LibraryMediaType;
   const rawTitle =
     cleanDisplay(media.title || inferTitleFromFile(media.file)) || "Untitled";
@@ -226,64 +231,57 @@ function parseLibraryItem(media: MediaItem): ParsedLibraryItem {
 }
 
 export function buildLibrary(media: MediaItem[], artwork: LibraryArtwork = {}, kids = false): LibraryGroup[] {
+  const playable = media.filter(isPlayableLibraryMedia);
+  const metadata = new Map(playable.filter(item => item.type === "show").map(item => [item.id, seriesMetadata(item)]));
+  // Prefer the most common spelling so punctuation and spacing variants share a card.
+  const names = new Map<string, Map<string, number>>();
+  for (const item of metadata.values()) {
+    const key = seriesIdentity(item.title);
+    const counts = names.get(key) ?? new Map<string, number>();
+    counts.set(item.title, (counts.get(item.title) ?? 0) + 1);
+    names.set(key, counts);
+  }
+  const preferred = new Map([...names].map(([key, counts]) => [key, [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0]]));
   const groups = new Map<string, LibraryGroup>();
+  for (const source of playable) {
+    const legacy = parseLegacyLibraryItem(source);
+    const meta = metadata.get(source.id);
+    const groupTitle = meta ? preferred.get(seriesIdentity(meta.title))! : legacy.groupTitle;
+    const groupKey = meta ? seriesGroupKey(groupTitle) : legacy.groupKey;
+    const code = meta ? (meta.episode > 0 ? `${meta.season >= 0 ? `S${String(meta.season).padStart(2, "0")}E` : "Episode "}${String(meta.episode).padStart(2, "0")}` : "") : "";
+    const item: ParsedLibraryItem = meta ? { media: source, groupKey, groupTitle, type: "show", season: meta.season, episode: meta.episode,
+      displayTitle: [code, meta.episodeTitle].filter(Boolean).join(" · ") || source.title } : legacy;
+    let group = groups.get(groupKey);
+    if (!group) {
+      group = { key: groupKey, title: groupTitle, type: item.type, items: [], seasons: [], totalDuration: 0, poster: undefined, searchText: groupTitle.toLowerCase(), aliasKeys: [], seasonPosters: {} };
+      groups.set(groupKey, group);
+    }
+    group.items.push(item);
+    group.totalDuration += getSafeDuration(source.duration);
+    group.poster ||= source.poster;
+    group.searchText += ` ${source.title} ${item.displayTitle} ${source.description ?? ""}`.toLowerCase();
+    if (!group.seasons.includes(item.season)) group.seasons.push(item.season);
+    if (!group.aliasKeys.includes(legacy.groupKey)) group.aliasKeys.push(legacy.groupKey);
+  }
+  function posterFor(keys: string[]) {
+    return keys.map(key => artwork[key]).filter(value => value && (!kids || value.kidsApproved)).map(value => safeArtworkUrl(value?.poster)).find(Boolean);
+  }
+  return [...groups.values()].map(group => ({
+    ...group,
+    // Existing posters and watchlists follow the regrouped episodes.
+    poster: posterFor([group.key, ...group.aliasKeys]) || safeArtworkUrl(group.poster) || undefined,
+    seasonPosters: Object.fromEntries(group.seasons.map(season => [season, posterFor([group.key, ...group.aliasKeys].map(key => seasonArtworkKey(key, season)))]).filter(([, value]) => value)),
+    seasons: [...group.seasons].sort((a, b) => (a < 0 ? Infinity : a) - (b < 0 ? Infinity : b)),
+    items: [...group.items].sort((a, b) => {
+      if (a.season !== b.season) return (a.season < 0 ? Infinity : a.season) - (b.season < 0 ? Infinity : b.season);
+      if (a.episode !== b.episode) return (a.episode || Infinity) - (b.episode || Infinity);
+      return a.displayTitle.localeCompare(b.displayTitle, undefined, { numeric: true, sensitivity: "base" });
+    }),
+  })).sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" }));
+}
 
-  media
-    .filter(isPlayableLibraryMedia)
-    .map(parseLibraryItem)
-    .forEach((item) => {
-      const existing = groups.get(item.groupKey);
-
-      if (existing) {
-        existing.items.push(item);
-        existing.totalDuration += getSafeDuration(item.media.duration);
-        existing.poster ||= item.media.poster;
-        existing.searchText +=
-          ` ${item.displayTitle} ${item.media.description ?? ""}`.toLowerCase();
-        if (!existing.seasons.includes(item.season)) {
-          existing.seasons.push(item.season);
-        }
-        return;
-      }
-
-      groups.set(item.groupKey, {
-        key: item.groupKey,
-        title: item.groupTitle,
-        type: item.type,
-        items: [item],
-        seasons: [item.season],
-        totalDuration: getSafeDuration(item.media.duration),
-        poster: item.media.poster,
-        searchText: `${item.groupTitle} ${item.displayTitle} ${
-          item.media.description ?? ""
-        }`.toLowerCase(),
-      });
-    });
-
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      poster: (artwork[group.key] && (!kids || artwork[group.key]?.kidsApproved) ? safeArtworkUrl(artwork[group.key]?.poster) : "") || safeArtworkUrl(group.poster) || undefined,
-      seasons: [...group.seasons].sort((a, b) => a - b),
-      items: [...group.items].sort((a, b) => {
-        if (a.season !== b.season) return a.season - b.season;
-        if (a.episode !== b.episode) return a.episode - b.episode;
-        return a.displayTitle.localeCompare(b.displayTitle, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      }),
-    }))
-    .sort((a, b) => {
-      if (TYPE_ORDER[a.type] !== TYPE_ORDER[b.type]) {
-        return TYPE_ORDER[a.type] - TYPE_ORDER[b.type];
-      }
-
-      return a.title.localeCompare(b.title, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
+export function isSavedGroup(group: LibraryGroup, saved: readonly string[]) {
+  return saved.includes(group.key) || group.aliasKeys.some(key => saved.includes(key));
 }
 
 export function formatDuration(seconds: number): string {

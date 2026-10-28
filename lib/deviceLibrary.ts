@@ -34,7 +34,7 @@ interface DeviceLibrary {
   favouriteChannels: string[];
   watchlist: string[];
   toggleChannel: (id: string) => void;
-  toggleWatchlist: (id: string) => void;
+  toggleWatchlist: (id: string, aliases?: readonly string[]) => void;
 }
 
 // Device preferences are deliberately independent of cloud programming snapshots.
@@ -72,9 +72,11 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
             },
           };
         }),
-      toggleWatchlist: (id) =>
+      toggleWatchlist: (id, aliases = []) =>
         set((state) => {
-          const watchlist = toggle(state.watchlist, id);
+          const keys = new Set([id, ...aliases]);
+          const existing = state.watchlist.filter(value => !keys.has(value));
+          const watchlist = state.watchlist.some(value => keys.has(value)) ? existing : sanitizeSavedIds([id, ...existing]);
           return {
             watchlist,
             profiles: {
