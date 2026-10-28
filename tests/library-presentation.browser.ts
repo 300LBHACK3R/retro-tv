@@ -8,6 +8,13 @@ const video = Buffer.from(
   "base64",
 );
 async function fixture(page: Page, kids = false) {
+  // Every library case needs a catalogue, including the filter-only case.
+  // Tests with custom seasons or artwork register their override afterward.
+  await page.route("**/api/programming", (route) =>
+    route.fulfill({
+      json: { ok: true, programming: structuredClone(programming), source: "database" },
+    }),
+  );
   await page.addInitScript((isKids) => {
     const hash = isKids ? "0".repeat(64) : null;
     if (isKids)
@@ -308,7 +315,9 @@ test("library combines channel, alphabet and runtime filters and keeps selection
   const show = page.getByRole("button", { name: "Open Studio Sessions", exact: true });
   const movie = page.getByRole("button", { name: "Open A Calgary Evening", exact: true });
   await expect(show).toBeVisible();
+  await expect(movie).toBeVisible();
   await page.getByLabel("Channel", { exact: true }).selectOption("24");
+  await expect(show).toBeVisible();
   await expect(movie).toHaveCount(0);
   await page.getByLabel("Time to watch", { exact: true }).selectOption("long");
   await expect(page.getByRole("heading", { name: "No matching library titles" })).toBeVisible();
