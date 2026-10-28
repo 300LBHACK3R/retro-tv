@@ -313,9 +313,12 @@ test("account theme saves survive refresh without replacing guest profiles", asy
   ).toBe("Guest");
   await page.goto("/account");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL("/");
   await expect(
-    page.getByRole("button", { name: "Create account", exact: true }),
+    page.getByRole("link", { name: "Guest · Sign in to save", exact: true }),
   ).toBeVisible();
+  await expect(page.locator("html")).not.toHaveAttribute("data-ttv-theme", "shaw-2006");
+  expect(await page.evaluate(() => sessionStorage.getItem("ttv-profile-session-v1"))).toBeNull();
   await expect(
     page.getByRole("button", { name: "Watch as Alice", exact: true }),
   ).toHaveCount(0);
@@ -368,9 +371,11 @@ test("a preference outage does not prevent explicit sign-out without saving", as
   await page
     .getByRole("button", { name: "Sign out without saving", exact: true })
     .click();
+  await expect(page).toHaveURL("/");
   await expect(
-    page.getByRole("button", { name: "Create account", exact: true }),
+    page.getByRole("link", { name: "Guest · Sign in to save", exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Watch as Alice", exact: true })).toHaveCount(0);
   expect(f.actions.at(-1)?.action).toBe("signout");
 });
 
