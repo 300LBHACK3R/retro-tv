@@ -236,3 +236,92 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* The account dashboard keeps a calm cinema palette inside every viewer theme. */
+.ttv-account-dashboard {
+  --text: #f8f4eb;
+  --text-muted: #bbbcca;
+  --primary: #e1c38d;
+  --on-primary: #191c28;
+  --border: #ffffff24;
+  --panel-bg: #151824;
+  --panel-alt-bg: #1d2130;
+  --button-bg: #ffffff09;
+  --button-hover: #ffffff15;
+  --focus-ring: #f1d69e;
+  color: var(--text);
+  max-width: 68rem;
+  margin: auto;
+}
+.ttv-account-dashboard .ttv-account-card {
+  max-width: none;
+  border-radius: 1.5rem;
+  background: linear-gradient(135deg, #ffffff04, transparent 65%), var(--panel-bg);
+  box-shadow: 0 24px 72px #0004, inset 0 1px #ffffff08;
+  scroll-margin-top: 1.5rem;
+}
+.ttv-account-overview { position: relative; overflow: hidden; }
+.ttv-account-overview::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, #e1c38d, #a78250 42%, transparent);
+}
+.ttv-account-overview h1 { letter-spacing: -.04em; }
+.ttv-account-status {
+  float: right; padding: .45rem .8rem; border: 1px solid #e1c38d50;
+  border-radius: 99px; background: #e1c38d0c; color: #ecd6ad;
+  font-size: .75rem; font-weight: 700; letter-spacing: .02em;
+}
+.ttv-account-overview .ttv-account-actions > a {
+  background: #e1c38d; color: #191c28; border-color: #e1c38d;
+  text-decoration: none; padding-inline: 1.5rem;
+}
+.ttv-account-import { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.1rem; }
+.ttv-account-import summary { color: var(--text-muted); font-size: .85rem; cursor: pointer; padding-block: .4rem; }
+.ttv-account-import button { margin-top: .75rem; }
+.ttv-account-sections { display: flex; flex-wrap: wrap; gap: .25rem; padding: .25rem 0; margin: .5rem 0; }
+.ttv-account-sections a { padding: .85rem 1rem; color: #f8f4eb; text-decoration: none; font-size: .85rem; font-weight: 700; border-radius: .75rem; background: #151824de; }
+.ttv-account-sections a:hover { background: #292b39; }
+.ttv-account-dashboard .ttv-account-membership { border-color: #e1c38d50; background: radial-gradient(ellipse at top right, #b68a3b18, transparent 65%), #151824; }
+.ttv-account-membership h2 { font-size: clamp(1.8rem, 3.5vw, 2.7rem); max-width: 22ch; letter-spacing: -.035em; line-height: 1.14; }
+.ttv-membership-lead { max-width: 58ch; color: var(--text-muted); }
+.ttv-membership-benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 2rem 0; padding: 0; }
+.ttv-account-membership .ttv-membership-benefits li { list-style: none; margin: 0; display: flex; flex-direction: column; gap: .6rem; }
+.ttv-membership-benefits li > span:first-child { color: #e1c38d; font-size: 1.5rem; }
+.ttv-membership-benefits strong { font-size: .95rem; }
+.ttv-membership-benefits li > span:last-child { color: var(--text-muted); font-size: .85rem; line-height: 1.7; }
+.ttv-account-dashboard .ttv-membership-plans { gap: 1rem; margin-block: 2rem; }
+.ttv-account-dashboard .ttv-membership-plans article { padding: 1.5rem; gap: .85rem; border-radius: 1.1rem; }
+.ttv-membership-plans article[data-membership-plan="annual"] { border-color: #e1c38d; box-shadow: inset 0 3px #e1c38d; background: linear-gradient(150deg, #e1c38d12, transparent), #1d2130; }
+.ttv-plan-caption { color: #e1c38d; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .15em; }
+.ttv-account-dashboard .ttv-membership-total { font-size: 2.6rem; letter-spacing: -.06em; line-height: 1.2; }
+.ttv-membership-plans article > p:not(.ttv-membership-total) { font-size: .85rem; color: var(--text-muted); }
+.ttv-billing-unavailable { display: flex; align-items: flex-start; gap: 1rem; padding: 1.25rem; margin: 1.5rem 0; border: 1px solid #e1c38d30; border-radius: 1rem; background: #e1c38d08; }
+.ttv-billing-unavailable > span { color: #e1c38d; font-size: 1.4rem; }
+.ttv-billing-unavailable strong { font-size: .95rem; }
+.ttv-billing-unavailable p { font-size: .85rem; color: var(--text-muted); margin: .4rem 0 0; }
+.ttv-billing-terms { max-width: 85ch; }
+.ttv-billing-manage { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem; }
+.ttv-billing-manage h3 { font-size: 1rem; font-weight: 700; }
+.ttv-billing-manage p { margin: .35rem 0 0; font-size: .85rem; color: var(--text-muted); }
+.ttv-billing-manage > button { flex-shrink: 0; }
+.ttv-account-shop > p:not(.ttv-account-eyebrow) { color: var(--text-muted); }
+.ttv-account-dashboard .ttv-account-themes { gap: 1.25rem; margin-top: 2rem; }
+.ttv-account-dashboard .ttv-account-themes article { padding: .65rem; border-radius: 1.1rem; overflow: hidden; }
+.ttv-account-theme-art { border-radius: .7rem; }
+.ttv-theme-caption { padding: .4rem .4rem 1rem; }
+.ttv-theme-caption h3 { font-weight: 700; margin-bottom: .3rem; }
+.ttv-theme-caption span { font-size: .7rem; text-transform: uppercase; letter-spacing: .09em; color: #cbb58e; }
+.ttv-account-dashboard button { transition: background .15s ease, border-color .15s ease; }
+.ttv-account-dashboard button:hover:not(:disabled) { border-color: #e1c38d80; }
+@media (max-width: 640px) {
+  .ttv-account-status { float: none; display: inline-block; margin-bottom: .65rem; }
+  .ttv-membership-benefits { grid-template-columns: 1fr; gap: 1.25rem; }
+  .ttv-account-membership .ttv-membership-benefits li { display: grid; grid-template-columns: 2rem 1fr; gap: .3rem .6rem; }
+  .ttv-membership-benefits li > span:first-child { grid-row: span 2; }
+  .ttv-membership-benefits li > span:last-child { grid-column: 2; }
+  .ttv-billing-manage { flex-direction: column; align-items: stretch; }
+  .ttv-account-sections a { padding-inline: .8rem; font-size: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ttv-account-dashboard button { transition: none; }
+}

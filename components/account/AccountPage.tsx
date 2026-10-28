@@ -420,7 +420,8 @@ export default function AccountPage({
             </section>
           ) : (
             <div className="ttv-account-dashboard">
-              <section className="ttv-account-card">
+              <section className="ttv-account-card ttv-account-overview">
+                <span className="ttv-account-status">{account.member ? "Membership active" : "Free account"}</span>
                 <p className="ttv-account-eyebrow">Your account</p>
                 <h1>Your TV. Your way.</h1>
                 <p className="ttv-account-email">{account.user!.email}</p>
@@ -436,6 +437,8 @@ export default function AccountPage({
                   </button>
                 </div>
                 {!account.household ? (
+                  <details className="ttv-account-import">
+                  <summary>Bring your saved device preferences</summary>
                   <button
                     disabled={busy}
                     onClick={() =>
@@ -449,6 +452,7 @@ export default function AccountPage({
                   >
                     Import this device’s existing profiles and saved items
                   </button>
+                  </details>
                 ) : null}
               </section>
               {checkout === "success" ? (
@@ -464,22 +468,22 @@ export default function AccountPage({
                   Checkout was cancelled. You can keep watching for free.
                 </p>
               ) : null}
-              <section className="ttv-account-card ttv-account-membership">
+              <nav className="ttv-account-sections" aria-label="Account sections">
+                <a href="#membership">Membership</a><a href="#theme-shop">Theme collection</a><a href="#account-settings">Settings</a>
+              </nav>
+              <section id="membership" className="ttv-account-card ttv-account-membership">
                 <p className="ttv-account-eyebrow">Tate’s TV Membership</p>
                 <h2>
                   {account.member
                     ? "You’re a member. Thank you."
-                    : "A little extra for your TV."}
+                    : "Make every night your kind of night."}
                 </h2>
-                <ul>
-                  <li>
-                    Every current and future premium theme while your membership
-                    is active
-                  </li>
-                  <li>Up to 10 household profiles, instead of 5</li>
-                  <li>An optional member badge beside your profile</li>
+                <p className="ttv-membership-lead">More ways to make Tate’s TV feel like home. Live TV, the guide and the on-demand library stay free.</p>
+                <ul className="ttv-membership-benefits">
+                  <li><span aria-hidden="true">✦</span><strong>Every premium theme</strong><span>Current and future designs, while your membership is active.</span></li>
+                  <li><span aria-hidden="true">◈</span><strong>Room for everyone</strong><span>Up to 10 household profiles, instead of 5.</span></li>
+                  <li><span aria-hidden="true">★</span><strong>A little recognition</strong><span>An optional member badge beside your profile.</span></li>
                 </ul>
-                <p>Live TV, the guide and the on-demand library stay free.</p>
                 {account.member ? (
                   <label className="ttv-account-check">
                     <input
@@ -500,6 +504,7 @@ export default function AccountPage({
                         const plan = MEMBERSHIP_PLANS.find(option => option.id === id)!;
                         const savings = MEMBERSHIP_PLANS[0].amount * plan.months - plan.amount;
                         return <article key={id} data-membership-plan={id}>
+                          <span className="ttv-plan-caption">{id === "annual" ? "Best value" : id === "six-month" ? "A longer stay" : "Keep it flexible"}</span>
                           <h3>{plan.label}</h3>
                           <p className="ttv-membership-total">{price}</p>
                           <p>Billed upfront {plan.renewal}.</p>
@@ -511,17 +516,18 @@ export default function AccountPage({
                         </article>;
                       })}
                     </div>
-                  ) : <button disabled>Membership opens soon</button>
+                  ) : <div className="ttv-billing-unavailable" role="status"><span aria-hidden="true">✦</span><div><strong>Membership opens soon</strong><p>Purchases are not available right now. Your free account and viewing are ready to enjoy.</p></div></div>
                 )}
-                <p>
+                <p className="ttv-billing-terms">
                   <small>
                     Prices are in CAD, plus any applicable tax. Each plan renews automatically at its selected interval. Cancel future renewals through
                     Manage billing. Individually purchased themes stay yours
                     when membership ends.
                   </small>
                 </p>
+                <div className="ttv-billing-manage"><div><h3>Billing, on your terms.</h3><p>Manage payment details, view invoices and cancel future renewals.</p></div>
                 <button
-                  disabled={busy}
+                  disabled={busy || !account.commerce.enabled}
                   onClick={() =>
                     void task(async () =>
                       stripeRedirect(
@@ -531,10 +537,11 @@ export default function AccountPage({
                   }
                 >
                   Manage billing
-                </button>
+                </button></div>
               </section>
-              <section className="ttv-account-card">
-                <h2>Just want a theme?</h2>
+              <section id="theme-shop" className="ttv-account-card ttv-account-shop">
+                <p className="ttv-account-eyebrow">The theme collection</p>
+                <h2>Find your signature look.</h2>
                 <p>
                   Buy it once for your account. No membership required.{" "}
                   {account.commerce.themePrice} each, plus any applicable tax.
@@ -555,7 +562,7 @@ export default function AccountPage({
                           sizes="(max-width: 600px) 90vw, 280px"
                         />
                       </div>
-                      <h3>{theme.name}</h3>
+                      <div className="ttv-theme-caption"><h3>{theme.name}</h3><span>{account.purchasedThemeIds.includes(theme.id) ? "Yours to keep" : "One-time purchase"}</span></div>
                       <button
                         data-theme-buy={theme.id}
                         disabled={
@@ -575,7 +582,8 @@ export default function AccountPage({
                   ))}
                 </div>
               </section>
-              <section className="ttv-account-card">
+              <section id="account-settings" className="ttv-account-card">
+                <p className="ttv-account-eyebrow">You’re in control</p>
                 <h2>Account settings</h2>
                 <button
                   disabled={busy}
