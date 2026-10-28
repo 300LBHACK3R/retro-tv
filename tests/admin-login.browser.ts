@@ -9,8 +9,10 @@ test("password-only admin login rejects incorrect credentials and opens after au
     await route.fulfill({ status: isStaff ? 200 : 401, json: isStaff ? { ok: true } : { ok: false, error: "Unable to sign in with these admin credentials." } });
   });
   await page.route("**/api/admin/programming", route => route.fulfill({ status: 503, json: { error: "Test unavailable" } }));
+  await page.route("**/api/programming", route => route.fulfill({ status: 503, json: { error: "Test unavailable" } }));
   await page.goto("/admin");
   await expect(page.getByLabel("Admin email", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".ttv-global-sync-status")).toHaveCount(0);
   await page.getByLabel("Admin Password", { exact: true }).fill("a unique test password");
   await page.getByRole("button", { name: "Open Admin", exact: true }).click();
   await expect(page.getByText("Unable to sign in with these admin credentials.", { exact: true })).toBeVisible();

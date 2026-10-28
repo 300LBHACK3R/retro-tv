@@ -177,7 +177,7 @@ export default function AdminWindowClient() {
         color: "var(--text)",
       }}
     >
-      <GlobalProgrammingSync isAdminAuthorized={authorized} />
+      <GlobalProgrammingSync isAdminAuthorized={authorized} visibility={authorized ? "always" : "hidden"} />
 
       <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-4 p-3 sm:p-5">
         <header
