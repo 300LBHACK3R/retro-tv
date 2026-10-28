@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { serverModule, jsonRequest } from "./server-harness";
 
 const http = serverModule("lib/server/http.ts");
+const passwordAuth = serverModule("lib/server/adminPassword.ts");
 const env = { SUPABASE_URL: "https://qa.supabase.co", SUPABASE_PUBLISHABLE_KEY: "qa-key", TTV_ADMIN_USER_IDS: "staff-id" };
 
 test("admin verifies identity, ignores editable roles and old/parent cookies, fails closed", async () => {
@@ -14,6 +15,7 @@ test("admin verifies identity, ignores editable roles and old/parent cookies, fa
   ]);
   let options: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const auth = serverModule("lib/server/adminAuth.ts", {
+    "./adminPassword": passwordAuth,
     "next/headers": { cookies: async () => ({
       getAll: () => [...jar].map(([name, value]) => ({ name, value })),
       set: (name: string, value: string) => jar.set(name, value),
@@ -49,6 +51,7 @@ test("admin login rejects nonstaff, clears credentials, preserves password white
   let cleared = 0;
   const calls: unknown[] = [];
   const route = serverModule("app/api/admin/login/route.ts", {
+    "@/lib/server/adminPassword": passwordAuth,
     "@/lib/server/http": http,
     "@/lib/server/accountAuth": { accountMutationGuard: async () => rejected },
     "@/lib/server/adminAuth": {
@@ -88,4 +91,37 @@ test("admin logout clears only its cookies even when provider fails, rejects for
   expect(cleared).toBe(0);
   expect((await route.POST!(jsonRequest("/api/admin/logout", {}))).status).toBe(200);
   expect(cleared).toBe(1);
+});
+
+test("password admin sessions reject wrong passwords, tampering, expiry and password rotation", async () => {
+  const credentials = { ADMIN_PASSWORD: "synthetic-admin-password", ADMIN_SESSION_SECRET: "synthetic-signing-secret-for-tests" };
+  const auth = serverModule("lib/server/adminPassword.ts", {}, credentials);
+  expect(auth.matchesAdminPassword!("wrong")).toBe(false);
+  expect(auth.matchesAdminPassword!(credentials.ADMIN_PASSWORD)).toBe(true);
+  const now = Date.now();
+  const token = auth.createPasswordSession!(now);
+  expect(auth.validPasswordSession!(token, now)).toBe(true);
+  expect(auth.validPasswordSession!(token + "x", now)).toBe(false);
+  expect(auth.validPasswordSession!(token, now + 8 * 60 * 60 * 1000)).toBe(false);
+  expect(auth.validPasswordSession!(token, now - 1000)).toBe(false);
+  const rotated = serverModule("lib/server/adminPassword.ts", {}, { ...credentials, ADMIN_PASSWORD: "new-synthetic-password" });
+  expect(rotated.validPasswordSession!(token, now)).toBe(false);
+  expect(passwordAuth.validPasswordSession!(token, now)).toBe(false);
+});
+
+test("password-only login sets a secure admin cookie and honors incorrect-password rejection", async () => {
+  const auth = serverModule("lib/server/adminPassword.ts", {}, { ADMIN_PASSWORD: "synthetic-admin-password", ADMIN_SESSION_SECRET: "synthetic-signing-secret-for-tests" });
+  const issued: unknown[][] = [];
+  const route = serverModule("app/api/admin/login/route.ts", {
+    "@/lib/server/http": http,
+    "next/headers": { cookies: async () => ({ set: (...args: unknown[]) => issued.push(args) }) },
+    "@/lib/server/accountAuth": { accountMutationGuard: async () => null },
+    "@/lib/server/adminPassword": auth,
+    "@/lib/server/adminAuth": { adminAccountsEnabled: () => false, clearAdminCookies: async () => {} },
+  });
+  expect((await route.POST!(jsonRequest("/api/admin/login", { password: "wrong" }))).status).toBe(401);
+  expect(issued).toHaveLength(0);
+  expect((await route.POST!(jsonRequest("/api/admin/login", { password: "synthetic-admin-password" }))).status).toBe(200);
+  expect(issued[0]?.[0]).toBe("ttv-admin-password");
+  expect(issued[0]?.[2]).toMatchObject({ httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: 28800 });
 });

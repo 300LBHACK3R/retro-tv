@@ -52,7 +52,6 @@ export default function AdminWindowClient() {
 
   const [status, setStatus] = useState<AccessStatus>("checking");
   const [authorized, setAuthorized] = useState(false);
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("Checking secure admin session...");
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +74,7 @@ export default function AdminWindowClient() {
       setMessage(
         allowed
           ? "Authorized admin session active."
-          : data?.error || "Sign in with your separate admin account.",
+          : data?.error || "Enter your admin password.",
       );
     } catch {
       setAuthorized(false);
@@ -93,7 +92,7 @@ export default function AdminWindowClient() {
 
     const cleanPassword = password;
 
-    if (!email.trim() || !cleanPassword || submitting) {
+    if (!cleanPassword || submitting) {
       return;
     }
 
@@ -108,7 +107,6 @@ export default function AdminWindowClient() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email.trim(),
           password: cleanPassword,
         }),
       });
@@ -305,20 +303,6 @@ export default function AdminWindowClient() {
               Staff access only. Parent accounts and Kids profiles do not grant admin access.
             </p>
             <form onSubmit={login} className="mt-5 grid gap-3">
-              <label htmlFor="admin-window-email" className="text-xs font-black uppercase tracking-[0.12em]">
-                Admin email
-              </label>
-              <input
-                id="admin-window-email"
-                type="email"
-                autoComplete="username"
-                required
-                maxLength={254}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="rounded-xl border px-4 py-3 text-base outline-none"
-                style={{ background: "var(--panel-alt-bg)", borderColor: "var(--border)", color: "var(--text)" }}
-              />
               <label
                 htmlFor="admin-window-password"
                 className="text-xs font-black uppercase tracking-[0.12em]"
@@ -333,7 +317,7 @@ export default function AdminWindowClient() {
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value.slice(0, 512));
-                  setMessage("Sign in with your separate admin account.");
+                  setMessage("Enter your admin password.");
                 }}
                 autoComplete="current-password"
                 placeholder="Enter password"
@@ -347,7 +331,7 @@ export default function AdminWindowClient() {
 
               <button
                 type="submit"
-                disabled={!email.trim() || !password || submitting}
+                disabled={!password || submitting}
                 className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "Unlocking" : "Open Admin"}

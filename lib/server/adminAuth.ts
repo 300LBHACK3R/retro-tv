@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { PASSWORD_COOKIE, validPasswordSession } from "./adminPassword";
 import type { User } from "@supabase/supabase-js";
 
 export const ADMIN_COOKIE_NAME = "ttv-admin-auth";
@@ -39,13 +40,16 @@ export async function adminAccountClient() {
 export async function clearAdminCookies() {
   const jar = await cookies();
   for (const { name } of jar.getAll()) {
-    if (name === LEGACY_COOKIE_NAME || name === ADMIN_COOKIE_NAME || name.startsWith(`${ADMIN_COOKIE_NAME}.`)) {
+    if (name === PASSWORD_COOKIE || name === LEGACY_COOKIE_NAME || name === ADMIN_COOKIE_NAME || name.startsWith(`${ADMIN_COOKIE_NAME}.`)) {
       jar.set(name, "", { path: "/", maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
     }
   }
 }
 
 export async function isAdminRequestAuthorized(): Promise<boolean> {
+  const jar = await cookies();
+  const token = jar.getAll().find(({ name }) => name === PASSWORD_COOKIE)?.value;
+  if (token && validPasswordSession(token)) return true;
   if (!adminAccountsEnabled()) return false;
   try {
     const client = await adminAccountClient();

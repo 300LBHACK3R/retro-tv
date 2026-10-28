@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("separate admin login submits credentials, rejects a parent, and opens only after staff authorization", async ({ page }) => {
+test("password-only admin login rejects incorrect credentials and opens after authorization", async ({ page }) => {
   let isStaff = false;
   let submitted: Record<string, string> | null = null;
   await page.route("**/api/admin/session", route => route.fulfill({ json: { ok: true, isAdmin: false } }));
@@ -10,11 +10,11 @@ test("separate admin login submits credentials, rejects a parent, and opens only
   });
   await page.route("**/api/admin/programming", route => route.fulfill({ status: 503, json: { error: "Test unavailable" } }));
   await page.goto("/admin");
-  await page.getByLabel("Admin email", { exact: true }).fill("staff@example.test");
+  await expect(page.getByLabel("Admin email", { exact: true })).toHaveCount(0);
   await page.getByLabel("Admin Password", { exact: true }).fill("a unique test password");
   await page.getByRole("button", { name: "Open Admin", exact: true }).click();
   await expect(page.getByText("Unable to sign in with these admin credentials.", { exact: true })).toBeVisible();
-  expect(submitted).toEqual({ email: "staff@example.test", password: "a unique test password" });
+  expect(submitted).toEqual({ password: "a unique test password" });
   isStaff = true;
   await page.getByRole("button", { name: "Open Admin", exact: true }).click();
   await expect(page.getByLabel("Find an admin tool", { exact: true })).toBeVisible();
