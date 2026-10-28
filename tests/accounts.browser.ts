@@ -130,28 +130,25 @@ async function noOverflow(page: Page) {
 }
 
 for (const path of ["/", "/library?title=qa-movie", "/tv"]) {
-  test(`a free parent account is required at ${path}, even with old device profiles`, async ({ page }) => {
+  test(`guests can watch at ${path} without restoring old device profiles`, async ({ page }) => {
     await fixture(page, { ...EMPTY_ACCOUNT, enabled: true });
     await page.addInitScript(() => {
       sessionStorage.setItem("ttv-profile-session-v1", JSON.stringify({ id: "main", pinHash: null }));
     });
     await page.goto(path);
-    await expect(page.getByRole("button", { name: "Create account", exact: true })).toBeVisible();
-    await expect(page.getByText("Free account. Free viewing. Membership is optional.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Guest · Sign in to save", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);
-    await expect(page.locator("video")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Continue watching for free →" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Welcome back." })).toHaveCount(0);
     await noOverflow(page);
   });
 }
 
-test("an account outage never falls back to the old device-only viewer", async ({ page }) => {
+test("an account outage still allows isolated guest viewing", async ({ page }) => {
   await fixture(page, { ...EMPTY_ACCOUNT, enabled: true });
   await page.route("**/api/account", route => route.fulfill({ status: 503, json: { error: "Account service unavailable" } }));
   await page.goto("/");
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("Account services are unavailable");
-  await expect(page.locator("video")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Watch as Guest", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Guest · Sign in to save", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);
 });
 
 test("a locked household cannot open billing through the profile chooser", async ({ page }) => {

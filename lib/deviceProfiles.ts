@@ -163,6 +163,10 @@ export function saveProfile(profile: Profile) {
 }
 export function setProfileTheme(theme: ThemeId) {
   if (!isThemeId(theme) || !canUseTheme(theme, useAccount.getState().ownedThemeIds, false)) return;
+  if (!useAccount.getState().user) {
+    useStore.getState().setTheme(theme);
+    return; // Guest choices last only in memory for this visit.
+  }
   const { activeId } = useProfiles.getState();
   if (!activeId) return;
   useProfiles.setState((state) => ({

@@ -10,14 +10,16 @@ import {
 } from "@/lib/deviceProfiles";
 import { ProfileAvatar } from "./ProfileAvatar";
 import ProfilePicker from "./ProfilePicker";
-import AccountPage from "@/components/account/AccountPage";
+import Link from "next/link";
 
 export function ProfileButton() {
+  const user = useAccount((state) => state.user);
   const badge = useAccount((state) => state.member && state.showMemberBadge);
   const profile = useProfiles((state) =>
     state.profiles.find((item) => item.id === state.activeId),
   );
   const { disconnect } = useGoogleCast();
+  if (!user) return <Link href="/account" className="ttv-profile-switch">Guest · Sign in to save</Link>;
   return (
     <button
       type="button"
@@ -61,14 +63,12 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     disconnect();
-    if (!user || !activeId)
+    if (user && !activeId)
       document
         .querySelectorAll<HTMLMediaElement>("video, audio")
         .forEach((media) => media.pause());
   }, [user, activeId, disconnect, sdkState]);
-  // Device profiles are preferences, never proof of account authentication.
-  // Do not mount the viewer or programming sync until the verified account loads.
-  if (!accountReady || !user) return <AccountPage />;
+  // Guests can watch public programming; authenticated households retain their PIN gate.
   return (
     <>
       <GlobalProgrammingSync
@@ -76,15 +76,15 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
         visibility="problems"
         onReady={handleProgrammingReady}
       />
-      {!ready || !prepared || (activeId && !programmingReady) ? (
+      {!accountReady || !ready || !prepared || ((activeId || !user) && !programmingReady) ? (
         <main className="ttv-profile-screen">
           <div>
             <h1>Tate’s TV</h1>
             <p role="status">Getting your TV ready…</p>
           </div>
         </main>
-      ) : activeId ? (
-        <div key={activeId}>{children}</div>
+      ) : !user || activeId ? (
+        <div key={user ? `${user}:${activeId}` : "guest"}>{children}</div>
       ) : (
         <ProfilePicker key={revision} />
       )}

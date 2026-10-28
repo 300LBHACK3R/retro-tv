@@ -30,7 +30,7 @@ import {
 import { useStore } from "@/lib/store";
 import { useAccount } from "@/lib/accountStore";
 import { getEntranceThemeId } from "@/lib/themePreferences";
-import { setProfileTheme, useProfiles } from "@/lib/deviceProfiles";
+import { setProfileTheme } from "@/lib/deviceProfiles";
 
 const DIALOG_ID = "ttv-theme-library";
 
@@ -222,7 +222,6 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const isMember = useAccount((state) => state.member);
   const themePrice = useAccount((state) => state.commerce.themePrice);
   const themeId = canUseTheme(preferredTheme, ownedPremiumThemes, false) ? preferredTheme : getEntranceThemeId();
-  const storageAvailable = useProfiles((state) => state.storageAvailable);
 
   const activeTheme = useMemo(() => getThemeById(themeId), [themeId]);
   const themes = useMemo(() => getAllThemes(), []);
@@ -466,9 +465,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       {PREMIUM_THEMES_TEMPORARILY_UNLOCKED
                         ? "All themes are free. "
                         : "Free themes, individual purchases and membership. "}
-                      {accountUser ? "Your choice is saved to your account." : storageAvailable
-                        ? "Your choice is saved for this profile on this device."
-                        : "Browser storage is unavailable. Your choice lasts for this visit."}
+                      {accountUser ? "Your choice is saved to your account." : "Guest theme choices last for this visit. Sign in to save your preferences."}
                     </p>
                   </div>
 

@@ -184,7 +184,7 @@ export default function AccountPage({
     <main className="ttv-account-page">
       <header>
         <Link href="/" className="ttv-account-back">
-          {account.user ? "← Back to free TV" : "← Tate’s TV"}
+          {account.user ? "← Back to free TV" : "← Watch free without an account"}
         </Link>
         <Link href="/privacy">Privacy</Link>
       </header>
@@ -259,7 +259,7 @@ export default function AccountPage({
               <p>
                 {mode === "confirm"
                   ? "Confirm this email link to continue securely."
-                  : "Create a free parent account or sign in to watch. Add Kids profiles inside your household with a parent PIN and approved channels and titles. No paid membership required."}
+                  : "Watch free without an account. Sign in to save themes and favourites, or create a free parent account to manage Kids profiles with a parent PIN and approved channels and titles. Membership is optional."}
               </p>
               {!account.enabled ? (
                 <p role="status">

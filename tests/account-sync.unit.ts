@@ -4,7 +4,7 @@ import * as model from "../lib/accountModel";
 import * as profiles from "../lib/profiles";
 import { createStore } from "zustand/vanilla";
 
-test("an auth outage clears active device profiles instead of restoring guest viewing", async () => {
+test("an auth outage clears private profiles for isolated guest viewing", async () => {
   let account = { ...model.EMPTY_ACCOUNT, ready: false, error: "" };
   let local = { profiles: profiles.defaults, pin: null, activeId: "main" as string | null, ready: false };
   let initialized = false;

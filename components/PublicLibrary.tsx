@@ -1,4 +1,5 @@
 "use client";
+import { useAccount } from "@/lib/accountStore";
 import AccountLink from "@/components/account/AccountLink";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
@@ -76,28 +77,29 @@ function ProfileLibrary() {
     mediaId?: string;
     play?: boolean;
   } | null>(null);
+  const signedIn = !!useAccount((state) => state.user);
   const [progressKey] = useState(profileProgressKey);
   const [progress, setProgress] = useState<ProgressMap>({});
   const searchRef = useRef<HTMLInputElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const requestedRef = useRef(false);
   useEffect(() => {
-    setProgress(readProgress(progressKey));
-  }, [progressKey]);
+    setProgress(signedIn ? readProgress(progressKey) : {});
+  }, [progressKey, signedIn]);
   const updateProgress = useCallback(
     (id: string, entry: ProgressEntry | null) => {
       setProgress((previous) => {
-        const next = { ...previous, ...readProgress(progressKey) };
+        const next = { ...previous, ...(signedIn ? readProgress(progressKey) : {}) };
         if (entry) next[id] = entry;
         else delete next[id];
         const safe = sanitizeProgress(next);
         try {
-          localStorage.setItem(progressKey, JSON.stringify(safe));
+          if (signedIn) localStorage.setItem(progressKey, JSON.stringify(safe));
         } catch {}
         return safe;
       });
     },
-    [progressKey],
+    [progressKey, signedIn],
   );
   useEffect(() => {
     if (requestedRef.current || !library.length) return;

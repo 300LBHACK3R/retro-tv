@@ -1,7 +1,5 @@
 "use client";
 import { useEffect } from "react";
-import { DEVICE_LIBRARY_KEY, useDeviceLibrary } from "@/lib/deviceLibrary";
-import { PROFILE_STORAGE_KEY, refreshProfiles } from "@/lib/deviceProfiles";
 import { useAccount } from "@/lib/accountStore";
 import { startAccount, refreshAccount, watchAccountChanges } from "@/lib/accountSync";
 export default function DeviceLibraryRuntime() {
@@ -16,9 +14,7 @@ export default function DeviceLibraryRuntime() {
     };
     const sync = (event: StorageEvent) => {
       if (event.key === "ttv-account-change") { window.location.reload(); return; }
-      if (useAccount.getState().user) return;
-      if (event.key === PROFILE_STORAGE_KEY || event.key === null) refreshProfiles();
-      if (event.key === DEVICE_LIBRARY_KEY || event.key === null) void useDeviceLibrary.persist.rehydrate();
+      // Legacy device profiles never populate an anonymous viewing session.
     };
     const interval = setInterval(refresh, 300_000);
     window.addEventListener("storage", sync);

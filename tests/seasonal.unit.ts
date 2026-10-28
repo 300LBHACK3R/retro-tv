@@ -40,11 +40,11 @@ test("the entrance changes at Calgary midnight on November 1, independently of s
   }
 });
 
-test("first paint restores every valid profile choice and reduced motion before or after the switch", () => {
+test("first paint ignores legacy saved themes while preserving reduced motion", () => {
   for (const theme of THEMES) {
     for (const now of [CHRISTMAS_ENTRANCE_START - 1, CHRISTMAS_ENTRANCE_START]) {
       const root = bootstrap(now, { profiles: [{ id: "main", theme: theme.id }] }, { id: "main", pinHash: null });
-      expect(root.dataset.ttvTheme).toBe(theme.id);
+      expect(root.dataset.ttvTheme).toBe(getEntranceThemeId(now));
       expect(root.dataset.ttvReducedMotion).toBe("true");
     }
   }

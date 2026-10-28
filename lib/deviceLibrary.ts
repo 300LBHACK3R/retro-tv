@@ -2,8 +2,6 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { useAccount } from "./accountStore";
-import { browserStorage } from "./browserStorage";
 
 export const DEVICE_LIBRARY_KEY = "ttv-device-library-v1";
 const MAX_SAVED_ITEMS = 500;
@@ -92,9 +90,10 @@ export const useDeviceLibrary = create<DeviceLibrary>()(
     {
       name: DEVICE_LIBRARY_KEY,
       storage: createJSONStorage(() => ({
-        getItem: (key) => useAccount.getState().user ? null : browserStorage.getItem(key),
-        setItem: (key, value) => { if (!useAccount.getState().user) browserStorage.setItem(key, value); },
-        removeItem: (key) => { if (!useAccount.getState().user) browserStorage.removeItem(key); },
+        // Signed-in preferences sync through accountSync; guests stay in memory.
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
       })),
       skipHydration: true,
       partialize: (state) => ({

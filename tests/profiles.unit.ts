@@ -243,7 +243,7 @@ test("profile data is bounded and Main cannot become a Kids profile", () => {
     { id: "child", name: "Child", avatar: "boydragon", kids: true },
   ]);
 });
-test("profile themes survive reloads and edits without changing PINs or another profile", () => {
+test("guest theme previews do not overwrite legacy saved profiles or PINs", () => {
   const local = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const session = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
   function memory() {
@@ -285,16 +285,17 @@ test("profile themes survive reloads and edits without changing PINs or another 
     expect(useStore.getState().currentChannelId).toBe("1");
     expect(useStore.getState().themeId).toBe("obsidian-gold");
     setProfileTheme("midas-gold");
+    expect(useStore.getState().themeId).toBe("midas-gold");
     saveProfile({ ...useProfiles.getState().profiles[0]!, name: "Tate updated" });
-    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).profiles.map((profile: Record<string, unknown>) => profile.theme)).toEqual(["midas-gold", "shaw-2006"]);
+    expect(JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY)!).profiles.map((profile: Record<string, unknown>) => profile.theme)).toEqual(["obsidian-gold", "shaw-2006"]);
     useProfiles.setState({ ready: false });
     initializeProfiles();
-    expect(useStore.getState().themeId).toBe("midas-gold");
+    expect(useStore.getState().themeId).toBe("obsidian-gold");
     lockProfiles();
     expect(useStore.getState().themeId).toBe(getEntranceThemeId());
     useStore.getState().setTheme("electric-blue-live");
     activateProfile("main");
-    expect(useStore.getState().themeId).toBe("midas-gold");
+    expect(useStore.getState().themeId).toBe("obsidian-gold");
     expect(useProfiles.getState().profiles[0]!.name).toBe("Tate updated");
     useStore.getState().setTheme("shaw-2006");
     activateProfile("kids");
