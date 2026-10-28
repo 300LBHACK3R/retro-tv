@@ -26,6 +26,7 @@ import {
   buildLibrary,
   FILTERS,
   formatClock,
+  formatDuration,
   getTypeLabel,
   sanitizeProgress,
   type LibraryFilter,
@@ -33,6 +34,8 @@ import {
   type ProgressMap,
   type ProgressEntry,
 } from "@/lib/libraryCatalog";
+import { libraryCollections, groupRuntime, sortLibrary, titleLetter, watchStatus } from "@/lib/libraryBrowse";
+import { CHANNEL_CATEGORIES } from "@/lib/audience";
 import styles from "./library/library.module.css";
 
 function readProgress(key: string): ProgressMap {
@@ -50,7 +53,7 @@ export default function PublicLibrary() {
   );
 }
 function ProfileLibrary() {
-  const { media } = useViewerCatalog();
+  const { media, channels } = useViewerCatalog();
   const kids = useProfiles(
     (state) =>
       state.profiles.find((profile) => profile.id === state.activeId)?.kids ===
@@ -70,6 +73,15 @@ function ProfileLibrary() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [savedOnly, setSavedOnly] = useState(false);
+  const [category, setCategory] = useState("all");
+  const [channel, setChannel] = useState("all");
+  const [letter, setLetter] = useState("all");
+  const [watchFilter, setWatchFilter] = useState("all");
+  const [runtime, setRuntime] = useState("all");
+  const [view, setView] = useState("posters");
+  const collections = useMemo(() => libraryCollections(library, channels), [library, channels]);
+  const availableChannels = useMemo(() => [...new Map([...collections.values()].flatMap(entry => entry.channels).map(item => [item.id, item])).values()].sort((a, b) => (a.number ?? Number(a.id)) - (b.number ?? Number(b.id)) || a.name.localeCompare(b.name)), [collections]);
+  const availableCategories = CHANNEL_CATEGORIES.filter(value => [...collections.values()].some(entry => entry.categories.includes(value)));
   const [sort, setSort] = useState("az");
   const [limit, setLimit] = useState(30);
   const [selection, setSelection] = useState<{
@@ -125,23 +137,15 @@ function ProfileLibrary() {
       (group) =>
         (filter === "all" || group.type === filter) &&
         (!savedOnly || watchlist.includes(group.key)) &&
-        (!normalized || group.searchText.includes(normalized)),
+        (category === "all" || collections.get(group.key)?.categories.some(value => value === category)) &&
+        (channel === "all" || collections.get(group.key)?.channels.some(value => value.id === channel)) &&
+        (letter === "all" || titleLetter(group.title) === letter) &&
+        (watchFilter === "all" || watchStatus(group, progress) === watchFilter) &&
+        (runtime === "all" || (runtime === "short" ? groupRuntime(group) < 1800 : runtime === "medium" ? groupRuntime(group) >= 1800 && groupRuntime(group) < 3600 : groupRuntime(group) >= 3600)) &&
+        (!normalized || normalized.split(/\s+/).every(word => group.searchText.includes(word))),
     );
-    return groups.sort((a, b) =>
-      sort === "recent"
-        ? Math.max(
-            ...b.items.map(
-              (item) => Date.parse(item.media.createdAt || "") || 0,
-            ),
-          ) -
-            Math.max(
-              ...a.items.map(
-                (item) => Date.parse(item.media.createdAt || "") || 0,
-              ),
-            ) || a.title.localeCompare(b.title)
-        : a.title.localeCompare(b.title),
-    );
-  }, [library, query, filter, savedOnly, watchlist, sort]);
+    return sortLibrary(groups, sort);
+  }, [library, query, filter, savedOnly, watchlist, sort, collections, category, channel, letter, watchFilter, runtime, progress]);
   const continuing = useMemo(
     () =>
       library
@@ -181,9 +185,22 @@ function ProfileLibrary() {
     setQuery("");
     setFilter("all");
     setSavedOnly(false);
+    setCategory("all");
+    setChannel("all");
+    setLetter("all");
+    setWatchFilter("all");
+    setRuntime("all");
     setLimit(30);
     searchRef.current?.focus({ preventScroll: true });
   }
+  const activeFilters = [
+    ...(query ? [{ label: `Search: ${query}`, clear: () => setQuery("") }] : []),
+    ...(category !== "all" ? [{ label: category, clear: () => setCategory("all") }] : []),
+    ...(channel !== "all" ? [{ label: availableChannels.find(item => item.id === channel)?.name ?? "Channel", clear: () => setChannel("all") }] : []),
+    ...(letter !== "all" ? [{ label: `Starts with ${letter}`, clear: () => setLetter("all") }] : []),
+    ...(watchFilter !== "all" ? [{ label: watchFilter.replaceAll("-", " "), clear: () => setWatchFilter("all") }] : []),
+    ...(runtime !== "all" ? [{ label: runtime === "short" ? "Under 30 minutes" : runtime === "medium" ? "30–60 minutes" : "60+ minutes", clear: () => setRuntime("all") }] : []),
+  ];
   const savedCount = library.filter((group) =>
     watchlist.includes(group.key),
   ).length;
@@ -228,6 +245,10 @@ function ProfileLibrary() {
             </div>
             <span className={styles.count}>{library.length} titles</span>
           </section>
+          {availableCategories.length > 0 && <section className={styles.collectionSection} aria-label="Explore collections">
+            <div className={styles.sectionHead}><h2>Find your kind of TV</h2><p className={styles.muted}>Browse the collections from your channels.</p></div>
+            <div className={styles.collectionGrid}>{availableCategories.map(value => <button key={value} className={styles.collectionCard} aria-label={`Explore ${value}`} aria-pressed={category === value} onClick={() => { setCategory(value); setFilter("all"); setQuery(""); setSavedOnly(false); setChannel("all"); setLetter("all"); setWatchFilter("all"); setRuntime("all"); setLimit(30); searchRef.current?.scrollIntoView({ block: "center", behavior: "auto" }); searchRef.current?.focus({ preventScroll: true }); }}><span className={styles.eyebrow}>Collection</span><strong>{value}</strong><small>{library.filter(group => collections.get(group.key)?.categories.includes(value)).length} titles <span aria-hidden="true">↗</span></small></button>)}</div>
+          </section>}
           {continuing.length > 0 && (
             <section className={styles.section} aria-label="Continue watching">
               <div className={styles.sectionHead}>
@@ -280,7 +301,11 @@ function ProfileLibrary() {
                 onChange={(event) => setSort(event.target.value)}
               >
                 <option value="az">Title A–Z</option>
+                <option value="za">Title Z–A</option>
                 <option value="recent">Recently added</option>
+                <option value="shortest">Shortest first</option>
+                <option value="longest">Longest first</option>
+                <option value="episodes">Most episodes</option>
               </select>
               <div className={styles.filters} aria-label="Library filters">
                 <button
@@ -301,13 +326,28 @@ function ProfileLibrary() {
                       setLimit(30);
                     }}
                   >
-                    {item.label}
+                    {item.label}<span aria-hidden="true" className={styles.filterCount}>{item.id === "all" ? library.length : library.filter(group => group.type === item.id).length}</span>
                   </button>
                 ))}
               </div>
             </div>
+            <div className={styles.refine}>
+              <label>Category<select className={styles.select} value={category} onChange={event => { setCategory(event.target.value); setLimit(30); }}><option value="all">All categories</option>{availableCategories.map(value => <option key={value}>{value}</option>)}</select></label>
+              <label>Channel<select className={styles.select} value={channel} onChange={event => { setChannel(event.target.value); setLimit(30); }}><option value="all">All channels</option>{availableChannels.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <label>Watch status<select className={styles.select} value={watchFilter} onChange={event => { setWatchFilter(event.target.value); setLimit(30); }}><option value="all">Any watch status</option><option value="not-started">Not started</option><option value="in-progress">In progress</option><option value="finished">Finished</option></select></label>
+              <label>Time to watch<select className={styles.select} value={runtime} onChange={event => { setRuntime(event.target.value); setLimit(30); }}><option value="all">Any length</option><option value="short">Under 30 minutes</option><option value="medium">30–60 minutes</option><option value="long">60+ minutes</option></select></label>
+            </div>
+            <p className={styles.browseHint}>Categories follow the channel collections. For shows, time filters use the shortest available episode.</p>
+            <nav className={styles.alphabet} aria-label="Browse titles alphabetically">
+              {["all", "#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(value => <button key={value} aria-pressed={letter === value} disabled={value !== "all" && !library.some(group => titleLetter(group.title) === value)} onClick={() => { setLetter(value); setLimit(30); }}>{value === "all" ? "Any" : value}</button>)}
+            </nav>
+            {(activeFilters.length > 0 || filter !== "all" || savedOnly) && <div className={styles.activeFilters} aria-label="Active library filters">
+              {activeFilters.map(item => <button key={item.label} className={styles.button} onClick={() => { item.clear(); setLimit(30); }} aria-label={`Remove ${item.label} filter`}>{item.label} ×</button>)}
+              <button className={styles.button} onClick={browseAll}>Clear all filters</button>
+            </div>}
             <div className={styles.resultsHeading}>
-              <h2>Browse Titles</h2>
+              <h2>{savedOnly ? "My watchlist" : filter !== "all" ? FILTERS.find(item => item.id === filter)?.label : "Browse Titles"}</h2>
+              <div className={styles.viewSwitch} aria-label="Library layout"><button className={styles.button} aria-pressed={view === "posters"} onClick={() => setView("posters")}>Posters</button><button className={styles.button} aria-pressed={view === "list"} onClick={() => setView("list")}>List</button></div>
               <span className={styles.count} role="status">
                 {filtered.length} {filtered.length === 1 ? "title" : "titles"}
               </span>
@@ -342,7 +382,7 @@ function ProfileLibrary() {
               </div>
             ) : (
               <>
-                <div className={styles.grid}>
+                <div className={`${styles.grid} ${view === "list" ? styles.listView : ""}`}>
                   {filtered.slice(0, limit).map((group) => (
                     <article className={styles.card} key={group.key}>
                       <button
@@ -357,13 +397,16 @@ function ProfileLibrary() {
                             kind={getTypeLabel(group.type)}
                           />
                         </div>
-                        <h3>{group.title}</h3>
+                        <div className={styles.cardInfo}><h3>{group.title}</h3>
                         <p>
                           {getTypeLabel(group.type)}
                           {group.type === "show"
-                            ? ` · ${group.items.length} episodes`
-                            : ""}
+                            ? ` · ${group.seasons.length} ${group.seasons.length === 1 ? "season" : "seasons"} · ${group.items.length} episodes`
+                            : ` · ${formatDuration(group.totalDuration)}`}
                         </p>
+                        <p className={styles.cardCategory}>{collections.get(group.key)?.categories.join(" · ") || "On demand"}</p>
+                        {watchStatus(group, progress) !== "not-started" && <span className={styles.watchBadge}>{watchStatus(group, progress) === "finished" ? "Watched" : "In progress"}</span>}
+                        </div>
                       </button>
                       <div className={styles.cardSave}>
                         <SaveButton

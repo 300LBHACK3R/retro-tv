@@ -228,9 +228,12 @@ export default function TitleDetails({
                 )
                   video.currentTime = saved.position;
               }}
-              onEnded={() => {
+              onEnded={(event) => {
                 completedRef.current = true;
-                onProgress(selected.media.id, null);
+                const duration = event.currentTarget.duration;
+                if (Number.isFinite(duration) && duration > 0) {
+                  onProgress(selected.media.id, { position: duration, duration, updatedAt: Date.now() });
+                }
                 const next = group.items[index + 1];
                 if (next) start(next.media.id);
               }}

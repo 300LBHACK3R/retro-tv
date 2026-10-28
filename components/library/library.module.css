@@ -669,3 +669,46 @@
     border: 1px solid ButtonText;
   }
 }
+
+/* Catalogue tools stay in normal flow so they never obstruct browsing. */
+.refine { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 20px 0; border-top: 1px solid var(--border); }
+.refine label { min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 750; color: var(--text-muted); }
+.refine select { width: 100%; min-width: 0; color: var(--text); }
+.browseHint { color: var(--text-muted); font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
+.alphabet { display: flex; flex-wrap: wrap; gap: 5px; padding-block: 12px; border-block: 1px solid var(--border); margin-bottom: 18px; }
+.alphabet button { min-width: 38px; min-height: 44px; padding: 8px; border-radius: 8px; background: var(--panel-alt-bg); color: var(--text); font-size: 12px; font-weight: 750; }
+.alphabet button:disabled { opacity: .35; }
+.alphabet button[aria-pressed="true"], .viewSwitch button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary, #11131a); }
+.filterCount { font-size: 11px; opacity: .7; }
+.activeFilters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.activeFilters button { font-size: 12px; overflow-wrap: anywhere; text-align: left; }
+.viewSwitch { display: flex; gap: 4px; margin-left: auto; }
+.viewSwitch button { font-size: 12px; padding-inline: 12px; }
+.cardInfo { min-width: 0; }
+.cardCategory { font-size: 11px !important; line-height: 1.5; opacity: .85; }
+.watchBadge { display: inline-block; margin-top: 8px; font-size: 11px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 20px; color: var(--primary); }
+.listView { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.listView .card { border: 1px solid var(--border); border-radius: 14px; background: var(--panel-alt-bg); padding: 12px; }
+.listView .cardButton { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; align-items: center; padding-right: 30px; }
+.listView .cardSave { top: 12px; right: 12px; }
+.listView .cardInfo h3 { margin-top: 0; }
+@media (max-width: 760px) {
+  .refine { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .listView { grid-template-columns: minmax(0, 1fr); }
+  .resultsHeading { flex-wrap: wrap; }
+  .alphabet { gap: 4px; }
+  .alphabet button { min-width: 34px; }
+}
+@media (max-width: 380px) {
+  .refine { grid-template-columns: minmax(0, 1fr); }
+  .viewSwitch { margin-left: 0; }
+}
+.collectionSection { margin: 0 0 32px; }
+.collectionGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.collectionCard { min-width: 0; text-align: left; display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(135deg, #ffffff08, transparent), var(--panel-bg); color: var(--text); }
+.collectionCard strong { font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.collectionCard small { color: var(--text-muted); display: flex; justify-content: space-between; margin-top: auto; }
+.collectionCard[aria-pressed="true"] { border-color: var(--primary); }
+.collectionCard:hover { background: var(--panel-alt-bg); }
+@media (max-width: 900px) { .collectionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .collectionCard { padding: 14px; } .collectionCard strong { font-size: 15px; } }

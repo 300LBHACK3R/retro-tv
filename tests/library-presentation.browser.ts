@@ -289,3 +289,27 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     }),
   ).toBeVisible();
 });
+
+test("library combines channel, alphabet and runtime filters and keeps selections in list view", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/library");
+  const show = page.getByRole("button", { name: "Open Studio Sessions", exact: true });
+  const movie = page.getByRole("button", { name: "Open A Calgary Evening", exact: true });
+  await expect(show).toBeVisible();
+  await page.getByLabel("Channel", { exact: true }).selectOption("24");
+  await expect(movie).toHaveCount(0);
+  await page.getByLabel("Time to watch", { exact: true }).selectOption("long");
+  await expect(page.getByRole("heading", { name: "No matching library titles" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear all filters", exact: true }).click();
+  await page.getByRole("navigation", { name: "Browse titles alphabetically" }).getByRole("button", { name: "C", exact: true }).click();
+  await expect(movie).toBeVisible();
+  await expect(show).toHaveCount(0);
+  await page.getByRole("button", { name: "List", exact: true }).click();
+  await noOverflow(page);
+  await movie.click();
+  await page.getByRole("button", { name: "Close title ✕" }).click();
+  await expect(movie).toBeFocused();
+  await expect(page.getByRole("button", { name: "List", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Clear all filters", exact: true }).click();
+  await expect(show).toBeVisible();
+});
