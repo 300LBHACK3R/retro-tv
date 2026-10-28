@@ -350,6 +350,25 @@ function ProfileEditor({
           onSave({ ...profile, name: profile.name.trim() });
         }}
       >
+        {profile.id !== "main" && (
+          <label className="ttv-profile-check ttv-profile-kids-option">
+            <input
+              type="checkbox"
+              checked={profile.kids}
+              onChange={(event) =>
+                setProfile({ ...profile, kids: event.target.checked })
+              }
+            />
+            <span>
+              Kids profile
+              <small>
+                Only channels and programmes approved for Kids.
+                {!parentPin &&
+                  " You’ll set a parent PIN before their first watch."}
+              </small>
+            </span>
+          </label>
+        )}
         <div className="ttv-profile-editor-preview">
           <ProfileAvatar profile={profile} />
           <span>
@@ -397,25 +416,6 @@ function ProfileEditor({
             ))}
           </div>
         </fieldset>
-        {profile.id !== "main" && (
-          <label className="ttv-profile-check ttv-profile-kids-option">
-            <input
-              type="checkbox"
-              checked={profile.kids}
-              onChange={(event) =>
-                setProfile({ ...profile, kids: event.target.checked })
-              }
-            />
-            <span>
-              Kids profile
-              <small>
-                Only channels and programmes approved for Kids.
-                {!parentPin &&
-                  " You’ll set a parent PIN before their first watch."}
-              </small>
-            </span>
-          </label>
-        )}
         <div className="ttv-profile-actions">
           <button
             className="ttv-profile-primary"
