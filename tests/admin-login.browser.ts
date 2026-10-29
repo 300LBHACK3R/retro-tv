@@ -46,12 +46,15 @@ test("admin request inbox filters suggestions and saves member replies separatel
   await panel.getByRole("button", { name: "Apply filters" }).click();
   await expect(panel.getByText("1 request in this view", { exact: true })).toBeVisible();
   await panel.getByText("Review request", { exact: true }).click();
-  await panel.getByLabel("Status", { exact: true }).selectOption("reviewing");
+  // The select's accessible name excludes the option text in its wrapping label.
+  await panel.getByRole("combobox", { name: "Status", exact: true }).selectOption("reviewing");
   await panel.getByLabel("Reply visible to this member").fill("Checking availability");
   await panel.getByLabel("Private admin notes").fill("Private follow-up");
   await panel.getByRole("button", { name: "Save request update", exact: true }).click();
   await expect(panel.getByText("Saved. The member can now see the status and your reply in their account.")).toBeVisible();
-  await expect(panel.getByText("Under review", { exact: true })).toBeVisible();
+  const status = panel.getByRole("listitem").locator('[data-status="reviewing"]');
+  await expect(status).toBeVisible();
+  await expect(status).toHaveText("Under review");
   expect(saved).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });

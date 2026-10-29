@@ -316,10 +316,11 @@ test("library combines channel, alphabet and runtime filters and keeps selection
   const movie = page.getByRole("button", { name: "Open A Calgary Evening", exact: true });
   await expect(show).toBeVisible();
   await expect(movie).toBeVisible();
-  await page.getByLabel("Channel", { exact: true }).selectOption("24");
+  // Match the select's accessible name, not its wrapping label's option text.
+  await page.getByRole("combobox", { name: "Channel", exact: true }).selectOption("24");
   await expect(show).toBeVisible();
   await expect(movie).toHaveCount(0);
-  await page.getByLabel("Time to watch", { exact: true }).selectOption("long");
+  await page.getByRole("combobox", { name: "Time to watch", exact: true }).selectOption("long");
   await expect(page.getByRole("heading", { name: "No matching library titles" })).toBeVisible();
   await page.getByRole("button", { name: "Clear all filters", exact: true }).click();
   await page.getByRole("navigation", { name: "Browse titles alphabetically" }).getByRole("button", { name: "C", exact: true }).click();
