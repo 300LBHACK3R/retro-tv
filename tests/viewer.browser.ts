@@ -319,6 +319,9 @@ test("Cyberpunk Christmas saves the selected theme and decorates navigation and 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
   await expect.poll(() => page.locator(".ttv-noel-art").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(page.locator(".ttv-noel-art")).toHaveCSS("object-fit", "contain");
+  const frameInset = await page.locator(".ttv-premium-topbar").evaluate(element => element.getBoundingClientRect().left);
+  expect(frameInset).toBeGreaterThanOrEqual((page.viewportSize()?.width ?? 0) >= 1000 ? 70 : 20);
   const nav = page.locator(".ttv-premium-topbar, .ttv-mobile-viewer-nav").filter({ visible: true }).first();
   expect(await nav.evaluate(element => getComputedStyle(element, element.classList.contains("ttv-mobile-viewer-nav") ? "::before" : "::after").backgroundImage)).toContain("neon-noel-lights.svg");
   const brand = await page.locator(".ttv-premium-brand .ttv-noel-brand__name").boundingBox();

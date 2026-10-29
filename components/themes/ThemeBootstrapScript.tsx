@@ -1,7 +1,7 @@
 import { createThemeCssVars, DEFAULT_THEME_ID, THEMES, THEME_STORAGE_KEY } from "@/lib/themes";
-import { CHRISTMAS_ENTRANCE_START, CHRISTMAS_THEME_ID } from "@/lib/themePreferences";
+import { CHRISTMAS_ENTRANCE_START, CHRISTMAS_THEME_ID, LOGIN_THEME_STORAGE_KEY } from "@/lib/themePreferences";
 
-/** Start with the seasonal entrance; verified accounts restore saved themes after hydration. */
+/** Login gets a cosmetic hint; verified accounts restore authoritative preferences after hydration. */
 export function createThemeBootstrapScript() {
   const entries = THEMES.map((theme) => ({
     id: theme.id,
@@ -13,6 +13,12 @@ export function createThemeBootstrapScript() {
   const script = `(() => {
     const themes = ${JSON.stringify(entries)};
     let id = Date.now() >= ${CHRISTMAS_ENTRANCE_START} ? ${JSON.stringify(CHRISTMAS_THEME_ID)} : ${JSON.stringify(DEFAULT_THEME_ID)};
+    try {
+      if (["/account", "/auth/confirm"].includes(window.location?.pathname)) {
+        const remembered = window.localStorage.getItem(${JSON.stringify(LOGIN_THEME_STORAGE_KEY)});
+        if (themes.some((theme) => theme.id === remembered)) id = remembered;
+      }
+    } catch { /* The seasonal entrance works without storage. */ }
     const theme = themes.find((theme) => theme.id === id);
     const root = document.documentElement;
     root.dataset.ttvTheme = theme.id;

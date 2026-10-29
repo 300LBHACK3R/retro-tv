@@ -16,6 +16,7 @@ export function isMembershipPlanId(value: unknown): value is MembershipPlanId {
 }
 export type Household = {
   profiles: Profile[];
+  entranceTheme?: ThemeId;
   pin: Pin | null;
   library: Record<string, { favouriteChannels: string[]; watchlist: string[] }>;
   showMemberBadge: boolean;
@@ -109,6 +110,7 @@ export function sanitizeHousehold(value: unknown): Household | null {
   }
   return {
     profiles,
+    ...(isThemeId(source.entranceTheme) ? { entranceTheme: source.entranceTheme } : {}),
     pin: pin ? { salt: pin.salt!, hash: pin.hash! } : null,
     library,
     showMemberBadge: source.showMemberBadge === true,
@@ -121,6 +123,11 @@ export function validateHouseholdAccess(
   limit: number,
   enforceThemes: boolean,
 ): string | null {
+  if (next.entranceTheme && enforceThemes &&
+      getThemeById(next.entranceTheme).isPremium &&
+      !allowed.includes(next.entranceTheme) &&
+      next.entranceTheme !== previous?.entranceTheme)
+    return "This theme needs a purchase or an active membership.";
   const existingIds = new Set(previous?.profiles.map((profile) => profile.id));
   if (
     next.profiles.length > limit &&

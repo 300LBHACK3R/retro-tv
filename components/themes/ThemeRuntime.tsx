@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import Halloween90sScene from "@/components/themes/Halloween90sScene";
 import { useStore } from "@/lib/store";
 import { useAccount } from "@/lib/accountStore";
 import { useProfiles } from "@/lib/deviceProfiles";
-import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId } from "@/lib/themePreferences";
+import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId, readLoginThemeId } from "@/lib/themePreferences";
 import {
   canUseTheme,
   createThemeCssVars,
@@ -27,13 +28,20 @@ const THEME_CHANGE_EVENT = "ttv:theme-change";
  * changes and metadata after profiles restore their saved theme.
  */
 export default function ThemeRuntime() {
+  const pathname = usePathname();
+  const userId = useAccount((state) => state.user?.id);
   const themeId = useStore((state) => state.themeId);
   const profilesReady = useProfiles((state) => state.ready);
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
   const owned = useAccount((state) => state.ownedThemeIds);
-  const theme = useMemo(() => getThemeById(canUseTheme(themeId, owned, false) ? themeId : getEntranceThemeId()), [themeId, owned]);
+  const theme = useMemo(() => {
+    // A remembered sign-in appearance never grants a profile session or a paid viewer theme.
+    const loginTheme = profilesReady && !userId && ["/account", "/auth/confirm"].includes(pathname)
+      ? readLoginThemeId() : null;
+    return getThemeById(loginTheme ?? (canUseTheme(themeId, owned, false) ? themeId : getEntranceThemeId()));
+  }, [themeId, owned, profilesReady, userId, pathname]);
   const cssVars = useMemo(() => createThemeCssVars(theme), [theme]);
 
   useEffect(() => {
@@ -74,7 +82,7 @@ export default function ThemeRuntime() {
     const updateEntrance = () => {
       clearTimeout(timer);
       const profiles = useProfiles.getState();
-      if (profiles.ready && !profiles.activeId)
+      if (profiles.ready && !profiles.activeId && !profiles.entranceTheme)
         useStore.getState().setTheme(getEntranceThemeId());
       const remaining = CHRISTMAS_ENTRANCE_START - Date.now();
       if (remaining > 0) timer = setTimeout(updateEntrance, Math.min(remaining, 2_147_483_647));

@@ -8,6 +8,7 @@ import {
 import { programming } from "./programming-fixture";
 import { THEMES } from "../lib/themes";
 import { readFileSync } from "node:fs";
+import { waitForHouseholdSave } from "./viewer-fixture";
 const video = Buffer.from(
   readFileSync("tests/fixtures/test-video.webm.base64", "utf8"),
   "base64",
@@ -324,6 +325,71 @@ test("account theme saves survive refresh without replacing guest profiles", asy
   await expect(
     page.getByRole("button", { name: "Watch as Alice", exact: true }),
   ).toHaveCount(0);
+});
+
+test("saved account appearance follows the profile chooser and returning sign-in without restoring a session", async ({ page }, info) => {
+  const f = await fixture(page, account());
+  const root = page.locator("html");
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="christmas-neon-noel"]').click();
+  await waitForHouseholdSave(page);
+  expect(f.state().household?.entranceTheme).toBe("christmas-neon-noel");
+  await page.getByRole("button", { name: /^Switch profile:/ }).click();
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  expect(await page.evaluate(() => sessionStorage.getItem("ttv-profile-session-v1"))).toBeNull();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await page.evaluate(() => { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow")); });
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await page.locator(".ttv-noel-art").evaluate((image: HTMLImageElement) => image.decode());
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath("neon-noel-profile-entrance.png") });
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  await waitForHouseholdSave(page);
+  await page.goto("/account");
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("link", { name: "Guest · Sign in to save", exact: true })).toBeVisible();
+  await page.goto("/account");
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  expect(await page.evaluate(() => sessionStorage.getItem("ttv-profile-session-v1"))).toBeNull();
+  await expect(page.getByRole("button", { name: "Watch as Alice", exact: true })).toHaveCount(0);
+  await page.locator(".ttv-noel-art").evaluate((image: HTMLImageElement) => image.decode());
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath("neon-noel-signin.png") });
+});
+
+test("guest previews never replace the login appearance and verified account preferences win after sign-in", async ({ page }) => {
+  await fixture(page, { ...EMPTY_ACCOUNT, enabled: true });
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("ttv-login-theme-v1")) localStorage.setItem("ttv-login-theme-v1", "christmas-neon-noel");
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="christmas-96-living-room"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  expect(await page.evaluate(() => localStorage.getItem("ttv-login-theme-v1"))).toBe("christmas-neon-noel");
+  await page.goto("/account");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await page.getByLabel("Email address", { exact: true }).fill("alice@example.test");
+  await page.locator('input[name="password"]').fill("a long memorable passphrase");
+  await page.locator("form").getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your TV. Your way." })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
 });
 
 test("membership badge syncs, payment redirects cannot grant themes, and preference conflicts are visible", async ({

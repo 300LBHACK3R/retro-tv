@@ -24,4 +24,6 @@ Use the landscape as the reference for a separately recomposed tall 9:16 mobile 
 
 The scene loads only when selected. Decoration is non-interactive and sits behind the viewer. Glow and snowfall animate opacity or transforms; shared seasonal styles pause motion on hidden pages, disable it for reduced-motion preferences and hide decorative scenery in forced-colour mode. Lights repeat across the navigation and guide headers with dedicated space below controls. Narrow phone headers give the wordmark and account actions separate rows.
 
+The scene fits the complete landscape or portrait artwork with `object-fit: contain`, preserving the original images. Cyan and plum ambient gradients fill any remaining space around differing screen proportions. Wider desktop gutters, safe-area-aware phone gutters and a translucent navigation panel expose more of the room without shrinking playback in short phone landscape mode.
+
 Browser coverage checks selection under the Christmas filter, profile persistence after reload, image loading, light strings, control separation, overflow and reduced motion. Existing theme-switching coverage includes this theme.

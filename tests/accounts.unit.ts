@@ -96,6 +96,18 @@ test("account preferences reject invalid data, retain only bounded profile field
   expect(validateHouseholdAccess(ten, ten, free, 5, true)).toBeNull();
 });
 
+test("account entrance themes are bounded preferences and cannot grant paid access", () => {
+  const baseline = sanitizeHousehold({ profiles: [{ id: "main", name: "Parent" }], entranceTheme: "christmas-neon-noel" })!;
+  expect(baseline.entranceTheme).toBe("christmas-neon-noel");
+  expect(sanitizeHousehold({ ...baseline, entranceTheme: "unknown" })).not.toHaveProperty("entranceTheme");
+  const free = allowedThemeIds([], false);
+  expect(validateHouseholdAccess(baseline, null, free, 5, true)).toBeNull();
+  const locked = { ...baseline, entranceTheme: "midas-gold" as const };
+  expect(validateHouseholdAccess(locked, baseline, free, 5, true)).toContain("purchase");
+  expect(validateHouseholdAccess(locked, locked, free, 5, true)).toBeNull();
+  expect(validateHouseholdAccess(locked, baseline, allowedThemeIds(["midas-gold"], false), 5, true)).toBeNull();
+});
+
 test("Postgres enforces private account tables, atomic rate limits, payment replay protection and event ordering", async () => {
   test.setTimeout(60_000);
   const db = new PGlite();

@@ -4,21 +4,22 @@ import { createThemeBootstrapScript } from "../components/themes/ThemeBootstrapS
 import { THEMES, canUseTheme, getThemeAccessLabel, getThemePriceLabel, getFreeThemes } from "../lib/themes";
 import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";
-import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "../lib/themePreferences";
+import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId, LOGIN_THEME_STORAGE_KEY, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "../lib/themePreferences";
 import type { Channel, MediaItem } from "../lib/types";
 
-function bootstrap(now: number, profiles?: unknown, session?: unknown, blocked: boolean | "malformed" = false) {
+function bootstrap(now: number, profiles?: unknown, session?: unknown, blocked: boolean | "malformed" = false, login?: { path: string; theme: string }) {
   const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
   const local = {
     getItem: (key: string) => {
       if (blocked === "malformed") return "{";
       if (blocked) throw new Error("Storage blocked");
+      if (key === LOGIN_THEME_STORAGE_KEY) return login?.theme ?? null;
       return key === PROFILE_STORAGE_KEY ? JSON.stringify(profiles) : JSON.stringify({ state: { viewerSettings: { preferReducedMotion: true } } });
     },
   };
   runInNewContext(createThemeBootstrapScript(), {
     Date: { now: () => now },
-    window: { localStorage: local, sessionStorage: { getItem: (key: string) => key === PROFILE_SESSION_KEY ? JSON.stringify(session) : null } },
+    window: { location: { pathname: login?.path ?? "/" }, localStorage: local, sessionStorage: { getItem: (key: string) => key === PROFILE_SESSION_KEY ? JSON.stringify(session) : null } },
     document: { documentElement: root },
   });
   return root;
@@ -38,6 +39,17 @@ test("the entrance changes at Calgary midnight on November 1, independently of s
     expect(bootstrap(now, undefined, undefined, "malformed").dataset.ttvTheme).toBe(expected);
     expect(bootstrap(now, "malformed profiles", "bad session").dataset.ttvTheme).toBe(expected);
   }
+});
+
+test("remembered account appearance applies only to login and confirmation, including before hydration", () => {
+  for (const theme of THEMES) {
+    for (const path of ["/account", "/auth/confirm"])
+      expect(bootstrap(CHRISTMAS_ENTRANCE_START, undefined, undefined, false, { path, theme: theme.id }).dataset.ttvTheme).toBe(theme.id);
+    for (const path of ["/", "/library", "/tv"])
+      expect(bootstrap(CHRISTMAS_ENTRANCE_START, undefined, undefined, false, { path, theme: theme.id }).dataset.ttvTheme).toBe("christmas-96-living-room");
+  }
+  for (const theme of ["not-a-theme", "<script>", ""])
+    expect(bootstrap(CHRISTMAS_ENTRANCE_START, undefined, undefined, false, { path: "/account", theme }).dataset.ttvTheme).toBe("christmas-96-living-room");
 });
 
 test("first paint ignores legacy saved themes while preserving reduced motion", () => {

@@ -5,7 +5,7 @@ import { useStore } from "./store";
 import { useAccount } from "./accountStore";
 import { canUseTheme, isThemeId } from "./themes";
 import type { ThemeId } from "./types";
-import { getEntranceThemeId, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "./themePreferences";
+import { getEntranceThemeId, rememberLoginTheme, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "./themePreferences";
 import { PROGRESS_STORAGE_KEY } from "./libraryCatalog";
 
 export { PROFILE_STORAGE_KEY } from "./themePreferences";
@@ -42,6 +42,7 @@ export const useProfiles = create<
   Data & {
     ready: boolean;
     activeId: string | null;
+    entranceTheme: ThemeId | null;
     storageAvailable: boolean;
     revision: number;
   }
@@ -52,6 +53,7 @@ export const useProfiles = create<
   lockedUntil: 0,
   ready: false,
   activeId: null,
+  entranceTheme: null,
   storageAvailable: true,
   revision: 0,
 }));
@@ -82,7 +84,7 @@ function saveSession(id: string | null) {
     /* This tab remains usable. */
   }
 }
-export function initializeProfiles(accountData?: Data) {
+export function initializeProfiles(accountData?: Data & { entranceTheme?: ThemeId }) {
   if (useProfiles.getState().ready && !accountData) return;
   const data = accountData ?? readData();
   let activeId: string | null = null;
@@ -101,15 +103,22 @@ export function initializeProfiles(accountData?: Data) {
   } catch {
     useProfiles.setState({ storageAvailable: false });
   }
-  useProfiles.setState({ ...data, activeId, ready: true });
-  const theme = data.profiles.find((profile) => profile.id === activeId)?.theme ?? getEntranceThemeId();
-  useStore.getState().setTheme(canUseTheme(theme, useAccount.getState().ownedThemeIds, false) ? theme : getEntranceThemeId());
+  const accountEntrance = accountData
+    ? accountData.entranceTheme ?? data.profiles.find((profile) => profile.id === "main")?.theme
+    : undefined;
+  const preferred = data.profiles.find((profile) => profile.id === activeId)?.theme ?? accountEntrance;
+  const theme = preferred && canUseTheme(preferred, useAccount.getState().ownedThemeIds, false)
+    ? preferred : getEntranceThemeId();
+  useProfiles.setState({ ...data, activeId, ready: true, entranceTheme: accountData && preferred ? theme : null });
+  useStore.getState().setTheme(theme);
+  if (accountData && useAccount.getState().user) rememberLoginTheme(preferred ? theme : null);
   if (activeId) {
     useDeviceLibrary.getState().selectProfile(activeId);
   }
 }
 export function lockProfiles() {
-  useStore.getState().setTheme(getEntranceThemeId());
+  const entrance = useAccount.getState().user ? useProfiles.getState().entranceTheme : null;
+  useStore.getState().setTheme(entrance && canUseTheme(entrance, useAccount.getState().ownedThemeIds, false) ? entrance : getEntranceThemeId());
   useProfiles.setState({ activeId: null });
   saveSession(null);
 }
@@ -140,8 +149,9 @@ export function activateProfile(id: string) {
   if (!profile || (profile.kids && !useProfiles.getState().pin)) return;
   useDeviceLibrary.getState().selectProfile(id);
   const state = useStore.getState();
-  const theme = profile.theme ?? getEntranceThemeId();
-  state.setTheme(canUseTheme(theme, useAccount.getState().ownedThemeIds, false) ? theme : getEntranceThemeId());
+  const preferred = profile.theme ?? getEntranceThemeId();
+  const theme = canUseTheme(preferred, useAccount.getState().ownedThemeIds, false) ? preferred : getEntranceThemeId();
+  state.setTheme(theme);
   state.setChannel(
     state.channels.find((channel) => Number(channel.number ?? channel.id) === 1)
       ?.id ?? "1",
@@ -149,7 +159,9 @@ export function activateProfile(id: string) {
   state.closeGuide();
   state.setSettingsOpen(false);
   state.setPlayerViewMode("normal");
-  useProfiles.setState({ activeId: id });
+  const accountTheme = useAccount.getState().user && profile.theme ? theme : null;
+  useProfiles.setState({ activeId: id, entranceTheme: accountTheme });
+  if (useAccount.getState().user) rememberLoginTheme(accountTheme);
   saveSession(id);
 }
 export function saveProfile(profile: Profile) {
@@ -171,8 +183,10 @@ export function setProfileTheme(theme: ThemeId) {
   if (!activeId) return;
   useProfiles.setState((state) => ({
     profiles: state.profiles.map((profile) => profile.id === activeId ? { ...profile, theme } : profile),
+    entranceTheme: theme,
   }));
   useStore.getState().setTheme(theme);
+  rememberLoginTheme(theme);
   saveData();
 }
 export function deleteProfile(id: string) {

@@ -11,9 +11,9 @@
   --ttv-shadow-panel: inset 0 1px #c7efff18, 0 14px 36px #030a1680;
   --ttv-shadow-control: inset 0 1px #9beef222, 0 3px 14px #030a1680;
 }
-.ttv-noel-world { background: #060e1c; }
+.ttv-noel-world { background: radial-gradient(ellipse at 0 45%, #12303b, transparent 55%), radial-gradient(ellipse at 100% 30%, #30172f, transparent 55%), #060e1c; }
 :root:not([data-ttv-theme="christmas-neon-noel"]) .ttv-noel-world { display: none; }
-.ttv-noel-art { object-fit: cover; object-position: center; }
+.ttv-noel-art { object-fit: contain; object-position: center; }
 .ttv-noel-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #060e1c12, transparent 35%, #060e1c26); }
 .ttv-noel-aurora {
   position: absolute; inset: 0;
@@ -41,9 +41,13 @@
 }
 
 :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-topbar, .ttv-mobile-viewer-nav) {
-  background: linear-gradient(115deg, #0c2635f5, #101a30fa 48%, #30172ff5);
+  background: linear-gradient(115deg, #0c2635dc, #101a30e8 48%, #30172fdc);
   border-color: #537c98;
   box-shadow: inset 0 1px #a5edfa30, 0 8px 30px #03071380;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-frame {
+  padding-inline: clamp(1.25rem, 7vw, 7rem);
+  padding-top: clamp(1.25rem, 4vh, 3rem);
 }
 :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar { padding-bottom: 1.7rem; }
 :root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-header { padding-bottom: 2rem; }
@@ -104,10 +108,14 @@
 .ttv-profile-logo .ttv-noel-brand__name { font-size: clamp(3rem, 10vw, 5rem); }
 .ttv-profile-logo .ttv-noel-brand__edition { font-size: clamp(.75rem, 2.5vw, 1rem); }
 @media (max-width: 520px) {
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-frame { padding-inline: max(1.25rem, env(safe-area-inset-left), env(safe-area-inset-right)); }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar { flex-wrap: wrap; justify-content: center; gap: .5rem; }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-brand { flex: 0 0 100%; justify-content: center; }
   .ttv-premium-brand-logo.ttv-noel-brand { width: auto; aspect-ratio: auto; }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-profile-theme-actions { margin-inline: auto; }
+}
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1000px) {
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-frame { padding: .5rem max(.5rem, env(safe-area-inset-right)) 5rem max(.5rem, env(safe-area-inset-left)); }
 }
 @media (orientation: portrait) {
   .ttv-noel-art { object-position: center; }

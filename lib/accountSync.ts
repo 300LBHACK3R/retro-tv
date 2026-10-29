@@ -35,10 +35,11 @@ function announceHouseholdSave(userId: string, revision: number) {
   }
 }
 function snapshot(): Household {
-  const { profiles, pin } = useProfiles.getState();
+  const { profiles, pin, entranceTheme } = useProfiles.getState();
   return {
     profiles,
     pin,
+    ...(entranceTheme ? { entranceTheme } : {}),
     library: useDeviceLibrary.getState().profiles,
     showMemberBadge: useAccount.getState().showMemberBadge,
   };
@@ -60,6 +61,7 @@ function applyHousehold(household: Household | null) {
   initializeProfiles({
     profiles: data.profiles,
     pin: data.pin,
+    entranceTheme: data.entranceTheme,
     failures: 0,
     lockedUntil: 0,
   });
@@ -109,7 +111,7 @@ export async function refreshAccount(replacePreferences = false) {
       useAccount.setState({ revision: previous.revision });
   } else if (ownerChanged || !useProfiles.getState().ready) {
     lockProfiles();
-    useProfiles.setState({ profiles: [], pin: null, ready: true });
+    useProfiles.setState({ profiles: [], pin: null, ready: true, entranceTheme: null });
     useDeviceLibrary.setState({ profiles: {}, favouriteChannels: [], watchlist: [] });
   }
   const activeIndex = useProfiles
@@ -130,7 +132,7 @@ export function startAccount() {
           "Account services are unavailable. Please try again shortly to sign in.",
       });
       lockProfiles();
-      useProfiles.setState({ profiles: [], pin: null, ready: true });
+      useProfiles.setState({ profiles: [], pin: null, ready: true, entranceTheme: null });
       useDeviceLibrary.setState({ profiles: {}, favouriteChannels: [], watchlist: [] });
     });
   return start;

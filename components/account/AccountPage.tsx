@@ -20,6 +20,7 @@ import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import ShowRequests from "./ShowRequests";
 import { PROGRESS_STORAGE_KEY } from "@/lib/libraryCatalog";
 import { EMPTY_ACCOUNT, MEMBERSHIP_PLANS, type MembershipPlanId } from "@/lib/accountModel";
+import { rememberLoginTheme } from "@/lib/themePreferences";
 
 type Mode = "signin" | "signup" | "recover" | "resend" | "reset" | "confirm";
 function stripeRedirect(value: unknown) {
@@ -155,6 +156,7 @@ export default function AccountPage({
         /* Session credentials have already been cleared by the server. */
       }
       useAccount.setState({ ...EMPTY_ACCOUNT, ready: true, syncError: "" });
+      if (remove) rememberLoginTheme(null);
       announceAccountChange();
       // A full navigation discards all authenticated in-memory household state.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination

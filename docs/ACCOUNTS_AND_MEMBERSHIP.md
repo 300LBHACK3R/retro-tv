@@ -1,4 +1,4 @@
-> Parent-account update: the viewer, library and TV mode now require a verified free account. Historical references below to guest viewing describe the earlier rollout. Guest data is retained only for explicit import after sign-in. A new household starts with the parent profile; parents add Kids profiles and set a PIN before Kids viewing. Billing remains optional. See `PARENT_ACCOUNTS.md` for the current release boundaries.
+> Guest viewing is available without an account. Verified free parent accounts save household preferences; guest theme choices last only for the current visit. A new household starts with the parent profile; parents add Kids profiles and set a PIN before Kids viewing. Billing remains optional. See `PARENT_ACCOUNTS.md` for the parent-control boundaries.
 
 # Accounts and membership activation
 
@@ -8,11 +8,19 @@ The code is staged behind explicit flags. Free live TV, the guide and the librar
 
 - Optional Supabase email/password accounts, confirmation resend, password recovery, sign-out and password-confirmed deletion.
 - HttpOnly sessions; server-verified users, same-origin mutations and database rate limits. Email/password tokens are never stored in localStorage.
-- Cloud household profiles, favourites, watchlists, parent-PIN hashes and per-profile themes. Optional import of existing device data. Guest data remains local. Resume positions stay on each device and are scoped to the signed-in account.
+- Cloud household profiles, favourites, watchlists, parent-PIN hashes, per-profile themes and the selected entrance theme. Optional import of existing device data. Resume positions stay on each device and are scoped to the signed-in account.
 - Six premium themes at C$3 each. Membership includes all current/future premium themes, ten profiles instead of five and an optional member badge. The three plans have identical benefits; longer prepaid periods cost less than paying month by month.
 - The theme library filters by All, Free, Paid and Owned, then by style, holiday and search. Members also get a Membership filter. Owned shows verified individual purchases; membership access is labelled separately. While billing is disabled, all themes appear under Free and Paid is empty.
 - Stripe-hosted Checkout and billing management. Access is granted only from signed, verified payment webhooks. Redirects, browser storage and station backup metadata cannot grant purchases.
 - Membership expiry retains extra profiles and saved theme choices. They become usable again after renewal; individually owned themes remain available. Refunds and unresolved disputes revoke the affected purchase.
+
+## Account entrance appearance
+
+Choosing a theme or opening a profile with a saved theme also sets the household entrance appearance. The profile chooser keeps that choice through locking, refreshes and returning tabs. Accounts without a saved choice continue to use the seasonal entrance. Existing households fall back to the parent profile's theme until an entrance choice is saved.
+
+The optional `entranceTheme` field lives in the existing household JSON; no database migration is required. Server validation and runtime entitlement checks apply to it. Switching accounts restores the newly authenticated household's preferences.
+
+Returning sign-in and email-confirmation pages can display a validated theme ID remembered on that browser. This cosmetic hint contains no account identity, restores no profile session and grants no premium viewer access. Guest previews never overwrite it; deleting the account clears it. On a new browser before sign-in, the seasonal appearance is used because the account is not yet known.
 
 ## 1. Supabase
 
