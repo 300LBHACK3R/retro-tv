@@ -13,7 +13,7 @@
 }
 .ttv-noel-world { background: radial-gradient(ellipse at 0 45%, #12303b, transparent 55%), radial-gradient(ellipse at 100% 30%, #30172f, transparent 55%), #060e1c; }
 :root:not([data-ttv-theme="christmas-neon-noel"]) .ttv-noel-world { display: none; }
-.ttv-noel-art { object-fit: contain; object-position: center; }
+.ttv-noel-art { object-fit: cover; object-position: center; }
 .ttv-noel-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #060e1c12, transparent 35%, #060e1c26); }
 .ttv-noel-aurora {
   position: absolute; inset: 0;
