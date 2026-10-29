@@ -303,6 +303,42 @@ test("TV mode keeps channel navigation available and hides station management", 
   await noPageOverflow(page);
 });
 
+test("Cyberpunk Christmas saves the selected theme and decorates navigation and guide", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/?ch=24");
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "Theme Library", exact: true });
+  await picker.getByRole("button", { name: "Seasonal", exact: true }).click();
+  await picker.getByRole("group", { name: "Seasonal holidays" }).getByRole("button", { name: "Christmas", exact: true }).click();
+  const card = picker.locator('[data-theme-id="christmas-neon-noel"]');
+  await expect.poll(() => card.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await card.click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await waitForHouseholdSave(page);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await expect.poll(() => page.locator(".ttv-noel-art").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const nav = page.locator(".ttv-premium-topbar, .ttv-mobile-viewer-nav").filter({ visible: true }).first();
+  expect(await nav.evaluate(element => getComputedStyle(element, element.classList.contains("ttv-mobile-viewer-nav") ? "::before" : "::after").backgroundImage)).toContain("neon-noel-lights.svg");
+  const brand = await page.locator(".ttv-premium-brand .ttv-noel-brand__name").boundingBox();
+  const actions = await page.locator(".ttv-profile-theme-actions").boundingBox();
+  expect(brand && actions && (brand.x + brand.width <= actions.x || brand.y + brand.height <= actions.y)).toBeTruthy();
+  await noPageOverflow(page);
+  await testInfo.attach("neon-noel-viewer", { body: await page.screenshot({ path: testInfo.outputPath("neon-noel-viewer.png") }), contentType: "image/png" });
+  const desktopGuide = page.getByRole("button", { name: "Open live guide", exact: true });
+  const mobileGuide = page.getByRole("navigation", { name: "Mobile viewer navigation" }).getByRole("button", { name: "Guide", exact: true });
+  await desktopGuide.or(mobileGuide).filter({ visible: true }).click();
+  const guide = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  await expect(guide).toBeVisible();
+  await expect(guide.locator(".ttv-mobile-guide, .ttv-desktop-guide")).toBeVisible();
+  expect(await guide.locator(".ttv-guide-dialog-header").evaluate(element => getComputedStyle(element, "::after").backgroundImage)).toContain("neon-noel-lights.svg");
+  await noPageOverflow(page);
+  await testInfo.attach("neon-noel-guide", { body: await page.screenshot({ path: testInfo.outputPath("neon-noel-guide.png") }), contentType: "image/png" });
+  await guide.getByRole("button", { name: "Close live guide", exact: true }).click();
+  expect(errors).toEqual([]);
+});
+
 test("every theme applies, keeps readable surfaces and respects reduced motion", async ({
   page,
 }, testInfo) => {
@@ -337,6 +373,7 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       const afterDark = theme.id === "halloween-night";
       const nineties = theme.id === "halloween-90s-night";
       const christmas = theme.id === "christmas-96-living-room";
+      const neonNoel = theme.id === "christmas-neon-noel";
       const world = page.locator(".ttv-seasonal-world");
       await expect(world).toHaveCount(1);
       await expect(world).toBeVisible();
@@ -356,15 +393,17 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
       const portrait = await page.evaluate((christmas) => matchMedia(christmas
         ? "(orientation: portrait)"
-        : "(max-width: 760px) and (orientation: portrait)").matches, christmas);
-      const imageName = `${christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
+        : "(max-width: 760px) and (orientation: portrait)").matches, christmas || neonNoel);
+      const imageName = `${neonNoel ? "christmas-neon-noel" : christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
       await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
         image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
       )).toBe(true);
       await expect(page.locator(".ttv-halloween-scene")).toHaveCount(0);
       expect(await page.locator(".ttv-library-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
       await page.emulateMedia({ reducedMotion: "reduce" });
-      for (const selector of christmas
+      for (const selector of neonNoel
+        ? [".ttv-noel-aurora", ".ttv-noel-snow i"]
+        : christmas
         ? [".ttv-christmas96-tree-glow", ".ttv-christmas96-tv-glow", ".ttv-christmas96-lights i", ".ttv-christmas96-snow i"]
         : afterDark
         ? [".ttv-afterdark-witch", ".ttv-afterdark-fog", ".ttv-afterdark-skeleton-wave"]
@@ -832,8 +871,9 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   expect(cards[1]!.left).toBeGreaterThan(cards[0]!.left + cards[0]!.width);
   const holidays = dialog.getByRole("group", { name: "Seasonal holidays" });
   await holidays.getByRole("button", { name: "Christmas", exact: true }).click();
-  await expect(dialog.locator(".theme-card")).toHaveCount(1);
-  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "christmas-96-living-room");
+  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await expect(dialog.locator('[data-theme-id="christmas-96-living-room"]')).toBeVisible();
+  await expect(dialog.locator('[data-theme-id="christmas-neon-noel"]')).toBeVisible();
   await expect(holidays.getByRole("button", { name: "Christmas", exact: true })).toHaveAttribute("aria-pressed", "true");
   await search.fill("Haunted Arcade");
   await expect(dialog.getByRole("status")).toContainText("No themes match");
@@ -847,7 +887,7 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter((theme) => theme.category === "premium").length);
   await dialog.getByRole("button", { name: "Seasonal", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "All holidays", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(dialog.locator(".theme-card")).toHaveCount(4);
+  await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter(theme => theme.category === "seasonal").length);
   await search.fill("no-such-theme");
   await expect(dialog.getByRole("status")).toContainText("No themes match");
   await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();

@@ -1,6 +1,7 @@
 import type { StaticImageData } from "next/image";
 import type { ThemeId } from "@/lib/types";
 import christmas96 from "@/public/themes/christmas-96-world.webp";
+import neonNoel from "@/public/themes/christmas-neon-noel-world.webp";
 import halloween95 from "@/public/themes/halloween-90s-world.webp";
 import afterDark from "@/public/themes/halloween-after-dark-world.webp";
 import hauntedArcade from "@/public/themes/haunted-arcade-world.webp";
@@ -17,6 +18,7 @@ import electricBlue from "@/public/themes/previews/electric-blue-live.webp";
 // Seasonal scenery and screenshots of the real guide with sample programming.
 // A complete map makes a missing preview a type error when adding a new theme.
 export const THEME_PREVIEWS = {
+  "christmas-neon-noel": { image: neonNoel },
   "christmas-96-living-room": { image: christmas96 },
   "halloween-90s-night": { image: halloween95, className: "ttv-halloween90-preview-art" },
   "halloween-night": { image: afterDark, className: "ttv-afterdark-preview-art" },

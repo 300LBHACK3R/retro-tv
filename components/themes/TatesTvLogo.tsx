@@ -7,9 +7,18 @@ type LogoProps = Pick<ImageProps, "width" | "height" | "sizes" | "className" | "
 
 /** Seasonal wordmark shares the original logo's footprint and accessible name. */
 export default function TatesTvLogo({ className, ...props }: LogoProps) {
-  const isChristmas = useStore((state) => state.themeId === "christmas-96-living-room");
+  const themeId = useStore((state) => state.themeId);
 
-  if (isChristmas) {
+  if (themeId === "christmas-neon-noel") {
+    return (
+      <span className={`ttv-noel-brand ${className ?? ""}`} role="img" aria-label="Tate's TV">
+        <span aria-hidden="true" className="ttv-noel-brand__name">Tate&apos;s <b>TV</b></span>
+        <span aria-hidden="true" className="ttv-noel-brand__edition">✦ Neon Noël ✦</span>
+      </span>
+    );
+  }
+
+  if (themeId === "christmas-96-living-room") {
     return (
       <span className={`ttv-christmas96-brand ${className ?? ""}`} role="img" aria-label="Tate's TV">
         <span aria-hidden="true" className="ttv-christmas96-brand__stars">✦ · ✦ · ✦</span>

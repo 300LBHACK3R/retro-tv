@@ -6,6 +6,7 @@ import "./styles/themes/haunted-arcade.css";
 import "./styles/themes/halloween-after-dark.css";
 import "./styles/themes/halloween-90s.css";
 import "./styles/themes/christmas-96.css";
+import "./styles/themes/neon-noel.css";
 
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";

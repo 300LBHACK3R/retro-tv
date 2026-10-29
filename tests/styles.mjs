@@ -61,6 +61,8 @@ export function assertProfileStyles(css, context = "Profile entry") {
 
 export function assertHalloweenStyles(css, context = "Halloween") {
   assert.ok(css.includes(".ttv-seasonal-world"), `${context}: missing full-page scenery layout`);
+  assert.ok(css.includes(".ttv-noel-world"), `${context}: missing Neon Noël scenery`);
+  assert.ok(css.includes("neon-noel-lights.svg"), `${context}: missing Neon Noël guide and navigation lights`);
   assert.ok(css.includes("prefers-reduced-motion"), `${context}: missing reduced motion support`);
   for (const name of ["ttv-haunted-world", "ttv-haunted-mist", "ttv-haunted-preview-art"])
     assert.ok(css.includes(name), `${context}: missing ${name}`);

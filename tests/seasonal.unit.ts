@@ -116,7 +116,7 @@ test("Kids approval rejects a missing, empty or disabled lineup and a changed re
 
 test("every launch theme is free without purchases, including Christmas and Halloween", () => {
   expect(THEMES.filter((theme) => theme.category === "seasonal").map((theme) => theme.id))
-    .toEqual(["christmas-96-living-room", "halloween-90s-night", "halloween-night", "halloween-haunted-arcade"]);
+    .toEqual(["christmas-neon-noel", "christmas-96-living-room", "halloween-90s-night", "halloween-night", "halloween-haunted-arcade"]);
   expect(getFreeThemes()).toHaveLength(THEMES.length);
   for (const theme of THEMES) {
     expect(canUseTheme(theme.id, [], false), theme.name).toBe(true);

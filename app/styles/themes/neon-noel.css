@@ -1,0 +1,122 @@
+/* Neon Noël: snowy city light, graphite glass and a festive cyan/rose palette. */
+:root[data-ttv-theme="christmas-neon-noel"],
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-layout-electric-command {
+  --noel-lights: url("/themes/neon-noel-lights.svg");
+  --noel-spectrum: linear-gradient(100deg, #7af2f5, #95baff 46%, #ff9bd2);
+  --ttv-radius-shell: 1rem;
+  --ttv-radius-panel: .9rem;
+  --ttv-radius-control: .6rem;
+  --ttv-radius-player: 1rem;
+  --ttv-header-highlight: linear-gradient(115deg, #7af2f518, transparent 50%, #ff9bd214);
+  --ttv-shadow-panel: inset 0 1px #c7efff18, 0 14px 36px #030a1680;
+  --ttv-shadow-control: inset 0 1px #9beef222, 0 3px 14px #030a1680;
+}
+.ttv-noel-world { background: #060e1c; }
+:root:not([data-ttv-theme="christmas-neon-noel"]) .ttv-noel-world { display: none; }
+.ttv-noel-art { object-fit: cover; object-position: center; }
+.ttv-noel-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #060e1c12, transparent 35%, #060e1c26); }
+.ttv-noel-aurora {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 4% 48%, #5ef0ff22, transparent 25%), radial-gradient(ellipse at 98% 15%, #f650b927, transparent 30%);
+  animation: ttv-noel-glow 12s ease-in-out infinite alternate;
+}
+.ttv-noel-snow { position: absolute; inset: 12% 17% 36%; overflow: hidden; }
+.ttv-noel-snow i {
+  position: absolute; top: -6px; left: 12%; width: 3px; height: 3px;
+  border-radius: 50%; background: #defaff; opacity: 0;
+  animation: ttv-noel-snowfall 18s linear infinite;
+}
+.ttv-noel-snow i:nth-child(2) { left: 27%; animation-delay: -7s; }
+.ttv-noel-snow i:nth-child(3) { left: 42%; animation-delay: -14s; }
+.ttv-noel-snow i:nth-child(4) { left: 61%; animation-delay: -4s; }
+.ttv-noel-snow i:nth-child(5) { left: 78%; animation-delay: -10s; }
+.ttv-noel-snow i:nth-child(6) { left: 91%; animation-delay: -16s; }
+.ttv-noel-snow i:nth-child(7) { left: 34%; animation-delay: -2s; }
+.ttv-noel-snow i:nth-child(8) { left: 70%; animation-delay: -12s; }
+@keyframes ttv-noel-glow { from { opacity: .4; } to { opacity: .95; } }
+@keyframes ttv-noel-snowfall {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10%, 80% { opacity: .65; }
+  100% { transform: translate(18px, 55vh); opacity: 0; }
+}
+
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-topbar, .ttv-mobile-viewer-nav) {
+  background: linear-gradient(115deg, #0c2635f5, #101a30fa 48%, #30172ff5);
+  border-color: #537c98;
+  box-shadow: inset 0 1px #a5edfa30, 0 8px 30px #03071380;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar { padding-bottom: 1.7rem; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-header { padding-bottom: 2rem; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-topbar, .ttv-guide-dialog-header)::after,
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-viewer-nav::before {
+  content: ""; position: absolute; inset: auto 0 0; height: 30px;
+  background: var(--noel-lights) center top / 288px 30px repeat-x;
+  filter: drop-shadow(0 0 4px #6de6ef65);
+  pointer-events: none;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-viewer-nav::before { inset: -15px 0 auto; height: 25px; background-size: 240px 25px; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-player-frame, .ttv-guide-shell) {
+  border-color: #7af2f599;
+  box-shadow: 0 0 0 1px #082c40, 0 0 0 2px #7af2f52e, -8px 0 36px #44dce41c, 8px 0 36px #f16bb91c, 0 20px 60px #02071299;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-stage-sidebar, .ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-glass-panel, .ttv-glass-panel-strong, .ttv-surface, .ttv-profile-panel) {
+  background: linear-gradient(140deg, #142c40f5, #0b192cfa 65%, #251a34f5);
+  border-color: #4e728c; box-shadow: var(--ttv-shadow-panel);
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-section-heading, .ttv-library-intro) {
+  padding: 1rem 1.15rem; background: #0b192cf5;
+  border: 1px solid #4e728c; border-radius: .9rem; box-shadow: var(--ttv-shadow-panel);
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-section-kicker, .ttv-now-next-up-next > span, .ttv-library-eyebrow) {
+  color: #7af2f5; font-family: ui-monospace, monospace; letter-spacing: .12em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-section-heading h2, .ttv-channel-hero h1, .ttv-library-intro h1, .theme-dialog__title) {
+  color: #f3faff; text-shadow: 0 0 24px #7af2f526; letter-spacing: -.025em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.theme-trigger, .ttv-profile-switch, .ttv-section-action) {
+  background: linear-gradient(145deg, #1b3b50, #142139);
+  border-color: #6a9cb5; color: #f3faff; box-shadow: var(--ttv-shadow-control);
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-nav > [aria-current="page"] {
+  background: #7af2f51a; color: #b9fcff; border-color: #7af2f5aa;
+  box-shadow: inset 0 -2px #7af2f5, 0 0 18px #5eeaf215;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls { background: #0b192cf5; border-color: #537c98; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls button { color: #b9fcff; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-now-next-progress > span, .ttv-mobile-progress > span) { background: var(--noel-spectrum); }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)[data-selected="true"],
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-channel[data-current="true"] {
+  border-color: #7af2f5; box-shadow: inset 3px 0 #7af2f5, var(--ttv-shadow-panel);
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-dialog-header, .ttv-mobile-now-heading, .ttv-mobile-schedule-toolbar, .ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #0e2b3d, #271d38); border-color: #537c98;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  background: #0b192c; border-color: #6a9cb5;
+  box-shadow: inset 0 2px #7af2f5, 0 24px 80px #020712b3;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-footer { padding: 1rem; background: #0b192cf5; border-color: #537c98; border-radius: .9rem; }
+.ttv-noel-brand { display: grid; align-content: center; justify-items: center; gap: .4rem; padding: .5rem .2rem; text-align: center; }
+.ttv-noel-brand__name { font: 850 clamp(1.55rem, 3vw, 2.15rem)/1 system-ui, sans-serif; letter-spacing: -.06em; color: #f3faff; white-space: nowrap; text-shadow: 0 0 18px #64e3ef50; }
+.ttv-noel-brand__name b { color: #7af2f5; text-shadow: 0 0 22px #56eaf566; }
+.ttv-noel-brand__edition { font: 700 .6rem/1.3 ui-monospace, monospace; color: #ffc1e5; letter-spacing: .19em; text-transform: uppercase; }
+.ttv-profile-logo.ttv-noel-brand { min-height: clamp(9rem, 24vh, 15rem); gap: .85rem; }
+.ttv-profile-logo .ttv-noel-brand__name { font-size: clamp(3rem, 10vw, 5rem); }
+.ttv-profile-logo .ttv-noel-brand__edition { font-size: clamp(.75rem, 2.5vw, 1rem); }
+@media (max-width: 520px) {
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar { flex-wrap: wrap; justify-content: center; gap: .5rem; }
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-brand { flex: 0 0 100%; justify-content: center; }
+  .ttv-premium-brand-logo.ttv-noel-brand { width: auto; aspect-ratio: auto; }
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-profile-theme-actions { margin-inline: auto; }
+}
+@media (orientation: portrait) {
+  .ttv-noel-art { object-position: center; }
+  .ttv-noel-snow { inset: 13% 18% 37%; }
+  .ttv-noel-snow i:nth-child(even) { display: none; }
+}
+@media (forced-colors: active) {
+  :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-topbar, .ttv-guide-dialog-header)::after,
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-viewer-nav::before { display: none; }
+  :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-player-frame, .ttv-guide-shell) { border-color: CanvasText; box-shadow: none; }
+  .ttv-noel-brand__name, .ttv-noel-brand__name b, .ttv-noel-brand__edition { color: CanvasText; text-shadow: none; }
+}

@@ -19,6 +19,7 @@ const html = `<html data-ttv-theme="halloween-90s-night"><head>
 </div></body></html>`;
 
 const css = `
+.ttv-noel-world { background-image: url('/themes/neon-noel-lights.svg'); }
 .ttv-profile-screen,.ttv-profile-header,.ttv-profile-grid,.ttv-profile-card,
 .ttv-profile-avatar,.ttv-profile-portrait,.ttv-profile-panel,.ttv-profile-form,
 .ttv-profile-actions,.ttv-profile-primary,.ttv-profile-back { color: white; }

@@ -485,8 +485,9 @@ test("theme access filters combine with styles, holidays and search while free a
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter(theme => !paidBuild || !theme.isPremium).length);
   await dialog.getByRole("group", { name: "Theme categories" }).getByRole("button", { name: "Seasonal", exact: true }).click();
   await dialog.getByRole("button", { name: "Christmas", exact: true }).click();
-  await expect(dialog.locator(".theme-card")).toHaveCount(1);
-  await expect(dialog.locator(".theme-card")).toHaveAttribute("data-theme-id", "christmas-96-living-room");
+  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await expect(dialog.locator('[data-theme-id="christmas-96-living-room"]')).toBeVisible();
+  await expect(dialog.locator('[data-theme-id="christmas-neon-noel"]')).toBeVisible();
   await dialog.getByRole("searchbox").fill("not-a-theme");
   await expect(dialog.locator(".theme-card")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Show all themes", exact: true }).click();

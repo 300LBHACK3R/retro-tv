@@ -27,7 +27,7 @@ export type ThemeCategory =
 export type ThemeSeason = "christmas" | "halloween";
 
 export const THEME_SEASON_META: readonly { id: ThemeSeason; label: string; description: string }[] = [
-  { id: "christmas", label: "Christmas", description: "Warm lights & winter nights" },
+  { id: "christmas", label: "Christmas", description: "Cosy classics & neon winter nights" },
   { id: "halloween", label: "Halloween", description: "Haunted nights & cosy frights" },
 ];
 
@@ -121,6 +121,41 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 ];
 
 export const THEMES = [
+  {
+    id: "christmas-neon-noel",
+    name: "Cyberpunk Christmas: Neon Noël",
+    shortName: "Neon Noël",
+    description:
+      "Christmas above a neon city. A cyan-lit tree, snowy skyline, rose neon and warm holiday lights surround dark glass controls. Your midnight winter escape.",
+    priceLabel: "Free",
+    isPremium: false,
+    category: "seasonal",
+    season: "christmas",
+    layout: "electric-command",
+    appearance: "dark",
+    previewGradient:
+      "radial-gradient(ellipse at 0% 20%, #32e6f766, transparent 45%), radial-gradient(ellipse at 100% 70%, #f05baf55, transparent 45%), linear-gradient(145deg, #071522, #211125)",
+    recommendedFor: ["Christmas", "cyberpunk", "neon", "snow", "winter", "Noel"],
+    colors: {
+      appBg: "#060e1c",
+      panelBg: "#0b192c",
+      panelAltBg: "#17223c",
+      border: "#4e728c",
+      text: "#f3faff",
+      textMuted: "#b4cadb",
+      buttonBg: "#162c43",
+      buttonHover: "#23445e",
+      primary: "#7af2f5",
+      secondary: "#ff9bd2",
+      onPrimary: "#061522",
+      focusRing: "#fff0bb",
+      guideHeaderBg: "#1d203c",
+      guideRowBg: "#0b192c",
+      guideRowAltBg: "#142039",
+      guideActiveBg: "#7af2f5",
+      guideCurrentBg: "#ff9bd2",
+    },
+  },
   {
     id: "christmas-96-living-room",
     name: "Christmas '96: Living Room",
