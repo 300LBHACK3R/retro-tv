@@ -369,6 +369,9 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
     await expect(
       page.getByRole("dialog", { name: /Theme Library/i }),
     ).toHaveCount(0);
+    // Theme decoration must preserve the opaque surface that prevents native
+    // picture-in-picture overlays from intercepting player-control clicks.
+    await expect(page.locator(".ttv-player-controls")).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);

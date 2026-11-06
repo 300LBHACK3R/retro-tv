@@ -141,7 +141,6 @@
 }
 
 :root[data-ttv-theme="electric-blue-live"] .ttv-player-controls {
-  background: #04142bf2;
   border-color: #4bbfff;
   box-shadow: 0 0 0 3px #043b6f44, 0 8px 26px #0008;
 }

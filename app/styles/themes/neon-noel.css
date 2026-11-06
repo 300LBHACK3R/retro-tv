@@ -85,7 +85,7 @@
   background: #7af2f51a; color: #b9fcff; border-color: #7af2f5aa;
   box-shadow: inset 0 -2px #7af2f5, 0 0 18px #5eeaf215;
 }
-:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls { background: #0b192cf5; border-color: #537c98; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls { border-color: #537c98; }
 :root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls button { color: #b9fcff; }
 :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-now-next-progress > span, .ttv-mobile-progress > span) { background: var(--noel-spectrum); }
 :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)[data-selected="true"],

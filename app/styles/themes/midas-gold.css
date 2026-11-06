@@ -109,7 +109,6 @@
 
 :root[data-ttv-theme="midas-gold"] .ttv-player-controls {
   border-color: var(--border);
-  background: #100e0bef;
 }
 
 :root[data-ttv-theme="midas-gold"] .ttv-player-controls button {
