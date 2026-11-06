@@ -303,7 +303,8 @@ test("TV mode keeps channel navigation available and hides station management", 
   await noPageOverflow(page);
 });
 
-test("Cyberpunk Christmas saves the selected theme and decorates navigation and guide", async ({ page }, testInfo) => {
+test("Cyberpunk Christmas persists its premium guide, channels, settings and library", async ({ page }, testInfo) => {
+  test.setTimeout(90000);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/?ch=24");
@@ -338,7 +339,47 @@ test("Cyberpunk Christmas saves the selected theme and decorates navigation and 
   expect(await guide.locator(".ttv-guide-dialog-header").evaluate(element => getComputedStyle(element, "::after").backgroundImage)).toContain("neon-noel-lights.svg");
   await noPageOverflow(page);
   await testInfo.attach("neon-noel-guide", { body: await page.screenshot({ path: testInfo.outputPath("neon-noel-guide.png") }), contentType: "image/png" });
-  await guide.getByRole("button", { name: "Close live guide", exact: true }).click();
+  const mobileLayout = await guide.locator(".ttv-mobile-guide").isVisible();
+  if (mobileLayout) {
+    await expect(guide.locator('.ttv-mobile-channel[data-current="true"]')).toHaveCSS("border-top-color", "rgb(122, 242, 245)");
+    await guide.getByRole("button", { name: "Find", exact: true }).click();
+  } else {
+    await expect(guide.locator(".ttv-guide-station-logo").first()).toBeVisible();
+    await expect(guide.locator('.ttv-guide-cell[data-live="true"]').first()).toHaveCSS("color", "rgb(239, 252, 255)");
+    await guide.getByRole("button", { name: "Compact rows", exact: true }).click();
+    await expect(guide.locator(".ttv-guide-cell").first()).toHaveCSS("height", "50px");
+    await expect(guide.locator('.ttv-guide-marker[aria-pressed="true"]')).toHaveCSS("color", "rgb(239, 252, 255)");
+  }
+  const search = guide.getByRole("searchbox", { name: "Find a channel in the guide" });
+  await search.fill("25");
+  await expect(guide.locator(mobileLayout ? ".ttv-mobile-channel" : ".ttv-guide-station")).toHaveCount(1);
+  if (mobileLayout) {
+    await guide.getByRole("button", { name: "Schedule for Local Cinema", exact: true }).click();
+    await expect(guide.getByRole("heading", { name: "Local Cinema", exact: true })).toBeVisible();
+    await testInfo.attach("neon-noel-channel-schedule", { body: await page.screenshot(), contentType: "image/png" });
+    await guide.getByRole("button", { name: "Watch live", exact: true }).click();
+    await guide.getByRole("button", { name: "Close live guide", exact: true }).click();
+  } else {
+    await guide.locator(".ttv-guide-station").click();
+    await expect(guide).toHaveCount(0);
+  }
+  await expect(currentChannel(page).getByRole("heading", { name: "Local Cinema", exact: true })).toBeVisible();
+  await expect(page.locator(".ttv-player-controls")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  const directory = await openDirectory(page);
+  await expect(directory.locator('.ttv-channel-browser-card[data-selected="true"]')).toHaveCSS("border-top-color", "rgb(122, 242, 245)");
+  await testInfo.attach("neon-noel-directory", { body: await page.screenshot(), contentType: "image/png" });
+  await directory.getByRole("button", { name: "Close channel directory", exact: true }).click();
+  await openMore(page);
+  await expect(page.locator(".ttv-viewer-more-dialog")).toHaveCSS("background-color", "rgb(8, 20, 35)");
+  await noPageOverflow(page);
+  await testInfo.attach("neon-noel-settings", { body: await page.screenshot(), contentType: "image/png" });
+  await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
+  await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Library titles", exact: true })).toHaveCSS("background-color", "rgb(8, 20, 35)");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await noPageOverflow(page);
+  await testInfo.attach("neon-noel-library", { body: await page.screenshot(), contentType: "image/png" });
   expect(errors).toEqual([]);
 });
 

@@ -144,3 +144,7 @@
 body[data-ttv-guide-open="true"] .ttv-global-sync-status {
   display: none !important;
 }
+
+/* Optional theme treatments keep the standard guide unchanged. */
+.ttv-guide-station-logo, .ttv-guide-station-name { display: none; }
+.ttv-guide-station-copy { min-width: 0; width: 100%; }

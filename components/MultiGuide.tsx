@@ -13,6 +13,7 @@ import {
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import { useMobileGuideLayout } from "@/components/viewer/useMobileGuideLayout";
 import MobileGuide from "@/components/viewer/MobileGuide";
+import ChannelLogo from "@/components/viewer/ChannelLogo";
 import { BROADCAST_EPOCH_MS } from "@/lib/liveEngine";
 import { useStore } from "@/lib/store";
 import type { BroadcastItem, Channel } from "@/lib/types";
@@ -547,7 +548,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
     >
       {guideTools}
       <div
-        className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        className="ttv-guide-overview flex shrink-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
         style={{
           borderColor: "var(--border)",
           background:
@@ -556,13 +557,13 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       >
         <div className="min-w-0">
           <div
-            className="text-[11px] font-black uppercase tracking-[0.24em]"
+            className="ttv-guide-overview-brand text-[11px] font-black uppercase tracking-[0.24em]"
             style={{ color: "var(--text-muted)" }}
           >
             Tate&apos;s TV
           </div>
 
-          <div className="mt-1 text-lg font-black tracking-tight sm:text-xl">
+          <div className="ttv-guide-overview-title mt-1 text-lg font-black tracking-tight sm:text-xl">
             Live Guide
           </div>
 
@@ -572,7 +573,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="ttv-guide-overview-meta flex flex-wrap items-center gap-2 sm:justify-end">
           <div
             className="rounded-full border px-3 py-2 text-xs font-black"
             style={{
@@ -613,7 +614,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
       </div>
 
       <div
-        className="ttv-no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-3"
+        className="ttv-guide-markers ttv-no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-3"
         style={{
           borderColor: "var(--border)",
           background: "var(--panel-bg)",
@@ -624,7 +625,8 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
             key={`${marker.label}-${marker.offsetSec}`}
             type="button"
             onClick={() => scrollToMarker(marker, index)}
-            className="min-w-[7rem] rounded-full border px-3 py-2 text-left transition hover:translate-y-[-1px]"
+            className="ttv-guide-marker min-w-[7rem] rounded-full border px-3 py-2 text-left transition hover:translate-y-[-1px]"
+            aria-pressed={activeMarkerIndex === index}
             style={{
               borderColor:
                 activeMarkerIndex === index
@@ -632,11 +634,11 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
                   : "var(--border)",
               background:
                 activeMarkerIndex === index
-                  ? "var(--guide-current-bg)"
+                  ? "var(--ttv-guide-cell-live-bg, var(--guide-current-bg))"
                   : "var(--panel-alt-bg)",
               color:
                 activeMarkerIndex === index
-                  ? "var(--on-primary)"
+                  ? "var(--ttv-guide-active-text, var(--on-primary))"
                   : "var(--text)",
             }}
           >
@@ -661,7 +663,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           }}
         >
           <div
-            className="sticky left-0 top-0 z-50 flex items-center border-r border-b px-3 py-3 text-xs font-black uppercase tracking-[0.14em]"
+            className="ttv-guide-corner sticky left-0 top-0 z-50 flex items-center border-r border-b px-3 py-3 text-xs font-black uppercase tracking-[0.14em]"
             style={{
               minHeight: "58px",
               borderColor: "var(--border)",
@@ -673,7 +675,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
           </div>
 
           <div
-            className="sticky top-0 z-40 grid border-b"
+            className="ttv-guide-time-axis sticky top-0 z-40 grid border-b"
             style={{
               width: `${TIMELINE_WIDTH}px`,
               gridTemplateColumns: `repeat(${SLOT_COUNT}, ${SLOT_WIDTH}px)`,
@@ -782,7 +784,7 @@ function GuideRow({
       : "var(--guide-row-alt-bg)";
 
   const firstCell = cells[0];
-  const channelColor = isActive ? "var(--on-primary)" : "var(--text)";
+  const channelColor = isActive ? "var(--ttv-guide-active-text, var(--on-primary))" : "var(--text)";
   // Keep nearby cells ready without tripling the DOM on television screens.
   const overscan = Math.min(360, visibleWindow.width / 2);
 
@@ -800,30 +802,36 @@ function GuideRow({
             });
           }
         }}
-        className="sticky left-0 z-30 flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
+        className="ttv-guide-station sticky left-0 z-30 flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
+        aria-pressed={isActive}
         style={{
           height: `${rowHeight}px`,
           borderColor: "var(--border)",
           background: isActive
-            ? "var(--guide-active-bg)"
+            ? "var(--ttv-guide-station-active-bg, var(--guide-active-bg))"
             : "var(--panel-alt-bg)",
-          borderLeft: `4px solid ${isActive ? accent : "transparent"}`,
+          borderLeft: `4px solid ${isActive ? `var(--ttv-guide-live-accent, ${accent})` : "transparent"}`,
           color: channelColor,
         }}
       >
-        <div className="text-[13px] font-black">{getChannelLabel(channel)}</div>
-
-        <div
-          className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.16em]"
-          style={{ opacity: 0.8 }}
-          title={getChannelName(channel)}
-        >
-          {getChannelCallsign(channel)}
+        <ChannelLogo channel={channel} className="ttv-guide-station-logo" />
+        <div className="ttv-guide-station-copy">
+          <div className="ttv-guide-station-number text-[13px] font-black">{getChannelLabel(channel)}</div>
+          <div
+            className="ttv-guide-station-callsign mt-1 truncate text-[10px] font-bold uppercase tracking-[0.16em]"
+            style={{ opacity: 0.8 }}
+            title={getChannelName(channel)}
+          >
+            {getChannelCallsign(channel)}
+          </div>
+          <div className="ttv-guide-station-name" aria-hidden="true" title={getChannelName(channel)}>
+            {getChannelName(channel)}
+          </div>
         </div>
       </button>
 
       <div
-        className="relative border-b"
+        className="ttv-guide-programme-row relative border-b"
         style={{
           height: `${rowHeight}px`,
           width: `${TIMELINE_WIDTH}px`,
@@ -891,17 +899,18 @@ function GuideRow({
                 })
               }
               className="ttv-guide-cell absolute top-0 overflow-hidden border px-3 py-2 text-left text-[12px] leading-tight transition hover:z-20 hover:brightness-110"
+              data-live={isCurrent}
               style={{
                 left: `${left}px`,
                 width: `${width}px`,
-                height: `${rowHeight}px`,
+                height: `calc(${rowHeight}px - var(--ttv-guide-cell-gap, 0px))`,
                 background: isCurrent
-                  ? "var(--guide-current-bg)"
+                  ? "var(--ttv-guide-cell-live-bg, var(--guide-current-bg))"
                   : "var(--panel-alt-bg)",
-                borderColor: isCurrent ? accent : "var(--border)",
-                color: isCurrent ? "var(--on-primary)" : "var(--text)",
+                borderColor: isCurrent ? `var(--ttv-guide-live-accent, ${accent})` : "var(--border)",
+                color: isCurrent ? "var(--ttv-guide-active-text, var(--on-primary))" : "var(--text)",
                 boxShadow: isCurrent
-                  ? `inset 0 0 0 1px ${accent}, 0 0 18px rgba(255,255,255,0.12)`
+                  ? `var(--ttv-guide-live-shadow, inset 0 0 0 1px ${accent}, 0 0 18px rgba(255,255,255,0.12))`
                   : "none",
               }}
               title={`${title} / ${formatDuration(duration)}`}
@@ -922,7 +931,7 @@ function GuideRow({
         })}
 
         <div
-          className="absolute bottom-0 top-0 z-20 w-[2px] bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]"
+          className="ttv-guide-now-line pointer-events-none absolute bottom-0 top-0 z-20 w-[2px] bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]"
           style={{
             left: `${nowLineLeft}px`,
           }}

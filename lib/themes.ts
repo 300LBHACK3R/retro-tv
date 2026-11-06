@@ -126,7 +126,7 @@ export const THEMES = [
     name: "Cyberpunk Christmas: Neon Noël",
     shortName: "Neon Noël",
     description:
-      "Christmas above a neon city. A cyan-lit tree, snowy skyline, rose neon and warm holiday lights surround dark glass controls. Your midnight winter escape.",
+      "A futuristic Christmas lounge with a neon city skyline, precision programme guide, illuminated channel cards and matching midnight menus. Cyan light, rose accents and a premium interface on every screen.",
     priceLabel: "Free",
     isPremium: false,
     category: "seasonal",

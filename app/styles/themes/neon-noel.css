@@ -10,6 +10,14 @@
   --ttv-header-highlight: linear-gradient(115deg, #7af2f518, transparent 50%, #ff9bd214);
   --ttv-shadow-panel: inset 0 1px #c7efff18, 0 14px 36px #030a1680;
   --ttv-shadow-control: inset 0 1px #9beef222, 0 3px 14px #030a1680;
+  --noel-surface: linear-gradient(135deg, #102536, #0b1627 65%, #201a30);
+  --noel-edge: #37556c;
+  --ttv-guide-active-text: #effcff;
+  --ttv-guide-station-active-bg: #153641;
+  --ttv-guide-cell-live-bg: linear-gradient(115deg, #163d49, #14283e);
+  --ttv-guide-live-accent: #7af2f5;
+  --ttv-guide-live-shadow: inset 3px 0 #7af2f5, inset 0 1px #c3fcff18;
+  --ttv-guide-cell-gap: 8px;
 }
 .ttv-noel-world { background: radial-gradient(ellipse at 0 45%, #12303b, transparent 55%), radial-gradient(ellipse at 100% 30%, #30172f, transparent 55%), #060e1c; }
 :root:not([data-ttv-theme="christmas-neon-noel"]) .ttv-noel-world { display: none; }
@@ -100,6 +108,222 @@
   box-shadow: inset 0 2px #7af2f5, 0 24px 80px #020712b3;
 }
 :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-footer { padding: 1rem; background: #0b192cf5; border-color: #537c98; border-radius: .9rem; }
+/* The same console language follows the viewer into every browsing surface. */
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar {
+  gap: clamp(.75rem, 2vw, 2rem);
+  padding: .75rem 1rem 1.75rem;
+  border: 1px solid var(--noel-edge);
+  border-radius: 1.25rem .4rem 1.25rem .4rem;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-nav {
+  gap: .25rem; padding: .25rem; border: 1px solid #7af2f526;
+  border-radius: .75rem; background: #040d1b99;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-nav > :where(a, button) {
+  border-radius: .5rem; font-size: .8rem; letter-spacing: .01em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-live-dot {
+  box-shadow: 0 0 0 4px #7af2f512, 0 0 16px #7af2f566;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-stage-sidebar {
+  border-radius: .4rem 1.25rem .4rem 1.25rem; border-color: var(--noel-edge);
+  background: var(--noel-surface);
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-channel-hero {
+  background: linear-gradient(115deg, #7af2f50d, transparent 65%);
+  border-color: #7af2f526;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-channel-hero-logo {
+  padding: .35rem; border: 1px solid #7af2f533; border-radius: .7rem;
+  background: #050d19; box-shadow: inset 0 1px #7af2f51a;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-now-next-live {
+  border: 1px solid #7af2f555; border-radius: .3rem;
+  padding: .25rem .45rem; font: 650 .65rem ui-monospace, monospace;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-now-next-up-next {
+  padding: .85rem; border: 1px solid #ff9bd22b; border-radius: .75rem;
+  background: linear-gradient(110deg, #ff9bd20b, #07142180);
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-now-next-up-next > span { color: #ffc1e5; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-now-next-progress { height: 4px; background: #2a4154; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-section-heading {
+  border-width: 0 0 1px; border-radius: 0; background: #081423e8;
+  box-shadow: none; padding: .85rem 1rem;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card) {
+  border-radius: .35rem 1rem .35rem 1rem; border-color: var(--noel-edge);
+  background: var(--noel-surface);
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card)::after {
+  content: ""; position: absolute; inset: 0 1.25rem auto; height: 1px;
+  background: var(--noel-spectrum); opacity: .5; pointer-events: none;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-channel-rail-logo {
+  padding: .4rem; background: #050e1b; border: 1px solid #7af2f51f; border-radius: .65rem;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-copy strong, .ttv-channel-browser-number) {
+  color: #7af2f5; font-family: ui-monospace, monospace; letter-spacing: .12em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls {
+  /* Keep Player's opaque black surface: native PiP must not intercept clicks. */
+  border-color: #7af2f56b; border-radius: .5rem 1rem .5rem 1rem;
+  box-shadow: 0 0 0 1px #071726, 0 8px 30px #000b, inset 0 1px #7af2f526;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-player-controls > button { border-radius: .5rem; }
+
+/* Guide: opaque sticky rails, inset listings and a clearly visible live line. */
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-dialog, .ttv-guide-inline) {
+  --panel-bg: #081423;
+  --panel-alt-bg: #101f32;
+  --border: #2b4258;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog {
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 0 0, #12445170, transparent 50%), radial-gradient(ellipse at 100% 0, #4a214b50, transparent 45%), #050b17;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-header {
+  padding: 1.1rem 1.3rem 2.1rem;
+  border-color: #476c83; border-radius: 1rem .35rem 1rem .35rem;
+  background: linear-gradient(105deg, #0d2b3d, #111b2e 55%, #2c1935);
+  box-shadow: inset 0 1px #7af2f533, 0 8px 28px #0004;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-title span {
+  color: #7af2f5; font-family: ui-monospace, monospace; letter-spacing: .22em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-title strong {
+  font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 750; letter-spacing: -.045em;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-title small {
+  display: block; margin-top: .5rem; color: #b4cadb; font-size: .8rem; line-height: 1.5;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-dialog-body { padding-top: .8rem; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-desktop-guide {
+  border-radius: .75rem; background: #081423; box-shadow: 0 12px 45px #0006;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-overview { order: -1; padding: .7rem 1rem; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-overview-brand, .ttv-guide-overview-title) { display: none; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-overview-meta > div {
+  border-radius: .4rem; font-family: ui-monospace, monospace; font-size: .7rem;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-overview-meta > div:first-child { color: #7af2f5; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-tools { gap: .5rem; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-tools, .ttv-channel-browser-tools, .ttv-directory-filter) :is(input, select) {
+  border: 1px solid #49657b; border-radius: .55rem;
+  background: #060f1e; color: #f3faff; box-shadow: inset 0 1px 4px #0005;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-close, .ttv-premium-dialog-close, .ttv-section-action) {
+  border: 1px solid #52788e; background: #10283b; border-radius: .5rem;
+  color: #e6faff; font-weight: 650; box-shadow: inset 0 1px #7af2f51f;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-markers { gap: .5rem; padding: .65rem 1rem; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-marker { border-radius: .45rem; min-width: 7.5rem; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-marker[aria-pressed="true"] { box-shadow: inset 0 -2px #7af2f5; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-corner, .ttv-guide-time-axis) {
+  box-shadow: 0 3px 10px #0005; font-family: ui-monospace, monospace;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-time-axis > div { min-height: 48px; font-size: .7rem; font-weight: 600; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station {
+  display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); align-items: center;
+  gap: .6rem; padding-inline: .6rem; box-shadow: 3px 0 10px #0004;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station-logo {
+  display: grid; place-items: center; width: 2.75rem; height: 2.75rem; overflow: hidden;
+  padding: .25rem; background: #050d19; border: 1px solid #7af2f52b; border-radius: .5rem;
+  color: #b9fcff; font: 700 .6rem ui-monospace, monospace;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station-logo img { width: 100%; height: 100%; object-fit: contain; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station-number { color: #7af2f5; font: 700 .7rem ui-monospace, monospace; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station-name {
+  display: block; margin-top: .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #effcff; font-size: .7rem; font-weight: 600;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-station-callsign {
+  /* Keep the established accessible station name without duplicating the visible logo. */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-cell {
+  top: 4px; padding: .4rem .75rem; border-radius: .55rem; display: flex;
+  flex-direction: column; justify-content: center;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-cell > div:first-child { font-size: .85rem; font-weight: 650; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-cell > div:last-child { font-size: .65rem; letter-spacing: .025em; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-now-line { background: #ff9bd2; box-shadow: 0 0 12px #ff9bd280; }
+
+/* Mobile keeps the mounted video and one scrollable schedule below it. */
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-inline .ttv-guide-dialog-header {
+  padding: .45rem .85rem 1rem; min-height: 3.6rem; border-radius: 0;
+  border-width: 0 0 1px; box-shadow: inset 0 1px #7af2f533;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-inline .ttv-guide-dialog-header::after {
+  height: 13px; background-size: 160px 17px;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-inline .ttv-guide-dialog-title strong { font: 700 1.1rem system-ui, sans-serif; letter-spacing: -.02em; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-inline .ttv-guide-dialog-title > :is(span, small) { display: none; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-guide-inline .ttv-guide-dialog-body { padding-top: 0; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-category-tabs { gap: .4rem; padding: .55rem .65rem; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-category-tabs button {
+  background: #101f32; border: 1px solid #37556c; border-radius: .5rem; color: #b4cadb;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-category-tabs button[aria-pressed="true"] {
+  background: #173b49; color: #b9fcff; border-color: #7af2f5; box-shadow: inset 0 -2px #7af2f5;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-now-heading { background: #081423; border-color: #2b4258; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-now-heading h2 { color: #7af2f5; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-channel-list { gap: .5rem; padding: .65rem; background: #081423; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-channel {
+  border: 1px solid #37556c; border-radius: .4rem .9rem .4rem .9rem;
+  background: var(--noel-surface); overflow: hidden;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-channel[data-current="true"] {
+  border-color: #7af2f5; box-shadow: inset 3px 0 #7af2f5;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-channel-station { background: #0a192a; border-color: #37556c; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-airing[aria-pressed="true"] {
+  background: #7af2f50a; box-shadow: none;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-open-schedule { border-color: #37556c; background: #050e1a55; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-next-time { color: #ffc1e5; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-live {
+  padding: .85rem; border: 1px solid #7af2f566; border-radius: .7rem; background: #12303e;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-live span { color: #7af2f5; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-list > li {
+  padding: .65rem .75rem; margin-top: .4rem; border: 1px solid #37556c;
+  border-radius: .65rem; background: #101f32;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-list > li[data-live="true"] { border-color: #7af2f5; background: #12303e; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-day { color: #ffc1e5; }
+
+/* Directories, settings and library use the same panels and selected states. */
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  border-radius: 1.1rem .4rem 1.1rem .4rem; border-color: #52788e;
+  background: #081423; box-shadow: inset 0 2px #7af2f5, 0 24px 80px #020712d9;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(105deg, #0d2b3d, #111b2e 55%, #2c1935);
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-channel-browser-tools {
+  border-color: #2b4258; background: #0b192a;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-channel-browser-tools label { font-size: .65rem; letter-spacing: .14em; }
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-directory-filter { padding-top: .75rem; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-view-mode-card, .ttv-preference-toggle, .ttv-viewer-link-grid > :where(a, div)) {
+  border-color: #37556c; border-radius: .5rem .85rem .5rem .85rem; background: var(--noel-surface);
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-view-mode-card, .ttv-preference-toggle)[data-selected="true"] {
+  border-color: #7af2f5; background: #14333f; box-shadow: inset 0 -2px #7af2f5;
+}
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-view-mode-card):hover { border-color: #7af2f5; }
+:root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-dialog, .ttv-guide-inline, .ttv-channel-browser-dialog, .ttv-viewer-more-dialog) :where(button, input, select, a):focus-visible {
+  outline: 3px solid #fff0bb; outline-offset: -3px;
+}
+:root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-viewer-nav {
+  border: 1px solid #52788e; border-radius: 1rem 1rem .5rem .5rem;
+  background: linear-gradient(110deg, #0c2635, #101a30 60%, #30172f);
+}
 .ttv-noel-brand { display: grid; align-content: center; justify-items: center; gap: .4rem; padding: .5rem .2rem; text-align: center; }
 .ttv-noel-brand__name { font: 850 clamp(1.55rem, 3vw, 2.15rem)/1 system-ui, sans-serif; letter-spacing: -.06em; color: #f3faff; white-space: nowrap; text-shadow: 0 0 18px #64e3ef50; }
 .ttv-noel-brand__name b { color: #7af2f5; text-shadow: 0 0 22px #56eaf566; }
@@ -107,12 +331,18 @@
 .ttv-profile-logo.ttv-noel-brand { min-height: clamp(9rem, 24vh, 15rem); gap: .85rem; }
 .ttv-profile-logo .ttv-noel-brand__name { font-size: clamp(3rem, 10vw, 5rem); }
 .ttv-profile-logo .ttv-noel-brand__edition { font-size: clamp(.75rem, 2.5vw, 1rem); }
+@media (min-width: 761px) and (max-width: 1200px) {
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-nav > :where(a, button) { padding-inline: .65rem; }
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-nav > :where(a, button) > span { display: none; }
+}
 @media (max-width: 520px) {
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-frame { padding-inline: max(1.25rem, env(safe-area-inset-left), env(safe-area-inset-right)); }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-topbar { flex-wrap: wrap; justify-content: center; gap: .5rem; }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-brand { flex: 0 0 100%; justify-content: center; }
   .ttv-premium-brand-logo.ttv-noel-brand { width: auto; aspect-ratio: auto; }
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-profile-theme-actions { margin-inline: auto; }
+  :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog) { border-radius: 0; }
+  :root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-schedule-live { gap: .5rem; padding: .65rem; }
 }
 @media (orientation: landscape) and (max-height: 560px) and (max-width: 1000px) {
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-premium-frame { padding: .5rem max(.5rem, env(safe-area-inset-right)) 5rem max(.5rem, env(safe-area-inset-left)); }
@@ -123,6 +353,14 @@
   .ttv-noel-snow i:nth-child(even) { display: none; }
 }
 @media (forced-colors: active) {
+  :root[data-ttv-theme="christmas-neon-noel"] {
+    --ttv-guide-active-text: CanvasText;
+    --ttv-guide-station-active-bg: Canvas;
+    --ttv-guide-cell-live-bg: Canvas;
+    --ttv-guide-live-accent: Highlight;
+    --ttv-guide-live-shadow: none;
+  }
+  :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-guide-station[aria-pressed="true"], .ttv-guide-cell[data-live="true"], .ttv-mobile-channel[data-current="true"]) { outline: 2px solid Highlight; outline-offset: -2px; }
   :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-topbar, .ttv-guide-dialog-header)::after,
   :root[data-ttv-theme="christmas-neon-noel"] .ttv-mobile-viewer-nav::before { display: none; }
   :root[data-ttv-theme="christmas-neon-noel"] :is(.ttv-premium-player-frame, .ttv-guide-shell) { border-color: CanvasText; box-shadow: none; }

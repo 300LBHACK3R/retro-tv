@@ -718,5 +718,58 @@
 .collectionCard small { color: var(--text-muted); display: flex; justify-content: space-between; margin-top: auto; }
 .collectionCard[aria-pressed="true"] { border-color: var(--primary); }
 .collectionCard:hover { background: var(--panel-alt-bg); }
+
+/* Neon Noël carries the live-viewer console into on-demand browsing. */
+:global(html[data-ttv-theme="christmas-neon-noel"]) .header {
+  background: linear-gradient(110deg, #0c2635, #101a30 60%, #30172f);
+  border-color: #52788e;
+  box-shadow: 0 6px 28px #02071266;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.catalogue, .modal) {
+  border-radius: 18px 6px 18px 6px;
+  border-color: #37556c;
+  background: #081423;
+  box-shadow: inset 0 2px #7af2f566, 0 20px 60px #02071299;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.collectionCard, .continueCard, .requestBanner) {
+  border-radius: 6px 16px 6px 16px;
+  background: linear-gradient(135deg, #102536, #0b1627 65%, #201a30);
+  border-color: #37556c;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) .collectionCard[aria-pressed="true"] {
+  border-color: #7af2f5;
+  box-shadow: inset 0 -2px #7af2f5;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.eyebrow, .count) {
+  font-family: ui-monospace, monospace;
+  color: #7af2f5;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.search, .select) {
+  border-color: #49657b;
+  border-radius: 8px;
+  background: #060f1e;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.button, .filters button, .alphabet button) {
+  border-radius: 6px;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) :is(.filters button, .alphabet button, .viewSwitch button)[aria-pressed="true"] {
+  background: #173b49;
+  color: #b9fcff;
+  border-color: #7af2f5;
+  box-shadow: inset 0 -2px #7af2f5;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) .poster {
+  border-radius: 6px 16px 6px 16px;
+  border: 1px solid #37556c;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) .cardButton:hover .poster {
+  border-color: #7af2f5;
+  box-shadow: 0 0 20px #7af2f51a;
+}
+:global(html[data-ttv-theme="christmas-neon-noel"]) .listView .card {
+  background: linear-gradient(135deg, #102536, #0b1627);
+  border-color: #37556c;
+  border-radius: 6px 14px 6px 14px;
+}
 @media (max-width: 900px) { .collectionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .collectionCard { padding: 14px; } .collectionCard strong { font-size: 15px; } }
