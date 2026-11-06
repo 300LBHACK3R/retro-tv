@@ -135,6 +135,9 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
     page.getByRole("heading", { name: "Who’s watching?" }),
   ).toBeVisible();
   await expect(page.locator("video")).toHaveCount(0);
+  const logoBounds = await page.locator(".ttv-profile-logo").boundingBox();
+  expect(logoBounds!.height).toBeLessThanOrEqual(96);
+  await test.info().attach("profile-chooser", { body: await page.screenshot(), contentType: "image/png" });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -186,7 +189,11 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
   await name.pressSequentially("Alex");
   await expect(name).toHaveValue("Alex");
   await expect(name).toBeFocused();
+  await test.info().attach("profile-editor", { body: await page.screenshot(), contentType: "image/png" });
+  await page.getByRole("button", { name: "Change avatar", exact: true }).click();
   await page.getByRole("button", { name: "Dad fox avatar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Change avatar", exact: true })).toBeFocused();
+  await expect(name).toHaveValue("Alex");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
   await page
@@ -315,7 +322,10 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     page.getByRole("button", { name: "Save profile", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Profile name", { exact: true }).fill("Morgan");
+  await expect(page.getByRole("group", { name: "Choose an avatar", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Change avatar", exact: true }).click();
   await page.getByRole("button", { name: "Boy robot avatar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Change avatar", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Watch as Morgan", exact: true }),
@@ -324,9 +334,13 @@ test("the chooser adds profiles directly, restores focus, and makes deletion rev
     .getByRole("button", { name: "Manage profiles", exact: true })
     .click();
   await page.getByRole("button", { name: "Edit Morgan", exact: true }).click();
+  await page.getByRole("button", { name: "Change avatar", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Boy robot avatar", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Edit profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change avatar", exact: true })).toBeFocused();
   await page
     .getByRole("button", { name: "Delete profile", exact: true })
     .click();
@@ -361,6 +375,9 @@ test("PIN setup can be corrected or cancelled and the direct Add shortcut cannot
     .click();
   const pin = parentPinInput(page);
   const confirmation = page.getByLabel("Confirm PIN", { exact: true });
+  await page.getByText("About your parent PIN", { exact: true }).click();
+  await expect(page.getByText(/Clearing browser data won’t reset it/)).toBeVisible();
+  await page.getByText("About your parent PIN", { exact: true }).click();
   await pin.fill("4826");
   await confirmation.fill("4827");
   await page
@@ -438,6 +455,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   await expect(
     page.getByRole("button", { name: "Add profile", exact: true }),
   ).toHaveCount(0);
+  await expect(page.getByText("Your account includes 5 profiles.", { exact: false })).toBeVisible();
   await page.addStyleTag({ content: "html { font-size: 24px !important; }" });
   expect(
     await page.evaluate(
@@ -449,6 +467,7 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
     .click();
   await page.getByRole("button", { name: "Edit Taylor", exact: true }).click();
   await page.getByLabel("Profile name", { exact: true }).fill("Taylor updated");
+  await page.getByRole("button", { name: "Change avatar", exact: true }).click();
   const avatarOptions = page.locator(".ttv-avatar-groups");
   await expect(avatarOptions.getByRole("button")).toHaveCount(22);
   await expect(avatarOptions).toHaveCSS("display", "grid");
@@ -456,8 +475,10 @@ test("five profiles and the editor fit a narrow phone and remain reachable with 
   await expect(avatarOptions.locator(".ttv-avatar-options").first()).toHaveCSS("display", "grid");
   const newAvatar = avatarOptions.getByRole("button", { name: "Female doctor avatar", exact: true });
   await newAvatar.click();
-  await expect(newAvatar).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(() => newAvatar.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.getByRole("button", { name: "Change avatar", exact: true })).toBeFocused();
+  const preview = page.locator(".ttv-profile-editor-preview [data-avatar]");
+  await expect(preview).toHaveAttribute("data-avatar", "femaledoctors");
+  await expect.poll(() => preview.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(page.getByRole("checkbox", { name: /Kids profile/ })).not.toBeChecked();
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(

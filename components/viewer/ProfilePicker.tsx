@@ -97,6 +97,7 @@ function PinEntry({
   const input = useRef<HTMLInputElement>(null);
   const confirmInput = useRef<HTMLInputElement>(null);
   const lockedUntil = useProfiles((state) => state.lockedUntil);
+  const signedIn = useAccount((state) => Boolean(state.user));
   const [clock, setClock] = useState(() => Date.now());
   const seconds = screen.create
     ? 0
@@ -260,10 +261,9 @@ function PinEntry({
             {screen.create ? "About your parent PIN" : "Forgot your PIN?"}
           </summary>
           <p>
-            Profiles and the PIN are saved in this browser. There’s no email
-            recovery yet. Clearing this site’s browser data resets the PIN and
-            removes profiles, saved items and viewing progress. This is a device
-            convenience, not an account lock.
+            {signedIn
+              ? "Your parent PIN syncs with your account. Clearing browser data won’t reset it. To change it, unlock Manage profiles with your current PIN. Email PIN recovery is not available yet."
+              : "Your parent PIN is saved in this browser. There’s no email PIN recovery yet. Clearing this site’s browser data removes these device profiles and their saved items."}
           </p>
         </details>
       </form>
@@ -284,6 +284,10 @@ function ProfileEditor({
 }) {
   const [profile, setProfile] = useState(initial);
   const [deleting, setDeleting] = useState(false);
+  const [choosingAvatar, setChoosingAvatar] = useState(false);
+  const signedIn = useAccount((state) => Boolean(state.user));
+  const avatarButton = useRef<HTMLButtonElement>(null);
+  const avatarOptions = useRef<HTMLFieldSetElement>(null);
   const existing = useProfiles((state) =>
     state.profiles.some((item) => item.id === initial.id),
   );
@@ -295,6 +299,9 @@ function ProfileEditor({
   const back = () => {
     if (deleting) {
       setDeleting(false);
+    } else if (choosingAvatar) {
+      setChoosingAvatar(false);
+      avatarButton.current?.focus();
     } else onBack();
   };
   useEscape(back);
@@ -303,6 +310,10 @@ function ProfileEditor({
     else if (wasDeleting.current) deleteButton.current?.focus();
     wasDeleting.current = deleting;
   }, [deleting]);
+  useEffect(() => {
+    if (choosingAvatar)
+      avatarOptions.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+  }, [choosingAvatar]);
   if (deleting)
     return (
       <section className="ttv-profile-panel" aria-labelledby="profile-heading">
@@ -314,8 +325,10 @@ function ProfileEditor({
           Delete {profile.name}?
         </h1>
         <p className="ttv-profile-intro">
-          Their saved items and viewing progress will be removed from this
-          device. This can’t be undone.
+          {signedIn
+            ? "This profile and its saved items will be removed from your account on all devices."
+            : "This profile and its saved items will be removed from this device."}
+          {" "}This can’t be undone.
         </p>
         <div className="ttv-profile-actions ttv-profile-stacked-actions">
           <button
@@ -350,6 +363,67 @@ function ProfileEditor({
           onSave({ ...profile, name: profile.name.trim() });
         }}
       >
+        <div className="ttv-profile-editor-preview">
+          <ProfileAvatar profile={profile} />
+          <span>
+            {profile.name.trim() || "Your profile"}
+            <small>{profile.kids ? "Kids lineup" : "Full lineup"}</small>
+          </span>
+          <button
+            ref={avatarButton}
+            type="button"
+            className="ttv-profile-avatar-toggle"
+            aria-expanded={choosingAvatar}
+            aria-controls="profile-avatar-options"
+            onClick={() => setChoosingAvatar(!choosingAvatar)}
+          >
+            {choosingAvatar ? "Done choosing" : "Change avatar"}
+          </button>
+        </div>
+        <fieldset ref={avatarOptions} id="profile-avatar-options" hidden={!choosingAvatar}>
+          <legend>Choose an avatar</legend>
+          <div className="ttv-avatar-groups">
+            {PROFILE_AVATAR_GROUPS.map((group) => (
+              <div key={group.name} role="group" aria-label={group.name}>
+                <h3 className="ttv-avatar-group-title">{group.name}</h3>
+                <div className="ttv-avatar-options">
+                  {group.avatars.map((avatar) => (
+                    <button
+                      key={avatar}
+                      type="button"
+                      aria-label={`${PROFILE_PORTRAITS[avatar].name} avatar`}
+                      aria-pressed={profile.avatar === avatar}
+                      onClick={() => {
+                        setProfile({ ...profile, avatar });
+                        setChoosingAvatar(false);
+                        avatarButton.current?.focus();
+                      }}
+                    >
+                      <ProfileAvatar profile={{ avatar }} />
+                      <span className="ttv-avatar-name">{PROFILE_PORTRAITS[avatar].name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </fieldset>
+        <label>
+          Profile name
+          <input
+            ref={nameInput}
+            autoFocus
+            required
+            maxLength={24}
+            autoComplete="off"
+            enterKeyHint="done"
+            placeholder="Enter a name"
+            value={profile.name}
+            onChange={(event) =>
+              setProfile({ ...profile, name: event.target.value })
+            }
+          />
+        </label>
         {profile.id !== "main" && (
           <label className="ttv-profile-check ttv-profile-kids-option">
             <input
@@ -369,53 +443,6 @@ function ProfileEditor({
             </span>
           </label>
         )}
-        <div className="ttv-profile-editor-preview">
-          <ProfileAvatar profile={profile} />
-          <span>
-            {profile.name.trim() || "Your profile"}
-            <small>{profile.kids ? "Kids lineup" : "Full lineup"}</small>
-          </span>
-        </div>
-        <label>
-          Profile name
-          <input
-            ref={nameInput}
-            autoFocus
-            required
-            maxLength={24}
-            autoComplete="off"
-            enterKeyHint="done"
-            placeholder="Enter a name"
-            value={profile.name}
-            onChange={(event) =>
-              setProfile({ ...profile, name: event.target.value })
-            }
-          />
-        </label>
-        <fieldset>
-          <legend>Choose an avatar</legend>
-          <div className="ttv-avatar-groups">
-            {PROFILE_AVATAR_GROUPS.map((group) => (
-              <div key={group.name} role="group" aria-label={group.name}>
-                <h3 className="ttv-avatar-group-title">{group.name}</h3>
-                <div className="ttv-avatar-options">
-                  {group.avatars.map((avatar) => (
-                    <button
-                      key={avatar}
-                      type="button"
-                      aria-label={`${PROFILE_PORTRAITS[avatar].name} avatar`}
-                      aria-pressed={profile.avatar === avatar}
-                      onClick={() => setProfile({ ...profile, avatar })}
-                    >
-                      <ProfileAvatar profile={{ avatar }} />
-                      <span className="ttv-avatar-name">{PROFILE_PORTRAITS[avatar].name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </fieldset>
         <div className="ttv-profile-actions">
           <button
             className="ttv-profile-primary"
@@ -445,6 +472,8 @@ function ProfileEditor({
 export default function ProfilePicker() {
   const profileLimit = useAccount((state) => state.profileLimit);
   const accountUser = useAccount((state) => state.user);
+  const saving = useAccount((state) => state.saving);
+  const syncError = useAccount((state) => state.syncError);
   useSpatialNavigation(true);
   const profiles = useProfiles((state) => state.profiles);
   const parentPin = useProfiles((state) => state.pin);
@@ -508,7 +537,13 @@ export default function ProfilePicker() {
       aria-labelledby="profile-heading"
     >
       <header className="ttv-profile-header">
-        <span className="ttv-profile-device">Your TV. Your people.</span>
+        <TatesTvLogo
+          width={1536}
+          height={1024}
+          sizes="160px"
+          className="ttv-profile-logo"
+          priority
+        />
         <AccountLink />
       </header>
       <div className="ttv-profile-content">
@@ -545,13 +580,6 @@ export default function ProfilePicker() {
             className="ttv-profile-chooser"
             aria-labelledby="profile-heading"
           >
-            <TatesTvLogo
-              width={1536}
-              height={1024}
-              sizes="min(560px, 82vw, 60vh)"
-              className="ttv-profile-logo"
-              priority
-            />
             <h1 id="profile-heading" tabIndex={-1}>
               {screen.kind === "manage" ? "Your household" : "Who’s watching?"}
             </h1>
@@ -597,7 +625,9 @@ export default function ProfilePicker() {
                   </span>
                   <strong>{profile.name}</strong>
                   <small>
-                    {screen.kind === "manage" ? (
+                    {screen.kind !== "manage" && index >= profileLimit ? (
+                      "Membership needed"
+                    ) : screen.kind === "manage" ? (
                       "Edit profile"
                     ) : profile.kids ? (
                       "Kids"
@@ -630,6 +660,11 @@ export default function ProfilePicker() {
                 </button>
               )}
             </div>
+            {profiles.length >= profileLimit && (
+              <p className="ttv-profile-limit">
+                Your account includes {profileLimit} profiles. Manage your profiles to make room for someone new.
+              </p>
+            )}
             <div className="ttv-profile-actions ttv-profile-management">
               <button
                 type="button"
@@ -677,8 +712,14 @@ export default function ProfilePicker() {
         )}
       </div>
       <footer className="ttv-profile-footer">
-        {storageAvailable ? (
-          <p>{accountUser ? "Profiles and saved items sync with your account." : "Profiles are saved on this device. No signup needed."}</p>
+        {accountUser ? (
+          syncError ? (
+            <p role="alert">Your changes haven’t synced. Open Account to review and retry.</p>
+          ) : (
+            <p role="status">{saving ? "Saving changes to your account…" : "Profiles and saved items sync with your account."}</p>
+          )
+        ) : storageAvailable ? (
+          <p>Profiles are saved on this device.</p>
         ) : (
           <p role="status">
             Browser storage is unavailable. Profiles and saved items will only

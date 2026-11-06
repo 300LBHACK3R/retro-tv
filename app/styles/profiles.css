@@ -14,7 +14,7 @@
 }
 .ttv-profile-header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 1rem;
   width: min(80rem, 100%);
@@ -31,6 +31,23 @@
   object-fit: contain;
   border-radius: 0.75rem;
 }
+/* Keep the chooser focused on people, including seasonal wordmark variants. */
+.ttv-profile-screen .ttv-profile-header .ttv-profile-logo {
+  width: 10rem;
+  max-width: 45%;
+  height: 5rem;
+  min-height: 0;
+  margin: 0;
+  object-fit: contain;
+  gap: 0.25rem;
+}
+.ttv-profile-header .ttv-profile-logo :is(.ttv-christmas96-brand__name, .ttv-noel-brand__name) {
+  font-size: 1.75rem;
+}
+.ttv-profile-header .ttv-profile-logo :is(.ttv-christmas96-brand__edition, .ttv-noel-brand__edition) {
+  font-size: 0.65rem;
+}
+.ttv-profile-header .ttv-christmas96-brand__stars { display: none; }
 .ttv-profile-device {
   color: var(--text-muted);
   font-size: 0.8rem;
@@ -42,7 +59,13 @@
   text-align: center;
 }
 .ttv-profile-screen[data-view="chooser"] .ttv-profile-content {
-  padding-block: clamp(0.5rem, 2vh, 1.25rem);
+  padding-block: clamp(2rem, 8vh, 5rem);
+}
+.ttv-profile-chooser {
+  padding: clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: var(--panel-bg);
 }
 .ttv-profile-screen h1 {
   margin: 0;
@@ -387,9 +410,29 @@
   width: 3.5rem;
   flex-shrink: 0;
 }
-.ttv-profile-editor-preview > span:last-child {
+.ttv-profile-editor-preview > span:nth-child(2) {
   min-width: 0;
+  flex: 1;
   font-weight: 650;
+}
+.ttv-profile-avatar-toggle {
+  min-height: 2.75rem;
+  max-width: 7rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  color: var(--text);
+  background: var(--button-bg);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.ttv-profile-form fieldset[hidden] { display: none; }
+.ttv-profile-limit {
+  max-width: 30rem;
+  margin: 0 auto;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 .ttv-profile-editor-preview small {
   display: block;
@@ -492,6 +535,9 @@
   margin: 0 auto;
 }
 @media (max-width: 600px) {
+  .ttv-profile-chooser { padding: 1.25rem 0.75rem; }
+  .ttv-profile-screen[data-view="chooser"] .ttv-profile-content { padding-block: 1.25rem; }
+  .ttv-profile-editor-preview { flex-wrap: wrap; gap: 0.65rem; }
   .ttv-profile-device {
     display: none;
   }
