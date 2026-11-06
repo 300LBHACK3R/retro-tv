@@ -50,7 +50,15 @@ jobs:
           name: viewer-browser-report
           path: |
             playwright-report/
-            test-results/
             playwright-report-billing/
+          retention-days: 14
+      # Keep the self-contained HTML report and raw output separate. Combining
+      # both duplicates trace data and exceeded the report download size limit.
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: viewer-browser-raw-results
+          path: |
+            test-results/
             test-results-billing/
           retention-days: 14

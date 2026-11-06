@@ -383,20 +383,13 @@ test("Cyberpunk Christmas persists its premium guide, channels, settings and lib
   expect(errors).toEqual([]);
 });
 
-test("every theme applies, keeps readable surfaces and respects reduced motion", async ({
-  page,
-}, testInfo) => {
-  test.setTimeout(120000);
-  await page.goto("/library");
-  await expect(
-    page.getByRole("heading", { name: "Your time. Your TV." }),
-  ).toBeVisible();
-  for (const theme of THEMES) {
-    await page.getByRole("link", { name: "Live TV", exact: true }).click();
-    // Returning from Library enters Channel 1, which has no media in this
-    // synthetic catalogue. Tune a populated station before testing Player.
-    await page.getByRole("region", { name: "Find your channel", exact: true })
-      .getByRole("button", { name: "Tune to CH 24 Studio TV", exact: true }).click();
+// Give each theme an isolated context and the normal per-test timeout. A single
+// budget for the whole catalogue expires mid-loop on WebKit and hides later coverage.
+for (const theme of THEMES) {
+  test(`${theme.id} applies, keeps readable surfaces and respects reduced motion`, async ({ page }, testInfo) => {
+    // Channel 1 has no media in this synthetic catalogue. Start on a populated
+    // station so the opaque player-control surface is present in every case.
+    await page.goto("/?ch=24");
     await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
     await expect(page.locator(".ttv-player-controls")).toBeAttached();
     await page
@@ -484,22 +477,22 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
         .locator(".ttv-library-shell")
         .evaluate((element) => getComputedStyle(element).color),
     ).not.toBe("rgba(0, 0, 0, 0)");
-  }
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(
-    await page
-      .locator(".ttv-library-shell")
-      .evaluate(
-        (element) => getComputedStyle(element, "::before").animationName,
-      ),
-  ).toBe("none");
-  await waitForHouseholdSave(page);
-  await page.reload();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-ttv-theme",
-    THEMES[THEMES.length - 1]!.id,
-  );
-});
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await page
+        .locator(".ttv-library-shell")
+        .evaluate(
+          (element) => getComputedStyle(element, "::before").animationName,
+        ),
+    ).toBe("none");
+    await waitForHouseholdSave(page);
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-ttv-theme",
+      theme.id,
+    );
+  });
+}
 
 test("free household favourite channels and guide filtering persist", async ({
   page,
