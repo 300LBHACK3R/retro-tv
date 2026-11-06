@@ -393,6 +393,12 @@ test("every theme applies, keeps readable surfaces and respects reduced motion",
   ).toBeVisible();
   for (const theme of THEMES) {
     await page.getByRole("link", { name: "Live TV", exact: true }).click();
+    // Returning from Library enters Channel 1, which has no media in this
+    // synthetic catalogue. Tune a populated station before testing Player.
+    await page.getByRole("region", { name: "Find your channel", exact: true })
+      .getByRole("button", { name: "Tune to CH 24 Studio TV", exact: true }).click();
+    await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
+    await expect(page.locator(".ttv-player-controls")).toBeAttached();
     await page
       .getByRole("button", { name: "Open theme library", exact: true })
       .click();
