@@ -25,6 +25,9 @@
 }
 .headerActions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
   align-items: center;
   gap: 10px;
 }
@@ -773,3 +776,20 @@
 }
 @media (max-width: 900px) { .collectionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .collectionCard { padding: 14px; } .collectionCard strong { font-size: 15px; } }
+.backdrop .modal.rewindModal {
+  background: #182027; color: #f3eedf; border: 1px solid #817458; border-radius: 8px;
+  --text: #f3eedf; --text-muted: #bdc1b9; --primary: #efd29a;
+  --panel-bg: #1c242b; --panel-alt-bg: #26313a; --border: #ffffff30;
+  --button-bg: #26313a; --button-hover: #333d43;
+}
+.rewindModal .modalTop { border-bottom: 1px solid #ffffff25; }
+.rewindModal .detailInfo h2 { font-family: Georgia, serif; font-weight: 400; }
+.rewindModal .eyebrow { color: #dfbf83; }
+.backdrop .rewindModal .primary { background: #efd29a; color: #1b2227; border-color: #efd29a; }
+.rewindModal .player { padding: 12px; background: #101519; border: 1px solid #656b69; border-radius: 6px; }
+.rewindAdminList { display: grid; gap: 10px; margin: 18px 0; }
+.rewindAdminRow { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #ffffff30; border-radius: 8px; }
+.rewindAdminRow input { width: 22px; height: 22px; flex-shrink: 0; }
+.rewindAdminRow > span:first-of-type { display: grid; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rewindAdminRow small, .rewindAdminRow > span:last-child { font-size: 12px; opacity: .8; }
+@media (max-width: 600px) { .rewindAdminRow { gap: 10px; padding: 12px; }.rewindAdminRow > span:last-child { display: none; } }

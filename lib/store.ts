@@ -918,6 +918,7 @@ function normalizeMediaItem(item: MediaItem): MediaItem {
   return {
     ...item,
     kidsApproved: item.kidsApproved === true,
+    rewindRoom: type === "movie" && item.rewindRoom === true,
     id: normalizeText(item.id, createFallbackId()),
     title: normalizeText(item.title, "Untitled Media"),
     type,

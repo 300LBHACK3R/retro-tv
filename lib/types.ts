@@ -124,6 +124,8 @@ export interface ChannelBranding {
 
 export interface MediaItem {
   kidsApproved?: boolean;
+  /** Opt-in movie shelf; independent of Kids approval and live scheduling. */
+  rewindRoom?: boolean;
   id: string;
   title: string;
   type: MediaType;

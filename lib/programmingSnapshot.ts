@@ -466,6 +466,7 @@ function sanitizeMediaItem(value: unknown): MediaItem | null {
     id,
     title,
     kidsApproved: value.kidsApproved === true,
+    rewindRoom: type === "movie" && value.rewindRoom === true,
     type,
     duration,
     file,

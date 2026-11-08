@@ -1,10 +1,8 @@
 "use client";
-import { useAccount } from "@/lib/accountStore";
 import AccountLink from "@/components/account/AccountLink";
 import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -16,8 +14,9 @@ import SaveButton from "@/components/viewer/SaveButton";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import ComingSoon from "@/components/library/ComingSoon";
 import TitleDetails from "@/components/library/TitleDetails";
+import { useLibraryProgress } from "@/lib/useLibraryProgress";
 import { useViewerCatalog } from "@/lib/useViewerCatalog";
-import { useProfiles, profileProgressKey } from "@/lib/deviceProfiles";
+import { useProfiles } from "@/lib/deviceProfiles";
 import { useDeviceLibrary } from "@/lib/deviceLibrary";
 import { useStore } from "@/lib/store";
 import { getThemeLayoutClass } from "@/lib/themes";
@@ -29,24 +28,14 @@ import {
   formatClock,
   formatDuration,
   getTypeLabel,
-  sanitizeProgress,
   type LibraryFilter,
   type LibraryGroup,
-  type ProgressMap,
-  type ProgressEntry,
 } from "@/lib/libraryCatalog";
 import { libraryCollections, groupRuntime, sortLibrary, titleLetter, watchStatus } from "@/lib/libraryBrowse";
 import { CHANNEL_CATEGORIES } from "@/lib/audience";
 import { seasonSummary } from "@/lib/seriesMetadata";
 import styles from "./library/library.module.css";
 
-function readProgress(key: string): ProgressMap {
-  try {
-    return sanitizeProgress(JSON.parse(localStorage.getItem(key) || "{}"));
-  } catch {
-    return {};
-  }
-}
 export default function PublicLibrary() {
   return (
     <ProfileGate>
@@ -91,30 +80,10 @@ function ProfileLibrary() {
     mediaId?: string;
     play?: boolean;
   } | null>(null);
-  const signedIn = !!useAccount((state) => state.user);
-  const [progressKey] = useState(profileProgressKey);
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const { progress, updateProgress } = useLibraryProgress();
   const searchRef = useRef<HTMLInputElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const requestedRef = useRef(false);
-  useEffect(() => {
-    setProgress(signedIn ? readProgress(progressKey) : {});
-  }, [progressKey, signedIn]);
-  const updateProgress = useCallback(
-    (id: string, entry: ProgressEntry | null) => {
-      setProgress((previous) => {
-        const next = { ...previous, ...(signedIn ? readProgress(progressKey) : {}) };
-        if (entry) next[id] = entry;
-        else delete next[id];
-        const safe = sanitizeProgress(next);
-        try {
-          if (signedIn) localStorage.setItem(progressKey, JSON.stringify(safe));
-        } catch {}
-        return safe;
-      });
-    },
-    [progressKey, signedIn],
-  );
   useEffect(() => {
     if (requestedRef.current || !library.length) return;
     const id = new URLSearchParams(window.location.search).get("watch");
@@ -227,6 +196,7 @@ function ProfileLibrary() {
             <div className={styles.headerActions}>
               <AccountLink />
               <ProfileButton />
+              <Link href="/rewind-room" className={styles.button}>Rewind Room</Link>
               <Link href="/" className={styles.button}>
                 Live TV
               </Link>
