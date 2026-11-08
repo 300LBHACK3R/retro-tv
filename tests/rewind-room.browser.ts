@@ -2,6 +2,8 @@ import { test, expect, type Page, waitForHouseholdSave } from "./viewer-fixture"
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 import type { ProgrammingSnapshot } from "../lib/programmingSnapshot";
+import { THEME_STORAGE_KEY } from "../lib/themes";
+import { mediaResponse } from "./media-response";
 
 const video = Buffer.from(readFileSync("tests/fixtures/test-video.webm.base64", "utf8"), "base64");
 async function fixture(page: Page, stocked = true, kids = false) {
@@ -15,7 +17,7 @@ async function fixture(page: Page, stocked = true, kids = false) {
   await page.route("**/api/programming", route => route.fulfill({ json: { ok: true, programming: saved, source: "database" } }));
   await page.route("**/api/admin/session", route => route.fulfill({ json: { ok: true, isAdmin: true } }));
   await page.route("**/api/admin/programming", async route => { saved = route.request().postDataJSON(); await route.fulfill({ json: { ok: true, programming: saved } }); });
-  await page.route("**/qa-media.webm", route => route.fulfill({ contentType: "video/webm", body: video }));
+  await page.route("**/qa-media.webm", route => route.fulfill(mediaResponse(video, route.request().headers().range)));
   await page.route("**/api/engagement", route => route.fulfill({ json: { ok: true } }));
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
   await page.route("https://www.gstatic.com/**", route => route.fulfill({ contentType: "application/javascript", body: "" }));
@@ -66,16 +68,20 @@ test("the tape player pauses, seeks, resumes and starts over with focus restored
   await dialog.getByRole("button", { name: "▶ Play tape", exact: true }).click();
   const player = dialog.locator("video");
   await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThanOrEqual(1);
+  await expect.poll(() => player.evaluate((element: HTMLVideoElement) =>
+    element.seekable.length ? element.seekable.end(element.seekable.length - 1) : 0,
+  )).toBeGreaterThan(24);
   // Toggle from the actual media state, including browsers that deny autoplay.
   if (await player.evaluate((element: HTMLVideoElement) => element.paused)) await dialog.getByRole("button", { name: "Play tape", exact: true }).click();
   await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
   await dialog.getByRole("button", { name: "Pause tape", exact: true }).click();
   await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
   await player.evaluate((element: HTMLVideoElement) => { element.currentTime = Math.min(15, element.duration / 2); });
+  await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(14);
   await dialog.getByRole("button", { name: "Rewind to the beginning", exact: true }).click();
   await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeLessThan(1);
   await dialog.getByRole("button", { name: "Forward 10 seconds", exact: true }).click();
-  await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+  await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(9);
   await dialog.getByRole("button", { name: "Rewind 10 seconds", exact: true }).click();
   await expect.poll(() => player.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeLessThan(1);
   await expect(player).toHaveAttribute("controls", "");
@@ -118,14 +124,22 @@ test("admin stocks and removes existing movies without changing channels or gran
   await page.goto("/admin");
   await page.getByRole("button", { name: "Rewind Room", exact: true }).click();
   const checkbox = page.getByRole("checkbox", { name: "Show A Calgary Evening in Rewind Room", exact: true });
+  await expect(checkbox).toBeVisible();
+  // Hydration includes the station's default channels. Compare the actual
+  // complete lineup before and after stocking, not the two-channel API input.
+  const channelsBefore: ProgrammingSnapshot["channels"] = await page.evaluate(key =>
+    JSON.parse(localStorage.getItem(key)!).state.channels, THEME_STORAGE_KEY);
+  for (const channel of programming.channels)
+    expect(channelsBefore.find(item => item.id === channel.id)?.mediaIds).toEqual(channel.mediaIds);
   await checkbox.check();
   await expect.poll(() => saved().media.find(item => item.id === "qa-movie")?.rewindRoom).toBe(true);
   expect(saved().media.find(item => item.id === "qa-movie")?.kidsApproved).not.toBe(true);
-  expect(saved().channels.map(channel => channel.mediaIds)).toEqual(programming.channels.map(channel => channel.mediaIds));
+  expect(saved().channels).toEqual(channelsBefore);
   await page.reload();
   await expect(checkbox).toBeChecked();
   await checkbox.uncheck();
   await expect.poll(() => saved().media.find(item => item.id === "qa-movie")?.rewindRoom).toBe(false);
+  expect(saved().channels).toEqual(channelsBefore);
 });
 
 test("new movie upload saves to the Rewind Room without a channel or automatic Kids approval", async ({ page }) => {
@@ -133,7 +147,7 @@ test("new movie upload saves to the Rewind Room without a channel or automatic K
   let uploaded = false;
   await page.route("**/api/admin/uploads/sign", route => route.fulfill({ json: { ok: true, uploadUrl: "https://storage.example/tape", publicUrl: "https://media.example/tape.webm", objectKey: "Rewind-Room/tape.webm" } }));
   await page.route("https://storage.example/tape", route => { uploaded = route.request().method() === "PUT"; return route.fulfill({ status: 200 }); });
-  await page.route("https://media.example/tape.webm", route => route.fulfill({ contentType: "video/webm", body: video }));
+  await page.route("https://media.example/tape.webm", route => route.fulfill(mediaResponse(video, route.request().headers().range)));
   await page.goto("/admin");
   await page.getByRole("button", { name: "Rewind Room", exact: true }).click();
   await page.getByRole("button", { name: "Upload a movie", exact: true }).click();
