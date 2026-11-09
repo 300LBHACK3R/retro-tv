@@ -15,6 +15,7 @@ import {
 import { useDeviceLibrary, DEVICE_LIBRARY_KEY } from "./deviceLibrary";
 import { PROFILE_STORAGE_KEY } from "./themePreferences";
 import { canUseTheme } from "./themes";
+import { restoreKidsSession } from "./kidsSession";
 
 let applying = false;
 let lastSaved = "";
@@ -123,6 +124,7 @@ export async function refreshAccount(replacePreferences = false) {
   if (replacePreferences || ownerChanged) paused = false;
 }
 export function startAccount() {
+  restoreKidsSession();
   if (!start)
     start = refreshAccount().catch(() => {
       useAccount.setState({

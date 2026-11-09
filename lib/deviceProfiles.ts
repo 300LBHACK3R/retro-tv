@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { useDeviceLibrary } from "./deviceLibrary";
 import { useStore } from "./store";
 import { useAccount } from "./accountStore";
+import { rememberKidsSession } from "./kidsSession";
 import { canUseTheme, isThemeId } from "./themes";
 import type { ThemeId } from "./types";
 import { getEntranceThemeId, rememberLoginTheme, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "./themePreferences";
@@ -110,9 +111,11 @@ export function initializeProfiles(accountData?: Data & { entranceTheme?: ThemeI
   const theme = preferred && canUseTheme(preferred, useAccount.getState().ownedThemeIds, false)
     ? preferred : getEntranceThemeId();
   useProfiles.setState({ ...data, activeId, ready: true, entranceTheme: accountData && preferred ? theme : null });
+  if (accountData && data.pin && !activeId) rememberKidsSession(true);
   useStore.getState().setTheme(theme);
   if (accountData && useAccount.getState().user) rememberLoginTheme(preferred ? theme : null);
   if (activeId) {
+    if (accountData) rememberKidsSession(data.profiles.find((profile) => profile.id === activeId)!.kids);
     useDeviceLibrary.getState().selectProfile(activeId);
   }
 }
@@ -147,6 +150,7 @@ export function activateProfile(id: string) {
     .getState()
     .profiles.slice(0, useAccount.getState().profileLimit).find((profile) => profile.id === id);
   if (!profile || (profile.kids && !useProfiles.getState().pin)) return;
+  if (useAccount.getState().user) rememberKidsSession(profile.kids);
   useDeviceLibrary.getState().selectProfile(id);
   const state = useStore.getState();
   const preferred = profile.theme ?? getEntranceThemeId();

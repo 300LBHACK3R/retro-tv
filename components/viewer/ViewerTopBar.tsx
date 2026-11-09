@@ -134,11 +134,6 @@ export default function ViewerTopBar({
           <span>Library</span>
         </Link>
 
-        <Link href="/rewind-room" aria-label="Open Rewind Room" title="Rewind Room">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="12" r="2" /><circle cx="16" cy="12" r="2" /><path d="M8 9h8M8 15h8" /></svg>
-          <span>Rewind Room</span>
-        </Link>
-
         <button
           type="button"
           onClick={onOpenMore}

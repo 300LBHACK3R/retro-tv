@@ -11,6 +11,7 @@ import {
 import { ProfileAvatar } from "./ProfileAvatar";
 import ProfilePicker from "./ProfilePicker";
 import Link from "next/link";
+import { useKidsSession } from "@/lib/kidsSession";
 
 export function ProfileButton() {
   const user = useAccount((state) => state.user);
@@ -45,6 +46,7 @@ export function ProfileButton() {
 export default function ProfileGate({ children }: { children: ReactNode }) {
   const accountReady = useAccount((state) => state.ready);
   const user = useAccount((state) => state.user?.id);
+  const parentRequired = useKidsSession((state) => state.parentRequired);
   const ready = useProfiles((state) => state.ready);
   const activeId = useProfiles((state) => state.activeId);
   const revision = useProfiles((state) => state.revision);
@@ -76,7 +78,15 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
         visibility="problems"
         onReady={handleProgrammingReady}
       />
-      {!accountReady || !ready || !prepared || ((activeId || !user) && !programmingReady) ? (
+      {accountReady && !user && parentRequired ? (
+        <main className="ttv-profile-screen">
+          <section className="ttv-account-card">
+            <h1>Ask a parent to sign in</h1>
+            <p>This device was using a Kids profile. Sign in to restore your household before watching.</p>
+            <Link href="/account" className="ttv-btn-primary">Parent sign in</Link>
+          </section>
+        </main>
+      ) : !accountReady || !ready || !prepared || ((activeId || !user) && !programmingReady) ? (
         <main className="ttv-profile-screen">
           <div>
             <h1>Tate’s TV</h1>

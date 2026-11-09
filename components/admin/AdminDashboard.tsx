@@ -7,7 +7,6 @@ import type { Channel, MediaItem } from "@/lib/types";
 
 function PanelLoading() { return <div className="ttv-admin-card" role="status">Opening admin tools…</div>; }
 const LibraryPresentationPanel = dynamic(() => import("./LibraryPresentationPanel"), { loading: PanelLoading });
-const RewindRoomPanel = dynamic(() => import("./RewindRoomPanel"), { loading: PanelLoading });
 const ChannelLineupPanel = dynamic(() => import("./ChannelLineupPanel"), { loading: PanelLoading });
 const AudiencePanel = dynamic(() => import("./AudiencePanel"), { loading: PanelLoading });
 const StationInsightsPanel = dynamic(() => import("./StationInsightsPanel"), { loading: PanelLoading });
@@ -25,7 +24,6 @@ const CommercialsPanel = dynamic(() => import("./CommercialsPanel"), { loading: 
 const BatchImportPanel = dynamic(() => import("./BatchImportPanel"), { loading: PanelLoading, ssr: false });
 
 type AdminTab =
-  | "rewind-room"
   | "batch"
   | "commercials"
   | "artwork"
@@ -68,7 +66,6 @@ const ADMIN_TAB_STORAGE_KEY = "tatestv:admin-dashboard-tab:v1";
 const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
-  { id: "rewind-room", label: "Rewind Room", shortLabel: "Rewind Room", description: "Stock the VHS movie shelf without changing live channels." },
   { id: "show-organization", label: "Show Organization", shortLabel: "Seasons", description: "Group series, review missing season numbers and correct episode order." },
   { id: "show-requests", label: "Show Requests", shortLabel: "Requests", description: "Review paid-member show suggestions, update progress and reply to members." },
   { id: "batch", label: "Batch Import", shortLabel: "Batch Import", description: "Upload multiple episodes, reuse R2 links, detect runtimes and assign a channel in one review." },
@@ -143,7 +140,7 @@ const TABS: AdminTabMeta[] = [
 ];
 
 const TOOL_GROUPS: { name: string; tabs: AdminTab[] }[] = [
-  { name: "Content & campaigns", tabs: ["batch", "add", "commercials", "quick-edit", "library", "rewind-room", "show-organization", "artwork", "show-requests", "submissions"] },
+  { name: "Content & campaigns", tabs: ["batch", "add", "commercials", "quick-edit", "library", "show-organization", "artwork", "show-requests", "submissions"] },
   { name: "Channels & scheduling", tabs: ["lineup", "programming", "blocks", "audience", "branding"] },
   { name: "Station health & safety", tabs: ["insights", "launch", "config"] },
 ];
@@ -901,7 +898,6 @@ export default function AdminDashboard() {
         {activeTab === "programming" ? <ChannelProgrammingPanel /> : null}
         {activeTab === "branding" ? <ChannelBrandingPanel /> : null}
         {activeTab === "library" ? <MediaLibraryPanel /> : null}
-        {activeTab === "rewind-room" ? <RewindRoomPanel onArtwork={() => setActiveTab("artwork")} /> : null}
 
         {activeTab === "launch" ? (
           <LaunchReadinessPanel

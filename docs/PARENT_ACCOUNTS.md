@@ -1,6 +1,8 @@
 # Required free parent accounts
 
-The viewer entry points `/`, `/library` and `/tv` now show account registration/sign-in until `/api/account` returns an authenticated user. That endpoint uses Supabase `getUser` and requires a confirmed email. Existing local profiles cannot grant access. Auth service failures do not restore device-only viewing. Paid membership is never required to pass this gate.
+Guests can watch free at `/`, `/library` and `/tv`. Verified free parent accounts provide saved profiles and Kids controls. `/api/account` uses Supabase `getUser` and requires a confirmed email; local profile data cannot grant account access. Paid membership is never required to watch.
+
+A device that enters a Kids profile or a locked PIN-protected household remembers a restriction flag without storing private household data. If the account expires or account services fail, all three viewer entry points ask a parent to sign in instead of falling back to unrestricted guest viewing. Profile switching preserves this restriction. Opening an adult profile through the existing PIN flow releases it. Older PIN-protected tab sessions migrate to this guard. Ordinary guests remain able to watch during an account outage.
 
 New households start with the parent profile. The parent adds Kids profiles inside the household. There is no separate child email registration. Existing adult-confirmation signup and password-recovery flows remain in place. Old device data is preserved for explicit import after sign-in, not used as account identity.
 
@@ -12,7 +14,7 @@ Kids channels must pass the existing complete-lineup approval checks, including 
 
 This change controls the application’s viewing and account-setting flow. Household PINs are client-side parental controls inside a shared authenticated parent session, not separate server-issued child identities. Public programming and R2 media URLs remain public. This is not a guarantee against a child deliberately bypassing client code or opening a known media URL. Strong media-level enforcement requires private media delivery and server-authorized child sessions as a separate change. Server account data remains isolated by authenticated parent identity; purchase entitlements remain server-owned.
 
-## Release verification
+## Historical release verification
 
 Type checking, lint, production build and HTTP/security checks passed locally. The full existing unit suite passed, followed by the added outage regression and focused Kids/PIN checks. Browser tests now use authenticated free-household fixtures rather than implicitly exercising guest viewing. New browser cases cover all three signed-out entry routes, auth outage, and locked account settings; existing Kids tests cover unapproved deep links and PIN transitions.
 

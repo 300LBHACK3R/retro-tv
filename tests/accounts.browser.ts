@@ -153,6 +153,37 @@ test("an account outage still allows isolated guest viewing", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toHaveCount(0);
 });
 
+for (const failure of ["outage", "expired"] as const) {
+  test(`Kids cannot become an unrestricted guest after account ${failure}`, async ({ page }) => {
+    const parent = account();
+    parent.household!.profiles.push({ id: "kids", name: "Kids", kids: true, avatar: "sun" });
+    parent.household!.pin = { salt: "a".repeat(32), hash: "b".repeat(64) };
+    const f = await fixture(page, parent);
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem("qa-initialized-kids")) {
+        sessionStorage.setItem("ttv-profile-session-v1", JSON.stringify({ id: "kids", pinHash: "b".repeat(64) }));
+        sessionStorage.setItem("qa-initialized-kids", "1");
+      }
+    });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Switch profile: Kids", exact: true })).toBeVisible();
+    if (failure === "outage")
+      await page.route("**/api/account", route => route.fulfill({ status: 503, json: { error: "Account service unavailable" } }));
+    else f.setState({ ...EMPTY_ACCOUNT, enabled: true });
+    for (const path of ["/", "/library?title=qa-movie", "/tv"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: "Ask a parent to sign in" })).toBeVisible();
+      await expect(page.locator("video")).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Guest · Sign in to save", exact: true })).toHaveCount(0);
+    }
+    // A restored session returns to the PIN-protected chooser, never guest TV.
+    await page.unroute("**/api/account");
+    await page.route("**/api/account", route => route.fulfill({ json: parent }));
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
+  });
+}
+
 test("a locked household cannot open billing through the profile chooser", async ({ page }) => {
   const parent = account();
   parent.household!.pin = { salt: "a".repeat(32), hash: "b".repeat(64) };

@@ -188,8 +188,6 @@ export default function ViewerMoreDialog({
             </div>
 
             <div className="ttv-viewer-link-grid">
-              <Link href="/rewind-room" onClick={onClose}><strong>Rewind Room</strong><span>Pick a tape. Your on-demand movie shelf.</span></Link>
-
               <Link href={tvModeUrl} onClick={onClose}>
                 <strong>TV Mode</strong>
                 <span>A larger view for the living room.</span>

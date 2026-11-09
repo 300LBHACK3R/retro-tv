@@ -127,8 +127,8 @@ export const THEMES = [
     shortName: "Neon Noël",
     description:
       "A futuristic Christmas lounge with a neon city skyline, precision programme guide, illuminated channel cards and matching midnight menus. Cyan light, rose accents and a premium interface on every screen.",
-    priceLabel: "Free",
-    isPremium: false,
+    priceLabel: "C$3",
+    isPremium: true,
     category: "seasonal",
     season: "christmas",
     layout: "electric-command",

@@ -6,6 +6,7 @@ import { approveReviewedKidsLineup, kidsLineupReview, viewerCatalog } from "../l
 import { programming } from "./programming-fixture";
 import { CHRISTMAS_ENTRANCE_START, getEntranceThemeId, LOGIN_THEME_STORAGE_KEY, PROFILE_STORAGE_KEY, PROFILE_SESSION_KEY } from "../lib/themePreferences";
 import type { Channel, MediaItem } from "../lib/types";
+import { serverModule } from "./server-harness";
 
 function bootstrap(now: number, profiles?: unknown, session?: unknown, blocked: boolean | "malformed" = false, login?: { path: string; theme: string }) {
   const root = { dataset: {} as Record<string, string>, style: { colorScheme: "", setProperty() {} } };
@@ -134,5 +135,24 @@ test("every launch theme is free without purchases, including Christmas and Hall
     expect(canUseTheme(theme.id, [], false), theme.name).toBe(true);
     expect(getThemeAccessLabel(theme, [], false), theme.name).toBe("Free");
     expect(getThemePriceLabel(theme), theme.name).toBe("Free");
+  }
+});
+
+test("paid catalogue keeps Halloween and classic themes free, with one free Christmas theme", () => {
+  const paid = serverModule("lib/themes.ts", {}, { NEXT_PUBLIC_THEME_BILLING_ENABLED: "true" });
+  const freeIds = ["ttv-neon-crt", "shaw-2006", "telus-2008-inspired", "christmas-96-living-room",
+    ...THEMES.filter(theme => theme.category === "seasonal" && theme.season === "halloween").map(theme => theme.id)];
+  for (const id of freeIds) {
+    const theme = paid.getThemeById!(id);
+    expect(theme.isPremium, id).toBe(false);
+    expect(paid.canUseTheme!(id, [], false), id).toBe(true);
+    expect(paid.getThemePriceLabel!(theme), id).toBe("Free");
+  }
+  for (const theme of THEMES.filter(theme => theme.category === "seasonal" && theme.season === "christmas" && theme.id !== "christmas-96-living-room")) {
+    expect(theme.isPremium, theme.name).toBe(true);
+    expect(paid.canUseTheme!(theme.id, [], false)).toBe(false);
+    expect(paid.getThemePriceLabel!(theme)).toBe("C$3");
+    expect(paid.canUseTheme!(theme.id, [theme.id], false)).toBe(true);
+    expect(paid.getThemeAccessLabel!(theme, [theme.id], false)).toBe("Owned");
   }
 });

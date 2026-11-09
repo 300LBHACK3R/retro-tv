@@ -20,7 +20,6 @@ import {
 } from "@/lib/libraryCatalog";
 import styles from "./library.module.css";
 import { seasonLabel, seasonSummary } from "@/lib/seriesMetadata";
-import TapeControls from "@/components/rewind/TapeControls";
 
 type Props = {
   group: LibraryGroup;
@@ -31,7 +30,6 @@ type Props = {
   onClose: () => void;
   returnFocusRef: RefObject<HTMLElement | null>;
   themeStyle: CSSProperties;
-  variant?: "default" | "rewind";
 };
 export default function TitleDetails({
   group,
@@ -42,7 +40,6 @@ export default function TitleDetails({
   onClose,
   returnFocusRef,
   themeStyle,
-  variant = "default",
 }: Props) {
   const [mediaId, setMediaId] = useState(
     initialMediaId ?? group.items[0]?.media.id,
@@ -165,7 +162,7 @@ export default function TitleDetails({
     >
       <div
         ref={dialogRef}
-        className={`${styles.modal} ${variant === "rewind" ? styles.rewindModal : ""}`}
+        className={styles.modal}
         role="dialog"
         aria-modal="true"
         aria-labelledby="library-title-heading"
@@ -173,7 +170,7 @@ export default function TitleDetails({
       >
         <div className={styles.modalTop}>
           <button ref={closeRef} className={styles.button} onClick={onClose}>
-            {variant === "rewind" ? "Eject tape ✕" : "Close title ✕"}
+            Close title ✕
           </button>
         </div>
         <div className={styles.detailHead}>
@@ -212,8 +209,8 @@ export default function TitleDetails({
                   : resume &&
                       resume.position >= 10 &&
                       resume.position < resume.duration - 10
-                    ? variant === "rewind" ? "▶ Resume tape" : "▶ Resume"
-                    : variant === "rewind" ? "▶ Play tape" : "▶ Watch now"}
+                    ? "▶ Resume"
+                    : "▶ Watch now"}
               </button>
               <SaveButton id={group.key} aliases={group.aliasKeys} title={group.title} kind="programme" />
             </div>
@@ -231,7 +228,6 @@ export default function TitleDetails({
               autoPlay
               preload="metadata"
               aria-label={`Watch ${selected.displayTitle}`}
-              onPlay={() => { completedRef.current = false; }}
               onLoadedMetadata={(event) => {
                 const video = event.currentTarget;
                 const saved = progressRef.current[selected.media.id];
@@ -252,10 +248,6 @@ export default function TitleDetails({
                 if (next) start(next.media.id);
               }}
             />
-            {variant === "rewind" ? <TapeControls key={selected.media.id} videoRef={videoRef} onRestart={() => {
-              completedRef.current = false;
-              onProgress(selected.media.id, null);
-            }} /> : null}
             {monitor.notice && (
               <div className={styles.playerError} role="status">
                 {monitor.notice}

@@ -10,12 +10,6 @@ ffmpeg -f lavfi -i color=c=0x10151e:s=320x180:r=10 -t 60 -c:v libvpx -b:v 80k te
 
 Then base64-encode the generated file into `tests/fixtures/test-video.webm.base64`. The decoded video is served only by the test harness.
 
-Tests that seek or resume must serve the bytes with `mediaResponse` from
-`tests/media-response.ts`, passing the request's `Range` header. Chromium sends
-`Range: bytes=0-`; returning an unconditional 200 without range support makes
-the synthetic movie unseekable. The helper returns matching 206 byte ranges,
-lengths and `Accept-Ranges` headers, like the movie storage endpoint.
-
 ## HTTPS test certificate
 
 `localhost.pfx.base64` is a public test-only self-signed certificate and private key for `localhost` and `127.0.0.1`, with passphrase `tates-tv-tests-only`. It carries no production identity or secrets and must never be used outside local tests. The test server binds only to `127.0.0.1`; Playwright accepts this self-signed certificate for its isolated test contexts.

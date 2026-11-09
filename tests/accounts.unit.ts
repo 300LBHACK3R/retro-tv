@@ -97,8 +97,8 @@ test("account preferences reject invalid data, retain only bounded profile field
 });
 
 test("account entrance themes are bounded preferences and cannot grant paid access", () => {
-  const baseline = sanitizeHousehold({ profiles: [{ id: "main", name: "Parent" }], entranceTheme: "christmas-neon-noel" })!;
-  expect(baseline.entranceTheme).toBe("christmas-neon-noel");
+  const baseline = sanitizeHousehold({ profiles: [{ id: "main", name: "Parent" }], entranceTheme: "christmas-96-living-room" })!;
+  expect(baseline.entranceTheme).toBe("christmas-96-living-room");
   expect(sanitizeHousehold({ ...baseline, entranceTheme: "unknown" })).not.toHaveProperty("entranceTheme");
   const free = allowedThemeIds([], false);
   expect(validateHouseholdAccess(baseline, null, free, 5, true)).toBeNull();
@@ -106,6 +106,9 @@ test("account entrance themes are bounded preferences and cannot grant paid acce
   expect(validateHouseholdAccess(locked, baseline, free, 5, true)).toContain("purchase");
   expect(validateHouseholdAccess(locked, locked, free, 5, true)).toBeNull();
   expect(validateHouseholdAccess(locked, baseline, allowedThemeIds(["midas-gold"], false), 5, true)).toBeNull();
+  const christmas = { ...baseline, entranceTheme: "christmas-neon-noel" as const };
+  expect(validateHouseholdAccess(christmas, baseline, free, 5, true)).toContain("purchase");
+  expect(validateHouseholdAccess(christmas, baseline, allowedThemeIds(["christmas-neon-noel"], false), 5, true)).toBeNull();
 });
 
 test("Postgres enforces private account tables, atomic rate limits, payment replay protection and event ordering", async () => {

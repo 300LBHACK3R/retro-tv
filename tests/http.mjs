@@ -68,7 +68,7 @@ try {
   }
   assert.ok(ready, "Production server starts");
   const stylesheetResponses = new Map();
-  for (const path of ["/", "/library", "/rewind-room", "/tv", "/help", "/privacy"]) {
+  for (const path of ["/", "/library", "/tv", "/help", "/privacy"]) {
     const response = await get(path);
     assert.equal(response.status, 200, path);
     const canonical = response.body.match(
@@ -90,7 +90,7 @@ try {
     );
     assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.ok(!response.headers["x-powered-by"]);
-    if (["/", "/library", "/rewind-room", "/tv"].includes(path)) {
+    if (["/", "/library", "/tv"].includes(path)) {
       assertDefaultScenery(response.body, `HTTP ${path}`);
       const styles = [];
       for (const asset of stylesheetPaths(response.body)) {
@@ -111,7 +111,6 @@ try {
       }
       assertProfileStyles(styles.join("\n"), `HTTP ${path}`);
       assertHalloweenStyles(styles.join("\n"), `HTTP ${path}`);
-      if (path === "/rewind-room") assert.match(styles.join("\n"), /--rewind-room-ready:\s*1/, "Rewind Room stylesheet is linked and served");
     }
   }
   const favicon = await get("/favicon.ico", "HEAD");
@@ -217,7 +216,6 @@ try {
   );
   const sitemap = await get("/sitemap.xml");
   assert.ok(sitemap.body.includes("/library"));
-  assert.ok(sitemap.body.includes("/rewind-room"));
   assert.ok(!sitemap.body.includes("/admin"));
   console.log(
     "PASS: production routes, profile and Halloween styles, 22 optimized portraits, metadata, security headers, private cache rules, authorization, cross-origin rejection and analytics opt-out.",

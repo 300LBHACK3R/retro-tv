@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useAccount } from "@/lib/accountStore";
 import { startAccount, refreshAccount, watchAccountChanges } from "@/lib/accountSync";
+import { KIDS_SESSION_KEY, restoreKidsSession } from "@/lib/kidsSession";
 export default function DeviceLibraryRuntime() {
   useEffect(() => {
     let disposed = false;
@@ -13,6 +14,7 @@ export default function DeviceLibraryRuntime() {
       });
     };
     const sync = (event: StorageEvent) => {
+      if (event.key === KIDS_SESSION_KEY) restoreKidsSession();
       if (event.key === "ttv-account-change") { window.location.reload(); return; }
       // Legacy device profiles never populate an anonymous viewing session.
     };

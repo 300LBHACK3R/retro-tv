@@ -3,12 +3,14 @@ import { serverModule } from "./server-harness";
 import * as model from "../lib/accountModel";
 import * as profiles from "../lib/profiles";
 import { createStore } from "zustand/vanilla";
+import * as kidsSession from "../lib/kidsSession";
 
 test("an auth outage clears private profiles for isolated guest viewing", async () => {
   let account = { ...model.EMPTY_ACCOUNT, ready: false, error: "" };
   let local = { profiles: profiles.defaults, pin: null, activeId: "main" as string | null, ready: false };
   let initialized = false;
   const sync = serverModule("lib/accountSync.ts", {
+    "./kidsSession": kidsSession,
     "./profiles": profiles,
     "./accountModel": model,
     "./accountStore": {
@@ -38,6 +40,7 @@ test("overlapping save callers serialize edits and never submit the same revisio
   const firstResponse = new Promise<{ revision: number }>(resolve => { finishFirst = resolve; });
   const writes: { revision: number; household: model.Household }[] = [];
   const sync = serverModule("lib/accountSync.ts", {
+    "./kidsSession": kidsSession,
     "./profiles": profiles,
     "./accountModel": model,
     "./accountStore": {
@@ -88,6 +91,7 @@ function syncHarness(storageFallback = false) {
     close() { this.closed = true; }
   }
   const sync = serverModule("lib/accountSync.ts", {
+    "./kidsSession": kidsSession,
     "./profiles": profiles, "./accountModel": model,
     "./accountStore": {
       useAccount: account,
