@@ -10,7 +10,7 @@
 
 - Production was on e3c6261. The newer Rewind Room repair 24120df passed Viewer quality but was not production; this release explicitly reverses both Rewind Room commits.
 - Live guest viewing loaded and displayed playback in the browser.
-- 135 unit tests passed, including account isolation, payment validation, Kids catalogue rules and new outage/expiry guard coverage. Type checking, lint, production builds, built CSS checks and HTTP/security checks passed. The production dependency audit reported no advisories.
+- 136 unit tests passed, including account isolation, payment validation, Kids catalogue rules and new outage/expiry guard coverage. Type checking, lint, production builds, built CSS checks and HTTP/security checks passed. The production dependency audit reported no advisories.
 - New browser regressions cover Kids sessions expiring or failing on `/`, `/library?title=qa-movie` and `/tv`, plus recovery to the protected chooser. These new browser tests still require a green Viewer quality run on the final pushed commit. A previous green run does not validate this change.
 - Local visual preview could not complete because the managed development runtime reported `uv_resident_set_memory` failures and blocked development-resource requests. Production build/HTTP verification is separate from browser verification.
 

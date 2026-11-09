@@ -4,6 +4,8 @@ import { create } from "zustand";
 import { PROFILE_SESSION_KEY } from "../lib/themePreferences";
 import * as model from "../lib/accountModel";
 import * as profiles from "../lib/profiles";
+import * as themes from "../lib/themes";
+import * as themePreferences from "../lib/themePreferences";
 
 function guardHarness() {
   const local = new Map<string, string>();
@@ -76,4 +78,30 @@ test("blocked storage cannot remove the current Kids restriction", () => {
   expect(() => h.guard.rememberKidsSession!(true)).not.toThrow();
   expect(() => h.guard.restoreKidsSession!()).not.toThrow();
   expect((h.guard.useKidsSession as unknown as {getState(): {parentRequired: boolean}}).getState().parentRequired).toBe(true);
+});
+
+test("Kids entry and the locked chooser retain the guard; adult activation releases it", () => {
+  const h = guardHarness();
+  const store = { setTheme() {}, setChannel() {}, closeGuide() {}, setSettingsOpen() {}, setPlayerViewMode() {}, channels: [] };
+  const device = serverModule("lib/deviceProfiles.ts", {
+    zustand: { create }, "./kidsSession": h.guard,
+    "./profiles": profiles, "./themes": themes, "./themePreferences": themePreferences,
+    "./libraryCatalog": { PROGRESS_STORAGE_KEY: "test-progress" },
+    "./accountStore": { useAccount: { getState: () => ({ ...model.EMPTY_ACCOUNT, user: { id: "parent" } }) } },
+    "./deviceLibrary": { useDeviceLibrary: { getState: () => ({ selectProfile() {} }) } },
+    "./store": { useStore: { getState: () => store } },
+  }, {}, { window: h.window, localStorage: h.window.localStorage, sessionStorage: h.window.sessionStorage });
+  const restricted = () => (h.guard.useKidsSession as unknown as {getState(): {parentRequired: boolean}}).getState().parentRequired;
+  device.initializeProfiles!({
+    profiles: [{ id: "main", name: "Parent", avatar: "sun", kids: false }, { id: "kids", name: "Kids", avatar: "sun", kids: true }],
+    pin: { salt: "a".repeat(32), hash: "b".repeat(64) }, failures: 0, lockedUntil: 0,
+  });
+  expect(restricted()).toBe(true);
+  // ProfilePicker performs PIN verification before calling adult activation.
+  device.activateProfile!("main");
+  expect(restricted()).toBe(false);
+  device.lockProfiles!();
+  expect(restricted()).toBe(true);
+  device.activateProfile!("kids");
+  expect(restricted()).toBe(true);
 });

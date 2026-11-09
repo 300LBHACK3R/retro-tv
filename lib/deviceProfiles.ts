@@ -120,6 +120,7 @@ export function initializeProfiles(accountData?: Data & { entranceTheme?: ThemeI
   }
 }
 export function lockProfiles() {
+  if (useProfiles.getState().pin) rememberKidsSession(true);
   const entrance = useAccount.getState().user ? useProfiles.getState().entranceTheme : null;
   useStore.getState().setTheme(entrance && canUseTheme(entrance, useAccount.getState().ownedThemeIds, false) ? entrance : getEntranceThemeId());
   useProfiles.setState({ activeId: null });
