@@ -550,6 +550,7 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and pres
   await testInfo.attach("halloween-95-profile-entrance", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
   await expect(scene).toHaveCount(0);
@@ -559,6 +560,7 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and pres
   const savedProfiles = await page.evaluate(async () => (await (await fetch("/api/account")).json()).household.profiles);
   expect(savedProfiles.find((profile: { id: string }) => profile.id === "main").theme).toBe("obsidian-gold");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await switchProfile(page);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
@@ -588,9 +590,11 @@ test("Christmas entrance starts November 1 while each profile keeps its chosen t
   await page.screenshot({ path: testInfo.outputPath("christmas-entrance.png") });
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="christmas-96-living-room"]').click();
   await waitForHouseholdSave(page);
   await page.reload();
@@ -626,6 +630,7 @@ test("an open entrance changes at midnight and returning tabs refresh the season
   await expect(page.locator(".ttv-profile-logo")).toContainText("Christmas '96");
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await page.evaluate(() => {
     document.dispatchEvent(new Event("visibilitychange"));
@@ -641,6 +646,7 @@ test("blocked local storage still saves account themes across reloads", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await expect(page.getByText("Your choice is saved to your account.", { exact: false })).toBeVisible();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
@@ -654,6 +660,7 @@ test("new tabs restore saved choices and theme updates do not sign out an existi
   await page.goto("/");
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
   await waitForHouseholdSave(page);
   const other = await context.newPage();
@@ -662,6 +669,7 @@ test("new tabs restore saved choices and theme updates do not sign out an existi
   await other.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await expect(other.locator("html")).toHaveAttribute("data-ttv-theme", "midas-gold");
   await other.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await other.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await other.locator('.theme-card[data-theme-id="electric-blue-live"]').click();
   await waitForHouseholdSave(other);
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");

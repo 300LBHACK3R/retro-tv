@@ -221,6 +221,7 @@ test("theme choices persist across navigation and reloads for the active profile
   await page
     .getByRole("button", { name: "Open theme library", exact: true })
     .click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await expect(
     page.getByRole("dialog", { name: /Theme Library/i }),
   ).toBeVisible();
@@ -309,6 +310,7 @@ test("Cyberpunk Christmas persists its premium guide, channels, settings and lib
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/?ch=24");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Theme Library", exact: true });
   await picker.getByRole("button", { name: "Seasonal", exact: true }).click();
   await picker.getByRole("group", { name: "Seasonal holidays" }).getByRole("button", { name: "Christmas", exact: true }).click();
@@ -388,6 +390,7 @@ test("Christmas '96 carries its retro controls through guide, settings and libra
   await page.goto("/?ch=24");
   await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.getByRole("dialog", { name: "Theme Library", exact: true }).locator('[data-theme-id="christmas-96-living-room"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   const controls = page.locator(".ttv-player-controls");
@@ -453,6 +456,7 @@ for (const theme of THEMES) {
     await page
       .getByRole("button", { name: "Open theme library", exact: true })
       .click();
+    await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
     await expect(page.locator(".theme-card")).toHaveCount(THEMES.length);
     const card = page.locator(`.theme-card[data-theme-id="${theme.id}"]`);
     await card.scrollIntoViewIfNeeded();
@@ -969,6 +973,36 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await expect(close).toBeFocused();
   await expect(search).not.toBeFocused();
   await expect(dialog.getByText("All themes are free. Your choice is saved to your account.", { exact: true })).toBeVisible();
+  await expect(dialog.locator(".theme-card")).toHaveCount(0);
+  const collections = dialog.getByRole("group", { name: "Theme collections", exact: true });
+  await expect(collections.locator(".theme-collection-card")).toHaveCount(8);
+  await expect(collections.getByRole("button", { name: "Browse Christmas themes", exact: true })).toBeInViewport();
+  await expect(collections.getByRole("button", { name: "Browse Halloween themes", exact: true })).toBeInViewport();
+  const tiles = await collections.locator(".theme-collection-card").evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return { id: element.getAttribute("data-collection-id"), x: rect.x, y: rect.y, width: rect.width };
+  }));
+  expect(tiles.slice(0, 2).map(tile => tile.id)).toEqual(["christmas", "halloween"]);
+  expect(Math.abs(tiles[0]!.y - tiles[1]!.y)).toBeLessThan(2);
+  expect(tiles[1]!.x).toBeGreaterThan(tiles[0]!.x + tiles[0]!.width);
+  const christmasTile = collections.getByRole("button", { name: "Browse Christmas themes", exact: true });
+  await expect.poll(() => christmasTile.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await testInfo.attach("theme-collections-mobile", { body: await page.screenshot(), contentType: "image/png" });
+  await christmasTile.click();
+  await expect(dialog.getByRole("heading", { name: "Christmas", exact: true })).toBeFocused();
+  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await dialog.getByRole("button", { name: "← Collections", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Find your style", exact: true })).toBeFocused();
+  await collections.getByRole("button", { name: "Browse Gold themes", exact: true }).click();
+  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await expect(dialog.locator('[data-theme-id="midas-gold"]')).toBeVisible();
+  await expect(dialog.locator('[data-theme-id="obsidian-gold"]')).toBeVisible();
+  await dialog.getByRole("button", { name: "← Collections", exact: true }).click();
+  await search.fill("Haunted Arcade");
+  await expect(dialog.locator(".theme-card")).toHaveCount(1);
+  await search.fill("");
+  await expect(collections).toBeVisible();
+  await collections.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.length);
   await expect(dialog.locator(".theme-card:disabled")).toHaveCount(0);
   await expect(dialog.locator(".theme-card__status").filter({ hasText: /^Free$/ })).toHaveCount(THEMES.length - 1);

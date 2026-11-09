@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { THEME_PREVIEWS } from "@/components/themes/themePreviews";
+import { THEME_COLLECTIONS, themeInCollection, type ThemeCollectionId } from "@/components/themes/themeCollections";
 import { useDialogViewport } from "@/components/viewer/useDialogViewport";
 import {
   canUseTheme,
@@ -201,6 +202,7 @@ function ThemeCard({
 export default function ThemeButton({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [collection, setCollection] = useState<ThemeCollectionId | "all" | null>(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
@@ -211,6 +213,9 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const resultsRef = useRef<HTMLHeadingElement | null>(null);
+  const collectionsRef = useRef<HTMLHeadingElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useDialogViewport(dialogRef, portalReady && isOpen);
 
@@ -229,6 +234,22 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
     const matching = themes.filter((theme) => theme.season === season.id);
     return matching.length ? [{ ...season, count: matching.length }] : [];
   }), [themes]);
+  const collections = useMemo(() => THEME_COLLECTIONS.map(group => ({
+    ...group, count: themes.filter(theme => themeInCollection(theme, group.id)).length,
+  })).filter(group => group.count > 0), [themes]);
+  const browsing = collection !== null || query.trim().length > 0;
+
+  const browseCollection = (id: ThemeCollectionId | "all" | null) => {
+    setCollection(id);
+    setQuery("");
+    setAccessFilter("all");
+    setCategoryFilter("all");
+    setSeasonFilter("all");
+    window.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0 });
+      (id === null ? collectionsRef : resultsRef).current?.focus({ preventScroll: true });
+    });
+  };
 
   const visibleThemes = useMemo(() => {
     return themes.filter((theme) => {
@@ -236,6 +257,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         categoryFilter === "all" || theme.category === categoryFilter;
 
       return (
+        (!collection || collection === "all" || themeInCollection(theme, collection)) &&
         categoryMatches &&
         (accessFilter === "all" ||
           (accessFilter === "free" && (PREMIUM_THEMES_TEMPORARILY_UNLOCKED || !theme.isPremium)) ||
@@ -246,7 +268,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         themeMatchesQuery(theme, query)
       );
     });
-  }, [categoryFilter, accessFilter, seasonFilter, query, themes, purchasedThemes, isMember]);
+  }, [collection, categoryFilter, accessFilter, seasonFilter, query, themes, purchasedThemes, isMember]);
 
   const accessCopy = accessFilter === "owned"
     ? accountUser ? "Your purchased themes stay with your account, with or without membership." : "Sign in to see themes you have purchased."
@@ -256,10 +278,12 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         ? PREMIUM_THEMES_TEMPORARILY_UNLOCKED ? "All themes are currently free." : `${themePrice} per theme, or included with membership.`
         : accessFilter === "free"
           ? "Ready to apply. No purchase needed."
-          : "Browse by access, then narrow by style or holiday.";
+          : "Themes style your guide, controls and menus.";
 
-  const collectionLabel = categoryFilter === "all"
-    ? "All styles"
+  const collectionLabel = collection && collection !== "all"
+    ? THEME_COLLECTIONS.find(group => group.id === collection)?.label
+    : categoryFilter === "all"
+    ? "All themes"
     : categoryFilter === "seasonal" && seasonFilter !== "all"
       ? THEME_SEASON_META.find((season) => season.id === seasonFilter)?.label
       : getThemeCategoryMeta(categoryFilter).label;
@@ -402,6 +426,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
         type="button"
         className={`theme-trigger ttv-touch-target${compact ? " theme-trigger--compact" : ""}`}
         onClick={() => {
+          setCollection(null);
           setQuery("");
           setCategoryFilter("all");
           setAccessFilter("all");
@@ -481,9 +506,13 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                   </button>
                 </header>
 
-                <div className="theme-dialog__scroll">
-                  <div className="theme-dialog__toolbar">
-                    <div className="theme-access-browser">
+                <div ref={scrollRef} className="theme-dialog__scroll">
+                  <div className={`theme-dialog__toolbar${!browsing ? " theme-dialog__toolbar--collections" : ""}`}>
+                    {browsing ? <div className="theme-collection-navigation">
+                      <button type="button" className="theme-filter" onClick={() => browseCollection(null)}>← Collections</button>
+                      {collection !== "all" ? <button type="button" className="theme-filter" onClick={() => browseCollection("all")}>All themes</button> : null}
+                    </div> : null}
+                    {browsing ? <div className="theme-access-browser">
                       <div className="theme-access-filters" role="group" aria-label="Theme access">
                         {[...ACCESS_FILTERS, ...(isMember ? [{ id: "membership" as const, label: "Membership" }] : [])].map((filter) => (
                           <button
@@ -498,14 +527,14 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                         ))}
                       </div>
                       <p className="theme-access-copy">{accessCopy}</p>
-                    </div>
+                    </div> : null}
                     <input
                       ref={searchRef}
                       className="theme-search"
                       type="search"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search themes…"
+                      placeholder={browsing && collection && collection !== "all" ? `Search ${collectionLabel}…` : "Search all themes…"}
                       enterKeyHint="search"
                       onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();
@@ -515,7 +544,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       spellCheck={false}
                     />
 
-                    <div
+                    {browsing && (!collection || collection === "all") ? <div
                       className="theme-filter-row"
                       role="group"
                       aria-label="Theme categories"
@@ -534,11 +563,41 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                           {filter.label}
                         </button>
                       ))}
-                    </div>
+                    </div> : null}
                   </div>
 
                   <div className="theme-dialog__body">
-                    {categoryFilter === "seasonal" ? (
+                    {!browsing ? <>
+                      <div className="theme-collections-heading">
+                        <h3 ref={collectionsRef} tabIndex={-1}>Find your style</h3>
+                        <p>Choose a collection to see its themes.</p>
+                      </div>
+                      <div className="theme-collection-grid" role="group" aria-label="Theme collections">
+                        {collections.map(group => <button
+                          key={group.id} type="button" className="theme-collection-card"
+                          data-collection-id={group.id} aria-label={`Browse ${group.label} themes`}
+                          onClick={() => browseCollection(group.id)}
+                        >
+                          <span className="theme-collection-card__image" aria-hidden="true">
+                            <Image src={THEME_PREVIEWS[group.preview].image} alt="" fill
+                              sizes="(max-width: 639px) 45vw, (max-width: 999px) 30vw, 265px"
+                              placeholder="blur" />
+                          </span>
+                          <span className="theme-collection-card__copy">
+                            <strong>{group.label}</strong>
+                            <span>{group.description}</span>
+                            <small>{group.count} {group.count === 1 ? "theme" : "themes"} <span aria-hidden="true">→</span></small>
+                          </span>
+                        </button>)}
+                        <button type="button" className="theme-collection-card" data-collection-id="all" aria-label="Browse all themes" onClick={() => browseCollection("all")}>
+                          <span className="theme-collection-card__image" aria-hidden="true">
+                            <Image src={THEME_PREVIEWS["ttv-neon-crt"].image} alt="" fill sizes="(max-width: 639px) 45vw, (max-width: 999px) 30vw, 265px" placeholder="blur" />
+                          </span>
+                          <span className="theme-collection-card__copy"><strong>All themes</strong><span>Explore the full collection</span><small>{themes.length} themes <span aria-hidden="true">→</span></small></span>
+                        </button>
+                      </div>
+                    </> : <>
+                    {categoryFilter === "seasonal" && (!collection || collection === "all") ? (
                       <section className="theme-season-browser" aria-labelledby={`${DIALOG_ID}-seasons`}>
                         <div className="theme-season-browser__heading">
                           <h3 id={`${DIALOG_ID}-seasons`}>Choose a holiday</h3>
@@ -573,7 +632,8 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                       </section>
                     ) : null}
                     <div className="theme-results-heading" role="status" aria-live="polite" aria-atomic="true">
-                      {visibleThemes.length ? <><h3>{collectionLabel}</h3><span>{visibleThemes.length} {visibleThemes.length === 1 ? "theme" : "themes"}</span></> : accessFilter === "owned" && !query && categoryFilter === "all" ? "No purchased themes yet." : "No themes match these filters."}
+                      <h3 ref={resultsRef} tabIndex={-1}>{collectionLabel}</h3>
+                      <span>{visibleThemes.length ? `${visibleThemes.length} ${visibleThemes.length === 1 ? "theme" : "themes"}` : accessFilter === "owned" && !query && categoryFilter === "all" ? "No purchased themes yet." : "No themes match these filters."}</span>
                     </div>
                     {visibleThemes.length > 0 ? (
                       <div className={`theme-grid${visibleThemes.length === 1 ? " theme-grid--single" : ""}`}>
@@ -608,6 +668,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                           type="button"
                           className="theme-dialog__done"
                           onClick={() => {
+                            setCollection("all");
                             setQuery("");
                             setCategoryFilter("all");
                             setAccessFilter("all");
@@ -622,6 +683,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                         </button>
                       </div>
                     )}
+                    </>}
                   </div>
                 </div>
                 <footer className="theme-dialog__footer">

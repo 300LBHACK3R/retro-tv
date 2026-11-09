@@ -325,6 +325,7 @@ test("account theme saves survive refresh without replacing guest profiles", asy
   await page
     .getByRole("button", { name: "Open theme library", exact: true })
     .click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   const saved = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/account/household") &&
@@ -366,6 +367,7 @@ test("saved account appearance follows the profile chooser and returning sign-in
   await expect(root).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="christmas-neon-noel"]').click();
   await waitForHouseholdSave(page);
   expect(f.state().household?.entranceTheme).toBe("christmas-neon-noel");
@@ -408,6 +410,7 @@ test("guest previews never replace the login appearance and verified account pre
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="christmas-96-living-room"]').click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   expect(await page.evaluate(() => localStorage.getItem("ttv-login-theme-v1"))).toBe("christmas-neon-noel");
@@ -525,6 +528,7 @@ test("@billing premium access comes from verified purchases, not local saved own
   await page
     .getByRole("button", { name: "Open theme library", exact: true })
     .click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
   await expect(page).toHaveURL(/\/account\?theme=midas-gold$/);
   await expect(page.locator('[data-theme-buy="midas-gold"]')).toHaveText(
@@ -542,6 +546,7 @@ test("@billing premium access comes from verified purchases, not local saved own
   await page
     .getByRole("button", { name: "Open theme library", exact: true })
     .click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   const saved = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/account/household") &&
@@ -575,6 +580,7 @@ test("theme access filters combine with styles, holidays and search while free a
   await page.goto("/");
   await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Theme Library", exact: true });
   const access = dialog.getByRole("group", { name: "Theme access", exact: true });
   const paidBuild = process.env.NEXT_PUBLIC_THEME_BILLING_ENABLED === "true";
@@ -608,6 +614,7 @@ test("@billing Owned keeps purchases distinct from membership and reflects refun
   await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
   const open = async () => {
     await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+    await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
     return page.getByRole("dialog", { name: "Theme Library", exact: true });
   };
   let dialog = await open();

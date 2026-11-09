@@ -324,6 +324,35 @@
 }
 .theme-dialog__body { padding: 1rem; }
 
+/* The library opens on visual collections, not an unfiltered catalogue. */
+.theme-dialog__toolbar.theme-dialog__toolbar--collections { grid-template-columns: minmax(0, 1fr); }
+.theme-collection-navigation { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: .75rem; }
+.theme-collections-heading { margin-bottom: 1rem; }
+.theme-collections-heading h3 { margin: 0; color: var(--text); font-size: 1.1rem; font-weight: 800; }
+.theme-collections-heading p { margin: .3rem 0 0; color: var(--text-muted); font-size: .85rem; }
+.theme-collection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.theme-collection-card {
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--ttv-radius-panel);
+  padding: 0; background: var(--panel-alt-bg); color: var(--text);
+  box-shadow: var(--ttv-shadow-control); text-align: left; cursor: pointer;
+}
+.theme-collection-card:hover { border-color: var(--primary); background: var(--button-hover); }
+.theme-collection-card:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -4px; }
+.theme-collection-card__image { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-bottom: 1px solid var(--border); }
+.theme-collection-card__image img { object-fit: cover; }
+.theme-collection-card__copy { display: flex; flex: 1; flex-direction: column; gap: .3rem; padding: .8rem; }
+.theme-collection-card__copy strong { font-size: 1rem; font-weight: 800; line-height: 1.3; }
+.theme-collection-card__copy > span { color: var(--text-muted); font-size: .8rem; line-height: 1.4; }
+.theme-collection-card__copy small { display: flex; justify-content: space-between; gap: .4rem; margin-top: auto; padding-top: .6rem; color: var(--primary); font-size: .75rem; }
+@media (min-width: 640px) { .theme-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .theme-collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 359px) { .theme-collection-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (forced-colors: active) {
+  .theme-collection-card { border-color: ButtonText; background: Canvas; color: CanvasText; }
+  .theme-collection-card__copy :is(span, small) { color: CanvasText; }
+}
+
 .theme-season-browser {
   margin-bottom: 1.25rem;
   padding-bottom: 1.1rem;

@@ -235,6 +235,7 @@
   color: var(--primary);
 }
 :root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog, .ttv-library-catalogue) {
+  --border: #b5915b;
   border: 2px solid #b5915b;
   border-radius: .65rem;
   box-shadow: inset 0 2px #fff4db26, 0 16px 45px #180b0799;
