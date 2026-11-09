@@ -225,6 +225,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
   const accountsEnabled = useAccount((state) => state.enabled);
   const purchasedThemes = useAccount((state) => state.purchasedThemeIds);
   const isMember = useAccount((state) => state.member);
+  const isAdmin = useAccount((state) => state.isAdmin);
   const themePrice = useAccount((state) => state.commerce.themePrice);
   const themeId = canUseTheme(preferredTheme, ownedPremiumThemes, false) ? preferredTheme : getEntranceThemeId();
 
@@ -270,7 +271,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
     });
   }, [collection, categoryFilter, accessFilter, seasonFilter, query, themes, purchasedThemes, isMember]);
 
-  const accessCopy = accessFilter === "owned"
+  const accessCopy = isAdmin && accessFilter !== "owned" ? "Every theme is included with your administrator access. No purchase needed." : accessFilter === "owned"
     ? accountUser ? "Your purchased themes stay with your account, with or without membership." : "Sign in to see themes you have purchased."
     : accessFilter === "membership"
       ? "Included while your membership is active. Purchased themes remain yours."
@@ -647,7 +648,7 @@ export default function ThemeButton({ compact = false }: { compact?: boolean }) 
                               ownedPremiumThemes,
                               false,
                             )}
-                            accessLabel={purchasedThemes.includes(theme.id)
+                            accessLabel={isAdmin && theme.isPremium ? "Admin access" : purchasedThemes.includes(theme.id)
                               ? "Owned"
                               : !theme.isPremium || PREMIUM_THEMES_TEMPORARILY_UNLOCKED
                                 ? "Free"

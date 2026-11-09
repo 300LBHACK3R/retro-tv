@@ -81,6 +81,7 @@ export async function refreshAccount(replacePreferences = false) {
   const data = (await response.json()) as AccountView & { error?: string };
   if (!response.ok)
     throw new Error(data.error || "Could not load your account.");
+  data.isAdmin = data.isAdmin === true;
   const previous = useAccount.getState();
   const ownerChanged = previous.user?.id !== data.user?.id;
   const dirty = previous.user && JSON.stringify(snapshot()) !== lastSaved;
@@ -104,7 +105,8 @@ export async function refreshAccount(replacePreferences = false) {
       !useProfiles.getState().ready ||
       (!dirty &&
         (data.revision !== previous.revision ||
-          data.member !== previous.member))
+          data.member !== previous.member ||
+          data.isAdmin !== previous.isAdmin))
     )
       applyHousehold(data.household);
     // Keep the local revision while edits are pending so the server can detect conflicts.

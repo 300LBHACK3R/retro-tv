@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -20,6 +21,7 @@ type AccessStatus = "checking" | "locked" | "authorized" | "error";
 
 type SessionResponse = {
   isAdmin?: boolean;
+  methods?: { account: boolean; password: boolean };
   error?: string;
 };
 
@@ -53,6 +55,9 @@ export default function AdminWindowClient() {
   const [status, setStatus] = useState<AccessStatus>("checking");
   const [authorized, setAuthorized] = useState(false);
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [loginMode, setLoginMode] = useState<"account" | "password">("account");
+  const [methods, setMethods] = useState({ account: true, password: false });
   const [message, setMessage] = useState("Checking secure admin session...");
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,13 +73,16 @@ export default function AdminWindowClient() {
 
       const data = await readJsonSafe<SessionResponse>(response);
       const allowed = Boolean(response.ok && data?.isAdmin);
+      const available = data?.methods ?? { account: true, password: false };
+      setMethods(available);
+      setLoginMode(available.account ? "account" : "password");
 
       setAuthorized(allowed);
       setStatus(allowed ? "authorized" : "locked");
       setMessage(
         allowed
           ? "Authorized admin session active."
-          : data?.error || "Enter your admin password.",
+          : data?.error || (available.account ? "Sign in with your approved administrator account." : available.password ? "Enter your backup admin password." : "Admin sign-in is not configured yet."),
       );
     } catch {
       setAuthorized(false);
@@ -92,7 +100,7 @@ export default function AdminWindowClient() {
 
     const cleanPassword = password;
 
-    if (!cleanPassword || submitting) {
+    if (!cleanPassword || (loginMode === "account" && !email.trim()) || submitting) {
       return;
     }
 
@@ -107,6 +115,7 @@ export default function AdminWindowClient() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          ...(loginMode === "account" ? { email: email.trim() } : {}),
           password: cleanPassword,
         }),
       });
@@ -206,7 +215,7 @@ export default function AdminWindowClient() {
                 className="text-[11px] font-black uppercase tracking-[0.22em]"
                 style={{ color: "var(--primary)" }}
               >
-                Protected Station Tools
+                Tate’s TV Administration
               </div>
 
               <h1 className="mt-1 truncate text-xl font-black tracking-tight sm:text-2xl">
@@ -224,6 +233,7 @@ export default function AdminWindowClient() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {authorized ? <Link href="/account" className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em]">My account & themes</Link> : null}
             <button
               type="button"
               onClick={returnToTv}
@@ -292,10 +302,10 @@ export default function AdminWindowClient() {
             </div>
 
             <h2 className="mt-2 text-xl font-black">
-              Unlock the control centre
+              Sign in to administration
             </h2>
 
-            <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
+            <p role="status" className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
               {message}
             </p>
 
@@ -303,6 +313,13 @@ export default function AdminWindowClient() {
               Staff access only. Parent accounts and Kids profiles do not grant admin access.
             </p>
             <form onSubmit={login} className="mt-5 grid gap-3">
+              {loginMode === "account" ? <>
+                <label htmlFor="admin-window-email" className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: "var(--text-muted)" }}>Admin email</label>
+                <input id="admin-window-email" type="email" autoComplete="username" required maxLength={254}
+                  value={email} onChange={event => setEmail(event.target.value)}
+                  className="rounded-xl border px-4 py-3 text-base outline-none"
+                  style={{ background: "var(--panel-alt-bg)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </> : null}
               <label
                 htmlFor="admin-window-password"
                 className="text-xs font-black uppercase tracking-[0.12em]"
@@ -317,9 +334,9 @@ export default function AdminWindowClient() {
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value.slice(0, 512));
-                  setMessage("Enter your admin password.");
                 }}
                 autoComplete="current-password"
+                required
                 placeholder="Enter password"
                 className="rounded-xl border px-4 py-3 text-base outline-none"
                 style={{
@@ -331,12 +348,22 @@ export default function AdminWindowClient() {
 
               <button
                 type="submit"
-                disabled={!password || submitting}
+                disabled={!password || (loginMode === "account" && !email.trim()) || (!methods.account && !methods.password) || submitting}
                 className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-sm font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "Unlocking" : "Open Admin"}
               </button>
             </form>
+            {loginMode === "account" ? <p className="mt-4 text-sm" style={{ color: "var(--text-muted)" }}>
+              Use the same email and password for your viewer account to unlock all themes and 10 profiles at no charge. Administration has a separate secure session.
+              {" "}<Link href="/account?mode=recover" className="underline">Forgot password?</Link>
+            </p> : null}
+            {methods.account && methods.password ? <button type="button" disabled={submitting}
+              className="mt-4 min-h-11 text-sm underline" onClick={() => {
+                const next = loginMode === "account" ? "password" : "account";
+                setLoginMode(next); setPassword("");
+                setMessage(next === "account" ? "Sign in with your approved administrator account." : "Enter your backup admin password.");
+              }}>{loginMode === "account" ? "Use backup admin password" : "Use administrator account"}</button> : null}
           </section>
         ) : null}
 

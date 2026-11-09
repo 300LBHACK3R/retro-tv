@@ -63,6 +63,7 @@ export default function AccountPage({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "reset") setMode("reset");
+    if (params.get("mode") === "recover") setMode("recover");
     setSelectedTheme(
       isThemeId(params.get("theme")) ? params.get("theme")! : "",
     );
@@ -424,9 +425,9 @@ export default function AccountPage({
           ) : (
             <div className="ttv-account-dashboard">
               <section className="ttv-account-card ttv-account-overview">
-                <span className="ttv-account-status">{account.member ? "Membership active" : "Free account"}</span>
+                <span className="ttv-account-status">{account.isAdmin ? "Administrator · All access" : account.member ? "Membership active" : "Free account"}</span>
                 <p className="ttv-account-eyebrow">Your account</p>
-                <h1>Your TV. Your way.</h1>
+                <h1>{account.isAdmin ? "Your station. Your control centre." : "Your TV. Your way."}</h1>
                 <p className="ttv-account-email">{account.user!.email}</p>
                 <p>
                   {account.saving
@@ -434,6 +435,7 @@ export default function AccountPage({
                     : "Profiles, favourites, watchlist and theme choices sync with your account."}
                 </p>
                 <div className="ttv-account-actions">
+                  {account.isAdmin ? <Link href="/admin">Open administration</Link> : null}
                   <Link href="/">Watch TV</Link>
                   <button disabled={busy} onClick={() => void leaveAccount()}>
                     Sign out
@@ -472,8 +474,23 @@ export default function AccountPage({
                 </p>
               ) : null}
               <nav className="ttv-account-sections" aria-label="Account sections">
-                <a href="#membership">Membership</a><a href="#theme-shop">Theme collection</a><a href="#show-requests">Request a Show</a><a href="#account-settings">Settings</a>
+                <a href="#membership">{account.isAdmin ? "Admin access" : "Membership"}</a><a href="#theme-shop">Theme collection</a><a href="#show-requests">{account.isAdmin ? "Show requests" : "Request a Show"}</a><a href="#account-settings">Settings</a>
               </nav>
+              {account.isAdmin ? <section id="membership" className="ttv-account-card ttv-account-membership">
+                <p className="ttv-account-eyebrow">Administrator access</p>
+                <h2>Everything included. No purchase needed.</h2>
+                <p className="ttv-membership-lead">Your approved administrator account includes every current and future premium theme and up to {account.profileLimit} household profiles, free of charge.</p>
+                <ul className="ttv-membership-benefits">
+                  <li><strong>Station management</strong><span>Channels, playlists, schedules, commercials and branding.</span></li>
+                  <li><strong>Library & artwork</strong><span>Manage media, series, posters and coming-soon announcements.</span></li>
+                  <li><strong>Kids & audience controls</strong><span>Review approved programming, artwork and advertising.</span></li>
+                  <li><strong>Operations</strong><span>Show requests, submissions, insights, backups and restore.</span></li>
+                </ul>
+                <div className="ttv-account-actions"><Link href="/admin">Open administration</Link><Link href="/">Explore themes</Link></div>
+                <p>Sign in to administration with this same email and password. Its secure session stays separate from household viewing.</p>
+                {account.member || account.purchasedThemeIds.length ? <div className="ttv-billing-manage"><div><h3>Existing billing</h3><p>Complimentary admin access does not cancel an existing subscription. Manage renewals and previous invoices here.</p></div><button disabled={busy || !account.commerce.enabled}
+                  onClick={() => void task(async () => stripeRedirect((await accountRequest("/api/billing/portal", {})).url))}>Manage billing</button></div> : null}
+              </section> : (
               <section id="membership" className="ttv-account-card ttv-account-membership">
                 <p className="ttv-account-eyebrow">Tate’s TV Membership</p>
                 <h2>
@@ -543,12 +560,12 @@ export default function AccountPage({
                   Manage billing
                 </button></div>
               </section>
+              )}
               <section id="theme-shop" className="ttv-account-card ttv-account-shop">
                 <p className="ttv-account-eyebrow">The theme collection</p>
                 <h2>Find your signature look.</h2>
                 <p>
-                  Buy it once for your account. No membership required.{" "}
-                  {account.commerce.themePrice} each, plus any applicable tax.
+                  {account.isAdmin ? "Every premium theme is included with your administrator access. Open Themes while watching to apply one." : <>Buy it once for your account. No membership required.{" "}{account.commerce.themePrice} each, plus any applicable tax.</>}
                 </p>
                 <div className="ttv-account-themes">
                   {THEMES.filter((theme) => theme.isPremium).map((theme) => (
@@ -566,7 +583,7 @@ export default function AccountPage({
                           sizes="(max-width: 600px) 90vw, 280px"
                         />
                       </div>
-                      <div className="ttv-theme-caption"><h3>{theme.name}</h3><span>{account.purchasedThemeIds.includes(theme.id) ? "Yours to keep" : "One-time purchase"}</span></div>
+                      <div className="ttv-theme-caption"><h3>{theme.name}</h3><span>{account.isAdmin ? "Complimentary admin access" : account.purchasedThemeIds.includes(theme.id) ? "Yours to keep" : "One-time purchase"}</span></div>
                       <button
                         data-theme-buy={theme.id}
                         disabled={
@@ -576,7 +593,7 @@ export default function AccountPage({
                         }
                         onClick={() => void buy("theme", theme.id)}
                       >
-                        {account.purchasedThemeIds.includes(theme.id)
+                        {account.isAdmin ? "Included with admin access" : account.purchasedThemeIds.includes(theme.id)
                           ? "Owned"
                           : account.member
                             ? "Included with membership"
@@ -586,7 +603,11 @@ export default function AccountPage({
                   ))}
                 </div>
               </section>
-              <ShowRequests key={account.user!.id} member={account.member} />
+              {account.isAdmin ? <section id="show-requests" className="ttv-account-card">
+                <p className="ttv-account-eyebrow">Show requests</p><h2>Manage the request inbox</h2>
+                <p>Review suggestions, update their progress and reply to members in Administration → Show Requests.</p>
+                <div className="ttv-account-actions"><Link href="/admin">Open administration</Link></div>
+              </section> : <ShowRequests key={account.user!.id} member={account.member} />}
               <section id="account-settings" className="ttv-account-card">
                 <p className="ttv-account-eyebrow">You’re in control</p>
                 <h2>Account settings</h2>

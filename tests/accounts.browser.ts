@@ -131,6 +131,34 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
+test("@billing administrator sees complimentary access and applies premium themes without checkout", async ({ page }) => {
+  const state = { ...account(), isAdmin: true, member: false, profileLimit: 10, ownedThemeIds: THEMES.map(theme => theme.id) };
+  const f = await fixture(page, state);
+  let checkouts = 0;
+  await page.route("**/api/billing/checkout", async route => { checkouts++; await route.fulfill({ status: 500, json: {} }); });
+  await page.goto("/account");
+  await expect(page.getByText("Administrator · All access", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Everything included. No purchase needed." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open administration", exact: true }).first()).toHaveAttribute("href", "/admin");
+  await expect(page.getByRole("button", { name: /^Choose monthly/ })).toHaveCount(0);
+  await expect(page.getByText("Membership opens soon", { exact: true })).toHaveCount(0);
+  await noOverflow(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
+  const premium = THEMES.find(theme => theme.isPremium)!;
+  const card = page.locator(`.theme-card[data-theme-id="${premium.id}"]`);
+  await expect(card).toContainText("Admin access");
+  const saved = page.waitForResponse(response => response.url().endsWith("/api/account/household") && response.request().method() === "PUT" && response.ok());
+  await card.click();
+  await saved;
+  expect(f.state().household?.profiles[0]?.theme).toBe(premium.id);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", premium.id);
+  expect(checkouts).toBe(0);
+});
+
 for (const path of ["/", "/library?title=qa-movie", "/tv"]) {
   test(`guests can watch at ${path} without restoring old device profiles`, async ({ page }) => {
     await fixture(page, { ...EMPTY_ACCOUNT, enabled: true });

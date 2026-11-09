@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("password-only admin login rejects incorrect credentials and opens after authorization", async ({ page }) => {
   let isStaff = false;
   let submitted: Record<string, string> | null = null;
-  await page.route("**/api/admin/session", route => route.fulfill({ json: { ok: true, isAdmin: false } }));
+  await page.route("**/api/admin/session", route => route.fulfill({ json: { ok: true, isAdmin: false, methods: { account: false, password: true } } }));
   await page.route("**/api/admin/login", async route => {
     submitted = route.request().postDataJSON();
     await route.fulfill({ status: isStaff ? 200 : 401, json: isStaff ? { ok: true } : { ok: false, error: "Unable to sign in with these admin credentials." } });
@@ -21,6 +21,36 @@ test("password-only admin login rejects incorrect credentials and opens after au
   await page.getByRole("button", { name: "Open Admin", exact: true }).click();
   await expect(page.getByLabel("Find an admin tool", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Admin email", { exact: true })).toHaveCount(0);
+});
+
+test("administrator account login includes email, rejects nonstaff and keeps backup login explicit", async ({ page }) => {
+  let staff = false;
+  let submitted: unknown;
+  await page.route("**/api/admin/session", route => route.fulfill({ json: { ok: true, isAdmin: false, methods: { account: true, password: true } } }));
+  await page.route("**/api/admin/login", async route => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ status: staff ? 200 : 401, json: staff ? { ok: true } : { error: "Unable to sign in with these admin credentials." } });
+  });
+  await page.route("**/api/admin/programming", route => route.fulfill({ status: 503, json: { error: "Test unavailable" } }));
+  await page.route("**/api/programming", route => route.fulfill({ status: 503, json: { error: "Test unavailable" } }));
+  await page.goto("/admin");
+  await page.getByLabel("Admin email", { exact: true }).fill("owner@example.test");
+  await page.getByLabel("Admin Password", { exact: true }).fill(" password with spaces ");
+  await page.getByRole("button", { name: "Open Admin", exact: true }).click();
+  await expect(page.getByText("Unable to sign in with these admin credentials.", { exact: true })).toBeVisible();
+  expect(submitted).toEqual({ email: "owner@example.test", password: " password with spaces " });
+  await expect(page.getByLabel("Find an admin tool", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Use backup admin password" }).click();
+  await expect(page.getByLabel("Admin email", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Admin Password", { exact: true })).toHaveValue("");
+  await page.getByRole("button", { name: "Use administrator account" }).click();
+  await expect(page.getByLabel("Admin email", { exact: true })).toHaveValue("owner@example.test");
+  staff = true;
+  await page.getByLabel("Admin Password", { exact: true }).fill("correct test password");
+  await page.getByRole("button", { name: "Open Admin", exact: true }).click();
+  await expect(page.getByLabel("Find an admin tool", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "My account & themes" })).toHaveAttribute("href", "/account");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
 
 test("admin request inbox filters suggestions and saves member replies separately from private notes", async ({ page }) => {

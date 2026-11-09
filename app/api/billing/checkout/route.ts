@@ -31,6 +31,11 @@ export async function POST(request: Request) {
     if (input.product === "membership" && !isMembershipPlanId(input.planId))
       return privateJson({ error: "Choose a membership plan." }, 400);
     const state = await accountView(user);
+    if (state.isAdmin)
+      return privateJson(
+        { error: "Administrator access is complimentary. No purchase is needed." },
+        409,
+      );
     if (
       input.product === "theme" &&
       isThemeId(input.themeId) &&

@@ -10,6 +10,7 @@ import {
   type AccountView,
 } from "../accountModel";
 import { isThemeId } from "../themes";
+import { isAdminUser } from "./adminAuth";
 
 export async function ensureAccount(user: User) {
   const db = createSupabaseAdminClient();
@@ -51,13 +52,15 @@ export async function accountView(user: User): Promise<AccountView> {
       Date.parse(item.current_period_end) > Date.now(),
   );
   const owned = orders.data.map((item) => item.theme_id).filter(isThemeId);
+  const isAdmin = isAdminUser(user);
   return {
     ...EMPTY_ACCOUNT,
     enabled: true,
     user: { id: user.id, email: user.email ?? "" },
     member,
-    profileLimit: member ? MEMBER_PROFILE_LIMIT : FREE_PROFILE_LIMIT,
-    ownedThemeIds: allowedThemeIds(owned, member),
+    isAdmin,
+    profileLimit: member || isAdmin ? MEMBER_PROFILE_LIMIT : FREE_PROFILE_LIMIT,
+    ownedThemeIds: allowedThemeIds(owned, member || isAdmin),
     purchasedThemeIds: [...new Set(owned)],
     household: sanitizeHousehold(row.household),
     revision: Number(row.revision),

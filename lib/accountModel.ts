@@ -29,6 +29,8 @@ export type AccountView = {
   // includes free themes and time-limited membership access.
   purchasedThemeIds: ThemeId[];
   member: boolean;
+  // Computed on the server from the verified administrator allowlist.
+  isAdmin: boolean;
   profileLimit: number;
   household: Household | null;
   revision: number;
@@ -44,6 +46,7 @@ export const EMPTY_ACCOUNT: AccountView = {
   ownedThemeIds: [],
   purchasedThemeIds: [],
   member: false,
+  isAdmin: false,
   profileLimit: FREE_PROFILE_LIMIT,
   household: null,
   revision: 0,
