@@ -1028,12 +1028,20 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await expect(dialog.getByRole("group", { name: "Theme access filters" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Seasonal", exact: true }).click();
   await expect(dialog.locator(".theme-card")).toHaveCount(THEMES.filter((theme) => theme.category === "seasonal").length);
+  // A narrow desktop Safari window still has a mouse. Its hovered card lifts
+  // 2px intentionally; measure grid layout separately from that visual effect.
   const cards = await dialog.locator(".theme-card").evaluateAll((elements) => elements.map((element) => {
-    const rect = element.getBoundingClientRect();
-    return { left: rect.left, top: rect.top, width: rect.width };
+    const card = element as HTMLElement;
+    return { left: card.offsetLeft, top: card.offsetTop, width: card.offsetWidth };
   }));
   expect(Math.abs(cards[0]!.top - cards[1]!.top)).toBeLessThan(2);
   expect(cards[1]!.left).toBeGreaterThan(cards[0]!.left + cards[0]!.width);
+  if (!await page.evaluate(() => matchMedia("(hover: hover) and (pointer: fine)").matches)) {
+    // Touch browsers must not retain the desktop lift after tapping a filter.
+    await expect.poll(() => dialog.locator(".theme-card").evaluateAll(elements =>
+      elements.every(element => getComputedStyle(element).transform === "none"),
+    )).toBe(true);
+  }
   const holidays = dialog.getByRole("group", { name: "Seasonal holidays" });
   await holidays.getByRole("button", { name: "Christmas", exact: true }).click();
   await expect(dialog.locator(".theme-card")).toHaveCount(2);

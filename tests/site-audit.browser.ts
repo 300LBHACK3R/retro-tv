@@ -1,4 +1,4 @@
-import { test, expect } from "./viewer-fixture";
+import { test, expect, waitForAdminProgramming } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
 
@@ -73,7 +73,7 @@ test("admin tools load their separate panels without changing saved programming"
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
   await page.route("https://www.gstatic.com/**", route => route.fulfill({ contentType: "application/javascript", body: "" }));
   await page.goto("/admin");
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await waitForAdminProgramming(page);
 
   const panels = [
     ["Quick Edit", "Media Library"],

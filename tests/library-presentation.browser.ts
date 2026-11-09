@@ -1,4 +1,4 @@
-import { waitForHouseholdSave } from "./viewer-fixture";
+import { waitForAdminProgramming, waitForHouseholdSave } from "./viewer-fixture";
 import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
@@ -226,7 +226,7 @@ test("admin uploads shared artwork, reviews Kids access and publishes Coming Soo
     return route.fulfill({ json: { ok: true, publicUrl: "/avatars/boyrobot.png" } });
   });
   await page.goto("/admin");
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await waitForAdminProgramming(page);
   await page
     .getByRole("button", { name: "Artwork & Coming Soon", exact: true })
     .click();

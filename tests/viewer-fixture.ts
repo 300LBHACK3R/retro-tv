@@ -3,6 +3,16 @@ import { EMPTY_ACCOUNT, allowedThemeIds, sanitizeHousehold, type AccountView } f
 import { defaults } from "../lib/profiles";
 export { expect, type Page } from "@playwright/test";
 
+export async function waitForAdminProgramming(page: Page) {
+  const sync = page.locator(".ttv-global-sync-status");
+  // "Global loaded" is transient: a successful save settles to "Global sync
+  // active". Require a healthy state and the hydrated editor's enabled Save
+  // control, never accept fallback/loading/offline/error as ready.
+  await expect(sync).toBeVisible();
+  await expect(sync).toContainText(/Global (?:loaded|saved|sync active)\b/);
+  await expect(sync.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+}
+
 export async function waitForHouseholdSave(page: Page) {
   // The app blocks navigation while a household write is dirty. Wait for that
   // real guard to clear instead of reloading during its debounce window.

@@ -1,4 +1,4 @@
-import { waitForHouseholdSave } from "./viewer-fixture";
+import { waitForAdminProgramming, waitForHouseholdSave } from "./viewer-fixture";
 import { test, expect, type Page } from "./viewer-fixture";
 import { readFileSync } from "node:fs";
 import { programming } from "./programming-fixture";
@@ -19,7 +19,7 @@ async function fixture(page: Page) {
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
   await page.route("https://www.gstatic.com/**", route => route.fulfill({ contentType: "application/javascript", body: "" }));
   await page.goto("/admin");
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await waitForAdminProgramming(page);
   await page.getByRole("button", { name: "Commercials", exact: true }).click();
   return () => saved;
 }
@@ -42,7 +42,7 @@ test("commercial campaign saves, configures breaks, previews and pauses without 
   await testInfo.attach("commercials-workspace", { body: await page.screenshot({ path: testInfo.outputPath("commercials.png"), fullPage: true }), contentType: "image/png" });
   await waitForHouseholdSave(page);
   await page.reload();
-  await expect(page.getByText(/Global loaded/)).toBeVisible();
+  await waitForAdminProgramming(page);
   await page.getByRole("button", { name: "Commercials", exact: true }).click();
   await expect(workspace.getByLabel("Advertiser", { exact: true })).toHaveValue("Local business");
   await workspace.getByRole("checkbox", { name: /CH 24/ }).uncheck();
