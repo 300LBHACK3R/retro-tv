@@ -471,9 +471,14 @@
 }
 
 .theme-card:hover {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--primary) 74%, var(--border));
   box-shadow: var(--ttv-shadow-elevated);
+}
+
+/* Touch browsers can retain :hover after a tap. Keep cards in their grid row;
+   the lift belongs only to devices with a real hover pointer. */
+@media (hover: hover) and (pointer: fine) {
+  .theme-card:hover { transform: translateY(-2px); }
 }
 
 .theme-card[aria-pressed="true"] {

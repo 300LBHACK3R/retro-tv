@@ -402,6 +402,9 @@ test("Christmas '96 carries its retro controls through guide, settings and libra
   await desktopGuide.or(mobileGuide).filter({ visible: true }).click();
   const guide = page.getByRole("dialog", { name: "Live Guide", exact: true });
   await expect(guide).toBeVisible();
+  // The dialog appears before its lazy-loaded guide. Wait for a real layout
+  // before choosing mobile or desktop assertions, rather than reading a placeholder.
+  await expect(guide.locator(".ttv-mobile-guide, .ttv-desktop-guide").filter({ visible: true })).toBeVisible();
   const mobileLayout = await guide.locator(".ttv-mobile-guide").isVisible();
   if (mobileLayout) {
     await expect(guide.locator(".ttv-mobile-now-heading")).toHaveCSS("background-color", "rgb(21, 43, 97)");
@@ -476,11 +479,27 @@ for (const theme of THEMES) {
     await expect(page.locator(".ttv-player-controls")).toHaveCSS("background-color", "rgb(0, 0, 0)");
     // Buttons must consume the active theme, including light themes, instead
     // of retaining the old hard-coded translucent white controls.
-    const keySurface = await page.locator(".ttv-player-controls > button").first().evaluate(element => {
-      const style = getComputedStyle(element);
-      return { image: style.backgroundImage, color: style.backgroundColor };
-    });
-    expect(keySurface.image !== "none" || /^rgb\(/.test(keySurface.color)).toBe(true);
+    // A theme change animates the background, and browsers can serialize the
+    // intermediate colour as oklab()/color()/rgba(). Compare against the actual
+    // design token and retry until the transition finishes. Transparent or
+    // unthemed controls must still fail, with actual/expected colours in the log.
+    await expect.poll(() => page.locator(".ttv-player-controls > button").first().evaluate(element => {
+      const probe = document.createElement("span");
+      probe.hidden = true;
+      probe.style.background = element.matches(":hover")
+        ? "var(--ttv-control-face-hover)" : "var(--ttv-control-face)";
+      element.append(probe);
+      const actual = getComputedStyle(element);
+      const expected = getComputedStyle(probe);
+      const surface = {
+        actualColor: actual.backgroundColor, actualImage: actual.backgroundImage,
+        expectedColor: expected.backgroundColor, expectedImage: expected.backgroundImage,
+        matches: actual.backgroundColor === expected.backgroundColor && actual.backgroundImage === expected.backgroundImage,
+        hasSurface: expected.backgroundImage !== "none" || expected.backgroundColor !== "rgba(0, 0, 0, 0)",
+      };
+      probe.remove();
+      return surface;
+    })).toEqual(expect.objectContaining({ matches: true, hasSurface: true }));
     await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", theme.id);

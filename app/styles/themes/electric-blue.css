@@ -141,17 +141,14 @@
 }
 
 :root[data-ttv-theme="electric-blue-live"] .ttv-player-controls {
+  --ttv-control-face: #16345a;
+  --ttv-control-face-hover: #245487;
   border-color: #4bbfff;
   box-shadow: 0 0 0 3px #043b6f44, 0 8px 26px #0008;
 }
 
 :root[data-ttv-theme="electric-blue-live"] .ttv-player-controls button {
   color: #d1f6ff;
-  background-color: #16345a;
-}
-
-:root[data-ttv-theme="electric-blue-live"] .ttv-player-controls button:hover {
-  background-color: #245487;
 }
 
 :root[data-ttv-theme="electric-blue-live"] .ttv-channel-rail-card::after {

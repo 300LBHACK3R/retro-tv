@@ -31,6 +31,16 @@ jobs:
         # A stalled download must not consume the entire verification budget.
         timeout-minutes: 12
         run: npx playwright install --with-deps chromium firefox webkit
+      - name: Check theme and admin flows first
+        # Catch shared theme failures before repeating them across the catalogue.
+        # The complete seven-device suite still runs after these checks pass.
+        run: >-
+          npx playwright test tests/viewer.browser.ts tests/admin-login.browser.ts tests/accounts.browser.ts
+          --project=chromium-desktop --project=iphone
+          --grep "ttv-neon-crt applies|Christmas '96 carries|mobile themes are free|administrator"
+          --max-failures=1 --output=test-results-smoke
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-smoke
       - run: npm run test:browser
       - name: Build with paid themes enabled
         # Recompile the browser bundle with the new build-time billing flag.
@@ -44,6 +54,14 @@ jobs:
         env:
           NEXT_PUBLIC_THEME_BILLING_ENABLED: "true"
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-billing
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: viewer-browser-smoke-report
+          path: |
+            playwright-report-smoke/
+            test-results-smoke/
+          retention-days: 14
       - uses: actions/upload-artifact@v6
         if: always()
         with:
