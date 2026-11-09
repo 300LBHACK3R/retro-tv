@@ -24,5 +24,6 @@
 @import "./styles/themes/refinements.css";
 @import "./styles/viewer/discovery.css";
 @import "./styles/mobile-guide.css";
+@import "./styles/themes/interface.css";
 @import "./styles/themes/midas-gold.css";
 @import "./styles/themes/electric-blue.css";

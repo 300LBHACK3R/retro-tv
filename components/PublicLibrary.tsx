@@ -214,7 +214,7 @@ function ProfileLibrary() {
         inert={selectedGroup ? true : undefined}
         aria-hidden={selectedGroup ? true : undefined}
       >
-        <header className={styles.header}>
+        <header className={`ttv-library-header ${styles.header}`}>
           <div className={styles.headerInner}>
             <Link href="/" aria-label="Back to Tate's TV live channels">
               <TatesTvLogo
@@ -280,7 +280,7 @@ function ProfileLibrary() {
               </div>
             </section>
           )}
-          <section className={styles.catalogue} aria-label="Library titles">
+          <section className={`ttv-library-catalogue ${styles.catalogue}`} aria-label="Library titles">
             <div className={styles.tools}>
               <label className={styles.search}>
                 <span aria-hidden="true">⌕</span>

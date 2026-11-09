@@ -19,6 +19,8 @@ const html = `<html data-ttv-theme="halloween-90s-night"><head>
 </div></body></html>`;
 
 const css = `
+:root { --ttv-control-face: blue; --ttv-library-surface: navy; --ttv-guide-axis-bg: navy; }
+.ttv-christmas96-world { background-image: url('/themes/christmas-96-light-string.svg'); }
 .ttv-noel-world { background-image: url('/themes/neon-noel-lights.svg'); }
 .ttv-profile-screen,.ttv-profile-header,.ttv-profile-grid,.ttv-profile-card,
 .ttv-profile-avatar,.ttv-profile-portrait,.ttv-profile-panel,.ttv-profile-form,
@@ -95,6 +97,18 @@ test("adapter style gate rejects missing linked CSS and cannot pass using an unu
     const broken = runGate(root);
     expect(broken.status).toBe(1);
     expect(broken.stderr).toContain("missing .ttv-profile-screen");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("style gate rejects scenery-only delivery without functional theme styles", () => {
+  const root = fixture(false);
+  try {
+    put(root, "static/chunks/viewer.css", css.replaceAll("--ttv-control-face", "--unused-token"));
+    const broken = runGate(root);
+    expect(broken.status).toBe(1);
+    expect(broken.stderr).toContain("missing functional theme token --ttv-control-face");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

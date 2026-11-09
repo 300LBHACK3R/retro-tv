@@ -383,6 +383,64 @@ test("Cyberpunk Christmas persists its premium guide, channels, settings and lib
   expect(errors).toEqual([]);
 });
 
+test("Christmas '96 carries its retro controls through guide, settings and library", async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  await page.goto("/?ch=24");
+  await expect(currentChannel(page).getByRole("heading", { name: "Studio TV", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("dialog", { name: "Theme Library", exact: true }).locator('[data-theme-id="christmas-96-living-room"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  const controls = page.locator(".ttv-player-controls");
+  await expect(controls).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(controls.getByRole("button", { name: "CH +", exact: true })).toHaveCSS("border-top-color", "rgb(140, 119, 79)");
+  await expect(controls).toHaveCSS("font-family", /monospace/);
+  const desktopGuide = page.getByRole("button", { name: "Open live guide", exact: true });
+  const mobileGuide = page.getByRole("navigation", { name: "Mobile viewer navigation" }).getByRole("button", { name: "Guide", exact: true });
+  await desktopGuide.or(mobileGuide).filter({ visible: true }).click();
+  const guide = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  await expect(guide).toBeVisible();
+  const mobileLayout = await guide.locator(".ttv-mobile-guide").isVisible();
+  if (mobileLayout) {
+    await expect(guide.locator(".ttv-mobile-now-heading")).toHaveCSS("background-color", "rgb(21, 43, 97)");
+    const selected = guide.locator('.ttv-mobile-airing[aria-pressed="true"]').first();
+    await expect(selected).toHaveCSS("background-color", "rgb(241, 202, 131)");
+    await expect(selected).toHaveCSS("color", "rgb(24, 38, 27)");
+    await guide.getByRole("button", { name: "Find", exact: true }).click();
+  } else {
+    await expect(guide.locator(".ttv-guide-time-axis")).toHaveCSS("background-color", "rgb(21, 43, 97)");
+    const liveCell = guide.locator('.ttv-guide-cell[data-live="true"]').first();
+    await expect(liveCell).toHaveCSS("background-color", "rgb(241, 202, 131)");
+    await expect(liveCell).toHaveCSS("color", "rgb(24, 38, 27)");
+  }
+  await noPageOverflow(page);
+  await testInfo.attach("christmas96-retro-guide", { body: await page.screenshot(), contentType: "image/png" });
+  await guide.getByRole("searchbox", { name: "Find a channel in the guide" }).fill("25");
+  await expect(guide.locator(mobileLayout ? ".ttv-mobile-channel" : ".ttv-guide-station")).toHaveCount(1);
+  if (mobileLayout) {
+    await guide.getByRole("button", { name: "Schedule for Local Cinema", exact: true }).click();
+    await guide.getByRole("button", { name: "Watch live", exact: true }).click();
+    await guide.getByRole("button", { name: "Close live guide", exact: true }).click();
+  } else {
+    await guide.locator(".ttv-guide-station").click();
+  }
+  await expect(currentChannel(page).getByRole("heading", { name: "Local Cinema", exact: true })).toBeVisible();
+  await openMore(page);
+  const settings = page.getByRole("dialog", { name: "More from Tate's TV", exact: true });
+  await expect(settings).toHaveCSS("border-top-color", "rgb(181, 145, 91)");
+  await expect(settings.locator(".ttv-view-mode-card").first()).toHaveCSS("font-family", /monospace/);
+  await noPageOverflow(page);
+  await testInfo.attach("christmas96-retro-settings", { body: await page.screenshot(), contentType: "image/png" });
+  await page.getByRole("button", { name: "Close viewer controls", exact: true }).click();
+  await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
+  await expect(page.getByRole("region", { name: "Library titles", exact: true })).toHaveCSS("border-top-color", "rgb(181, 145, 91)");
+  await expect(page.getByRole("link", { name: "Live TV", exact: true })).toHaveCSS("font-family", /monospace/);
+  await noPageOverflow(page);
+  await testInfo.attach("christmas96-retro-library", { body: await page.screenshot(), contentType: "image/png" });
+  await waitForHouseholdSave(page);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+});
+
 // Give each theme an isolated context and the normal per-test timeout. A single
 // budget for the whole catalogue expires mid-loop on WebKit and hides later coverage.
 for (const theme of THEMES) {
@@ -412,8 +470,16 @@ for (const theme of THEMES) {
     // Theme decoration must preserve the opaque surface that prevents native
     // picture-in-picture overlays from intercepting player-control clicks.
     await expect(page.locator(".ttv-player-controls")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    // Buttons must consume the active theme, including light themes, instead
+    // of retaining the old hard-coded translucent white controls.
+    const keySurface = await page.locator(".ttv-player-controls > button").first().evaluate(element => {
+      const style = getComputedStyle(element);
+      return { image: style.backgroundImage, color: style.backgroundColor };
+    });
+    expect(keySurface.image !== "none" || /^rgb\(/.test(keySurface.color)).toBe(true);
     await page.locator('a[href="/library"]').filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: "Your time. Your TV." })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", theme.id);
     await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toHaveCount(0);
     if (theme.category === "seasonal") {
       const afterDark = theme.id === "halloween-night";

@@ -60,6 +60,9 @@ export function assertProfileStyles(css, context = "Profile entry") {
 }
 
 export function assertHalloweenStyles(css, context = "Halloween") {
+  for (const token of ["--ttv-control-face", "--ttv-library-surface", "--ttv-guide-axis-bg"])
+    assert.ok(css.includes(token), `${context}: missing functional theme token ${token}`);
+  assert.ok(css.includes("christmas-96-light-string.svg"), `${context}: missing Christmas '96 interface styles`);
   assert.ok(css.includes(".ttv-seasonal-world"), `${context}: missing full-page scenery layout`);
   assert.ok(css.includes(".ttv-noel-world"), `${context}: missing Neon Noël scenery`);
   assert.ok(css.includes("neon-noel-lights.svg"), `${context}: missing Neon Noël guide and navigation lights`);

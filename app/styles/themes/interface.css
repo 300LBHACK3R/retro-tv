@@ -1,0 +1,50 @@
+/* Functional surfaces share the active theme, including portals outside the
+   viewer shell. Seasonal sheets loaded by the root layout refine these defaults. */
+:root {
+  --ttv-ui-font: inherit;
+  --ttv-heading-font: inherit;
+  --ttv-control-face: var(--button-bg);
+  --ttv-control-face-hover: var(--button-hover);
+  --ttv-library-surface: var(--panel-bg);
+  --ttv-library-header: var(--panel-bg);
+}
+:root[data-ttv-layout="classic-cable"] {
+  --ttv-ui-font: ui-monospace, "Courier New", monospace;
+}
+.ttv-player-controls {
+  /* Preserve the opaque black base required for native PiP hit testing. */
+  border-color: var(--border);
+  border-radius: var(--ttv-radius-panel);
+  box-shadow: var(--ttv-shadow-elevated);
+  font-family: var(--ttv-ui-font);
+}
+.ttv-player-controls > :is(button, div) {
+  border-radius: var(--ttv-radius-control);
+  background: var(--ttv-control-face);
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-control);
+}
+.ttv-player-controls > button:hover {
+  background: var(--ttv-control-face-hover);
+}
+.ttv-player-controls > button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+:is(.ttv-guide-shell, .ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog) {
+  border-radius: var(--ttv-radius-shell);
+  color: var(--text);
+}
+:is(.ttv-guide-tools, .ttv-guide-dialog-header, .ttv-mobile-guide, .ttv-viewer-more-dialog, .theme-dialog)
+  :where(button, select, input, a) {
+  border-radius: var(--ttv-radius-control);
+  font-family: var(--ttv-ui-font);
+}
+:is(.ttv-guide-time-axis, .ttv-guide-corner, .ttv-guide-station, .ttv-guide-cell) {
+  font-family: var(--ttv-ui-font);
+}
+:is(.ttv-channel-rail-card, .ttv-channel-browser-card, .ttv-mobile-channel) {
+  border-radius: var(--ttv-radius-panel);
+}
+.ttv-viewer-settings-section { border-radius: var(--ttv-radius-panel); }
+.ttv-viewer-link-grid > :where(a, div) { border-radius: var(--ttv-radius-control); }

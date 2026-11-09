@@ -667,7 +667,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
             style={{
               minHeight: "58px",
               borderColor: "var(--border)",
-              background: "var(--panel-alt-bg)",
+              background: "var(--ttv-guide-axis-bg, var(--panel-alt-bg))",
               color: "var(--text-muted)",
             }}
           >
@@ -680,7 +680,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
               width: `${TIMELINE_WIDTH}px`,
               gridTemplateColumns: `repeat(${SLOT_COUNT}, ${SLOT_WIDTH}px)`,
               borderColor: "var(--border)",
-              background: "var(--panel-alt-bg)",
+              background: "var(--ttv-guide-axis-bg, var(--panel-alt-bg))",
             }}
           >
             {SLOT_INDEXES.map((index) => {
@@ -809,7 +809,7 @@ function GuideRow({
           borderColor: "var(--border)",
           background: isActive
             ? "var(--ttv-guide-station-active-bg, var(--guide-active-bg))"
-            : "var(--panel-alt-bg)",
+            : "var(--ttv-guide-station-bg, var(--panel-alt-bg))",
           borderLeft: `4px solid ${isActive ? `var(--ttv-guide-live-accent, ${accent})` : "transparent"}`,
           color: channelColor,
         }}
@@ -906,7 +906,7 @@ function GuideRow({
                 height: `calc(${rowHeight}px - var(--ttv-guide-cell-gap, 0px))`,
                 background: isCurrent
                   ? "var(--ttv-guide-cell-live-bg, var(--guide-current-bg))"
-                  : "var(--panel-alt-bg)",
+                  : "var(--ttv-guide-cell-bg, var(--panel-alt-bg))",
                 borderColor: isCurrent ? `var(--ttv-guide-live-accent, ${accent})` : "var(--border)",
                 color: isCurrent ? "var(--ttv-guide-active-text, var(--on-primary))" : "var(--text)",
                 boxShadow: isCurrent

@@ -7,8 +7,8 @@
   top: 0;
   z-index: 40;
   border-bottom: 1px solid var(--border);
-  background: var(--panel-bg);
-  backdrop-filter: blur(18px);
+  background: var(--ttv-library-header);
+  backdrop-filter: blur(var(--ttv-panel-blur));
 }
 .headerInner {
   max-width: 1520px;
@@ -52,6 +52,7 @@
   letter-spacing: 0.18em;
 }
 .intro h1 {
+  font-family: var(--ttv-heading-font);
   font-size: clamp(32px, 4vw, 56px);
   font-weight: 850;
   line-height: 1.1;
@@ -65,10 +66,10 @@
 }
 .catalogue {
   border: 1px solid var(--border);
-  border-radius: 24px;
-  background: var(--panel-bg);
+  border-radius: var(--ttv-radius-panel);
+  background: var(--ttv-library-surface);
   padding: 24px;
-  box-shadow: 0 16px 70px #0003;
+  box-shadow: var(--ttv-shadow-panel);
 }
 .tools {
   display: grid;
@@ -82,7 +83,7 @@
   gap: 12px;
   background: var(--panel-alt-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--ttv-radius-control);
   padding: 0 14px;
 }
 .search input {
@@ -103,12 +104,14 @@
 .primary,
 .filters button {
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: var(--ttv-radius-control);
   border: 1px solid var(--border);
   padding: 10px 16px;
-  background: var(--panel-alt-bg);
+  background: var(--ttv-control-face);
   color: var(--text);
   font-weight: 650;
+  font-family: var(--ttv-ui-font);
+  box-shadow: var(--ttv-shadow-control);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -272,7 +275,7 @@
 .upcoming {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--ttv-radius-panel);
   padding: 24px;
   margin: 28px 0;
 }
@@ -299,7 +302,7 @@
   text-align: left;
   border: 1px solid var(--border);
   background: var(--panel-bg);
-  border-radius: 14px;
+  border-radius: var(--ttv-radius-control);
   padding: 14px;
   cursor: pointer;
 }
@@ -334,11 +337,11 @@
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--border);
-  border-radius: 24px;
-  background: var(--panel-bg);
+  border-radius: var(--ttv-radius-shell);
+  background: var(--ttv-library-surface);
   color: var(--text);
   padding: 24px;
-  box-shadow: 0 30px 100px #0008;
+  box-shadow: var(--ttv-shadow-elevated);
 }
 .modalTop {
   display: flex;
@@ -352,6 +355,7 @@
   align-items: start;
 }
 .detailInfo h2 {
+  font-family: var(--ttv-heading-font);
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 850;
   line-height: 1.1;
@@ -417,7 +421,8 @@
   min-height: 44px;
   max-width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--ttv-radius-control);
+  font-family: var(--ttv-ui-font);
   background: var(--panel-alt-bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -549,7 +554,7 @@
   }
   .catalogue {
     padding: 16px;
-    border-radius: 18px;
+    border-radius: var(--ttv-radius-panel);
   }
   .tools {
     grid-template-columns: 1fr;
@@ -577,7 +582,7 @@
     padding: 12px;
   }
   .modal {
-    border-radius: 18px;
+    border-radius: var(--ttv-radius-panel);
     padding: 18px;
   }
   .detailHead {
@@ -718,6 +723,27 @@
 .collectionCard small { color: var(--text-muted); display: flex; justify-content: space-between; margin-top: auto; }
 .collectionCard[aria-pressed="true"] { border-color: var(--primary); }
 .collectionCard:hover { background: var(--panel-alt-bg); }
+
+:is(.requestBanner, .collectionCard, .listView .card) {
+  border-radius: var(--ttv-radius-panel);
+  box-shadow: var(--ttv-shadow-panel);
+}
+.page :is(.alphabet button, .viewSwitch button) {
+  border-radius: var(--ttv-radius-control);
+  font-family: var(--ttv-ui-font);
+}
+:global(html[data-ttv-theme="christmas-96-living-room"]) :is(.collectionCard, .continueCard, .requestBanner, .modal) {
+  background: var(--ttv-library-surface);
+  border-color: #b5915b;
+  box-shadow: var(--ttv-shadow-panel);
+}
+:global(html[data-ttv-theme="christmas-96-living-room"]) .poster {
+  border: 1px solid #b5915b;
+  border-radius: .4rem;
+}
+:global(html[data-ttv-theme="christmas-96-living-room"]) :is(.eyebrow, .count) {
+  font-family: var(--ttv-ui-font);
+}
 
 /* Neon Noël carries the live-viewer console into on-demand browsing. */
 :global(html[data-ttv-theme="christmas-neon-noel"]) .header {

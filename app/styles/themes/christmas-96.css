@@ -10,6 +10,12 @@
   --ttv-header-highlight: linear-gradient(120deg, #f1ca831a, transparent 55%);
   --ttv-shadow-panel: inset 0 1px #fff4db1a, 0 12px 30px #10080365;
   --ttv-shadow-control: inset 0 1px #fff4db20, inset 0 -2px #071c1855, 0 3px 10px #0004;
+  --ttv-ui-font: ui-monospace, "Courier New", monospace;
+  --ttv-heading-font: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --ttv-control-face: linear-gradient(180deg, #35513f, #20392e);
+  --ttv-control-face-hover: linear-gradient(180deg, #46684f, #2d4b3b);
+  --ttv-library-header: linear-gradient(110deg, #54232c, #172d25 70%);
+  --ttv-library-surface: linear-gradient(145deg, #294035, #142a23 70%);
 }
 .ttv-christmas96-world { background: #30241a; }
 :root:not([data-ttv-theme="christmas-96-living-room"]) .ttv-christmas96-world { display: none; }
@@ -146,6 +152,113 @@
   box-shadow: inset 0 3px #d3ae6c, 0 24px 80px #180b07b3;
 }
 :root[data-ttv-theme="christmas-96-living-room"] .ttv-premium-footer { padding: 1rem; background: #142a23f5; border-color: #b5915b; border-radius: .85rem; }
+/* The room continues into the cable box: blue listings, cream type and gold
+   selection. Sticky rails stay opaque, with no texture over video or text. */
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-guide-dialog, .ttv-guide-inline) {
+  --panel-bg: #0c1f44;
+  --panel-alt-bg: #142b58;
+  --border: #536b8f;
+  --ttv-guide-axis-bg: #152b61;
+  --ttv-guide-station-bg: #10254e;
+  --ttv-guide-cell-bg: #142b58;
+  --ttv-guide-cell-gap: 2px;
+  --ttv-guide-live-shadow: inset 0 0 0 2px #ffe1a3;
+  background: linear-gradient(110deg, #3e2920, #241a14 55%, #4b3020);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-desktop-guide, .ttv-mobile-guide) {
+  border: 2px solid #b5915b;
+  border-radius: .35rem;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-desktop-guide {
+  background: var(--guide-row-bg);
+  border-radius: .35rem;
+  box-shadow: inset 0 2px 6px #0006;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-guide-overview {
+  background: linear-gradient(180deg, #203d75, #152b61);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-guide-time-axis, .ttv-guide-corner) {
+  box-shadow: inset 0 1px #fff4db26, inset 0 -2px #06112f;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-guide-cell {
+  border-radius: 0;
+  font-size: .8rem;
+  font-weight: 650;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-mobile-now-heading, .ttv-mobile-schedule-toolbar) {
+  background: var(--guide-header-bg);
+  border-color: #b5915b;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-channel {
+  border-radius: .25rem;
+  background: var(--guide-row-bg);
+  box-shadow: inset 0 1px #fff4db12;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-channel:nth-child(even) {
+  background: var(--guide-row-alt-bg);
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-channel-station {
+  background: #10254e;
+  border-color: #536b8f;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-airing[aria-pressed="true"] {
+  background: var(--guide-current-bg);
+  color: var(--on-primary);
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-airing[aria-pressed="true"] :is(.ttv-mobile-airing-meta, .ttv-mobile-airing-meta > span, .ttv-mobile-airing-time) {
+  color: var(--on-primary);
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-airing[aria-pressed="true"] .ttv-mobile-progress {
+  background: #18261b40;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-mobile-airing[aria-pressed="true"] .ttv-mobile-progress > span {
+  background: var(--on-primary);
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-player-controls {
+  background-image: linear-gradient(180deg, #3e2920, #171c17);
+  border-width: 2px;
+  border-radius: .55rem;
+  box-shadow: inset 0 1px #f1ca8366, 0 5px 16px #0009;
+}
+:root[data-ttv-theme="christmas-96-living-room"] .ttv-player-controls > :is(button, div) {
+  border: 1px solid #8c774f;
+  border-radius: .3rem;
+  color: #fff4db;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-channel-rail-card, .ttv-channel-browser-card) {
+  border-radius: .55rem;
+  border-color: #b5915b;
+  box-shadow: inset 0 2px #fff4db1a, inset 0 -3px #071c1855, 0 5px 12px #0004;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-channel-rail-copy strong, .ttv-channel-browser-number) {
+  font-family: var(--ttv-ui-font);
+  color: var(--primary);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-viewer-more-dialog, .ttv-channel-browser-dialog, .theme-dialog, .ttv-library-catalogue) {
+  border: 2px solid #b5915b;
+  border-radius: .65rem;
+  box-shadow: inset 0 2px #fff4db26, 0 16px 45px #180b0799;
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-view-mode-card, .ttv-preference-toggle) {
+  background: var(--ttv-control-face);
+  border-color: #8c774f;
+  box-shadow: var(--ttv-shadow-control);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-view-mode-card, .ttv-preference-toggle)[data-selected="true"] {
+  border-color: var(--primary);
+  box-shadow: inset 0 -3px var(--primary), var(--ttv-shadow-control);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-guide-close, .ttv-premium-dialog-close, .theme-dialog__close) {
+  background: var(--ttv-control-face);
+  border-color: #b5915b;
+  color: var(--text);
+  box-shadow: var(--ttv-shadow-control);
+}
+:root[data-ttv-theme="christmas-96-living-room"] :is(.ttv-guide-dialog, .ttv-guide-inline, .ttv-viewer-more-dialog, .ttv-library-shell)
+  :where(button, input, select, a):focus-visible {
+  outline: 3px solid #ffe1a3;
+  outline-offset: 2px;
+}
 :root[data-ttv-theme="christmas-96-living-room"] .ttv-christmas96-brand {
   display: grid;
   align-content: center;
