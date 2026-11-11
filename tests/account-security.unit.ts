@@ -250,6 +250,8 @@ test("Stripe webhook verifies the exact payload, rejects tampering and test/live
   const route = serverModule(
     "app/api/billing/webhook/route.ts",
     {
+      "next/server": { after: () => {} },
+      "@/lib/server/accountEmails": { deliverAccountEmails: async () => ({ accepted: 0 }) },
       "@/lib/server/http": http,
       "@/lib/server/billing": {
         stripeClient: () => stripe,

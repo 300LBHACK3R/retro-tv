@@ -32,6 +32,7 @@ export type AccountView = {
   // Computed on the server from the verified administrator allowlist.
   isAdmin: boolean;
   profileLimit: number;
+  welcomeEmailAvailable?: boolean;
   household: Household | null;
   revision: number;
   commerce: {

@@ -1,5 +1,7 @@
 import { applyBillingEvent, stripeClient } from "@/lib/server/billing";
 import { privateJson } from "@/lib/server/http";
+import { after } from "next/server";
+import { deliverAccountEmails } from "@/lib/server/accountEmails";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   if (!process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_SECRET_KEY)
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
   }
   try {
     await applyBillingEvent(event);
+    after(() => deliverAccountEmails().then(() => {}));
     return privateJson({ received: true });
   } catch {
     return privateJson({ error: "Processing failed; retry required" }, 500);

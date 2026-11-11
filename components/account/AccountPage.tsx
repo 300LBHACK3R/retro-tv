@@ -611,6 +611,15 @@ export default function AccountPage({
               <section id="account-settings" className="ttv-account-card">
                 <p className="ttv-account-eyebrow">You’re in control</p>
                 <h2>Account settings</h2>
+                {account.welcomeEmailAvailable ? <button
+                  disabled={busy}
+                  onClick={() => void task(async () => {
+                    const result = await accountRequest("/api/account/welcome", {});
+                    setMessage(result.message);
+                  })}
+                >
+                  Email my welcome
+                </button> : null}
                 <button
                   disabled={busy}
                   onClick={() =>

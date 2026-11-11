@@ -2,6 +2,8 @@
 
 # Accounts and membership activation
 
+Branded post-confirmation welcome and paid-membership emails have separate delivery setup: see [account emails](ACCOUNT_EMAILS.md). Enabling Supabase SMTP alone does not send those messages.
+
 The code is staged behind explicit flags. Free live TV, the guide and the library never require an account or payment. Keep billing disabled until the provider checks below pass. The approved plans are C$4.99 monthly, C$24.99 prepaid for six months, and C$44.99 prepaid yearly; each renews at its selected interval.
 
 ## What ships
