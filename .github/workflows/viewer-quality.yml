@@ -11,7 +11,17 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    # Browser installation and all seven browser/device projects share this budget.
+    # Includes the exact browsers and Linux libraries required by the lockfile.
+    # Avoid downloading Ubuntu packages from the runner's unavailable APT mirror.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
+    defaults:
+      run:
+        shell: bash
+    env:
+      TTV_CI_PLAYWRIGHT_VERSION: "1.63.0"
+    # All seven browser/device projects still run within this budget.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -20,6 +30,9 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Verify preinstalled test browsers
+        timeout-minutes: 2
+        run: node scripts/verify-ci-browsers.mjs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:unit
@@ -27,10 +40,6 @@ jobs:
       - run: npm run build
       - run: npm run test:http
       - run: git diff --check
-      - name: Install test browsers
-        # A stalled download must not consume the entire verification budget.
-        timeout-minutes: 12
-        run: npx playwright install --with-deps chromium firefox webkit
       - name: Check theme, admin and commercial flows first
         # Exercise every browser engine before repeating the full catalogue.
         # The complete seven-device suite still runs after these checks pass.
