@@ -1,5 +1,5 @@
 import { pageMetadata } from "@/lib/metadata";
-import Image from "next/image";
+import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 
 import SubmitClipForm from "./SubmitClipForm";
@@ -34,11 +34,9 @@ export default function SubmitClipPage() {
     <main className="ttv-submit-page">
       <header className="ttv-submit-nav">
         <Link href="/" aria-label="Back to Tate's TV live channels">
-          <Image
-            src="/tatestv-logo.png"
-            alt="Tate's TV"
+          <TatesTvLogo
             width={210}
-            height={72}
+            height={140}
             className="h-auto w-[150px] sm:w-[190px]"
             priority
           />

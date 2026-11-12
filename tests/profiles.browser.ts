@@ -563,8 +563,8 @@ test("Halloween 95 entrance fills the viewport, remembers accessibility and pres
   await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
   await page.locator('.theme-card[data-theme-id="obsidian-gold"]').click();
   await switchProfile(page);
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
-  await expect(scene).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "halloween-90s-night");
+  await expect(scene).toBeVisible();
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "obsidian-gold");
 });
@@ -584,7 +584,8 @@ test("Christmas entrance starts November 1 while each profile keeps its chosen t
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await expect(page.locator(".ttv-christmas96-world")).toBeVisible();
-  await expect(page.locator(".ttv-profile-logo")).toContainText("Christmas '96");
+  await expect(page.locator(".ttv-profile-logo")).toHaveAttribute("src", /tatestv-logo-christmas/);
+  await page.locator(".ttv-profile-logo").evaluate((image: HTMLImageElement) => image.decode());
   await page.locator(".ttv-christmas96-art").evaluate((image: HTMLImageElement) => image.decode());
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("christmas-entrance.png") });
@@ -607,12 +608,12 @@ test("Christmas entrance starts November 1 while each profile keeps its chosen t
   await page.reload();
   await expect(page.getByRole("button", { name: "Open theme library", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
-  // End the tab session; the account entrance keeps the last active appearance.
+  // End the tab session; Christmas returns without changing Taylor's saved theme.
   await page.evaluate(() => sessionStorage.clear());
   await waitForHouseholdSave(page);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await page.getByRole("button", { name: "Watch as Taylor", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "electric-blue-live");
   expect(errors).toEqual([]);
@@ -627,7 +628,8 @@ test("an open entrance changes at midnight and returning tabs refresh the season
   await page.clock.fastForward(60_001);
   await page.clock.resume();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
-  await expect(page.locator(".ttv-profile-logo")).toContainText("Christmas '96");
+  await expect(page.locator(".ttv-profile-logo")).toHaveAttribute("src", /tatestv-logo-christmas/);
+  await page.locator(".ttv-profile-logo").evaluate((image: HTMLImageElement) => image.decode());
   await page.getByRole("button", { name: "Watch as Main", exact: true }).click();
   await page.getByRole("button", { name: "Open theme library", exact: true }).click();
   await page.getByRole("button", { name: "Browse all themes", exact: true }).click();

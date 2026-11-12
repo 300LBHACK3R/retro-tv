@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import Halloween90sScene from "@/components/themes/Halloween90sScene";
+import Christmas96Scene from "@/components/themes/Christmas96Scene";
 import { useStore } from "@/lib/store";
 import { useAccount } from "@/lib/accountStore";
 import { useProfiles } from "@/lib/deviceProfiles";
@@ -16,7 +16,7 @@ import {
 
 const HauntedArcadeScene = dynamic(() => import("@/components/themes/HauntedArcadeScene"), { ssr: false });
 const HalloweenAfterDark = dynamic(() => import("@/components/themes/HalloweenAfterDark"), { ssr: false });
-const Christmas96Scene = dynamic(() => import("@/components/themes/Christmas96Scene"), { ssr: false });
+const Halloween90sScene = dynamic(() => import("@/components/themes/Halloween90sScene"), { ssr: false });
 const NeonNoelScene = dynamic(() => import("@/components/themes/NeonNoelScene"), { ssr: false });
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
@@ -32,16 +32,20 @@ export default function ThemeRuntime() {
   const userId = useAccount((state) => state.user?.id);
   const themeId = useStore((state) => state.themeId);
   const profilesReady = useProfiles((state) => state.ready);
+  const activeId = useProfiles((state) => state.activeId);
+  const entranceTheme = useProfiles((state) => state.entranceTheme);
   const preferReducedMotion = useStore(
     (state) => state.viewerSettings.preferReducedMotion,
   );
   const owned = useAccount((state) => state.ownedThemeIds);
   const theme = useMemo(() => {
     // A remembered sign-in appearance never grants a profile session or a paid viewer theme.
-    const loginTheme = profilesReady && !userId && ["/account", "/auth/confirm"].includes(pathname)
-      ? readLoginThemeId() : null;
-    return getThemeById(loginTheme ?? (canUseTheme(themeId, owned, false) ? themeId : getEntranceThemeId()));
-  }, [themeId, owned, profilesReady, userId, pathname]);
+    const loginTheme = profilesReady && !activeId && ["/account", "/auth/confirm"].includes(pathname)
+      ? userId ? entranceTheme : readLoginThemeId() : null;
+    const profilePicker = userId && !activeId && ["/", "/library"].includes(pathname);
+    const preferred = profilePicker ? getEntranceThemeId() : loginTheme ?? themeId;
+    return getThemeById(loginTheme && !userId ? loginTheme : (canUseTheme(preferred, owned, false) ? preferred : getEntranceThemeId()));
+  }, [themeId, owned, profilesReady, activeId, entranceTheme, userId, pathname]);
   const cssVars = useMemo(() => createThemeCssVars(theme), [theme]);
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export default function ThemeRuntime() {
     const updateEntrance = () => {
       clearTimeout(timer);
       const profiles = useProfiles.getState();
-      if (profiles.ready && !profiles.activeId && !profiles.entranceTheme)
+      if (profiles.ready && !profiles.activeId && !["/account", "/auth/confirm"].includes(pathname))
         useStore.getState().setTheme(getEntranceThemeId());
       const remaining = CHRISTMAS_ENTRANCE_START - Date.now();
       if (remaining > 0) timer = setTimeout(updateEntrance, Math.min(remaining, 2_147_483_647));
@@ -95,7 +99,7 @@ export default function ThemeRuntime() {
       document.removeEventListener("visibilitychange", updateEntrance);
       window.removeEventListener("pageshow", updateEntrance);
     };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const root = document.documentElement;

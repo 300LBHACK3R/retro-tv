@@ -1,5 +1,5 @@
-import { createThemeCssVars, DEFAULT_THEME_ID, THEMES, THEME_STORAGE_KEY } from "@/lib/themes";
-import { CHRISTMAS_ENTRANCE_START, CHRISTMAS_THEME_ID, LOGIN_THEME_STORAGE_KEY } from "@/lib/themePreferences";
+import { createThemeCssVars, THEMES, THEME_STORAGE_KEY } from "@/lib/themes";
+import { CHRISTMAS_ENTRANCE_START, CHRISTMAS_THEME_ID, HALLOWEEN_ENTRANCE_THEME_ID, LOGIN_THEME_STORAGE_KEY } from "@/lib/themePreferences";
 
 /** Login gets a cosmetic hint; verified accounts restore authoritative preferences after hydration. */
 export function createThemeBootstrapScript() {
@@ -12,7 +12,7 @@ export function createThemeBootstrapScript() {
   }));
   const script = `(() => {
     const themes = ${JSON.stringify(entries)};
-    let id = Date.now() >= ${CHRISTMAS_ENTRANCE_START} ? ${JSON.stringify(CHRISTMAS_THEME_ID)} : ${JSON.stringify(DEFAULT_THEME_ID)};
+    let id = Date.now() >= ${CHRISTMAS_ENTRANCE_START} ? ${JSON.stringify(CHRISTMAS_THEME_ID)} : ${JSON.stringify(HALLOWEEN_ENTRANCE_THEME_ID)};
     try {
       if (["/account", "/auth/confirm"].includes(window.location?.pathname)) {
         const remembered = window.localStorage.getItem(${JSON.stringify(LOGIN_THEME_STORAGE_KEY)});

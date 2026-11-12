@@ -25,7 +25,7 @@ const androidSteps = [
 const importantFiles = [
   "/.well-known/assetlinks.json",
   "/manifest.webmanifest",
-  "/tatestv-logo.png",
+  "/tatestv-logo-christmas.png",
   "/privacy",
   "/terms",
 ] as const;

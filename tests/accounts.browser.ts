@@ -387,7 +387,7 @@ test("account theme saves survive refresh without replacing guest profiles", asy
   ).toHaveCount(0);
 });
 
-test("saved account appearance follows the profile chooser and returning sign-in without restoring a session", async ({ page }, info) => {
+test("Christmas profile chooser preserves saved viewing and returning sign-in appearance", async ({ page }, info) => {
   const f = await fixture(page, account());
   const root = page.locator("html");
   await page.goto("/");
@@ -401,16 +401,16 @@ test("saved account appearance follows the profile chooser and returning sign-in
   expect(f.state().household?.entranceTheme).toBe("christmas-neon-noel");
   await page.getByRole("button", { name: /^Switch profile:/ }).click();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   expect(await page.evaluate(() => sessionStorage.getItem("ttv-profile-session-v1"))).toBeNull();
   await page.reload();
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
-  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await page.evaluate(() => { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow")); });
-  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
-  await page.locator(".ttv-noel-art").evaluate((image: HTMLImageElement) => image.decode());
+  await expect(root).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
+  await page.locator(".ttv-christmas96-art").evaluate((image: HTMLImageElement) => image.decode());
   await noOverflow(page);
-  await page.screenshot({ path: info.outputPath("neon-noel-profile-entrance.png") });
+  await page.screenshot({ path: info.outputPath("christmas-profile-entrance.png") });
   await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
   await waitForHouseholdSave(page);
   await page.goto("/account");

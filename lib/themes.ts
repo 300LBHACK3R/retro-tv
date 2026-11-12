@@ -82,7 +82,7 @@ export const PREMIUM_THEMES_TEMPORARILY_UNLOCKED =
   THEME_ACCESS_MODE === "all-unlocked";
 
 // Static rendering fallback. Runtime entrance dates live in themePreferences.
-export const DEFAULT_THEME_ID: ThemeId = "halloween-90s-night";
+export const DEFAULT_THEME_ID: ThemeId = "christmas-96-living-room";
 
 /** Zustand persistence key used by the pre-hydration theme bootstrap. */
 export const THEME_STORAGE_KEY = "retro-tv-programming-v1";

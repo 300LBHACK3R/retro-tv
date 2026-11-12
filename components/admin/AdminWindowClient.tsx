@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import TatesTvLogo from "@/components/themes/TatesTvLogo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -197,14 +197,11 @@ export default function AdminWindowClient() {
           }}
         >
           <div className="flex min-w-0 items-center gap-4">
-            <Image
-              src="/tatestv-logo.png"
-              alt="Tate's TV"
+            <TatesTvLogo
               width={220}
-              height={76}
+              height={147}
               className="h-auto w-full max-w-[180px]"
               priority
-              draggable={false}
             />
 
             <div

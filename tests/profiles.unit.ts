@@ -24,6 +24,7 @@ import {
   PROFILE_STORAGE_KEY,
 } from "../lib/deviceProfiles";
 import { getEntranceThemeId } from "../lib/themePreferences";
+import { useAccount } from "../lib/accountStore";
 import { programming } from "./programming-fixture";
 import type { Channel, MediaItem } from "../lib/types";
 const programme: MediaItem = { ...programming.media[0]!, kidsApproved: true };
@@ -320,6 +321,48 @@ test("guest theme previews do not overwrite legacy saved profiles or PINs", () =
     else Reflect.deleteProperty(globalThis, "sessionStorage");
   }
 });
+test("account chooser uses the seasonal theme without replacing saved profile or login choices", () => {
+  const originalAccount = useAccount.getState();
+  const originalProfiles = useProfiles.getState();
+  const originalTheme = useStore.getState().themeId;
+  const session = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  const values = new Map<string, string>();
+  try {
+    Object.defineProperty(globalThis, "sessionStorage", { configurable: true, value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    } });
+    useAccount.setState({ user: { id: "christmas-parent", email: "parent@example.test" }, ownedThemeIds: ["obsidian-gold"], profileLimit: 2 });
+    const household = {
+      profiles: [{ id: "main", name: "Tate", kids: false, avatar: "sun", theme: "obsidian-gold" }] as const,
+      entranceTheme: "obsidian-gold" as const,
+      pin: null, failures: 0, lockedUntil: 0,
+    };
+    initializeProfiles({ ...household, profiles: [...household.profiles] });
+    expect(useProfiles.getState().activeId).toBeNull();
+    expect(useStore.getState().themeId).toBe(getEntranceThemeId());
+    expect(useProfiles.getState().entranceTheme).toBe("obsidian-gold");
+    activateProfile("main");
+    expect(useStore.getState().themeId).toBe("obsidian-gold");
+    initializeProfiles({ ...household, profiles: [...household.profiles] });
+    expect(useProfiles.getState().activeId).toBe("main");
+    expect(useStore.getState().themeId).toBe("obsidian-gold");
+    lockProfiles();
+    expect(useStore.getState().themeId).toBe(getEntranceThemeId());
+    expect(useProfiles.getState().profiles[0]?.theme).toBe("obsidian-gold");
+    expect(useProfiles.getState().entranceTheme).toBe("obsidian-gold");
+    initializeProfiles({ ...household, profiles: [...household.profiles] });
+    expect(useStore.getState().themeId).toBe(getEntranceThemeId());
+  } finally {
+    useAccount.setState(originalAccount);
+    useProfiles.setState(originalProfiles);
+    useStore.getState().setTheme(originalTheme);
+    if (session) Object.defineProperty(globalThis, "sessionStorage", session);
+    else Reflect.deleteProperty(globalThis, "sessionStorage");
+  }
+});
+
 test("parent PIN verification rejects guesses and delays repeated attempts", async () => {
   await expect(setParentPin("12a")).rejects.toThrow();
   await setParentPin("4826");

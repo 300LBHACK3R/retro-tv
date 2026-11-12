@@ -4,7 +4,7 @@
 .ttv-premium-topbar { display: flex; min-width: 0; min-height: 6rem; align-items: center; gap: 2rem; border-bottom: 1px solid var(--border); }
 .ttv-premium-brand { display: flex; flex: 0 1 auto; min-width: 0; align-items: center; padding: .35rem 0; border: 0; background: transparent; color: var(--text); text-decoration: none; }
 /* Trim the outer backdrop while keeping the Halloween characters in view. */
-.ttv-premium-brand-logo { display: block; width: clamp(11rem, 18vw, 14rem); max-width: 100%; height: auto; aspect-ratio: 9 / 5; object-fit: cover; object-position: center; border-radius: .5rem; }
+.ttv-premium-brand-logo { display: block; width: clamp(11rem, 18vw, 14rem); max-width: 100%; height: auto; aspect-ratio: 9 / 5; object-fit: contain; object-position: center; border-radius: .5rem; }
 .ttv-premium-live-chip { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
 .ttv-premium-live-dot { width: .5rem; height: .5rem; flex: 0 0 auto; background: var(--primary); border-radius: 50%; }
 .ttv-premium-live-copy strong { display: block; color: var(--text); font: 600 .8rem ui-monospace, monospace; }

@@ -31,7 +31,7 @@
   object-fit: contain;
   border-radius: 0.75rem;
 }
-/* Keep the chooser focused on people, including seasonal wordmark variants. */
+/* Keep the Christmas logo visible without crowding the profile chooser. */
 .ttv-profile-screen .ttv-profile-header .ttv-profile-logo {
   width: 10rem;
   max-width: 45%;
@@ -41,13 +41,6 @@
   object-fit: contain;
   gap: 0.25rem;
 }
-.ttv-profile-header .ttv-profile-logo :is(.ttv-christmas96-brand__name, .ttv-noel-brand__name) {
-  font-size: 1.75rem;
-}
-.ttv-profile-header .ttv-profile-logo :is(.ttv-christmas96-brand__edition, .ttv-noel-brand__edition) {
-  font-size: 0.65rem;
-}
-.ttv-profile-header .ttv-christmas96-brand__stars { display: none; }
 .ttv-profile-device {
   color: var(--text-muted);
   font-size: 0.8rem;

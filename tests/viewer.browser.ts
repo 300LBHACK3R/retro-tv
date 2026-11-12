@@ -327,7 +327,7 @@ test("Cyberpunk Christmas persists its premium guide, channels, settings and lib
   expect(frameInset).toBeGreaterThanOrEqual((page.viewportSize()?.width ?? 0) >= 1000 ? 70 : 20);
   const nav = page.locator(".ttv-premium-topbar, .ttv-mobile-viewer-nav").filter({ visible: true }).first();
   expect(await nav.evaluate(element => getComputedStyle(element, element.classList.contains("ttv-mobile-viewer-nav") ? "::before" : "::after").backgroundImage)).toContain("neon-noel-lights.svg");
-  const brand = await page.locator(".ttv-premium-brand .ttv-noel-brand__name").boundingBox();
+  const brand = await page.locator(".ttv-premium-brand .ttv-premium-brand-logo").boundingBox();
   const actions = await page.locator(".ttv-profile-theme-actions").boundingBox();
   expect(brand && actions && (brand.x + brand.width <= actions.x || brand.y + brand.height <= actions.y)).toBeTruthy();
   await noPageOverflow(page);

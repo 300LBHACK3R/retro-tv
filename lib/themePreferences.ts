@@ -1,4 +1,4 @@
-import { DEFAULT_THEME_ID, isThemeId } from "./themes";
+import { isThemeId } from "./themes";
 import type { ThemeId } from "./types";
 
 export const PROFILE_STORAGE_KEY = "ttv-profiles-v1";
@@ -27,8 +27,9 @@ export function rememberLoginTheme(theme: ThemeId | null) {
 // November 1, 2026 at midnight in Calgary (America/Edmonton), before DST ends.
 export const CHRISTMAS_ENTRANCE_START = Date.parse("2026-11-01T00:00:00-06:00");
 export const CHRISTMAS_THEME_ID: ThemeId = "christmas-96-living-room";
+export const HALLOWEEN_ENTRANCE_THEME_ID: ThemeId = "halloween-90s-night";
 
 /** The entrance follows the calendar; a profile's explicit choice never does. */
 export function getEntranceThemeId(now = Date.now()): ThemeId {
-  return now >= CHRISTMAS_ENTRANCE_START ? CHRISTMAS_THEME_ID : DEFAULT_THEME_ID;
+  return now >= CHRISTMAS_ENTRANCE_START ? CHRISTMAS_THEME_ID : HALLOWEEN_ENTRANCE_THEME_ID;
 }

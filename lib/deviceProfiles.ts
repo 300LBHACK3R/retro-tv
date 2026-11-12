@@ -107,13 +107,17 @@ export function initializeProfiles(accountData?: Data & { entranceTheme?: ThemeI
   const accountEntrance = accountData
     ? accountData.entranceTheme ?? data.profiles.find((profile) => profile.id === "main")?.theme
     : undefined;
-  const preferred = data.profiles.find((profile) => profile.id === activeId)?.theme ?? accountEntrance;
+  // The chooser is seasonal. A saved appearance belongs to the selected
+  // profile (or returning sign-in), and must not replace the shared entrance.
+  const preferred = data.profiles.find((profile) => profile.id === activeId)?.theme;
   const theme = preferred && canUseTheme(preferred, useAccount.getState().ownedThemeIds, false)
     ? preferred : getEntranceThemeId();
-  useProfiles.setState({ ...data, activeId, ready: true, entranceTheme: accountData && preferred ? theme : null });
+  const loginTheme = accountEntrance && canUseTheme(accountEntrance, useAccount.getState().ownedThemeIds, false)
+    ? accountEntrance : null;
+  useProfiles.setState({ ...data, activeId, ready: true, entranceTheme: loginTheme });
   if (accountData && data.pin && !activeId) rememberKidsSession(true);
   useStore.getState().setTheme(theme);
-  if (accountData && useAccount.getState().user) rememberLoginTheme(preferred ? theme : null);
+  if (accountData && useAccount.getState().user) rememberLoginTheme(loginTheme);
   if (activeId) {
     if (accountData) rememberKidsSession(data.profiles.find((profile) => profile.id === activeId)!.kids);
     useDeviceLibrary.getState().selectProfile(activeId);
@@ -121,8 +125,7 @@ export function initializeProfiles(accountData?: Data & { entranceTheme?: ThemeI
 }
 export function lockProfiles() {
   if (useProfiles.getState().pin) rememberKidsSession(true);
-  const entrance = useAccount.getState().user ? useProfiles.getState().entranceTheme : null;
-  useStore.getState().setTheme(entrance && canUseTheme(entrance, useAccount.getState().ownedThemeIds, false) ? entrance : getEntranceThemeId());
+  useStore.getState().setTheme(getEntranceThemeId());
   useProfiles.setState({ activeId: null });
   saveSession(null);
 }
