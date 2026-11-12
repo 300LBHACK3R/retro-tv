@@ -9,6 +9,25 @@ concurrency:
   group: viewer-quality-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  roku:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: roku/package-lock.json
+      - run: npm --prefix roku ci
+      - run: npm --prefix roku audit
+      - run: npm --prefix roku run build
+      - uses: actions/upload-artifact@v6
+        with:
+          name: tates-tv-roku-beta
+          path: roku/dist/tates-tv-roku.zip
+          if-no-files-found: error
+          retention-days: 14
   verify:
     runs-on: ubuntu-24.04
     # Includes the exact browsers and Linux libraries required by the lockfile.
@@ -38,7 +57,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:unit
-      - run: npm run audit:prod
+      - run: npm audit
       - run: npm run build
       - run: npm run test:http
       - run: git diff --check

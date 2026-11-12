@@ -5,6 +5,7 @@ import {
   safeDuration,
 } from "./liveEngine";
 import type { BroadcastItem, Channel, ProgrammeBlock, Weekday } from "./types";
+import { copyScheduleDate } from "./scheduleDate";
 
 export const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -128,9 +129,9 @@ export function applyProgrammeBlocks(
     (block) => block.days.includes(WEEKDAYS[now.getDay()] ?? "sunday"),
   );
   if (!blocks.length || !base.length) return base;
-  const dayStart = new Date(now);
+  const dayStart = copyScheduleDate(now);
   dayStart.setHours(0, 0, 0, 0);
-  const nextDay = new Date(dayStart);
+  const nextDay = copyScheduleDate(dayStart);
   nextDay.setDate(nextDay.getDate() + 1);
   const dayLength = (nextDay.getTime() - dayStart.getTime()) / 1000;
   const dayStartSeconds = (dayStart.getTime() - BROADCAST_EPOCH_MS) / 1000;
@@ -138,7 +139,7 @@ export function applyProgrammeBlocks(
     .flatMap((block) => {
       const content = buildBlock(block.mediaIds);
       if (!content.length || !getScheduleDuration(content)) return [];
-      const start = new Date(now);
+      const start = copyScheduleDate(now);
       start.setHours(
         Number(block.startTime.slice(0, 2)),
         Number(block.startTime.slice(3)),

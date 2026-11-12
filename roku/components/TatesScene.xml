@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="TatesScene" extends="Scene">
+  <interface>
+    <field id="launch" type="assocarray" alwaysNotify="true" onChange="onLaunch" />
+  </interface>
+  <script type="text/brightscript" uri="TatesScene.brs" />
+  <script type="text/brightscript" uri="Profiles.brs" />
+  <script type="text/brightscript" uri="Playback.brs" />
+  <children>
+    <Rectangle id="background" width="1280" height="720" color="0x10271FFF" />
+    <Poster id="room" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" opacity="0.4" uri="https://www.tatestv.ca/themes/christmas-96-world.webp" />
+    <Rectangle id="accent" translation="[40,42]" width="1200" height="3" color="0xE7C584FF" />
+    <Poster uri="pkg:/images/logo.png" translation="[50,48]" width="155" height="100" loadDisplayMode="scaleToFit" />
+    <Label id="heading" translation="[255,65]" width="680" height="44" text="Good TV. Your way." font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
+    <Label id="profileLabel" translation="[960,74]" width="270" height="36" horizAlign="right" color="0xE7C584FF" />
+    <Label id="status" translation="[255,114]" width="960" height="35" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+    <Rectangle id="menuPanel" translation="[40,165]" width="205" height="460" color="0x193B2FFF" />
+    <LabelList id="menu" translation="[52,178]" itemSize="[180,52]" numRows="8" itemSpacing="[0,3]" color="0xFFF3D8FF" focusedColor="0x10271FFF" focusBitmapBlendColor="0xE7C584FF" font="font:SmallBoldSystemFont" focusedFont="font:SmallBoldSystemFont" vertFocusAnimationStyle="floatingFocus" />
+    <Rectangle id="listPanel" translation="[255,165]" width="960" height="460" color="0x102035F5" />
+    <LabelList id="list" translation="[275,185]" itemSize="[500,56]" numRows="7" itemSpacing="[0,3]" color="0xF2F5FFFF" focusedColor="0x102035FF" focusBitmapBlendColor="0xE7C584FF" font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" vertFocusAnimationStyle="floatingFocus" />
+    <Poster id="artwork" translation="[805,185]" width="385" height="225" loadDisplayMode="scaleToFit" uri="pkg:/images/logo.png" />
+    <Label id="detailTitle" translation="[805,430]" width="385" height="80" wrap="true" maxLines="2" font="font:MediumBoldSystemFont" color="0xFFF3D8FF" />
+    <Label id="detail" translation="[805,520]" width="385" height="88" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+    <Label id="hint" translation="[52,645]" width="1160" height="35" text="OK select   •   Back return   •   * search library" font="font:SmallSystemFont" color="0xE7C584FF" />
+    <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" />
+    <Timer id="refreshTimer" duration="60" repeat="true" />
+    <Timer id="segmentTimer" duration="30" repeat="false" />
+  </children>
+</component>

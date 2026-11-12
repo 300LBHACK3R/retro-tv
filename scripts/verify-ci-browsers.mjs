@@ -1,10 +1,10 @@
 import { accessSync, constants } from "node:fs";
 import { createRequire } from "node:module";
-import { chromium, firefox, webkit } from "playwright";
+import { chromium, firefox, webkit } from "@playwright/test";
 
 const require = createRequire(import.meta.url);
 const expected = process.env.TTV_CI_PLAYWRIGHT_VERSION;
-const actual = require("playwright-core/package.json").version;
+const actual = require("@playwright/test/package.json").version;
 if (!expected || actual !== expected) {
   throw new Error(`Playwright ${actual} does not match the CI image ${expected ?? "(unset)"}. Update the image pin and TTV_CI_PLAYWRIGHT_VERSION together with package-lock.json.`);
 }

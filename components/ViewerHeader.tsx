@@ -11,7 +11,7 @@ import {
 import ChannelLogo from "@/components/viewer/ChannelLogo";
 import type { Channel } from "@/lib/types";
 
-export type ViewerHeaderVariant = "hero" | "compact";
+type ViewerHeaderVariant = "hero" | "compact";
 
 interface ViewerHeaderProps {
   channel: Channel | undefined;

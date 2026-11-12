@@ -74,7 +74,7 @@ export async function commerceCatalog(): Promise<AccountView["commerce"]> {
   priceCache = { until: Date.now() + 300_000, value };
   return value;
 }
-export async function customerFor(user: User) {
+async function customerFor(user: User) {
   const account = await ensureAccount(user);
   if (account.stripe_customer_id) return account.stripe_customer_id as string;
   const customer = await stripeClient().customers.create(

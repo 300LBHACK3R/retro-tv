@@ -8,7 +8,7 @@ import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
-export type NowNextBarVariant = "default" | "compact";
+type NowNextBarVariant = "default" | "compact";
 
 interface NowNextBarProps {
   channel: Channel | undefined;

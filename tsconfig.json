@@ -49,6 +49,7 @@
     "**/*.old.ts",
     "**/*.old.tsx",
     "**/*.tmp.ts",
-    "**/*.tmp.tsx"
+    "**/*.tmp.tsx",
+    "roku"
   ]
 }

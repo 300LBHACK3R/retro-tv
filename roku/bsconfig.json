@@ -1,0 +1,15 @@
+{
+  "rootDir": ".",
+  "files": [
+    "manifest",
+    "source/**/*",
+    "components/**/*",
+    "images/**/*"
+  ],
+  "outFile": "dist/tates-tv-roku.zip",
+  "stagingDir": "dist/staging",
+  "autoImportComponentScript": false,
+  "sourceMap": false,
+  "emitDefinitions": false,
+  "retainStagingDir": true
+}

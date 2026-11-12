@@ -76,3 +76,10 @@ public/media/
 /Resume-TatesTV-*.ps1
 /Publish-TatesTV-*.ps1
 /supabase/.temp/
+
+# Native Roku build tools, unsigned output, and private signing material
+/roku/node_modules/
+/roku/dist/
+*.pkg
+*.key
+/roku/images/logo.png

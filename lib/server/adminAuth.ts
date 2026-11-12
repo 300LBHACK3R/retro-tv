@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { PASSWORD_COOKIE, validPasswordSession } from "./adminPassword";
 import type { User } from "@supabase/supabase-js";
 
-export const ADMIN_COOKIE_NAME = "ttv-admin-auth";
+const ADMIN_COOKIE_NAME = "ttv-admin-auth";
 const LEGACY_COOKIE_NAME = "ttv_admin_session";
 
 /** Deployment-controlled IDs grant access, never profiles or editable metadata. */

@@ -21,6 +21,7 @@
     "test:http": "node tests/http.mjs"
   },
   "dependencies": {
+    "@date-fns/tz": "1.5.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.87.0",
     "@vercel/analytics": "^2.0.1",
@@ -44,5 +45,10 @@
   },
   "engines": {
     "node": ">=20.9.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    }
   }
 }

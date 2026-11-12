@@ -1,4 +1,5 @@
 import { applyProgrammeBlocks } from "./programmeBlocks";
+import { copyScheduleDate } from "./scheduleDate";
 import type {
   AdCategory,
   AdPlacement,
@@ -64,7 +65,7 @@ function getToday(now: Date): Weekday {
 }
 
 function getDateSeed(now: Date): string {
-  return now.toISOString().slice(0, 10);
+  return new Date(now.getTime()).toISOString().slice(0, 10);
 }
 
 function hashString(value: string): number {
@@ -274,7 +275,7 @@ function getUtcDayOffsetForLocalAirStart(
   const hours = Math.floor(minutesSinceLocalMidnight / 60);
   const minutes = minutesSinceLocalMidnight % 60;
 
-  const localAirDate = new Date(now);
+  const localAirDate = copyScheduleDate(now);
   localAirDate.setHours(hours, minutes, 0, 0);
 
   const utcMidnightMs = Date.UTC(

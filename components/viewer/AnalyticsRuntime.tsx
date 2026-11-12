@@ -12,7 +12,7 @@ import {
   clearAnalyticsQueue,
 } from "@/lib/analyticsClient";
 
-export function filterAnalytics(
+function filterAnalytics(
   event: BeforeSendEvent,
 ): BeforeSendEvent | null {
   if (!analyticsAllowed()) return null;

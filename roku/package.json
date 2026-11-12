@@ -1,0 +1,14 @@
+{
+  "name": "tates-tv-roku",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "check": "bsc --create-package false --copy-to-staging false",
+    "build": "bsc && node scripts/verify-package.mjs",
+    "precheck": "node scripts/prepare-assets.mjs",
+    "prebuild": "node scripts/prepare-assets.mjs"
+  },
+  "devDependencies": {
+    "brighterscript": "0.73.8"
+  }
+}

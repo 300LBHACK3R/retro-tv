@@ -193,6 +193,11 @@ try {
   assert.equal(account.status, 200);
   assert.match(account.headers["cache-control"], /private.*no-store/);
   assert.equal(JSON.parse(account.body).user, null);
+  for (const path of ["/api/roku/catalog?audience=admin", "/api/roku/play?id=missing", "/api/roku/play?audience=admin&id=channel:1"]) {
+    const response = await get(path);
+    assert.equal(response.status, 400, `${path}: invalid Roku input is rejected before querying storage`);
+    assert.match(response.headers["cache-control"], /no-store/);
+  }
   const artworkUnauthorized = await get("/api/admin/artwork", "POST", { Origin: origin });
   assert.equal(artworkUnauthorized.status, 401);
   assert.match(artworkUnauthorized.headers["cache-control"], /no-store/);
