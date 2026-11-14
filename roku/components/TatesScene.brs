@@ -1,5 +1,5 @@
 sub init()
-    for each id in ["menu", "list", "status", "heading", "profileLabel", "artwork", "detailTitle", "detail", "video", "refreshTimer", "segmentTimer"]
+    for each id in ["home", "browser", "menu", "list", "status", "heading", "profileLabel", "artwork", "detailTitle", "detail", "video", "refreshTimer", "segmentTimer"]
         m[id] = m.top.FindNode(id)
     end for
     m.registry = CreateObject("roRegistrySection", "tates-tv-v1")
@@ -15,6 +15,7 @@ sub init()
     m.sequence = 0
     m.launchComplete = false
     m.dialogSequence = 0
+    m.home.ObserveField("action", "onHomeAction")
     m.menu.ObserveField("itemSelected", "onMenuSelected")
     m.list.ObserveField("itemSelected", "onItemSelected")
     m.list.ObserveField("itemFocused", "onItemFocused")
@@ -24,9 +25,45 @@ sub init()
     m.segmentTimer.ObserveField("fire", "onSegmentEnd")
     applyTheme(m.registry.Read("theme"))
     buildMenu()
-    m.menu.SetFocus(true)
+    showHome()
     refreshCatalog()
     m.refreshTimer.control = "start"
+end sub
+
+sub showHome()
+    m.browser.visible = false
+    m.top.FindNode("room").opacity = 0.85
+    m.home.kids = m.kids
+    m.home.visible = true
+    m.home.CallFunc("reset")
+end sub
+
+sub showBrowser()
+    m.home.visible = false
+    m.top.FindNode("room").opacity = 0.4
+    m.browser.visible = true
+    m.menu.SetFocus(true)
+end sub
+
+sub onHomeAction()
+    if m.home.action = "watch"
+        ' Guest entry keeps the saved Kids restriction; it never selects an adult profile.
+        showBrowser()
+    else if m.home.action = "parentAccount"
+        showMessage("Ask a parent", ["Choose Watch for free to continue the approved Kids lineup.", "To set up an account, a parent must first choose Exit Kids and enter the parent PIN."])
+    end if
+end sub
+
+sub restoreFocus()
+    if m.video.visible
+        m.video.SetFocus(true)
+    else if m.home.visible
+        m.home.SetFocus(true)
+    else if m.entries.Count() > 0 and m.view <> "channels"
+        m.list.SetFocus(true)
+    else
+        m.menu.SetFocus(true)
+    end if
 end sub
 
 function audience() as string
@@ -98,14 +135,14 @@ end sub
 
 sub buildMenu()
     content = CreateObject("roSGNode", "ContentNode")
-    labels = ["Live TV", "Library", "Search", "Kids mode", "Themes", "Refresh", "Help"]
+    labels = ["Live TV", "Library", "Search", "Kids mode", "Themes", "Refresh", "Help", "Home"]
     if m.kids then labels[3] = "Exit Kids"
     for each label in labels
         node = content.CreateChild("ContentNode")
         node.title = label
     end for
     m.menu.content = content
-    m.profileLabel.text = "HOUSEHOLD"
+    m.profileLabel.text = "FREE VIEWING"
     if m.kids then m.profileLabel.text = "KIDS • PIN LOCKED"
 end sub
 
@@ -135,6 +172,9 @@ sub onMenuSelected()
         return
     else if index = 6
         showMessage("Welcome to Tate's TV", ["Choose Live TV for the shared schedule, or Library to watch from the beginning.", "Kids mode requires a parent PIN to exit. Themes and viewing progress are saved on this Roku.", "Support and privacy: tatestv.ca/help • tatestv.ca/privacy"])
+        return
+    else if index = 7
+        showHome()
         return
     end if
     if m.entries.Count() > 0 then m.list.SetFocus(true)
@@ -242,6 +282,7 @@ sub applyTheme(theme as string)
     m.menu.focusBitmapBlendColor = accent
     m.list.focusBitmapBlendColor = accent
     m.top.FindNode("hint").color = accent
+    m.home.accent = accent
     palette = CreateObject("roSGNode", "RSGPalette")
     palette.colors = {
         DialogBackgroundColor: background
@@ -301,18 +342,12 @@ sub onDialogClosed(event as object)
     end if
     m.top.dialog = invalid
     m.newPinHash = invalid
-    if m.video.visible
-        m.video.SetFocus(true)
-    else if m.entries.Count() > 0 and m.view <> "channels"
-        m.list.SetFocus(true)
-    else
-        m.menu.SetFocus(true)
-    end if
+    restoreFocus()
 end sub
 
 sub closeMessage()
     m.top.dialog.close = true
-    m.menu.SetFocus(true)
+    restoreFocus()
 end sub
 
 sub onRefresh()
@@ -326,6 +361,7 @@ sub onLaunch()
     if type(args.mediaType) <> "roString" and type(args.mediaType) <> "String" then return
     if Len(args.contentId) > 255 then return
     if m.top.dialog <> invalid then m.top.dialog.close = true
+    showBrowser()
     m.pendingLaunch = { id: args.contentId, mediaType: LCase(args.mediaType) }
     if m.catalog <> invalid then dispatchLaunch()
 end sub
@@ -371,6 +407,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if m.home.visible then return false
     if key = "back"
         if m.video.visible or m.isLoadingPlayback
             stopPlayback()
@@ -382,6 +419,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         else if m.list.HasFocus()
             m.menu.SetFocus(true)
+            return true
+        else if m.menu.HasFocus()
+            showHome()
             return true
         end if
         return false

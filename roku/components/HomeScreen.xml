@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="HomeScreen" extends="Group">
+  <interface>
+    <field id="action" type="string" alwaysNotify="true" />
+    <field id="kids" type="boolean" onChange="updateProfile" />
+    <field id="accent" type="color" value="0xE7C584FF" onChange="updateAccent" />
+    <function name="reset" />
+  </interface>
+  <script type="text/brightscript" uri="HomeScreen.brs" />
+  <children>
+    <Rectangle width="1280" height="720" color="0x090F1866" />
+    <Poster translation="[525,30]" width="230" height="154" uri="pkg:/images/logo.png" loadDisplayMode="scaleToFit" />
+    <Group id="chooser">
+      <Label translation="[200,201]" width="880" height="50" horizAlign="center" text="Who's watching?" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
+      <Label translation="[160,257]" width="960" height="36" horizAlign="center" text="Settle into something good. No account needed to watch." font="font:SmallSystemFont" color="0xE8E4DCFF" />
+      <ProfileCard id="watch" translation="[350,318]" title="Watch for free" subtitle="Jump into the full lineup" portrait="pkg:/images/guest.png" />
+      <ProfileCard id="create" translation="[670,318]" title="Create account" subtitle="Make yourself at home" add="true" />
+      <Label translation="[160,661]" width="960" height="30" horizAlign="center" text="Left / Right to choose   •   OK to select" font="font:SmallSystemFont" color="0xE7C584FF" />
+    </Group>
+    <Group id="account" visible="false">
+      <Rectangle translation="[180,200]" width="920" height="430" color="0x101B29F5" />
+      <Label translation="[230,225]" width="820" height="44" text="Your next chapter starts here." font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
+      <Poster translation="[230,300]" width="264" height="264" uri="pkg:/images/account-qr.png" loadDisplayMode="scaleToFit" />
+      <Label translation="[540,300]" width="500" height="70" text="Scan with your phone, or visit:" wrap="true" maxLines="2" font="font:MediumSystemFont" color="0xFFF3D8FF" />
+      <Label translation="[540,375]" width="500" height="40" text="tatestv.ca/account" font="font:MediumBoldSystemFont" color="0xE7C584FF" />
+      <Label translation="[540,430]" width="500" height="70" text="Choose Create account to sign up. Already registered? Sign in there." wrap="true" maxLines="2" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+      <Label translation="[540,520]" width="500" height="82" text="Your website account won't sign in this TV yet. You can keep watching here for free." wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+      <Label translation="[160,661]" width="960" height="30" horizAlign="center" text="OK or Back to return home" font="font:SmallSystemFont" color="0xE7C584FF" />
+    </Group>
+  </children>
+</component>

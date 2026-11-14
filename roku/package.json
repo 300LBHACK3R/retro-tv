@@ -9,6 +9,8 @@
     "prebuild": "node scripts/prepare-assets.mjs"
   },
   "devDependencies": {
-    "brighterscript": "0.73.8"
+    "brighterscript": "0.73.8",
+    "qrcode": "1.5.4",
+    "sharp": "0.35.5"
   }
 }

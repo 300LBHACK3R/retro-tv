@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ProfileCard" extends="Group">
+  <interface>
+    <field id="title" type="string" alias="titleLabel.text" />
+    <field id="subtitle" type="string" alias="subtitleLabel.text" />
+    <field id="portrait" type="string" alias="portraitImage.uri" />
+    <field id="add" type="boolean" alias="addSymbol.visible" />
+    <field id="selected" type="boolean" onChange="updateFocus" />
+    <field id="accent" type="color" value="0xE7C584FF" onChange="updateFocus" />
+  </interface>
+  <script type="text/brightscript" uri="ProfileCard.brs" />
+  <children>
+    <Rectangle id="border" translation="[14,0]" width="232" height="232" color="0x708078FF" />
+    <Rectangle translation="[18,4]" width="224" height="224" color="0x14231FFF" />
+    <Poster id="portraitImage" translation="[26,12]" width="208" height="208" loadDisplayMode="scaleToFit" />
+    <Group id="addSymbol" visible="false">
+      <Rectangle translation="[80,112]" width="100" height="8" color="0xFFF3D8FF" />
+      <Rectangle translation="[126,66]" width="8" height="100" color="0xFFF3D8FF" />
+    </Group>
+    <Label id="titleLabel" translation="[0,245]" width="260" height="36" horizAlign="center" font="font:MediumBoldSystemFont" color="0xFFF3D8FF" />
+    <Label id="subtitleLabel" translation="[-25,287]" width="310" height="30" horizAlign="center" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+  </children>
+</component>

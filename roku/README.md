@@ -4,6 +4,8 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 ## Included
 
+- Profile-style home screen on every normal launch, with **Watch for free** and **Create account** cards. Logo, Christmas room, guest portrait and account QR code are packaged locally, so the home screen does not wait for the network. Back from the navigation menu, or its Home entry, returns here.
+- Create account shows a scannable link to the existing website account screen. It explicitly describes website signup; it does not claim to link or sign in the Roku. A saved Kids session can continue free viewing but cannot open this account screen until a parent exits Kids with the PIN.
 - Live channel list with current/next listings and playback from the station clock.
 - Grouped on-demand library, title search, cover images and resumed viewing.
 - Persistent Kids mode with a local four-digit parent PIN, bounded retry lockout, separate viewing history, and server-filtered channels, programmes and artwork.
@@ -42,10 +44,12 @@ Developer enrollment: https://developer.roku.com/enrollment/standard
 Record results and the Roku model/OS before calling this release ready:
 
 - Cold launch, warm launch, readable artwork, long titles, every menu and Back/Options behaviour.
+- Launch without an account: check the Christmas home, highlighted profile cards, left/right/OK, free entry, Home return and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: the home artwork and cards must still be usable. Deep links still open their target directly.
 - Play a regular live channel through a programme/ad boundary; confirm source offsets after a mid-roll and after rejoining a channel.
 - Play MP4 and MKV files; test audio, captions, seeking and a resumed library title. File extensions alone do not establish codec compatibility.
 - Disconnect/reconnect networking; verify an unavailable programme returns a usable error screen.
 - Create a PIN, cancel/confirm it, enter Kids, restart the app, try an incorrect PIN, test the lockout and exit with the correct PIN. The app must remain in Kids after restart.
+- From the home screen in Kids mode, Watch for free must retain the Kids filter; Create account must show the parent notice and return focus to the cards, including when dismissed with Back.
 - Test approved Kids titles and blocked adult deep links. Review every programme and eligible ad before approving a Kids channel in the website admin.
 - Check both themes, keyboard and PIN colours, persisted selection and independent Household/Kids bookmarks.
 - Run cold/warm deep links using a channel's `channel:<id>` with `mediaType=live`, an episode's `media:<id>` with `mediaType=episode`, and a movie with `mediaType=movie`. Series links open their episode list.

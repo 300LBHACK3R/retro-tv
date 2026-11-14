@@ -10,10 +10,10 @@ function files(directory) {
   });
 }
 const paths = files(root).map(path => relative(root, path).replaceAll("\\", "/"));
-for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "images/logo.png"])
+for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "components/HomeScreen.xml", "components/ProfileCard.xml", "images/logo.png", "images/room.jpg", "images/guest.png", "images/account-qr.png"])
   assert.ok(paths.includes(required), `Missing ${required}`);
 for (const path of paths)
-  assert.match(path, /^(manifest|(?:source|components)\/[\w/-]+\.(?:brs|xml)|images\/[\w-]+\.png)$/, `Unexpected package file: ${path}`);
+  assert.match(path, /^(manifest|(?:source|components)\/[\w/-]+\.(?:brs|xml)|images\/[\w-]+\.(?:png|jpg))$/, `Unexpected package file: ${path}`);
 const manifest = readFileSync(join(root, "manifest"), "utf8");
 assert.match(manifest, /^supports_input_launch=1$/m);
 assert.match(manifest, /^ui_resolutions=hd$/m);

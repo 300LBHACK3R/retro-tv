@@ -7,6 +7,12 @@ sub Main(args as dynamic)
     scene = screen.CreateScene("TatesScene")
     screen.Show()
     if args <> invalid then scene.launch = args
+    ' Normal launches have a usable, packaged home screen without waiting for the feed.
+    hasDeepLink = false
+    if args <> invalid
+        hasDeepLink = args.DoesExist("contentId") and args.DoesExist("mediaType")
+    end if
+    if not hasDeepLink then scene.CallFunc("markLaunchComplete")
 
     while true
         event = wait(0, port)
