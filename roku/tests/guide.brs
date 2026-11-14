@@ -23,6 +23,10 @@ sub main()
     check(rows.children.Count() = 5 and m.top.nodes.position.text = "6–10 of 12", "Only one bounded page of readable rows is built")
     check(rows.children[1].children[1].text = "CH 7 • LIVE", "The playing station is visibly marked")
     check(rows.children[1].children[3].text = "Current show" and rows.children[1].children[4].text = "Next show", "Guide rows display real Now and Next metadata")
+    m.top.themeColors = { text: "0x10233BFF", onPrimary: "0xFFFFFFFF", guideRowBg: "0xF8FBFFFF", guideCurrentBg: "0x1769C2FF" }
+    render()
+    check(rows.children[1].children[0].color = "0x1769C2FF" and rows.children[1].children[3].color = "0xFFFFFFFF", "The tuned row keeps white text on Bright Cable's blue background")
+    check(rows.children[0].children[3].color = "0x10233BFF", "Other light-theme rows use dark programme text")
     check(onKeyEvent("down", true) and m.index = 7, "Down browses without tuning")
     check(m.top.selectedId = invalid, "Browsing does not emit a playback selection")
     m.top.channels = channels

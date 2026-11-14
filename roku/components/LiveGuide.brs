@@ -26,6 +26,12 @@ sub open()
     m.top.SetFocus(true)
 end sub
 
+sub updateColors()
+    paintTheme({ title: "text", subtitle: "textMuted", panel: "guideHeaderBg", channelHeading: "primary",
+        nowHeading: "primary", nextHeading: "primary", empty: "text", position: "textMuted", help: "primary" })
+    render()
+end sub
+
 sub render()
     if m.rows = invalid then return
     m.rows.RemoveChildrenIndex(m.rows.GetChildCount(), 0)
@@ -43,24 +49,31 @@ sub render()
         row.translation = [0, (i - first) * 79]
         row.width = 1176
         row.height = 72
-        row.color = "0x314257FF"
+        row.color = themeColor("border", "0x314257FF")
         if i = m.index then row.color = m.top.accent
         inset = row.CreateChild("Rectangle")
         inset.translation = [3,3]
         inset.width = 1170
         inset.height = 66
-        inset.color = "0x132538FF"
-        if channel.id = m.top.channelId then inset.color = "0x224236FF"
+        inset.color = themeColor("guideRowBg", "0x132538FF")
+        if i mod 2 = 1 then inset.color = themeColor("guideRowAltBg", "0x132538FF")
+        textColor = themeColor("text", "0xFFF3D8FF")
+        numberColor = m.top.accent
+        if channel.id = m.top.channelId
+            inset.color = themeColor("guideCurrentBg", "0x224236FF")
+            textColor = themeColor("onPrimary", "0xFFF3D8FF")
+            numberColor = textColor
+        end if
         number = "CH " + channel.number.ToStr()
         if channel.id = m.top.channelId then number = number + " • LIVE"
-        addLabel(row, number, 12, 5, 224, 27, true)
-        addLabel(row, channel.title, 12, 34, 224, 30, false)
-        addLabel(row, channel.now, 256, 6, 434, 60, false)
-        addLabel(row, channel.next, 718, 6, 434, 60, false)
+        addLabel(row, number, 12, 5, 224, 27, numberColor)
+        addLabel(row, channel.title, 12, 34, 224, 30, textColor)
+        addLabel(row, channel.now, 256, 6, 434, 60, textColor)
+        addLabel(row, channel.next, 718, 6, 434, 60, textColor)
     end for
 end sub
 
-sub addLabel(parent as object, text as string, x as integer, y as integer, width as integer, height as integer, bold as boolean)
+sub addLabel(parent as object, text as string, x as integer, y as integer, width as integer, height as integer, color as dynamic)
     label = parent.CreateChild("Label")
     label.translation = [x,y]
     label.width = width
@@ -70,8 +83,7 @@ sub addLabel(parent as object, text as string, x as integer, y as integer, width
     label.maxLines = 2
     label.vertAlign = "center"
     label.font.size = 22
-    label.color = "0xFFF3D8FF"
-    if bold then label.color = m.top.accent
+    label.color = color
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean

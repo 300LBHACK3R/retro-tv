@@ -86,3 +86,6 @@ public/media/
 /roku/images/room.jpg
 /roku/images/guest.png
 /roku/images/account-qr.png
+/roku/images/theme-preview-*.jpg
+/roku/images/theme-world-*.jpg
+/roku/data/themes.json

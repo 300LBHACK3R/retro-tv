@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="TatesScene" extends="Scene">
   <interface>
+    <field id="themeColors" type="assocarray" />
     <function name="startApp" />
     <field id="launch" type="assocarray" alwaysNotify="true" onChange="onLaunch" />
   </interface>
@@ -9,6 +10,8 @@
   <script type="text/brightscript" uri="Playback.brs" />
   <script type="text/brightscript" uri="Viewer.brs" />
   <script type="text/brightscript" uri="Guide.brs" />
+  <script type="text/brightscript" uri="ThemeStyle.brs" />
+  <script type="text/brightscript" uri="Themes.brs" />
   <children>
     <Rectangle id="background" width="1280" height="720" color="0x10271FFF" />
     <Poster id="room" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" opacity="0.4" uri="pkg:/images/room.jpg" />
@@ -28,9 +31,9 @@
           <Label id="playerMessage" translation="[315,300]" width="560" height="100" horizAlign="center" wrap="true" maxLines="3" text="Getting your TV ready..." font="font:MediumSystemFont" color="0xFFF3D8FF" />
         </Group>
         <Label id="channelTitle" translation="[935,185]" width="260" height="54" wrap="true" maxLines="2" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-        <Label translation="[935,255]" width="260" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label id="nowHeading" translation="[935,255]" width="260" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
         <Label id="nowTitle" translation="[935,290]" width="260" height="90" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xFFF3D8FF" />
-        <Label translation="[935,402]" width="260" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label id="nextHeading" translation="[935,402]" width="260" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
         <Label id="nextTitle" translation="[935,438]" width="260" height="90" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
         <ChannelStrip id="channels" translation="[275,555]" />
       </Group>
@@ -43,10 +46,10 @@
     <Rectangle id="guideBackdrop" width="1280" height="720" color="0x081723FF" visible="false" />
     <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
     <Group id="liveBanner" visible="false">
-      <Rectangle translation="[40,550]" width="1200" height="134" color="0x102035F0" />
+      <Rectangle id="bannerPanel" translation="[40,550]" width="1200" height="134" color="0x102035F0" />
       <Label id="bannerChannel" translation="[64,562]" width="1152" height="34" font="font:MediumBoldSystemFont" color="0xE7C584FF" />
       <Label id="bannerProgramme" translation="[64,602]" width="1152" height="32" font="font:SmallSystemFont" color="0xFFF3D8FF" />
-      <Label translation="[64,644]" width="1152" height="30" text="Up/Down change channel   •   OK live guide   •   Back viewer   •   * captions" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+      <Label id="bannerHelp" translation="[64,644]" width="1152" height="30" text="Up/Down change channel   •   OK live guide   •   Back viewer   •   * captions" font="font:SmallSystemFont" color="0xD5DDDBFF" />
     </Group>
     <LiveGuide id="guide" visible="false" />
     <Timer id="bannerTimer" duration="5" repeat="false" />

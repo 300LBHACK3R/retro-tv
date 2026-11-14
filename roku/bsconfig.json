@@ -4,7 +4,8 @@
     "manifest",
     "source/**/*",
     "components/**/*",
-    "images/**/*"
+    "images/**/*",
+    "data/themes.json"
   ],
   "outFile": "dist/tates-tv-roku.zip",
   "stagingDir": "dist/staging",

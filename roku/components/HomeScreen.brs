@@ -28,6 +28,15 @@ sub updateAccent()
     updateSelection()
 end sub
 
+sub updateColors()
+    paintTheme({ homeTitle: "text", homeSubtitle: "textMuted", homeHelp: "primary", homeBuildLabel: "textMuted",
+        accountPanel: "panelBg", accountTitle: "text", accountPrompt: "text", accountUrl: "primary",
+        accountInstructions: "textMuted", accountExplanation: "textMuted", accountHelp: "primary" })
+    m.top.FindNode("overlay").color = Left(themeColor("appBg", "0x090F18FF"), 8) + "66"
+    m.watch.themeColors = m.top.themeColors
+    m.create.themeColors = m.top.themeColors
+end sub
+
 sub updateSelection()
     m.watch.selected = m.selected = 0
     m.create.selected = m.selected = 1

@@ -218,7 +218,8 @@ sub renderList(preserve as boolean)
         return
     else if m.view = "themes"
         m.heading.text = "Make yourself at home."
-        m.entries = [{ id: "christmas", title: "Christmas '96", poster: "pkg:/images/room.jpg" }, { id: "retro", title: "Classic Blue", poster: "pkg:/images/logo.png" }]
+        m.entries = m.themeCatalog.themes
+        if selectedId = "" then selectedId = m.themeId
     else if m.catalog <> invalid
         if m.view = "episodes" and m.group <> invalid
             m.heading.text = m.group.title
@@ -238,6 +239,13 @@ sub renderList(preserve as boolean)
         node = content.CreateChild("ContentNode")
         node.AddField("viewerAccent", "color", false)
         node.viewerAccent = m.viewerAccent
+        node.AddField("viewerColors", "assocarray", false)
+        node.viewerColors = m.top.themeColors
+        node.AddField("themeBadge", "string", false)
+        if m.view = "themes"
+            node.themeBadge = "Free"
+            if entry.id = m.themeId then node.themeBadge = "Selected"
+        end if
         node.title = entry.title
         node.HDPosterUrl = "pkg:/images/logo.png"
         if entry.poster <> invalid then node.HDPosterUrl = entry.poster
@@ -271,7 +279,7 @@ sub onGridSelected()
     entry = m.entries[index]
     if m.view = "themes"
         applyTheme(entry.id)
-        m.registry.Write("theme", entry.id)
+        m.registry.Write("theme", m.themeId)
         m.registry.Flush()
         renderList(true)
     else if m.view = "library"
@@ -283,44 +291,6 @@ sub onGridSelected()
         m.fullscreen = true
         requestPlayback(entry.id)
     end if
-end sub
-
-sub applyTheme(theme as string)
-    m.top.FindNode("room").visible = theme <> "retro"
-    if theme = "retro"
-        background = "0x071C36FF"
-        menu = "0x123663FF"
-        accent = "0x80E5FFFF"
-    else
-        background = "0x10271FFF"
-        menu = "0x193B2FFF"
-        accent = "0xE7C584FF"
-    end if
-    m.top.FindNode("background").color = background
-    m.top.FindNode("menuPanel").color = menu
-    m.top.FindNode("accent").color = accent
-    m.menu.focusBitmapBlendColor = accent
-    m.guide.accent = accent
-    m.top.FindNode("hint").color = accent
-    m.home.accent = accent
-    m.channels.accent = accent
-    m.libraryGrid.focusBitmapBlendColor = accent
-    m.playerFocus.color = accent
-    m.viewerAccent = accent
-    palette = CreateObject("roSGNode", "RSGPalette")
-    palette.colors = {
-        DialogBackgroundColor: background
-        DialogTextColor: "0xFFF3D8FF"
-        DialogFocusColor: accent
-        DialogFocusItemColor: "0x102035FF"
-        DialogItemColor: accent
-        DialogSecondaryTextColor: "0xD5DDDBFF"
-        DialogSecondaryItemColor: accent
-        DialogInputFieldColor: menu
-        DialogKeyboardColor: menu
-        DialogFootprintColor: menu
-    }
-    m.top.palette = palette
 end sub
 
 sub showSearch()
