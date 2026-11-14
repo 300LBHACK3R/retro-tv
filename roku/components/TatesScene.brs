@@ -32,7 +32,8 @@ sub init()
     m.segmentTimer.ObserveField("fire", "onSegmentEnd")
     applyTheme(m.registry.Read("theme"))
     buildMenu()
-    showHome()
+    m.top.FindNode("buildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
+    m.home.kids = m.kids
     refreshCatalog()
     m.refreshTimer.control = "start"
 end sub
@@ -410,10 +411,7 @@ end sub
 
 sub onLaunch()
     args = m.top.launch
-    if args = invalid then return
-    if type(args.contentId) <> "roString" and type(args.contentId) <> "String" then return
-    if type(args.mediaType) <> "roString" and type(args.mediaType) <> "String" then return
-    if Len(args.contentId) > 255 then return
+    if not isPlaybackLaunch(args) then return
     if m.top.dialog <> invalid then m.top.dialog.close = true
     m.autoTune = false
     showBrowser()

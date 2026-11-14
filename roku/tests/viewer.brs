@@ -3,6 +3,26 @@
 sub main()
     resetViewer()
     m.home.visible = true
+    startApp(invalid)
+    check(not m.home.visible and m.autoTune, "Normal app launch opens live TV without a profile or Play step")
+    check(m.launchComplete, "Normal launch reports its usable live viewer")
+    m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
+    startDefaultChannel()
+    check(m.requested = "channel:1", "Normal launch starts playback when listings arrive")
+
+    resetViewer()
+    m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
+    startApp({ source: "homescreen" })
+    check(m.requested = "channel:1", "An already loaded catalogue starts immediately")
+
+    resetViewer()
+    startApp({ contentId: "media:episode", mediaType: "episode" })
+    check(m.top.launch.contentId = "media:episode" and m.requested = "", "Cold deep links bypass default channel tuning")
+    check(not isPlaybackLaunch({ contentId: 7, mediaType: "live" }), "Malformed launch values are rejected")
+    check(not isPlaybackLaunch({ contentId: "", mediaType: "live" }), "Empty content IDs cannot block ordinary launch")
+
+    resetViewer()
+    m.home.visible = true
     m.catalog = { channels: [{ id: "channel:7", number: 7 }, { id: "channel:1", number: 1 }] }
     enterViewer()
     check(m.requested = "channel:1", "Guest entry starts channel one when available")
@@ -108,6 +128,7 @@ sub resetViewer()
     m.view = "live"
     m.requested = ""
     m.stopped = false
+    m.launchComplete = false
     if m.failed = invalid then m.failed = 0
 end sub
 
@@ -144,4 +165,7 @@ sub stopPlayback()
 end sub
 sub restoreFocus()
     m.restored = m.restoreTarget
+end sub
+sub markLaunchComplete()
+    m.launchComplete = true
 end sub

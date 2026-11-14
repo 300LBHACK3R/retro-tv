@@ -4,7 +4,8 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 ## Included
 
-- Profile-style home screen on every normal launch, with **Watch for free** and **Create account** cards. Logo, Christmas room, guest portrait and account QR code are packaged locally, so the home screen does not wait for the network. Back from the navigation menu, or its Home entry, returns here.
+- Normal app launch opens live TV directly and starts playback when the catalogue arrives, without a profile, channel-selection or Play step. The saved Kids restriction still applies. The viewer footer shows the installed version for device testing.
+- A profile-style home screen remains available through Home in the menu, with **Watch for free** and **Create account** cards. Logo, Christmas room, guest portrait and account QR code are packaged locally. Back from the navigation menu also returns here.
 - Create account shows a scannable link to the existing website account screen. It explicitly describes website signup; it does not claim to link or sign in the Roku. A saved Kids session can continue free viewing but cannot open this account screen until a parent exits Kids with the PIN.
 - A shared live viewer after Watch for free: inline video, now/next details, and a horizontal channel strip. It starts channel 1 when that channel is in the current audience's lineup, otherwise the first available channel.
 - A three-column live guide showing channel, on now and up next. Video keeps running in a small header player while browsing the guide, artwork library, search results or themes.
@@ -48,7 +49,7 @@ Developer enrollment: https://developer.roku.com/enrollment/standard
 Record results and the Roku model/OS before calling this release ready:
 
 - Cold launch, warm launch, readable artwork, long titles, every menu and Back/Options behaviour.
-- Launch without an account: check the Christmas home, highlighted profile cards, left/right/OK, free entry, Home return and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: the home artwork and cards must still be usable. Deep links still open their target directly.
+- Launch without an account: live TV must open and begin playing without any keypress after launch. Check the installed version at bottom right. Open Home from the menu to test the highlighted profile cards, left/right/OK, free entry and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: navigation and Home must remain usable, and the viewer must show a retry message. Deep links must still open their target directly instead of first playing the default station.
 - From Watch for free, confirm live video starts inside the viewer and now/next matches the station. Press OK for fullscreen, then Back: playback should continue at the same position. Press Down for the channel strip, Left/Right to browse and OK to tune. Up returns to the player; Back returns to the menu.
 - Open the guide and library during playback: confirm the small header player continues, text and focus borders are readable, and scrolling stays responsive. Open a library title, then Back to its episode grid. Test a slow channel response while moving between menu, guide and library: completion must not steal browsing focus.
 - Play a regular live channel through a programme/ad boundary; confirm source offsets after a mid-roll and after rejoining a channel.

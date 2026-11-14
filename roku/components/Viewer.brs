@@ -1,12 +1,30 @@
-' Every entry path uses this viewer; audience filtering is kept separate from layout.
+sub startApp(args as dynamic)
+    if isPlaybackLaunch(args)
+        m.top.launch = args
+        return
+    end if
+    enterViewer()
+    markLaunchComplete()
+end sub
+
+function isPlaybackLaunch(args as dynamic) as boolean
+    if type(args) <> "roAssociativeArray" then return false
+    if type(args.contentId) <> "roString" and type(args.contentId) <> "String" then return false
+    if type(args.mediaType) <> "roString" and type(args.mediaType) <> "String" then return false
+    return Len(args.contentId) > 0 and Len(args.contentId) <= 255 and Len(args.mediaType) > 0
+end function
+
+' Normal launches and free entry use the same audience-filtered live viewer.
 sub enterViewer()
     m.view = "live"
     m.group = invalid
     m.search = ""
     m.tunedChannelId = ""
     m.autoTune = true
+    m.playerMessage.text = "Starting live TV..."
     showBrowser()
     renderList(false)
+    layoutVideo()
     focusPlayer()
     startDefaultChannel()
 end sub
@@ -96,7 +114,7 @@ sub layoutVideo()
     end if
     m.profileLabel.visible = not m.video.visible or m.view = "live"
     m.top.FindNode("hint").text = "OK select   •   Back return   •   * viewer options"
-    if m.view = "live" then m.top.FindNode("hint").text = "OK player: fullscreen   •   Down: channels   •   Left: menu   •   * options"
+    if m.view = "live" then m.top.FindNode("hint").text = "OK fullscreen   •   Down channels   •   Back menu   •   * options"
 end sub
 
 sub enterFullscreen()

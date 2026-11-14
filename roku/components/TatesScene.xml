@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="TatesScene" extends="Scene">
   <interface>
-    <function name="markLaunchComplete" />
+    <function name="startApp" />
     <field id="launch" type="assocarray" alwaysNotify="true" onChange="onLaunch" />
   </interface>
   <script type="text/brightscript" uri="TatesScene.brs" />
@@ -41,9 +41,10 @@
       </Group>
       <MarkupGrid id="libraryGrid" translation="[283,192]" itemComponentName="ArtworkCard" itemSize="[214,200]" itemSpacing="[14,18]" numColumns="4" numRows="2" visible="false" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
       <Label id="emptyMessage" translation="[315,300]" width="820" height="120" wrap="true" maxLines="3" horizAlign="center" visible="false" font="font:MediumSystemFont" color="0xFFF3D8FF" />
-      <Label id="hint" translation="[52,645]" width="1160" height="35" text="OK select   •   Back return   •   * search library" font="font:SmallSystemFont" color="0xE7C584FF" />
+      <Label id="hint" translation="[52,645]" width="970" height="35" text="OK select   •   Back return   •   * viewer options" font="font:SmallSystemFont" color="0xE7C584FF" />
+      <Label id="buildLabel" translation="[1060,645]" width="155" height="35" horizAlign="right" font="font:SmallSystemFont" color="0xD5DDDBFF" />
     </Group>
-    <HomeScreen id="home" />
+    <HomeScreen id="home" visible="false" />
     <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
     <Timer id="refreshTimer" duration="60" repeat="true" />
     <Timer id="segmentTimer" duration="30" repeat="false" />
