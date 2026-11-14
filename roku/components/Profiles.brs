@@ -103,9 +103,11 @@ sub setKids(enabled as boolean)
     m.group = invalid
     m.pendingLaunch = invalid
     m.search = ""
-    m.view = "channels"
+    m.view = "live"
+    m.tunedChannelId = ""
+    m.autoTune = true
     buildMenu()
     renderList(false)
-    m.menu.SetFocus(true)
+    focusPlayer()
     refreshCatalog()
 end sub

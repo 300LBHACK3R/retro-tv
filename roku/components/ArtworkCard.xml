@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ArtworkCard" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="updateContent" />
+    <field id="itemHasFocus" type="boolean" onChange="showFocus" />
+  </interface>
+  <script type="text/brightscript" uri="ArtworkCard.brs" />
+  <script type="text/brightscript" uri="ContentFocus.brs" />
+  <children>
+    <Rectangle width="214" height="200" color="0x132538FF" />
+    <Rectangle id="focusFrame" width="214" height="200" color="0xE7C584FF" visible="false" />
+    <Rectangle translation="[3,3]" width="208" height="194" color="0x132538FF" />
+    <Poster id="poster" translation="[6,6]" width="202" height="120" loadWidth="404" loadHeight="240" loadDisplayMode="scaleToFit" />
+    <Label id="title" translation="[10,132]" width="194" height="60" wrap="true" maxLines="2" font="font:SmallBoldSystemFont" color="0xFFF3D8FF" />
+  </children>
+</component>

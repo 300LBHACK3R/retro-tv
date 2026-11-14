@@ -4,9 +4,16 @@ sub requestPlayback(id as string)
     m.segmentTimer.control = "stop"
     m.playing = invalid
     m.video.control = "stop"
+    m.video.visible = false
     m.isLoadingPlayback = true
     m.requestedId = id
     m.status.text = "Tuning in..."
+    m.playerMessage.text = "Tuning in..."
+    if Left(id, 8) = "channel:"
+        m.tunedChannelId = id
+        updateNowNext()
+    end if
+    layoutVideo()
     task = CreateObject("roSGNode", "ApiTask")
     task.path = "play?audience=" + audience() + "&id=" + encoded(id)
     m.sequence++
@@ -21,6 +28,9 @@ sub onPlayback(event as object)
     if not m.isLoadingPlayback then return
     data = event.GetData()
     if data.requestId <> m.playRequest then return
+    if data.playback <> invalid
+        if data.playback.id <> m.requestedId then return
+    end if
     m.isLoadingPlayback = false
     if data.ok <> true or data.playback = invalid
         stopPlayback()
@@ -29,7 +39,6 @@ sub onPlayback(event as object)
         return
     end if
     item = data.playback
-    if item.id <> m.requestedId then return
     m.playing = item
     m.lastSavedPosition = -1
     content = CreateObject("roSGNode", "ContentNode")
@@ -64,8 +73,10 @@ sub onPlayback(event as object)
     m.video.enableTrickPlay = item.mediaType <> "live"
     m.video.content = content
     m.video.visible = true
-    m.video.SetFocus(true)
+    layoutVideo()
+    if m.fullscreen and m.top.dialog = invalid then m.video.SetFocus(true)
     m.video.control = "play"
+    m.status.text = "Playing • " + item.title
 end sub
 
 sub stopPlayback()
@@ -76,7 +87,10 @@ sub stopPlayback()
     m.segmentTimer.control = "stop"
     m.video.control = "stop"
     m.video.visible = false
-    if m.entries.Count() > 0 then m.list.SetFocus(true) else m.menu.SetFocus(true)
+    m.fullscreen = false
+    m.playerMessage.text = "Choose a channel, or press OK to try live TV again."
+    layoutVideo()
+    restoreFocus()
 end sub
 
 sub onVideoState()

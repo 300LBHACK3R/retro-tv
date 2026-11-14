@@ -1,0 +1,206 @@
+' Every entry path uses this viewer; audience filtering is kept separate from layout.
+sub enterViewer()
+    m.view = "live"
+    m.group = invalid
+    m.search = ""
+    m.tunedChannelId = ""
+    m.autoTune = true
+    showBrowser()
+    renderList(false)
+    focusPlayer()
+    startDefaultChannel()
+end sub
+
+sub openLive()
+    m.view = "live"
+    m.autoTune = true
+    if m.playing <> invalid
+        if m.playing.mediaType = "live"
+            m.autoTune = false
+        else
+            stopPlayback()
+        end if
+    end if
+    renderList(false)
+    layoutVideo()
+    focusPlayer()
+    startDefaultChannel()
+end sub
+
+sub startDefaultChannel()
+    if not m.autoTune or m.home.visible or m.view <> "live" then return
+    if m.catalog = invalid or m.pendingLaunch <> invalid then return
+    m.autoTune = false
+    if m.catalog.channels.Count() = 0
+        m.playerMessage.text = "No live channels are available. Open Library to choose something to watch."
+        if m.kids then m.playerMessage.text = "Your Kids live lineup is being prepared. Open Library for approved shows."
+        return
+    end if
+    channel = m.catalog.channels[0]
+    for each candidate in m.catalog.channels
+        if candidate.number = 1 then channel = candidate
+    end for
+    requestPlayback(channel.id)
+end sub
+
+sub focusPlayer()
+    m.restoreTarget = "player"
+    m.playerTarget.SetFocus(true)
+end sub
+
+sub onPlayerFocus()
+    m.playerFocus.visible = m.playerTarget.HasFocus() and not m.fullscreen
+end sub
+
+sub onChannelSelected()
+    m.restoreTarget = "channels"
+    requestPlayback(m.channels.selectedId)
+end sub
+
+sub updateNowNext()
+    m.top.FindNode("channelTitle").text = "LIVE TV"
+    m.top.FindNode("nowTitle").text = "Choose a channel below."
+    m.top.FindNode("nextTitle").text = "The schedule updates automatically."
+    m.channels.channelId = m.tunedChannelId
+    if m.catalog = invalid then return
+    for each channel in m.catalog.channels
+        if channel.id = m.tunedChannelId
+            m.top.FindNode("channelTitle").text = "CH " + channel.number.ToStr() + " • " + channel.title
+            m.top.FindNode("nowTitle").text = channel.now
+            m.top.FindNode("nextTitle").text = channel.next
+            return
+        end if
+    end for
+end sub
+
+sub layoutVideo()
+    if m.fullscreen
+        m.video.translation = [0,0]
+        m.video.width = 1280
+        m.video.height = 720
+        m.video.enableUI = true
+        m.playerFocus.visible = false
+    else if m.view = "live"
+        m.video.translation = [275,185]
+        m.video.width = 640
+        m.video.height = 360
+        m.video.enableUI = false
+        onPlayerFocus()
+    else
+        ' Keep one decoder running while the guide or library is open.
+        m.video.translation = [1020,48]
+        m.video.width = 176
+        m.video.height = 99
+        m.video.enableUI = false
+        m.playerFocus.visible = false
+    end if
+    m.profileLabel.visible = not m.video.visible or m.view = "live"
+    m.top.FindNode("hint").text = "OK select   •   Back return   •   * viewer options"
+    if m.view = "live" then m.top.FindNode("hint").text = "OK player: fullscreen   •   Down: channels   •   Left: menu   •   * options"
+end sub
+
+sub enterFullscreen()
+    if not m.video.visible and not m.isLoadingPlayback then return
+    m.fullscreen = true
+    layoutVideo()
+    m.video.SetFocus(true)
+end sub
+
+sub leaveFullscreen()
+    m.fullscreen = false
+    layoutVideo()
+    restoreFocus()
+end sub
+
+sub showViewerOptions()
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Your TV. Your way."
+    dialog.message = ["Use the player for fullscreen viewing, or keep watching while you browse the guide and library."]
+    dialog.buttons = ["Watch fullscreen", "Live guide", "Search library", "Help", "Back"]
+    dialog.ObserveField("buttonSelected", "onViewerOption")
+    presentDialog(dialog)
+end sub
+
+sub onViewerOption(event as object)
+    selection = event.GetData()
+    m.top.dialog.close = true
+    if selection = 0
+        enterFullscreen()
+    else if selection = 1
+        m.autoTune = false
+        m.view = "channels"
+        renderList(false)
+        layoutVideo()
+        focusContent()
+    else if selection = 2
+        showSearch()
+    else if selection = 3
+        showMessage("Welcome to Tate's TV", ["Watch live, browse the guide, or choose a title from the library. OK on the player opens fullscreen; Back returns without restarting it.", "Kids mode needs a parent PIN to exit. Theme and viewing progress are saved on this Roku.", "Support and privacy: tatestv.ca/help • tatestv.ca/privacy"])
+    else
+        restoreFocus()
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press or m.home.visible then return false
+    if m.top.dialog <> invalid then return false
+    if m.fullscreen
+        if key = "back"
+            leaveFullscreen()
+            return true
+        end if
+        ' Keep Roku's transport and closed-caption controls on the Video node.
+        return false
+    end if
+    if key = "back"
+        if m.view = "episodes" and m.libraryGrid.HasFocus()
+            m.view = "library"
+            m.group = invalid
+            renderList(false)
+        else if m.menu.HasFocus()
+            showHome()
+        else
+            m.restoreTarget = "menu"
+            m.menu.SetFocus(true)
+        end if
+        return true
+    else if key = "options"
+        showViewerOptions()
+        return true
+    else if key = "play"
+        enterFullscreen()
+        return true
+    end if
+    if m.playerTarget.HasFocus()
+        if key = "OK"
+            if not m.video.visible and not m.isLoadingPlayback
+                m.autoTune = true
+                if m.catalog = invalid then refreshCatalog() else startDefaultChannel()
+            else
+                enterFullscreen()
+            end if
+            return true
+        else if key = "down" and m.catalog <> invalid
+            if m.catalog.channels.Count() > 0
+                m.restoreTarget = "channels"
+                m.channels.SetFocus(true)
+                return true
+            end if
+        else if key = "up" or key = "left"
+            m.restoreTarget = "menu"
+            m.menu.SetFocus(true)
+            return true
+        end if
+    else if m.channels.HasFocus() and key = "up"
+        focusPlayer()
+        return true
+    else if m.menu.HasFocus() and key = "right"
+        focusContent()
+        return true
+    else if (m.list.HasFocus() or m.libraryGrid.HasFocus()) and key = "left"
+        m.restoreTarget = "menu"
+        m.menu.SetFocus(true)
+        return true
+    end if
+    return false
+end function

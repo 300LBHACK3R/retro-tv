@@ -1,12 +1,12 @@
 sub init()
-    for each id in ["home", "browser", "menu", "list", "status", "heading", "profileLabel", "artwork", "detailTitle", "detail", "video", "refreshTimer", "segmentTimer"]
+    for each id in ["home", "browser", "menu", "list", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guideStage", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer"]
         m[id] = m.top.FindNode(id)
     end for
     m.registry = CreateObject("roRegistrySection", "tates-tv-v1")
     m.kids = m.registry.Read("kids") = "true"
     m.catalog = invalid
     m.entries = []
-    m.view = "channels"
+    m.view = "live"
     m.group = invalid
     m.search = ""
     m.pendingLaunch = invalid
@@ -15,10 +15,17 @@ sub init()
     m.sequence = 0
     m.launchComplete = false
     m.dialogSequence = 0
+    m.fullscreen = false
+    m.autoTune = false
+    m.tunedChannelId = ""
+    m.restoreTarget = "menu"
     m.home.ObserveField("action", "onHomeAction")
     m.menu.ObserveField("itemSelected", "onMenuSelected")
     m.list.ObserveField("itemSelected", "onItemSelected")
-    m.list.ObserveField("itemFocused", "onItemFocused")
+    m.list.ObserveField("itemFocused", "onGuideFocused")
+    m.libraryGrid.ObserveField("itemSelected", "onGridSelected")
+    m.channels.ObserveField("selectedId", "onChannelSelected")
+    m.playerTarget.ObserveField("focusedChild", "onPlayerFocus")
     m.video.ObserveField("state", "onVideoState")
     m.video.ObserveField("position", "onVideoPosition")
     m.refreshTimer.ObserveField("fire", "onRefresh")
@@ -31,6 +38,9 @@ sub init()
 end sub
 
 sub showHome()
+    m.autoTune = false
+    m.pendingLaunch = invalid
+    stopPlayback()
     m.browser.visible = false
     m.top.FindNode("room").opacity = 0.85
     m.home.kids = m.kids
@@ -48,19 +58,23 @@ end sub
 sub onHomeAction()
     if m.home.action = "watch"
         ' Guest entry keeps the saved Kids restriction; it never selects an adult profile.
-        showBrowser()
+        enterViewer()
     else if m.home.action = "parentAccount"
         showMessage("Ask a parent", ["Choose Watch for free to continue the approved Kids lineup.", "To set up an account, a parent must first choose Exit Kids and enter the parent PIN."])
     end if
 end sub
 
 sub restoreFocus()
-    if m.video.visible
-        m.video.SetFocus(true)
-    else if m.home.visible
+    if m.home.visible
         m.home.SetFocus(true)
-    else if m.entries.Count() > 0 and m.view <> "channels"
-        m.list.SetFocus(true)
+    else if m.fullscreen
+        m.video.SetFocus(true)
+    else if m.restoreTarget = "player" and m.view = "live"
+        m.playerTarget.SetFocus(true)
+    else if m.restoreTarget = "channels" and m.view = "live"
+        m.channels.SetFocus(true)
+    else if m.restoreTarget = "content"
+        focusContent()
     else
         m.menu.SetFocus(true)
     end if
@@ -101,17 +115,18 @@ sub onCatalog(event as object)
     if data.requestId <> m.catalogRequest then return
     if data.ok <> true
         m.status.text = data.error
+        if m.catalog = invalid then m.playerMessage.text = "Your listings could not load. Press OK to try again, or choose Refresh."
         markLaunchComplete()
         return
     end if
     if data.audience <> audience() then return
     if type(data.channels) <> "roArray" or type(data.library) <> "roArray"
         m.status.text = "Listings could not be read. Choose Refresh to try again."
+        if m.catalog = invalid then m.playerMessage.text = "Your listings could not load. Press OK to try again, or choose Refresh."
         markLaunchComplete()
         return
     end if
     m.catalog = data
-    if m.kids and m.view = "channels" and data.channels.Count() = 0 then m.view = "library"
     if m.view = "episodes" and m.group <> invalid
         previousId = m.group.id
         m.group = invalid
@@ -123,7 +138,12 @@ sub onCatalog(event as object)
     m.status.text = "Free viewing • Updated from Tate's TV"
     if m.kids then m.status.text = "Kids mode • Only your approved lineup"
     renderList(true)
-    if m.pendingLaunch <> invalid then dispatchLaunch()
+    updateNowNext()
+    if m.pendingLaunch <> invalid
+        dispatchLaunch()
+    else
+        startDefaultChannel()
+    end if
     if not m.isLoadingPlayback then markLaunchComplete()
 end sub
 
@@ -135,8 +155,8 @@ end sub
 
 sub buildMenu()
     content = CreateObject("roSGNode", "ContentNode")
-    labels = ["Live TV", "Library", "Search", "Kids mode", "Themes", "Refresh", "Help", "Home"]
-    if m.kids then labels[3] = "Exit Kids"
+    labels = ["Live TV", "Live guide", "Library", "Search", "Kids mode", "Themes", "Refresh", "Home"]
+    if m.kids then labels[4] = "Exit Kids"
     for each label in labels
         node = content.CreateChild("ContentNode")
         node.title = label
@@ -148,59 +168,67 @@ end sub
 
 sub onMenuSelected()
     index = m.menu.itemSelected
+    m.autoTune = false
     if index = 0
-        m.view = "channels"
-        m.group = invalid
-        m.search = ""
-        renderList(false)
+        openLive()
+        return
     else if index = 1
+        m.view = "channels"
+    else if index = 2
         m.view = "library"
         m.group = invalid
         m.search = ""
-        renderList(false)
-    else if index = 2
+    else if index = 3
         showSearch()
         return
-    else if index = 3
+    else if index = 4
         changeProfile()
         return
-    else if index = 4
-        m.view = "themes"
-        renderList(false)
     else if index = 5
-        refreshCatalog()
-        return
+        m.view = "themes"
     else if index = 6
-        showMessage("Welcome to Tate's TV", ["Choose Live TV for the shared schedule, or Library to watch from the beginning.", "Kids mode requires a parent PIN to exit. Themes and viewing progress are saved on this Roku.", "Support and privacy: tatestv.ca/help • tatestv.ca/privacy"])
+        refreshCatalog()
         return
     else if index = 7
         showHome()
         return
     end if
-    if m.entries.Count() > 0 then m.list.SetFocus(true)
+    renderList(false)
+    layoutVideo()
+    focusContent()
 end sub
 
 sub renderList(preserve as boolean)
-    selected = 0
     selectedId = ""
-    if preserve and m.entries.Count() > 0
-        selected = m.list.itemFocused
-        if selected >= 0 and selected < m.entries.Count() then selectedId = m.entries[selected].id
-    end if
+    focused = m.libraryGrid.itemFocused
+    if m.view = "channels" then focused = m.list.itemFocused
+    if preserve and focused >= 0 and focused < m.entries.Count() then selectedId = m.entries[focused].id
+    m.liveStage.visible = m.view = "live"
+    m.guideStage.visible = m.view = "channels"
+    m.libraryGrid.visible = m.view = "library" or m.view = "episodes" or m.view = "themes"
+    m.emptyMessage.visible = false
     m.entries = []
     m.heading.text = "Good TV. Your way."
-    if m.view = "themes"
+    if m.view = "live"
+        m.heading.text = "Your TV. Your way."
+        lineup = []
+        if m.catalog <> invalid then lineup = m.catalog.channels
+        m.channels.channels = lineup
+        updateNowNext()
+        return
+    else if m.view = "themes"
         m.heading.text = "Make yourself at home."
-        m.entries = [{ id: "christmas", title: "Christmas '96", description: "Warm Christmas colours, blue cable guide and brass controls. Free." }, { id: "retro", title: "Classic Blue", description: "A familiar blue TV guide with clear, high-contrast controls. Free." }]
+        m.entries = [{ id: "christmas", title: "Christmas '96", poster: "pkg:/images/room.jpg" }, { id: "retro", title: "Classic Blue", poster: "pkg:/images/logo.png" }]
     else if m.catalog <> invalid
         if m.view = "channels"
-            m.heading.text = "On now. Up next."
+            m.heading.text = "Live guide • On now. Up next."
             m.entries = m.catalog.channels
         else if m.view = "episodes" and m.group <> invalid
             m.heading.text = m.group.title
             m.entries = m.group.items
         else
             m.heading.text = "Your library. Your evening."
+            if m.search <> "" then m.heading.text = "Search: " + m.search
             for each group in m.catalog.library
                 if m.search = "" or Instr(1, LCase(group.title), LCase(m.search)) > 0 then m.entries.Push(group)
             end for
@@ -211,56 +239,74 @@ sub renderList(preserve as boolean)
     for index = 0 to m.entries.Count() - 1
         entry = m.entries[index]
         node = content.CreateChild("ContentNode")
+        node.AddField("viewerAccent", "color", false)
+        node.viewerAccent = m.viewerAccent
         node.title = entry.title
-        if m.view = "channels" then node.title = entry.number.ToStr() + "  " + entry.title
+        node.HDPosterUrl = "pkg:/images/logo.png"
+        if entry.poster <> invalid then node.HDPosterUrl = entry.poster
+        if m.view = "channels"
+            node.title = "CH " + entry.number.ToStr() + "  " + entry.title
+            node.shortDescriptionLine1 = entry.now
+            node.shortDescriptionLine2 = entry.next
+        end if
         if entry.id = selectedId then selected = index
     end for
-    m.list.content = content
+    target = m.libraryGrid
+    if m.view = "channels" then target = m.list
+    target.content = content
     if m.entries.Count() > 0
-        m.list.jumpToItem = selected
-        showDetail(selected)
+        target.jumpToItem = selected
     else
-        m.artwork.uri = "pkg:/images/logo.png"
-        m.detailTitle.text = "More good TV is on the way."
-        m.detail.text = "Nothing available here yet. Choose Refresh to check again."
+        m.emptyMessage.text = "Nothing available here yet. Choose Refresh to check again."
+        if m.search <> "" then m.emptyMessage.text = "No titles match that search. Open Search to try another title."
+        m.emptyMessage.visible = true
     end if
 end sub
 
-sub onItemFocused()
-    showDetail(m.list.itemFocused)
+sub focusContent()
+    m.restoreTarget = "content"
+    if m.view = "live"
+        focusPlayer()
+    else if m.entries.Count() = 0
+        m.menu.SetFocus(true)
+    else if m.view = "channels"
+        m.list.SetFocus(true)
+    else
+        m.libraryGrid.SetFocus(true)
+    end if
 end sub
 
-sub showDetail(index as integer)
+sub onGuideFocused()
+    index = m.list.itemFocused
     if index < 0 or index >= m.entries.Count() then return
-    entry = m.entries[index]
-    m.artwork.uri = "pkg:/images/logo.png"
-    if entry.poster <> invalid and entry.poster <> "" then m.artwork.uri = entry.poster
-    m.detailTitle.text = entry.title
-    m.detail.text = ""
-    if entry.description <> invalid then m.detail.text = entry.description
-    if m.view = "channels"
-        m.detailTitle.text = "Now: " + entry.now
-        m.detail.text = "Next: " + entry.next
-    else if m.view = "library"
-        m.detail.text = entry.items.Count().ToStr() + " programme(s) • OK to browse"
-    else if m.view = "episodes"
-        m.detail.text = Int(entry.duration / 60).ToStr() + " minutes • OK to play"
-    end if
+    if m.view <> "channels" then return
+    m.status.text = "CH " + m.entries[index].number.ToStr() + " • " + m.entries[index].now
 end sub
 
 sub onItemSelected()
     index = m.list.itemSelected
+    if m.view <> "channels" or index < 0 or index >= m.entries.Count() then return
+    id = m.entries[index].id
+    m.restoreTarget = "content"
+    requestPlayback(id)
+end sub
+
+sub onGridSelected()
+    index = m.libraryGrid.itemSelected
     if index < 0 or index >= m.entries.Count() then return
     entry = m.entries[index]
     if m.view = "themes"
         applyTheme(entry.id)
         m.registry.Write("theme", entry.id)
         m.registry.Flush()
+        renderList(true)
     else if m.view = "library"
         m.group = entry
         m.view = "episodes"
         renderList(false)
-    else
+    else if m.view = "episodes"
+        m.restoreTarget = "content"
+        m.fullscreen = true
         requestPlayback(entry.id)
     end if
 end sub
@@ -283,6 +329,10 @@ sub applyTheme(theme as string)
     m.list.focusBitmapBlendColor = accent
     m.top.FindNode("hint").color = accent
     m.home.accent = accent
+    m.channels.accent = accent
+    m.libraryGrid.focusBitmapBlendColor = accent
+    m.playerFocus.color = accent
+    m.viewerAccent = accent
     palette = CreateObject("roSGNode", "RSGPalette")
     palette.colors = {
         DialogBackgroundColor: background
@@ -300,6 +350,7 @@ sub applyTheme(theme as string)
 end sub
 
 sub showSearch()
+    m.restoreTarget = "menu"
     dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
     dialog.title = "Find your next favourite"
     dialog.buttons = ["Search", "Cancel"]
@@ -313,10 +364,13 @@ sub onSearch(event as object)
         m.search = Left(dialog.text, 100)
         m.view = "library"
         m.group = invalid
+        m.autoTune = false
         renderList(false)
+        layoutVideo()
+        m.restoreTarget = "content"
     end if
     dialog.close = true
-    if m.entries.Count() > 0 then m.list.SetFocus(true) else m.menu.SetFocus(true)
+    restoreFocus()
 end sub
 
 sub showMessage(title as string, lines as object)
@@ -351,7 +405,7 @@ sub closeMessage()
 end sub
 
 sub onRefresh()
-    if not m.video.visible and not m.isLoadingPlayback and m.top.dialog = invalid then refreshCatalog()
+    if not m.isLoadingPlayback and m.top.dialog = invalid then refreshCatalog()
 end sub
 
 sub onLaunch()
@@ -361,7 +415,9 @@ sub onLaunch()
     if type(args.mediaType) <> "roString" and type(args.mediaType) <> "String" then return
     if Len(args.contentId) > 255 then return
     if m.top.dialog <> invalid then m.top.dialog.close = true
+    m.autoTune = false
     showBrowser()
+    m.restoreTarget = "player"
     m.pendingLaunch = { id: args.contentId, mediaType: LCase(args.mediaType) }
     if m.catalog <> invalid then dispatchLaunch()
 end sub
@@ -372,6 +428,9 @@ sub dispatchLaunch()
     if link.mediaType = "live"
         for each channel in m.catalog.channels
             if channel.id = link.id
+                m.view = "live"
+                renderList(false)
+                m.fullscreen = true
                 requestPlayback(channel.id)
                 return
             end if
@@ -383,7 +442,9 @@ sub dispatchLaunch()
                 m.view = "episodes"
                 m.group = group
                 renderList(false)
-                m.list.SetFocus(true)
+                layoutVideo()
+                m.restoreTarget = "content"
+                m.libraryGrid.SetFocus(true)
                 return
             end if
             for each item in group.items
@@ -393,8 +454,15 @@ sub dispatchLaunch()
                         m.view = "episodes"
                         m.group = group
                         renderList(false)
-                        m.list.SetFocus(true)
+                        layoutVideo()
+                        m.restoreTarget = "content"
+                        m.libraryGrid.SetFocus(true)
                     else if link.mediaType = item.mediaType or link.mediaType = "short-form"
+                        m.view = "episodes"
+                        m.group = group
+                        renderList(false)
+                        m.restoreTarget = "content"
+                        m.fullscreen = true
                         requestPlayback(item.id)
                     end if
                     return
@@ -404,38 +472,3 @@ sub dispatchLaunch()
     end if
     showMessage("Programme unavailable", ["This programme is not available in the current profile."])
 end sub
-
-function onKeyEvent(key as string, press as boolean) as boolean
-    if not press then return false
-    if m.home.visible then return false
-    if key = "back"
-        if m.video.visible or m.isLoadingPlayback
-            stopPlayback()
-            return true
-        else if m.view = "episodes" and m.list.HasFocus()
-            m.view = "library"
-            m.group = invalid
-            renderList(false)
-            return true
-        else if m.list.HasFocus()
-            m.menu.SetFocus(true)
-            return true
-        else if m.menu.HasFocus()
-            showHome()
-            return true
-        end if
-        return false
-    end if
-    if m.video.visible then return false
-    if key = "left" and m.list.HasFocus()
-        m.menu.SetFocus(true)
-        return true
-    else if key = "right" and m.menu.HasFocus() and m.entries.Count() > 0
-        m.list.SetFocus(true)
-        return true
-    else if key = "options"
-        showSearch()
-        return true
-    end if
-    return false
-end function

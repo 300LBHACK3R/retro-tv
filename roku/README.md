@@ -6,8 +6,10 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 - Profile-style home screen on every normal launch, with **Watch for free** and **Create account** cards. Logo, Christmas room, guest portrait and account QR code are packaged locally, so the home screen does not wait for the network. Back from the navigation menu, or its Home entry, returns here.
 - Create account shows a scannable link to the existing website account screen. It explicitly describes website signup; it does not claim to link or sign in the Roku. A saved Kids session can continue free viewing but cannot open this account screen until a parent exits Kids with the PIN.
-- Live channel list with current/next listings and playback from the station clock.
-- Grouped on-demand library, title search, cover images and resumed viewing.
+- A shared live viewer after Watch for free: inline video, now/next details, and a horizontal channel strip. It starts channel 1 when that channel is in the current audience's lineup, otherwise the first available channel.
+- A three-column live guide showing channel, on now and up next. Video keeps running in a small header player while browsing the guide, artwork library, search results or themes.
+- Grouped on-demand library, four-column artwork grid, title search and resumed viewing. Library titles open fullscreen; Back returns to the same library.
+- OK on the live player opens fullscreen. Back restores the browsing layout without replacing the Video node or seeking; native Roku transport and caption controls remain available in fullscreen.
 - Persistent Kids mode with a local four-digit parent PIN, bounded retry lockout, separate viewing history, and server-filtered channels, programmes and artwork.
 - Free Christmas '96 and Classic Blue styles across navigation, lists, controls, keyboard and PIN dialogs. The Christmas logo and room artwork come from the website's existing assets.
 - Cold and warm deep links, playback/network error screens, remote navigation, and launch-performance signalling.
@@ -28,6 +30,8 @@ npm --prefix roku audit
 
 The output is `roku/dist/tates-tv-roku.zip`. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
+The optional `tests/viewer.brs` harness exercises the actual viewer routing with mock node fields and focus. Run it from `roku/` with an installed BrightScript interpreter (`brs --root tests components/Viewer.brs tests/viewer.brs`; verified with brs 0.45.0 in an isolated test environment). That interpreter is not a build dependency and is not included in the ZIP. These checks cover free/Kids entry, deferred tuning, deep-link priority, uninterrupted resizing, browse focus and native fullscreen controls. They do not emulate SceneGraph rendering, networking, decoding or physical remote behaviour.
+
 ## Install on a test Roku
 
 1. Deploy the website update first. `https://www.tatestv.ca/api/roku/catalog?audience=all` must return `ok: true` and `version: 1`.
@@ -45,6 +49,8 @@ Record results and the Roku model/OS before calling this release ready:
 
 - Cold launch, warm launch, readable artwork, long titles, every menu and Back/Options behaviour.
 - Launch without an account: check the Christmas home, highlighted profile cards, left/right/OK, free entry, Home return and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: the home artwork and cards must still be usable. Deep links still open their target directly.
+- From Watch for free, confirm live video starts inside the viewer and now/next matches the station. Press OK for fullscreen, then Back: playback should continue at the same position. Press Down for the channel strip, Left/Right to browse and OK to tune. Up returns to the player; Back returns to the menu.
+- Open the guide and library during playback: confirm the small header player continues, text and focus borders are readable, and scrolling stays responsive. Open a library title, then Back to its episode grid. Test a slow channel response while moving between menu, guide and library: completion must not steal browsing focus.
 - Play a regular live channel through a programme/ad boundary; confirm source offsets after a mid-roll and after rejoining a channel.
 - Play MP4 and MKV files; test audio, captions, seeking and a resumed library title. File extensions alone do not establish codec compatibility.
 - Disconnect/reconnect networking; verify an unavailable programme returns a usable error screen.

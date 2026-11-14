@@ -7,6 +7,7 @@
   <script type="text/brightscript" uri="TatesScene.brs" />
   <script type="text/brightscript" uri="Profiles.brs" />
   <script type="text/brightscript" uri="Playback.brs" />
+  <script type="text/brightscript" uri="Viewer.brs" />
   <children>
     <Rectangle id="background" width="1280" height="720" color="0x10271FFF" />
     <Poster id="room" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" opacity="0.4" uri="pkg:/images/room.jpg" />
@@ -15,18 +16,35 @@
       <Poster uri="pkg:/images/logo.png" translation="[50,48]" width="155" height="100" loadDisplayMode="scaleToFit" />
       <Label id="heading" translation="[255,65]" width="680" height="44" text="Good TV. Your way." font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
       <Label id="profileLabel" translation="[960,74]" width="270" height="36" horizAlign="right" color="0xE7C584FF" />
-      <Label id="status" translation="[255,114]" width="960" height="35" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+      <Label id="status" translation="[255,114]" width="730" height="35" font="font:SmallSystemFont" color="0xD5DDDBFF" />
       <Rectangle id="menuPanel" translation="[40,165]" width="205" height="460" color="0x193B2FFF" />
       <LabelList id="menu" translation="[52,178]" itemSize="[180,52]" numRows="8" itemSpacing="[0,3]" color="0xFFF3D8FF" focusedColor="0x10271FFF" focusBitmapBlendColor="0xE7C584FF" font="font:SmallBoldSystemFont" focusedFont="font:SmallBoldSystemFont" vertFocusAnimationStyle="floatingFocus" />
       <Rectangle id="listPanel" translation="[255,165]" width="960" height="460" color="0x102035F5" />
-      <LabelList id="list" translation="[275,185]" itemSize="[500,56]" numRows="7" itemSpacing="[0,3]" color="0xF2F5FFFF" focusedColor="0x102035FF" focusBitmapBlendColor="0xE7C584FF" font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" vertFocusAnimationStyle="floatingFocus" />
-      <Poster id="artwork" translation="[805,185]" width="385" height="225" loadDisplayMode="scaleToFit" uri="pkg:/images/logo.png" />
-      <Label id="detailTitle" translation="[805,430]" width="385" height="80" wrap="true" maxLines="2" font="font:MediumBoldSystemFont" color="0xFFF3D8FF" />
-      <Label id="detail" translation="[805,520]" width="385" height="88" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+      <Group id="liveStage">
+        <Rectangle id="playerFocus" translation="[269,179]" width="652" height="372" color="0xE7C584FF" visible="false" />
+        <Group id="playerTarget">
+          <Rectangle translation="[275,185]" width="640" height="360" color="0x060C14FF" />
+          <Label id="playerMessage" translation="[315,300]" width="560" height="100" horizAlign="center" wrap="true" maxLines="3" text="Getting your TV ready..." font="font:MediumSystemFont" color="0xFFF3D8FF" />
+        </Group>
+        <Label id="channelTitle" translation="[935,185]" width="260" height="54" wrap="true" maxLines="2" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label translation="[935,255]" width="260" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label id="nowTitle" translation="[935,290]" width="260" height="90" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xFFF3D8FF" />
+        <Label translation="[935,402]" width="260" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label id="nextTitle" translation="[935,438]" width="260" height="90" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+        <ChannelStrip id="channels" translation="[275,555]" />
+      </Group>
+      <Group id="guideStage" visible="false">
+        <Label translation="[287,179]" width="190" height="28" text="CHANNEL" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label translation="[505,179]" width="321" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <Label translation="[854,179]" width="327" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+        <MarkupList id="list" translation="[275,220]" itemComponentName="ProgrammeRow" itemSize="[920,54]" numRows="7" itemSpacing="[0,3]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
+      </Group>
+      <MarkupGrid id="libraryGrid" translation="[283,192]" itemComponentName="ArtworkCard" itemSize="[214,200]" itemSpacing="[14,18]" numColumns="4" numRows="2" visible="false" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
+      <Label id="emptyMessage" translation="[315,300]" width="820" height="120" wrap="true" maxLines="3" horizAlign="center" visible="false" font="font:MediumSystemFont" color="0xFFF3D8FF" />
       <Label id="hint" translation="[52,645]" width="1160" height="35" text="OK select   •   Back return   •   * search library" font="font:SmallSystemFont" color="0xE7C584FF" />
     </Group>
     <HomeScreen id="home" />
-    <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" />
+    <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
     <Timer id="refreshTimer" duration="60" repeat="true" />
     <Timer id="segmentTimer" duration="30" repeat="false" />
   </children>
