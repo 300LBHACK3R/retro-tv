@@ -8,6 +8,7 @@
   <script type="text/brightscript" uri="Profiles.brs" />
   <script type="text/brightscript" uri="Playback.brs" />
   <script type="text/brightscript" uri="Viewer.brs" />
+  <script type="text/brightscript" uri="Guide.brs" />
   <children>
     <Rectangle id="background" width="1280" height="720" color="0x10271FFF" />
     <Poster id="room" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" opacity="0.4" uri="pkg:/images/room.jpg" />
@@ -33,19 +34,22 @@
         <Label id="nextTitle" translation="[935,438]" width="260" height="90" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
         <ChannelStrip id="channels" translation="[275,555]" />
       </Group>
-      <Group id="guideStage" visible="false">
-        <Label translation="[287,179]" width="190" height="28" text="CHANNEL" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-        <Label translation="[505,179]" width="321" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-        <Label translation="[854,179]" width="327" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-        <MarkupList id="list" translation="[275,220]" itemComponentName="ProgrammeRow" itemSize="[920,54]" numRows="7" itemSpacing="[0,3]" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
-      </Group>
       <MarkupGrid id="libraryGrid" translation="[283,192]" itemComponentName="ArtworkCard" itemSize="[214,200]" itemSpacing="[14,18]" numColumns="4" numRows="2" visible="false" drawFocusFeedback="false" vertFocusAnimationStyle="floatingFocus" />
       <Label id="emptyMessage" translation="[315,300]" width="820" height="120" wrap="true" maxLines="3" horizAlign="center" visible="false" font="font:MediumSystemFont" color="0xFFF3D8FF" />
       <Label id="hint" translation="[52,645]" width="970" height="35" text="OK select   •   Back return   •   * viewer options" font="font:SmallSystemFont" color="0xE7C584FF" />
       <Label id="buildLabel" translation="[1060,645]" width="155" height="35" horizAlign="right" font="font:SmallSystemFont" color="0xD5DDDBFF" />
     </Group>
     <HomeScreen id="home" visible="false" />
+    <Rectangle id="guideBackdrop" width="1280" height="720" color="0x081723FF" visible="false" />
     <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
+    <Group id="liveBanner" visible="false">
+      <Rectangle translation="[40,550]" width="1200" height="134" color="0x102035F0" />
+      <Label id="bannerChannel" translation="[64,562]" width="1152" height="34" font="font:MediumBoldSystemFont" color="0xE7C584FF" />
+      <Label id="bannerProgramme" translation="[64,602]" width="1152" height="32" font="font:SmallSystemFont" color="0xFFF3D8FF" />
+      <Label translation="[64,644]" width="1152" height="30" text="Up/Down change channel   •   OK live guide   •   Back viewer   •   * captions" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+    </Group>
+    <LiveGuide id="guide" visible="false" />
+    <Timer id="bannerTimer" duration="5" repeat="false" />
     <Timer id="refreshTimer" duration="60" repeat="true" />
     <Timer id="segmentTimer" duration="30" repeat="false" />
   </children>

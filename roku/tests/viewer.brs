@@ -1,4 +1,4 @@
-' Run with an off-device BrightScript interpreter, alongside components/Viewer.brs.
+' Run with an off-device BrightScript interpreter, alongside components/Viewer.brs and components/Guide.brs.
 ' Nodes below model focus and fields only; they do not simulate video or render XML.
 sub main()
     resetViewer()
@@ -137,6 +137,66 @@ sub main()
     m.requested = ""
     check(not onKeyEvent("channelup", true) and m.requested = "", "Channel shortcuts do not interrupt PIN or search dialogs")
 
+    resetViewer()
+    m.catalog = { channels: [{ id: "channel:1", number: 1, title: "Retro", now: "Show" }, { id: "channel:7", number: 7, title: "Kids", now: "Cartoon" }] }
+    m.playing = { id: "channel:1", mediaType: "live", title: "Show" }
+    m.tunedChannelId = "channel:1"
+    m.video.visible = true
+    m.video.control = "play"
+    m.video.position = 73
+    m.restoreTarget = "player"
+    enterFullscreen()
+    check(not m.video.enableUI, "Live fullscreen reserves directional keys for channel surfing")
+    check(m.liveBanner.visible, "Fullscreen explains channel and guide controls")
+    check(onKeyEvent("up", true) and m.requested = "channel:7" and m.fullscreen, "Up tunes the next allowed channel without leaving fullscreen")
+    check(onKeyEvent("down", true) and m.requested = "channel:1" and m.fullscreen, "Down returns to the previous station")
+    m.requested = ""
+    check(not onKeyEvent("up", false) and m.requested = "", "Releasing a channel key does not tune twice")
+    check(not onKeyEvent("options", true), "Live fullscreen leaves the native captions shortcut available")
+    check(onKeyEvent("play", true) and m.video.control = "play", "Live transport cannot pause the station clock")
+    check(onKeyEvent("OK", true), "OK opens the live guide from fullscreen")
+    check(m.guide.visible and m.guideBackdrop.visible and m.focus.current = "guide", "The guide receives focus above the existing video")
+    check(m.video.width = 176 and m.video.position = 73 and m.video.control = "play", "Guide preview resizes without stopping, seeking or retuning")
+    check(m.catalogRefreshed and m.guide.channelId = "channel:1", "Opening the guide refreshes listings and identifies the tuned station")
+    check(not onKeyEvent("up", true) and m.requested = "", "Guide arrows cannot change the background channel")
+    closeGuide()
+    check(not m.guide.visible and m.fullscreen and m.video.width = 1280, "Back restores the same fullscreen layout")
+    check(m.focus.current = "video" and m.requested = "", "Closing the guide restores playback focus without a network tune")
+    openGuide()
+    m.guide.selectedId = "channel:1"
+    onGuideSelected()
+    check(not m.guide.visible and m.requested = "", "Selecting the playing station returns to fullscreen without restarting it")
+    openGuide()
+    m.guide.selectedId = "channel:7"
+    onGuideSelected()
+    check(m.requested = "channel:7" and m.fullscreen and m.focus.current = "video", "Selecting another guide row tunes it in fullscreen")
+    openGuide()
+    m.catalog.channels = [{ id: "channel:1", number: 1, title: "Retro", now: "Show" }]
+    m.guide.selectedId = "channel:7"
+    m.requested = ""
+    onGuideSelected()
+    check(m.requested = "" and m.guide.visible, "A removed channel cannot be tuned by a queued guide selection")
+
+    resetViewer()
+    m.kids = true
+    m.catalog = { channels: [{ id: "channel:kids", number: 22, title: "Kids", now: "Cartoon" }] }
+    m.playing = { id: "channel:kids", mediaType: "live", title: "Cartoon" }
+    m.tunedChannelId = "channel:kids"
+    m.video.visible = true
+    enterFullscreen()
+    check(onKeyEvent("up", true) and m.requested = "channel:kids", "Fullscreen surfing stays within a one-channel Kids lineup")
+    openGuide()
+    check(m.guide.channels.Count() = 1 and m.guide.channels[0].id = "channel:kids", "The guide receives only the filtered Kids catalogue")
+
+    resetViewer()
+    m.playing = { id: "media:episode", mediaType: "episode", title: "Episode" }
+    m.video.visible = true
+    enterFullscreen()
+    check(m.video.enableUI, "Library fullscreen keeps the native transport UI")
+    for each key in ["up", "down", "left", "right", "OK", "play", "rewind", "fastforward", "options"]
+        check(not onKeyEvent(key, true), "VOD keeps native control: " + key)
+    end for
+
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
@@ -146,9 +206,17 @@ end sub
 
 sub resetViewer()
     m.focus = { current: "" }
+    m.guide = focusNode("guide")
+    m.guide.visible = false
+    m.guide.CallFunc = sub(name)
+        if name = "open" then m.SetFocus(true)
+    end sub
+    m.guideBackdrop = { visible: false }
+    m.liveBanner = { visible: false }
+    m.bannerTimer = { control: "stop" }
     m.top = {
         dialog: invalid
-        nodes: { hint: {} }
+        nodes: { hint: {}, bannerChannel: {}, bannerProgramme: {} }
         FindNode: function(id)
             return m.nodes[id]
         end function
@@ -159,7 +227,6 @@ sub resetViewer()
     m.playerTarget = focusNode("player")
     m.channels = focusNode("channels")
     m.menu = focusNode("menu")
-    m.list = focusNode("guide")
     m.libraryGrid = focusNode("library")
     m.playerMessage = { text: "" }
     m.playerFocus = { visible: false }
@@ -209,6 +276,8 @@ sub renderList(preserve as boolean)
 end sub
 sub requestPlayback(id as string)
     m.requested = id
+    m.requestedId = id
+    m.tunedChannelId = id
 end sub
 sub stopPlayback()
     m.stopped = true
@@ -216,6 +285,18 @@ sub stopPlayback()
 end sub
 sub restoreFocus()
     m.restored = m.restoreTarget
+    if m.guide.visible
+        m.guide.SetFocus(true)
+    else if m.fullscreen
+        m.video.SetFocus(true)
+    else if m.restoreTarget = "player"
+        m.playerTarget.SetFocus(true)
+    else if m.restoreTarget = "menu"
+        m.menu.SetFocus(true)
+    end if
+end sub
+sub refreshCatalog()
+    m.catalogRefreshed = true
 end sub
 sub markLaunchComplete()
     m.launchComplete = true

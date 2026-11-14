@@ -1,5 +1,5 @@
 sub init()
-    for each id in ["home", "browser", "menu", "list", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guideStage", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer"]
+    for each id in ["home", "browser", "menu", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guide", "guideBackdrop", "liveBanner", "bannerTimer", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer"]
         m[id] = m.top.FindNode(id)
     end for
     m.registry = CreateObject("roRegistrySection", "tates-tv-v1")
@@ -23,8 +23,9 @@ sub init()
     m.restoreTarget = "menu"
     m.home.ObserveField("action", "onHomeAction")
     m.menu.ObserveField("itemSelected", "onMenuSelected")
-    m.list.ObserveField("itemSelected", "onItemSelected")
-    m.list.ObserveField("itemFocused", "onGuideFocused")
+    m.guide.ObserveField("selectedId", "onGuideSelected")
+    m.guide.ObserveField("closeRequested", "closeGuide")
+    m.bannerTimer.ObserveField("fire", "hideLiveBanner")
     m.libraryGrid.ObserveField("itemSelected", "onGridSelected")
     m.channels.ObserveField("selectedId", "onChannelSelected")
     m.playerTarget.ObserveField("focusedChild", "onPlayerFocus")
@@ -41,6 +42,7 @@ sub init()
 end sub
 
 sub showHome()
+    dismissGuide()
     m.autoTune = false
     m.pendingLaunch = invalid
     stopPlayback()
@@ -61,6 +63,8 @@ end sub
 sub restoreFocus()
     if m.home.visible
         m.home.SetFocus(true)
+    else if m.guide.visible
+        m.guide.SetFocus(true)
     else if m.fullscreen
         m.video.SetFocus(true)
     else if m.restoreTarget = "player" and m.view = "live"
@@ -121,6 +125,7 @@ sub onCatalog(event as object)
         return
     end if
     m.catalog = data
+    m.guide.channels = data.channels
     if m.view = "episodes" and m.group <> invalid
         previousId = m.group.id
         m.group = invalid
@@ -168,7 +173,9 @@ sub onMenuSelected()
         openLive()
         return
     else if index = 1
-        m.view = "channels"
+        m.restoreTarget = "menu"
+        openGuide()
+        return
     else if index = 2
         m.view = "library"
         m.group = invalid
@@ -196,10 +203,8 @@ end sub
 sub renderList(preserve as boolean)
     selectedId = ""
     focused = m.libraryGrid.itemFocused
-    if m.view = "channels" then focused = m.list.itemFocused
     if preserve and focused >= 0 and focused < m.entries.Count() then selectedId = m.entries[focused].id
     m.liveStage.visible = m.view = "live"
-    m.guideStage.visible = m.view = "channels"
     m.libraryGrid.visible = m.view = "library" or m.view = "episodes" or m.view = "themes"
     m.emptyMessage.visible = false
     m.entries = []
@@ -215,10 +220,7 @@ sub renderList(preserve as boolean)
         m.heading.text = "Make yourself at home."
         m.entries = [{ id: "christmas", title: "Christmas '96", poster: "pkg:/images/room.jpg" }, { id: "retro", title: "Classic Blue", poster: "pkg:/images/logo.png" }]
     else if m.catalog <> invalid
-        if m.view = "channels"
-            m.heading.text = "Live guide • On now. Up next."
-            m.entries = m.catalog.channels
-        else if m.view = "episodes" and m.group <> invalid
+        if m.view = "episodes" and m.group <> invalid
             m.heading.text = m.group.title
             m.entries = m.group.items
         else
@@ -239,15 +241,9 @@ sub renderList(preserve as boolean)
         node.title = entry.title
         node.HDPosterUrl = "pkg:/images/logo.png"
         if entry.poster <> invalid then node.HDPosterUrl = entry.poster
-        if m.view = "channels"
-            node.title = "CH " + entry.number.ToStr() + "  " + entry.title
-            node.shortDescriptionLine1 = entry.now
-            node.shortDescriptionLine2 = entry.next
-        end if
         if entry.id = selectedId then selected = index
     end for
     target = m.libraryGrid
-    if m.view = "channels" then target = m.list
     target.content = content
     if m.entries.Count() > 0
         target.jumpToItem = selected
@@ -264,26 +260,9 @@ sub focusContent()
         focusPlayer()
     else if m.entries.Count() = 0
         m.menu.SetFocus(true)
-    else if m.view = "channels"
-        m.list.SetFocus(true)
     else
         m.libraryGrid.SetFocus(true)
     end if
-end sub
-
-sub onGuideFocused()
-    index = m.list.itemFocused
-    if index < 0 or index >= m.entries.Count() then return
-    if m.view <> "channels" then return
-    m.status.text = "CH " + m.entries[index].number.ToStr() + " • " + m.entries[index].now
-end sub
-
-sub onItemSelected()
-    index = m.list.itemSelected
-    if m.view <> "channels" or index < 0 or index >= m.entries.Count() then return
-    id = m.entries[index].id
-    m.restoreTarget = "content"
-    requestPlayback(id)
 end sub
 
 sub onGridSelected()
@@ -321,7 +300,7 @@ sub applyTheme(theme as string)
     m.top.FindNode("menuPanel").color = menu
     m.top.FindNode("accent").color = accent
     m.menu.focusBitmapBlendColor = accent
-    m.list.focusBitmapBlendColor = accent
+    m.guide.accent = accent
     m.top.FindNode("hint").color = accent
     m.home.accent = accent
     m.channels.accent = accent
@@ -407,6 +386,7 @@ sub onLaunch()
     args = m.top.launch
     if not isPlaybackLaunch(args) then return
     if m.top.dialog <> invalid then m.top.dialog.close = true
+    dismissGuide()
     m.autoTune = false
     showBrowser()
     m.restoreTarget = "player"

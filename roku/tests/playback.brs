@@ -70,6 +70,19 @@ sub main()
     check(m.launchComplete, "Successful video starts complete launch reporting")
 
     resetPlayback()
+    m.isLoadingPlayback = true
+    m.playRequest = 3
+    m.requestedId = "channel:1"
+    m.guide.visible = true
+    m.video.focusCalls = 0
+    m.video.SetFocus = sub(value)
+        m.focusCalls++
+    end sub
+    onPlayback(response({ requestId: 3, ok: true, playback: item }))
+    check(m.video.focusCalls = 0 and m.guide.visible, "A completed tune does not steal focus from an open guide")
+    check(m.video.control = "play", "Live segments continue playing while the guide is open")
+
+    resetPlayback()
     m.playing = { id: "media:episode", mediaType: "episode" }
     m.lastSavedPosition = 10
     m.video.position = 25
@@ -90,6 +103,8 @@ end sub
 
 sub resetPlayback()
     m.top = { dialog: invalid }
+    m.guide = { visible: false }
+    m.liveBanner = { visible: false }
     m.video = { visible: true, control: "play", position: 0, state: "playing", SetFocus: sub(value)
     end sub }
     m.segmentTimer = { control: "stop", duration: 0 }
@@ -132,4 +147,10 @@ sub markLaunchComplete()
 end sub
 sub showMessage(title as string, lines as object)
     m.dialogShown = true
+end sub
+
+sub hideLiveBanner()
+    m.liveBanner.visible = false
+end sub
+sub updateLiveBanner()
 end sub

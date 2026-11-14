@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LiveGuide" extends="Group">
+  <interface>
+    <field id="channels" type="array" onChange="updateChannels" />
+    <field id="channelId" type="string" onChange="render" />
+    <field id="accent" type="color" value="0xE7C584FF" onChange="render" />
+    <field id="selectedId" type="string" alwaysNotify="true" />
+    <field id="closeRequested" type="boolean" alwaysNotify="true" />
+    <function name="open" />
+  </interface>
+  <script type="text/brightscript" uri="LiveGuide.brs" />
+  <children>
+    <Poster uri="pkg:/images/logo.png" translation="[52,48]" width="155" height="100" loadDisplayMode="scaleToFit" />
+    <Label translation="[255,60]" width="730" height="44" text="Live guide" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
+    <Label translation="[255,112]" width="730" height="32" text="On now. Up next. Find your channel." font="font:SmallSystemFont" color="0xD5DDDBFF" />
+    <Rectangle translation="[40,165]" width="1200" height="460" color="0x102035FF" />
+    <Label translation="[64,177]" width="224" height="28" text="CHANNEL" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+    <Label translation="[308,177]" width="434" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+    <Label translation="[770,177]" width="434" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
+    <Group id="rows" translation="[52,215]" />
+    <Label id="empty" translation="[125,330]" width="1030" height="100" wrap="true" maxLines="3" horizAlign="center" text="No channels available yet. Press Back, then choose Refresh to try again." font="font:MediumSystemFont" color="0xFFF3D8FF" visible="false" />
+    <Label id="position" translation="[1000,633]" width="220" height="30" horizAlign="right" font="font:SmallSystemFont" color="0xD5DDDBFF" />
+    <Label translation="[52,667]" width="1170" height="30" text="Up/Down browse   •   Left/Right page   •   OK watch fullscreen   •   Back close" font="font:SmallSystemFont" color="0xE7C584FF" />
+  </children>
+</component>

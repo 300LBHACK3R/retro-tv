@@ -91,6 +91,8 @@ sub onPin(event as object)
 end sub
 
 sub setKids(enabled as boolean)
+    dismissGuide()
+    m.guide.channels = []
     stopPlayback()
     cancelTask("catalogTask")
     m.kids = enabled

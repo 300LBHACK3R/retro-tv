@@ -10,7 +10,7 @@ function files(directory) {
   });
 }
 const paths = files(root).map(path => relative(root, path).replaceAll("\\", "/"));
-for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "components/HomeScreen.xml", "components/ProfileCard.xml", "components/Viewer.brs", "components/ChannelStrip.xml", "components/ArtworkCard.xml", "components/ProgrammeRow.xml", "components/ContentFocus.brs", "images/logo.png", "images/room.jpg", "images/guest.png", "images/account-qr.png"])
+for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "components/HomeScreen.xml", "components/ProfileCard.xml", "components/Viewer.brs", "components/ChannelStrip.xml", "components/ArtworkCard.xml", "components/LiveGuide.xml", "components/LiveGuide.brs", "components/Guide.brs", "components/ContentFocus.brs", "images/logo.png", "images/room.jpg", "images/guest.png", "images/account-qr.png"])
   assert.ok(paths.includes(required), `Missing ${required}`);
 for (const path of paths)
   assert.match(path, /^(manifest|(?:source|components)\/[\w/-]+\.(?:brs|xml)|images\/[\w-]+\.(?:png|jpg))$/, `Unexpected package file: ${path}`);

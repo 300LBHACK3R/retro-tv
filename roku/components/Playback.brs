@@ -79,12 +79,14 @@ sub onPlayback(event as object)
     m.video.content = content
     m.video.visible = true
     layoutVideo()
-    if m.fullscreen and m.top.dialog = invalid then m.video.SetFocus(true)
+    if m.fullscreen and not m.guide.visible and m.top.dialog = invalid then m.video.SetFocus(true)
+    if m.liveBanner.visible then updateLiveBanner()
     m.video.control = "play"
     m.status.text = "Playing • " + item.title
 end sub
 
 sub stopPlayback()
+    hideLiveBanner()
     saveProgress()
     cancelTask("playTask")
     m.isLoadingPlayback = false
@@ -111,6 +113,7 @@ sub onVideoState()
             m.video.control = "stop"
             m.video.visible = false
             m.fullscreen = false
+            hideLiveBanner()
             m.playbackError = "Clip unavailable (" + detail + "). Waiting for the next live segment."
             m.playerMessage.text = "This clip could not play. Live TV will retry at the next segment."
             m.status.text = m.playbackError

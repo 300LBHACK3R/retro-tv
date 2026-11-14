@@ -115,6 +115,7 @@ sub changeLiveChannel(direction as integer)
     end if
     m.autoTune = false
     requestPlayback(m.catalog.channels[index].id)
+    showLiveBanner()
 end sub
 
 sub updateNowNext()
@@ -134,11 +135,18 @@ sub updateNowNext()
 end sub
 
 sub layoutVideo()
-    if m.fullscreen
+    if m.guide.visible
+        m.video.translation = [1020,48]
+        m.video.width = 176
+        m.video.height = 99
+        m.video.enableUI = false
+        m.playerFocus.visible = false
+    else if m.fullscreen
         m.video.translation = [0,0]
         m.video.width = 1280
         m.video.height = 720
-        m.video.enableUI = true
+        ' Live arrows belong to channel surfing; VOD retains Roku's transport UI.
+        m.video.enableUI = not isLivePlayback()
         m.playerFocus.visible = false
     else if m.view = "live"
         m.video.translation = [275,185]
@@ -156,7 +164,7 @@ sub layoutVideo()
     end if
     m.profileLabel.visible = not m.video.visible or m.view = "live"
     m.top.FindNode("hint").text = "OK select   •   Back return   •   * viewer options"
-    if m.view = "live" then m.top.FindNode("hint").text = "OK fullscreen   •   Down channels   •   Back menu   •   * options"
+    if m.view = "live" then m.top.FindNode("hint").text = "OK fullscreen   •   Right guide   •   Down channels   •   Back menu"
 end sub
 
 sub enterFullscreen()
@@ -164,9 +172,11 @@ sub enterFullscreen()
     m.fullscreen = true
     layoutVideo()
     m.video.SetFocus(true)
+    showLiveBanner()
 end sub
 
 sub leaveFullscreen()
+    hideLiveBanner()
     m.fullscreen = false
     layoutVideo()
     restoreFocus()
@@ -187,15 +197,11 @@ sub onViewerOption(event as object)
     if selection = 0
         enterFullscreen()
     else if selection = 1
-        m.autoTune = false
-        m.view = "channels"
-        renderList(false)
-        layoutVideo()
-        focusContent()
+        openGuide()
     else if selection = 2
         showSearch()
     else if selection = 3
-        showMessage("Remote controls", ["OK on the player: fullscreen. Back: viewer, menu, then Home. Down from the player: channels; Left/Right: browse; OK: tune; Up: player.", "Library fullscreen: Play/Pause, Rewind, Fast Forward and Replay use Roku's player. Live TV follows the station clock. * in fullscreen opens Roku caption/audio options where available.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
+        showMessage("Remote controls", ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: Up/Down browse, Left/Right page, OK watch fullscreen, Back return without tuning. Library fullscreen retains Roku's Play/Pause, seeking and Replay. * opens caption/audio options where available.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
     else
         restoreFocus()
     end if
@@ -204,6 +210,7 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press or m.home.visible then return false
     if m.top.dialog <> invalid then return false
+    if m.guide.visible then return false
     if key = "channelup" or key = "channeldown"
         direction = 1
         if key = "channeldown" then direction = -1
@@ -214,6 +221,21 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if key = "back"
             leaveFullscreen()
             return true
+        end if
+        if isLivePlayback()
+            if key = "up" or key = "down"
+                direction = 1
+                if key = "down" then direction = -1
+                changeLiveChannel(direction)
+                return true
+            else if key = "OK" or key = "left" or key = "right"
+                openGuide()
+                return true
+            else if key = "play" or key = "playonly" or key = "pause" or key = "replay" or key = "rewind" or key = "fastforward"
+                ' Live TV follows the station clock; these keys cannot pause an ad.
+                showLiveBanner()
+                return true
+            end if
         end if
         ' Keep Roku's transport and closed-caption controls on the Video node.
         return false
@@ -249,6 +271,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
                 enterFullscreen()
             end if
             return true
+        else if key = "right"
+            openGuide()
+            return true
         else if key = "down" and m.catalog <> invalid
             if m.catalog.channels.Count() > 0
                 m.restoreTarget = "channels"
@@ -266,7 +291,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if m.menu.HasFocus() and key = "right"
         focusContent()
         return true
-    else if (m.list.HasFocus() or m.libraryGrid.HasFocus()) and key = "left"
+    else if m.libraryGrid.HasFocus() and key = "left"
         m.restoreTarget = "menu"
         m.menu.SetFocus(true)
         return true
