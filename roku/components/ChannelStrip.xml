@@ -2,7 +2,7 @@
 <component name="ChannelStrip" extends="Group">
   <interface>
     <field id="channels" type="array" onChange="updateChannels" />
-    <field id="channelId" type="string" onChange="render" />
+    <field id="channelId" type="string" onChange="syncTunedChannel" />
     <field id="selectedId" type="string" alwaysNotify="true" />
     <field id="accent" type="color" value="0xE7C584FF" onChange="render" />
   </interface>

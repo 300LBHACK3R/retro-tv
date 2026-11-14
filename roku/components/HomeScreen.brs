@@ -3,6 +3,7 @@ sub init()
     m.create = m.top.FindNode("create")
     m.chooser = m.top.FindNode("chooser")
     m.account = m.top.FindNode("account")
+    m.top.FindNode("homeBuildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
     m.selected = 0
     updateProfile()
     updateAccent()

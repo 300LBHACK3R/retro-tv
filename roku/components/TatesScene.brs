@@ -11,6 +11,8 @@ sub init()
     m.search = ""
     m.pendingLaunch = invalid
     m.playing = invalid
+    m.segmentClock = invalid
+    m.playbackError = ""
     m.isLoadingPlayback = false
     m.sequence = 0
     m.launchComplete = false
@@ -54,15 +56,6 @@ sub showBrowser()
     m.top.FindNode("room").opacity = 0.4
     m.browser.visible = true
     m.menu.SetFocus(true)
-end sub
-
-sub onHomeAction()
-    if m.home.action = "watch"
-        ' Guest entry keeps the saved Kids restriction; it never selects an adult profile.
-        enterViewer()
-    else if m.home.action = "parentAccount"
-        showMessage("Ask a parent", ["Choose Watch for free to continue the approved Kids lineup.", "To set up an account, a parent must first choose Exit Kids and enter the parent PIN."])
-    end if
 end sub
 
 sub restoreFocus()
@@ -138,6 +131,7 @@ sub onCatalog(event as object)
     end if
     m.status.text = "Free viewing • Updated from Tate's TV"
     if m.kids then m.status.text = "Kids mode • Only your approved lineup"
+    if m.playbackError <> "" then m.status.text = m.playbackError
     renderList(true)
     updateNowNext()
     if m.pendingLaunch <> invalid

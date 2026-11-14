@@ -4,8 +4,8 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 ## Included
 
-- Normal app launch opens live TV directly and starts playback when the catalogue arrives, without a profile, channel-selection or Play step. The saved Kids restriction still applies. The viewer footer shows the installed version for device testing.
-- A profile-style home screen remains available through Home in the menu, with **Watch for free** and **Create account** cards. Logo, Christmas room, guest portrait and account QR code are packaged locally. Back from the navigation menu also returns here.
+- Normal app launch opens the profile-style Home screen with **Watch for free** and **Create account** cards. Watch for free opens the shared viewer and automatically starts live TV when the catalogue is ready. The saved Kids restriction still applies. Home and viewer show the installed version for device testing.
+- Logo, Christmas room, guest portrait and account QR code are packaged locally. Home in the menu and Back from the navigation menu return to the cards and stop playback.
 - Create account shows a scannable link to the existing website account screen. It explicitly describes website signup; it does not claim to link or sign in the Roku. A saved Kids session can continue free viewing but cannot open this account screen until a parent exits Kids with the PIN.
 - A shared live viewer after Watch for free: inline video, now/next details, and a horizontal channel strip. It starts channel 1 when that channel is in the current audience's lineup, otherwise the first available channel.
 - A three-column live guide showing channel, on now and up next. Video keeps running in a small header player while browsing the guide, artwork library, search results or themes.
@@ -14,6 +14,7 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 - Persistent Kids mode with a local four-digit parent PIN, bounded retry lockout, separate viewing history, and server-filtered channels, programmes and artwork.
 - Free Christmas '96 and Classic Blue styles across navigation, lists, controls, keyboard and PIN dialogs. The Christmas logo and room artwork come from the website's existing assets.
 - Cold and warm deep links, playback/network error screens, remote navigation, and launch-performance signalling.
+- Live segment changes follow the station clock. Old source-position notifications and early file endings cannot repeatedly reopen or skip a short commercial. A decoder failure shows a safe error code, preserves navigation and retries at the next scheduled segment. OK retries the selected station immediately.
 
 Fixed airtimes, day-specific campaigns and programme blocks use the Roku's configured time zone, including daylight-saving transitions. Ordinary browser dates keep their existing behaviour. The app reads the existing public programming database through `/api/roku/catalog` and `/api/roku/play`. Browsing refreshes every minute; the server coalesces reads for at most 15 seconds. New shows, posters and channel changes therefore require no app rebuild. Playback eligibility is checked again when tuning in. An expired cache is never used after a database failure.
 
@@ -31,7 +32,39 @@ npm --prefix roku audit
 
 The output is `roku/dist/tates-tv-roku.zip`. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
-The optional `tests/viewer.brs` harness exercises the actual viewer routing with mock node fields and focus. Run it from `roku/` with an installed BrightScript interpreter (`brs --root tests components/Viewer.brs tests/viewer.brs`; verified with brs 0.45.0 in an isolated test environment). That interpreter is not a build dependency and is not included in the ZIP. These checks cover free/Kids entry, deferred tuning, deep-link priority, uninterrupted resizing, browse focus and native fullscreen controls. They do not emulate SceneGraph rendering, networking, decoding or physical remote behaviour.
+Optional regression harnesses run the actual component functions with mock nodes, network boundaries and time. Run from `roku/` with brs 0.45.0 in an isolated test environment:
+
+```sh
+brs --root tests components/Viewer.brs tests/viewer.brs
+brs --root tests components/Playback.brs tests/playback.brs
+brs --root tests components/ChannelStrip.brs tests/channelstrip.brs
+brs --root tests components/HomeScreen.brs tests/home.brs
+```
+
+That interpreter is not a build dependency and is not included in the ZIP. Checks cover home/free/Kids entry, deferred tuning, deep-link priority, resizing, Back, channel keys, strip navigation, selected-channel retry, commercial boundaries, decoder failure recovery, stale responses and VOD progress. They do not emulate SceneGraph rendering, networking, decoding or physical remote behaviour.
+
+## Remote controls
+
+| Context | Control | Behaviour |
+| --- | --- | --- |
+| Home | Left/Right, OK | Choose free viewing or website account signup |
+| Account QR | OK or Back | Return to Home cards |
+| Inline live player | OK | Open fullscreen; retry selected station if the clip failed |
+| Inline live player | Down | Focus channel strip |
+| Channel strip | Left/Right, OK, Up | Browse, tune, return to player |
+| Menu | Up/Down, OK or Right | Browse navigation and open its content |
+| Browse screens | Play | Open the current video fullscreen |
+| Guide/library | Direction pad, OK | Browse channels/titles and select |
+| Episode list | Back | Return to its library |
+| Browse screens | Back | Return to menu, then Home |
+| Supported remotes | Channel Up/Down | Cycle the allowed live lineup, wrapping at the ends |
+| Fullscreen | Back | Return to the viewer without seeking or restarting |
+| Fullscreen library video | Play/Pause, Rewind, Fast Forward, Replay | Roku's native transport controls |
+| Fullscreen | * | Roku's native caption/audio options where available |
+| Browse screens | * | Viewer options and remote help |
+| Any screen | Roku Home, volume, mute, power | System/TV controls; not intercepted by the app |
+
+Live viewing follows the station clock and does not implement time-shifting. Pause and seeking are available for library titles. Captions require caption tracks in the source; the app does not generate them.
 
 ## Install on a test Roku
 
@@ -49,10 +82,10 @@ Developer enrollment: https://developer.roku.com/enrollment/standard
 Record results and the Roku model/OS before calling this release ready:
 
 - Cold launch, warm launch, readable artwork, long titles, every menu and Back/Options behaviour.
-- Launch without an account: live TV must open and begin playing without any keypress after launch. Check the installed version at bottom right. Open Home from the menu to test the highlighted profile cards, left/right/OK, free entry and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: navigation and Home must remain usable, and the viewer must show a retry message. Deep links must still open their target directly instead of first playing the default station.
+- Launch without an account: Home must open first. Check the installed version at bottom right. Select Watch for free: the viewer must open and begin playing without another keypress. Test highlighted cards, left/right/OK and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: navigation and Home must remain usable, and the viewer must show a retry message. Deep links must still open their target directly instead of first playing the default station.
 - From Watch for free, confirm live video starts inside the viewer and now/next matches the station. Press OK for fullscreen, then Back: playback should continue at the same position. Press Down for the channel strip, Left/Right to browse and OK to tune. Up returns to the player; Back returns to the menu.
 - Open the guide and library during playback: confirm the small header player continues, text and focus borders are readable, and scrolling stays responsive. Open a library title, then Back to its episode grid. Test a slow channel response while moving between menu, guide and library: completion must not steal browsing focus.
-- Play a regular live channel through a programme/ad boundary; confirm source offsets after a mid-roll and after rejoining a channel.
+- Play a regular live channel through programme → commercial → programme; confirm picture/audio, source offsets after a mid-roll and after rejoining a channel. Check short back-to-back ads. A deliberately unavailable clip must show its error code and move on at the next scheduled segment without a modal. Back/Home must cancel recovery.
 - Play MP4 and MKV files; test audio, captions, seeking and a resumed library title. File extensions alone do not establish codec compatibility.
 - Disconnect/reconnect networking; verify an unavailable programme returns a usable error screen.
 - Create a PIN, cancel/confirm it, enter Kids, restart the app, try an incorrect PIN, test the lockout and exit with the correct PIN. The app must remain in Kids after restart.

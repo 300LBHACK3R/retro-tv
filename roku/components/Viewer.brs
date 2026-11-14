@@ -3,7 +3,7 @@ sub startApp(args as dynamic)
         m.top.launch = args
         return
     end if
-    enterViewer()
+    showHome()
     markLaunchComplete()
 end sub
 
@@ -14,7 +14,16 @@ function isPlaybackLaunch(args as dynamic) as boolean
     return Len(args.contentId) > 0 and Len(args.contentId) <= 255 and Len(args.mediaType) > 0
 end function
 
-' Normal launches and free entry use the same audience-filtered live viewer.
+sub onHomeAction()
+    if m.home.action = "watch"
+        ' Guest entry retains the saved Kids restriction.
+        enterViewer()
+    else if m.home.action = "parentAccount"
+        showMessage("Ask a parent", ["Choose Watch for free to continue the approved Kids lineup.", "To set up an account, a parent must first choose Exit Kids and enter the parent PIN."])
+    end if
+end sub
+
+' Choosing free viewing opens live TV and starts the current audience's channel.
 sub enterViewer()
     m.view = "live"
     m.group = invalid
@@ -73,6 +82,39 @@ end sub
 sub onChannelSelected()
     m.restoreTarget = "channels"
     requestPlayback(m.channels.selectedId)
+end sub
+
+sub retryLiveChannel()
+    if m.catalog = invalid
+        m.autoTune = true
+        refreshCatalog()
+        return
+    end if
+    for each channel in m.catalog.channels
+        if channel.id = m.tunedChannelId
+            requestPlayback(channel.id)
+            return
+        end if
+    end for
+    m.autoTune = true
+    startDefaultChannel()
+end sub
+
+sub changeLiveChannel(direction as integer)
+    if m.catalog = invalid then return
+    count = m.catalog.channels.Count()
+    if count = 0 then return
+    index = -1
+    for i = 0 to count - 1
+        if m.catalog.channels[i].id = m.tunedChannelId then index = i
+    end for
+    if index < 0
+        index = 0
+    else
+        index = (index + direction + count) mod count
+    end if
+    m.autoTune = false
+    requestPlayback(m.catalog.channels[index].id)
 end sub
 
 sub updateNowNext()
@@ -153,7 +195,7 @@ sub onViewerOption(event as object)
     else if selection = 2
         showSearch()
     else if selection = 3
-        showMessage("Welcome to Tate's TV", ["Watch live, browse the guide, or choose a title from the library. OK on the player opens fullscreen; Back returns without restarting it.", "Kids mode needs a parent PIN to exit. Theme and viewing progress are saved on this Roku.", "Support and privacy: tatestv.ca/help • tatestv.ca/privacy"])
+        showMessage("Remote controls", ["OK on the player: fullscreen. Back: viewer, menu, then Home. Down from the player: channels; Left/Right: browse; OK: tune; Up: player.", "Library fullscreen: Play/Pause, Rewind, Fast Forward and Replay use Roku's player. Live TV follows the station clock. * in fullscreen opens Roku caption/audio options where available.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
     else
         restoreFocus()
     end if
@@ -162,6 +204,12 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press or m.home.visible then return false
     if m.top.dialog <> invalid then return false
+    if key = "channelup" or key = "channeldown"
+        direction = 1
+        if key = "channeldown" then direction = -1
+        changeLiveChannel(direction)
+        return true
+    end if
     if m.fullscreen
         if key = "back"
             leaveFullscreen()
@@ -185,15 +233,18 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if key = "options"
         showViewerOptions()
         return true
-    else if key = "play"
-        enterFullscreen()
+    else if key = "play" or key = "playonly"
+        if m.view = "live" and not m.video.visible and not m.isLoadingPlayback
+            retryLiveChannel()
+        else
+            enterFullscreen()
+        end if
         return true
     end if
     if m.playerTarget.HasFocus()
         if key = "OK"
             if not m.video.visible and not m.isLoadingPlayback
-                m.autoTune = true
-                if m.catalog = invalid then refreshCatalog() else startDefaultChannel()
+                retryLiveChannel()
             else
                 enterFullscreen()
             end if

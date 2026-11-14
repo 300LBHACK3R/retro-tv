@@ -4,16 +4,28 @@ sub main()
     resetViewer()
     m.home.visible = true
     startApp(invalid)
-    check(not m.home.visible and m.autoTune, "Normal app launch opens live TV without a profile or Play step")
-    check(m.launchComplete, "Normal launch reports its usable live viewer")
+    check(m.home.visible and not m.autoTune, "Normal app launch opens the account/free-viewing chooser")
+    check(m.launchComplete, "Normal launch reports its usable home screen")
     m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
     startDefaultChannel()
-    check(m.requested = "channel:1", "Normal launch starts playback when listings arrive")
+    check(m.requested = "", "Listings arriving behind Home do not start playback")
+    m.home.action = "watch"
+    onHomeAction()
+    check(m.requested = "channel:1" and not m.home.visible, "Choosing Watch for free opens the viewer and starts live TV")
 
     resetViewer()
     m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
     startApp({ source: "homescreen" })
-    check(m.requested = "channel:1", "An already loaded catalogue starts immediately")
+    check(m.requested = "" and m.home.visible, "An already loaded catalogue still waits for a home selection")
+
+    resetViewer()
+    startApp(invalid)
+    m.home.action = "watch"
+    onHomeAction()
+    check(m.autoTune and not m.home.visible, "Early free selection waits inside the viewer for the catalogue")
+    m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
+    startDefaultChannel()
+    check(m.requested = "channel:1", "A delayed catalogue starts live TV without another button press")
 
     resetViewer()
     startApp({ contentId: "media:episode", mediaType: "episode" })
@@ -91,6 +103,40 @@ sub main()
     m.top.dialog = {}
     check(not onKeyEvent("back", true), "Dialogs retain their own Back handling")
 
+    resetViewer()
+    m.catalog = { channels: [{ id: "channel:1", number: 1 }, { id: "channel:7", number: 7 }] }
+    m.tunedChannelId = "channel:7"
+    focusPlayer()
+    check(onKeyEvent("OK", true) and m.requested = "channel:7", "Retry keeps the failed channel instead of switching to channel one")
+    check(onKeyEvent("channelup", true) and m.requested = "channel:1", "Channel Up wraps within the allowed lineup")
+    m.tunedChannelId = "channel:1"
+    check(onKeyEvent("channeldown", true) and m.requested = "channel:7", "Channel Down wraps within the allowed lineup")
+    m.catalog.channels = []
+    m.requested = ""
+    check(onKeyEvent("channelup", true) and m.requested = "", "An empty approved lineup cannot tune an adult fallback")
+    m.home.visible = true
+    check(not onKeyEvent("play", true), "Transport keys cannot start hidden playback on Home")
+    m.home.visible = false
+    check(not onKeyEvent("OK", false), "Key releases never repeat selections")
+
+    resetViewer()
+    m.video.visible = true
+    m.video.control = "play"
+    m.restoreTarget = "content"
+    m.view = "episodes"
+    m.libraryGrid.SetFocus(true)
+    check(onKeyEvent("back", true) and m.view = "library", "Back from episodes returns to the library")
+    check(onKeyEvent("back", true) and m.focus.current = "menu", "Back from the library returns to navigation")
+    check(onKeyEvent("back", true) and m.home.visible, "Back from navigation returns to the home cards")
+    m.home.visible = false
+    m.fullscreen = true
+    for each key in ["play", "playonly", "replay", "rewind", "fastforward", "options"]
+        check(not onKeyEvent(key, true), "Fullscreen preserves native Roku control: " + key)
+    end for
+    m.top.dialog = {}
+    m.requested = ""
+    check(not onKeyEvent("channelup", true) and m.requested = "", "Channel shortcuts do not interrupt PIN or search dialogs")
+
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
@@ -127,6 +173,7 @@ sub resetViewer()
     m.kids = false
     m.view = "live"
     m.requested = ""
+    m.tunedChannelId = ""
     m.stopped = false
     m.launchComplete = false
     if m.failed = invalid then m.failed = 0
@@ -153,6 +200,10 @@ end sub
 ' Scene and API boundaries; the viewer's routing and layout functions run unchanged.
 sub showBrowser()
     m.home.visible = false
+end sub
+sub showHome()
+    m.home.visible = true
+    m.autoTune = false
 end sub
 sub renderList(preserve as boolean)
 end sub

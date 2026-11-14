@@ -18,6 +18,16 @@ sub updateChannels()
     render()
 end sub
 
+sub syncTunedChannel()
+    ' Follow channel keys without moving a viewer's in-progress strip selection.
+    if not m.top.HasFocus()
+        for i = 0 to m.ids.Count() - 1
+            if m.ids[i] = m.top.channelId then m.index = i
+        end for
+    end if
+    render()
+end sub
+
 sub render()
     m.top.RemoveChildrenIndex(m.top.GetChildCount(), 0)
     if m.top.channels = invalid then return

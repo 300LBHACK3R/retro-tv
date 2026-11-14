@@ -27,5 +27,6 @@
       <Label translation="[540,520]" width="500" height="82" text="Your website account won't sign in this TV yet. You can keep watching here for free." wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xD5DDDBFF" />
       <Label translation="[160,661]" width="960" height="30" horizAlign="center" text="OK or Back to return home" font="font:SmallSystemFont" color="0xE7C584FF" />
     </Group>
+    <Label id="homeBuildLabel" translation="[1060,645]" width="155" height="35" horizAlign="right" font="font:SmallSystemFont" color="0xD5DDDBFF" />
   </children>
 </component>
