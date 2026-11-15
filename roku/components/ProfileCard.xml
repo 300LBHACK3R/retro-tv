@@ -7,7 +7,6 @@
     <field id="portrait" type="string" alias="portraitImage.uri" />
     <field id="add" type="boolean" alias="addSymbol.visible" />
     <field id="selected" type="boolean" onChange="updateFocus" />
-    <field id="accent" type="color" value="0xE7C584FF" onChange="updateFocus" />
   </interface>
   <script type="text/brightscript" uri="ProfileCard.brs" />
   <script type="text/brightscript" uri="ThemeStyle.brs" />

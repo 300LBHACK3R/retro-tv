@@ -4,7 +4,6 @@
     <field id="themeColors" type="assocarray" onChange="updateColors" />
     <field id="channels" type="array" onChange="updateChannels" />
     <field id="channelId" type="string" onChange="render" />
-    <field id="accent" type="color" value="0xE7C584FF" onChange="render" />
     <field id="selectedId" type="string" alwaysNotify="true" />
     <field id="closeRequested" type="boolean" alwaysNotify="true" />
     <function name="open" />
@@ -12,6 +11,7 @@
   <script type="text/brightscript" uri="LiveGuide.brs" />
   <script type="text/brightscript" uri="ThemeStyle.brs" />
   <children>
+    <Rectangle id="accentLine" translation="[40,154]" width="1200" height="3" color="0xF1CA83FF" />
     <Poster uri="pkg:/images/logo.png" translation="[52,48]" width="155" height="100" loadDisplayMode="scaleToFit" />
     <Label id="title" translation="[255,60]" width="730" height="44" text="Live guide" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
     <Label id="subtitle" translation="[255,112]" width="730" height="32" text="On now. Up next. Find your channel." font="font:SmallSystemFont" color="0xD5DDDBFF" />

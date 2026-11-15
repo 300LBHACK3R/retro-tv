@@ -1,4 +1,4 @@
-# Tate's TV — Roku device-test build
+# Tate's TV — Roku v0.1.7 device-test build
 
 This is a native BrightScript/SceneGraph app, not a website wrapper. It is an unsigned development build. Compilation and server tests do not establish Roku hardware compatibility or store approval.
 
@@ -13,6 +13,7 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 - OK on the inline player opens fullscreen. Up/Down change live channels without leaving fullscreen; a five-second banner identifies the station and its controls. Back restores the browsing layout without replacing the Video node or seeking. Library playback retains native Roku transport; fullscreen Options remains available for captions/audio.
 - Persistent Kids mode with a local four-digit parent PIN, bounded retry lockout, separate viewing history, and server-filtered channels, programmes and artwork.
 - All seven free website themes: Christmas '96, Halloween '95, Halloween After Dark, Haunted Arcade, Neon CRT, Classic Cable 2006 and Bright Cable 2008. Seasonal room artwork and theme previews are packaged locally. Home, viewer, guide, cards, keyboard and PIN dialogs use the selected palette, including dark text for Bright Cable. Selection is saved on the device and marked in the theme grid; older Christmas/Classic Blue preferences migrate automatically.
+- The guide shares the viewer's backdrop, with themed panels behind its text. Christmas uses forest-green panels and gold highlights throughout the viewer and guide. Neon CRT and both cable themes have lightweight full-screen gradient backdrops. The playing channel keeps a LIVE label; a contrasting outline identifies the remote selection. Preview cards show each theme's own colours and a clear Selected badge, without carrying that badge into recycled library cards.
 - Cold and warm deep links, playback/network error screens, remote navigation, and launch-performance signalling.
 - Live segment changes follow the station clock. Old source-position notifications and early file endings cannot repeatedly reopen or skip a short commercial. A decoder failure shows a safe error code, preserves navigation and retries at the next scheduled segment. OK retries the selected station immediately.
 
@@ -32,6 +33,8 @@ npm --prefix roku audit
 
 The output is `roku/dist/tates-tv-roku.zip`. The build derives the free theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. Premium themes remain excluded until account entitlement synchronization is implemented. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
+The build removes obsolete generated theme images, verifies packaged assets and theme-to-node bindings, and checks at least 4.5:1 text contrast on the specified solid backgrounds. Translucent artwork, actual font sizing and TV display settings still require visual checks on a Roku.
+
 Optional regression harnesses run the actual component functions with mock nodes, network boundaries and time. Run from `roku/` with brs 0.45.0 in an isolated test environment:
 
 ```sh
@@ -41,6 +44,8 @@ brs --root tests components/Playback.brs tests/playback.brs
 brs --root tests components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip.brs
 brs --root tests components/ThemeStyle.brs components/HomeScreen.brs tests/home.brs
 brs --root dist/staging components/ThemeStyle.brs components/Themes.brs components/TatesScene.brs tests/themes.brs
+brs --root dist/staging components/ThemeStyle.brs components/ArtworkCard.brs tests/theme-cards.brs
+brs --root dist/staging components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip-render.brs
 ```
 
 That interpreter is not a build dependency and is not included in the ZIP. Checks cover home/free/Kids entry, deferred tuning, deep-link priority, resizing, guide paging/selection/refresh, focus during delayed responses, Back, fullscreen channel arrows, strip navigation, selected-channel retry, commercial boundaries, decoder failure recovery, stale responses and VOD progress. They do not emulate SceneGraph rendering, networking, decoding or physical remote behaviour.
@@ -100,6 +105,7 @@ Record results and the Roku model/OS before calling this release ready:
 - From the home screen in Kids mode, Watch for free must retain the Kids filter; Create account must show the parent notice and return focus to the cards, including when dismissed with Back.
 - Test approved Kids titles and blocked adult deep links. Review every programme and eligible ad before approving a Kids channel in the website admin.
 - Select every free theme and check its artwork, grid badge, guide, keyboard and PIN colours. Restart to confirm persistence. Check independent Household/Kids bookmarks. In Bright Cable, unfocused text must be dark and text on selected blue controls must be white.
+- For v0.1.7, confirm Themes says **7 free themes**. Select Christmas, open the guide and look for green panels, gold highlights and the Christmas backdrop. Browse away from the playing row: LIVE must stay on the tuned channel while the contrasting outline moves with the remote. Repeat with the other six styles, then open the library to check that theme badges do not persist on title cards. Switching themes must not restart the live video.
 - Run cold/warm deep links using a channel's `channel:<id>` with `mediaType=live`, an episode's `media:<id>` with `mediaType=episode`, and a movie with `mediaType=movie`. Series links open their episode list.
 - Measure startup/video performance on hardware. The compiler cannot certify performance or the native node layout.
 

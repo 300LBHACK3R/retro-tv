@@ -27,8 +27,8 @@ sub open()
 end sub
 
 sub updateColors()
-    paintTheme({ title: "text", subtitle: "textMuted", panel: "guideHeaderBg", channelHeading: "primary",
-        nowHeading: "primary", nextHeading: "primary", empty: "text", position: "textMuted", help: "primary" })
+    paintTheme({ title: "text", subtitle: "textMuted", panel: "guideHeaderBg", channelHeading: "text",
+        nowHeading: "text", nextHeading: "text", empty: "text", position: "textMuted", help: "primary", accentLine: "primary" })
     render()
 end sub
 
@@ -50,7 +50,6 @@ sub render()
         row.width = 1176
         row.height = 72
         row.color = themeColor("border", "0x314257FF")
-        if i = m.index then row.color = m.top.accent
         inset = row.CreateChild("Rectangle")
         inset.translation = [3,3]
         inset.width = 1170
@@ -58,11 +57,17 @@ sub render()
         inset.color = themeColor("guideRowBg", "0x132538FF")
         if i mod 2 = 1 then inset.color = themeColor("guideRowAltBg", "0x132538FF")
         textColor = themeColor("text", "0xFFF3D8FF")
-        numberColor = m.top.accent
+        numberColor = themeColor("primary", "0xF1CA83FF")
         if channel.id = m.top.channelId
             inset.color = themeColor("guideCurrentBg", "0x224236FF")
             textColor = themeColor("onPrimary", "0xFFF3D8FF")
             numberColor = textColor
+        end if
+        if i = m.index
+            inset.color = themeColor("guideActiveBg", "0xF1CA83FF")
+            textColor = themeColor("onPrimary", "0x18261BFF")
+            numberColor = textColor
+            row.color = textColor
         end if
         number = "CH " + channel.number.ToStr()
         if channel.id = m.top.channelId then number = number + " • LIVE"

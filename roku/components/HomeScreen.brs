@@ -6,7 +6,7 @@ sub init()
     m.top.FindNode("homeBuildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
     m.selected = 0
     updateProfile()
-    updateAccent()
+    updateSelection()
 end sub
 
 sub reset()
@@ -20,12 +20,6 @@ end sub
 sub updateProfile()
     m.watch.subtitle = "Jump into the full lineup"
     if m.top.kids then m.watch.subtitle = "Kids • Approved shows only"
-end sub
-
-sub updateAccent()
-    m.watch.accent = m.top.accent
-    m.create.accent = m.top.accent
-    updateSelection()
 end sub
 
 sub updateColors()

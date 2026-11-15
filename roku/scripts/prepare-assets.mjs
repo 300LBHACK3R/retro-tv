@@ -1,11 +1,14 @@
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import QRCode from "qrcode";
-import { defaultThemeId, freeThemes, rokuColor, worlds } from "./theme-catalog.mjs";
+import { backdropSvg, defaultThemeId, freeThemes, nativeColors, worlds } from "./theme-catalog.mjs";
 
 const images = new URL("../images/", import.meta.url);
 mkdirSync(images, { recursive: true });
+for (const name of readdirSync(images)) {
+  if (/^theme-(preview|world|backdrop)-[a-z0-9-]+\.jpg$/.test(name)) unlinkSync(new URL(name, images));
+}
 copyFileSync(new URL("../../public/tatestv-logo-christmas.png", import.meta.url),
   fileURLToPath(new URL("logo.png", images)));
 await sharp(fileURLToPath(new URL("../../public/themes/christmas-96-world.webp", import.meta.url)))
@@ -25,7 +28,7 @@ for (const theme of freeThemes) {
   const preview = `theme-preview-${theme.id}.jpg`;
   await sharp(fileURLToPath(artwork)).resize(404, 240, { fit: "cover" })
     .jpeg({ quality: 85 }).toFile(fileURLToPath(new URL(preview, images)));
-  let background = "";
+  let background;
   if (world) {
     const filename = theme.id === "christmas-96-living-room" ? "room.jpg" : `theme-world-${theme.id}.jpg`;
     if (filename !== "room.jpg") {
@@ -33,12 +36,18 @@ for (const theme of freeThemes) {
         .jpeg({ quality: 85 }).toFile(fileURLToPath(new URL(filename, images)));
     }
     background = `pkg:/images/${filename}`;
+  } else {
+    const filename = `theme-backdrop-${theme.id}.jpg`;
+    await sharp(Buffer.from(backdropSvg(theme))).jpeg({ quality: 90 })
+      .toFile(fileURLToPath(new URL(filename, images)));
+    background = `pkg:/images/${filename}`;
   }
   themes.push({
     id: theme.id, name: theme.name,
-    title: theme.id === "halloween-night" ? theme.name : theme.shortName,
+    title: theme.name.split(":")[0],
     poster: `pkg:/images/${preview}`, background,
-    colors: Object.fromEntries(Object.entries(theme.colors).map(([name, value]) => [name, rokuColor(value)])),
+    backgroundOpacity: world ? 0.4 : 1,
+    colors: nativeColors(theme),
   });
 }
 const data = new URL("../data/", import.meta.url);

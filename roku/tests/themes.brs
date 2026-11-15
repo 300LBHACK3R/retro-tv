@@ -1,4 +1,4 @@
-' Run with Themes.brs, ThemeStyle.brs and TatesScene.brs, rooted at roku/.
+' Run with Themes.brs, ThemeStyle.brs and TatesScene.brs, rooted at dist/staging.
 ' Actual selection/persistence functions run against the generated theme catalogue.
 sub main()
     _brs_.mockFunction("CreateObject", function(kind, name)
@@ -45,9 +45,15 @@ sub main()
         check(m.registry.saved = expected.id and m.registry.flushes = i + 1, "Selecting a theme saves its canonical ID")
         check(m.libraryGrid.jumpToItem = i, "Changing colours preserves the chosen grid item")
         check(m.libraryGrid.content.children[i].themeBadge = "Selected", "The applied theme is visibly marked")
+        check(m.home.themeColors.primary = expected.colors.primary and m.guide.themeColors.guideRowBg = expected.colors.guideRowBg and m.channels.themeColors.primary = expected.colors.primary, "Every themed screen receives the selected palette")
+        check(m.top.FindNode("room").uri = expected.background and m.top.FindNode("guideRoom").uri = expected.background, "Viewer and guide share the selected backdrop")
+        check(m.top.FindNode("guideRoom").opacity = expected.backgroundOpacity, "Guide artwork uses the intended contrast treatment")
         marked = 0
         for each item in m.libraryGrid.content.children
             if item.themeBadge = "Selected" then marked++
+        end for
+        for j = 0 to m.entries.Count() - 1
+            check(m.libraryGrid.content.children[j].viewerColors.primary = m.entries[j].colors.primary, "Each preview card retains its own theme colours")
         end for
         check(marked = 1, "Only the active theme is marked Selected")
         m.themeId = ""
@@ -59,10 +65,12 @@ sub main()
     renderList(false)
     check(m.libraryGrid.jumpToItem = 6, "Opening Themes highlights the current choice")
     check(m.menu.color = "0x10233BFF" and m.menu.focusedColor = "0xFFFFFFFF", "Bright Cable uses dark text and white focused text")
-    check(not m.top.FindNode("room").visible, "A guide thumbnail is never used as the room backdrop")
+    check(Instr(1, m.top.FindNode("room").uri, "theme-backdrop-telus") > 0 and m.top.FindNode("room").opacity = 1, "Bright Cable gets its own full-screen backdrop, not a guide thumbnail")
     check(m.top.palette.colors.DialogTextColor = "0x10233BFF", "Keyboard and PIN dialogs receive the light palette")
     applyTheme("halloween-haunted-arcade")
-    check(m.top.FindNode("room").visible and Instr(1, m.top.FindNode("room").uri, "haunted-arcade") > 0, "Seasonal themes use their own packaged room artwork")
+    check(Instr(1, m.top.FindNode("room").uri, "haunted-arcade") > 0, "Seasonal themes use their own packaged room artwork")
+    applyTheme("christmas")
+    check(m.guide.themeColors.guideRowBg = "0x142A23FF" and m.guide.themeColors.guideHeaderBg = "0x203B31FF", "Christmas carries its green-and-gold style into the guide")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop

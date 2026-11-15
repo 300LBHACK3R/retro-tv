@@ -4,7 +4,6 @@
     <field id="themeColors" type="assocarray" onChange="updateColors" />
     <field id="action" type="string" alwaysNotify="true" />
     <field id="kids" type="boolean" onChange="updateProfile" />
-    <field id="accent" type="color" value="0xE7C584FF" onChange="updateAccent" />
     <function name="reset" />
   </interface>
   <script type="text/brightscript" uri="HomeScreen.brs" />

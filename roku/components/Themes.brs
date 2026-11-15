@@ -15,24 +15,25 @@ sub applyTheme(id as string)
     m.themeId = theme.id
     m.top.themeColors = theme.colors
     colors = theme.colors
-    room = m.top.FindNode("room")
-    room.uri = theme.background
-    room.visible = theme.background <> ""
+    for each nodeId in ["room", "guideRoom"]
+        room = m.top.FindNode(nodeId)
+        room.uri = theme.background
+        room.opacity = theme.backgroundOpacity
+    end for
     paintTheme({ background: "appBg", menuPanel: "panelAltBg", listPanel: "panelBg", accent: "primary",
         heading: "text", profileLabel: "primary", status: "textMuted", channelTitle: "primary",
         nowHeading: "primary", nextHeading: "primary", nowTitle: "text", nextTitle: "textMuted",
-        emptyMessage: "text", hint: "primary", buildLabel: "textMuted", guideBackdrop: "appBg",
+        emptyMessage: "text", hint: "primary", buildLabel: "textMuted", guideBackground: "appBg",
+        browserHeader: "appBg", browserFooter: "appBg", guideHeaderShield: "appBg", guideFooterShield: "appBg",
         bannerPanel: "panelBg", bannerChannel: "primary", bannerProgramme: "text", bannerHelp: "textMuted" })
     m.menu.color = colors.text
     m.menu.focusedColor = colors.onPrimary
     m.menu.focusBitmapBlendColor = colors.primary
     for each component in [m.home, m.channels, m.guide]
         component.themeColors = colors
-        component.accent = colors.primary
     end for
     m.libraryGrid.focusBitmapBlendColor = colors.primary
     m.playerFocus.color = colors.primary
-    m.viewerAccent = colors.primary
     palette = CreateObject("roSGNode", "RSGPalette")
     palette.colors = {
         DialogBackgroundColor: colors.panelBg

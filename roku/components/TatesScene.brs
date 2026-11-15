@@ -217,7 +217,7 @@ sub renderList(preserve as boolean)
         updateNowNext()
         return
     else if m.view = "themes"
-        m.heading.text = "Make yourself at home."
+        m.heading.text = "Your style. " + m.themeCatalog.themes.Count().ToStr() + " free themes."
         m.entries = m.themeCatalog.themes
         if selectedId = "" then selectedId = m.themeId
     else if m.catalog <> invalid
@@ -237,12 +237,11 @@ sub renderList(preserve as boolean)
     for index = 0 to m.entries.Count() - 1
         entry = m.entries[index]
         node = content.CreateChild("ContentNode")
-        node.AddField("viewerAccent", "color", false)
-        node.viewerAccent = m.viewerAccent
         node.AddField("viewerColors", "assocarray", false)
         node.viewerColors = m.top.themeColors
         node.AddField("themeBadge", "string", false)
         if m.view = "themes"
+            node.viewerColors = entry.colors
             node.themeBadge = "Free"
             if entry.id = m.themeId then node.themeBadge = "Selected"
         end if

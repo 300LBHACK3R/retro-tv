@@ -40,19 +40,28 @@ sub render()
         card.translation = [slot * 184, 0]
         card.width = 172
         card.height = 64
-        card.color = themeColor("guideRowBg", "0x132538FF")
+        card.color = themeColor("border", "0x6E7E60FF")
+        inset = card.CreateChild("Rectangle")
+        inset.translation = [3,3]
+        inset.width = 166
+        inset.height = 58
+        inset.color = themeColor("guideRowBg", "0x132538FF")
         tuned = channel.id = m.top.channelId
-        if tuned then card.color = themeColor("guideCurrentBg", "0x35513FFF")
+        if tuned then inset.color = themeColor("guideCurrentBg", "0xF1CA83FF")
         selected = index = m.index and m.top.HasFocus()
-        if selected then card.color = m.top.accent
+        if selected
+            inset.color = themeColor("guideActiveBg", "0xF1CA83FF")
+            card.color = themeColor("onPrimary", "0x18261BFF")
+        end if
         label = card.CreateChild("Label")
         label.translation = [10,4]
         label.width = 152
         label.height = 26
         label.font.size = 22
         label.text = "CH " + channel.number.ToStr()
+        if tuned then label.text += " • LIVE"
         label.color = themeColor("text", "0xFFF3D8FF")
-        if tuned then label.color = themeColor("onPrimary", "0xFFF3D8FF")
+        if tuned then label.color = themeColor("onPrimary", "0x18261BFF")
         if selected then label.color = themeColor("onPrimary", "0x102035FF")
         title = card.CreateChild("Label")
         title.translation = [10,32]
