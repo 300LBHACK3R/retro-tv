@@ -1,8 +1,7 @@
 sub init()
     m.watch = m.top.FindNode("watch")
+    m.signin = m.top.FindNode("signin")
     m.create = m.top.FindNode("create")
-    m.chooser = m.top.FindNode("chooser")
-    m.account = m.top.FindNode("account")
     m.top.FindNode("homeBuildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
     m.selected = 0
     updateProfile()
@@ -10,56 +9,57 @@ sub init()
 end sub
 
 sub reset()
-    m.account.visible = false
-    m.chooser.visible = true
     m.selected = 0
     updateSelection()
     m.top.SetFocus(true)
 end sub
 
 sub updateProfile()
+    if m.watch = invalid then return
+    m.watch.title = "Watch for free"
     m.watch.subtitle = "Jump into the full lineup"
     if m.top.kids then m.watch.subtitle = "Kids • Approved shows only"
+    m.signin.title = "Sign in"
+    m.signin.subtitle = "Your existing Tate's TV account"
+    m.create.title = "Create account"
+    m.create.subtitle = "Sign up here with your remote"
+    subtitle = "Settle into something good. No account needed to watch."
+    if m.top.signedIn
+        m.signin.title = "Choose profile"
+        m.signin.subtitle = "Your Tate's TV household"
+        m.create.title = "Account"
+        m.create.subtitle = "Membership and sign out"
+        subtitle = "One Tate's TV account. At home on every screen."
+    end if
+    m.top.FindNode("homeSubtitle").text = subtitle
 end sub
 
 sub updateColors()
-    paintTheme({ homeTitle: "text", homeSubtitle: "textMuted", homeHelp: "primary", homeBuildLabel: "textMuted",
-        accountPanel: "panelBg", accountTitle: "text", accountPrompt: "text", accountUrl: "primary",
-        accountInstructions: "textMuted", accountExplanation: "textMuted", accountHelp: "primary" })
+    paintTheme({ homeTitle: "text", homeSubtitle: "textMuted", homeHelp: "primary", homeBuildLabel: "textMuted", accountStatusLabel: "textMuted" })
     m.top.FindNode("overlay").color = Left(themeColor("appBg", "0x090F18FF"), 8) + "66"
-    m.watch.themeColors = m.top.themeColors
-    m.create.themeColors = m.top.themeColors
+    for each card in [m.watch, m.signin, m.create]
+        card.themeColors = m.top.themeColors
+    end for
 end sub
 
 sub updateSelection()
     m.watch.selected = m.selected = 0
-    m.create.selected = m.selected = 1
+    m.signin.selected = m.selected = 1
+    m.create.selected = m.selected = 2
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if m.account.visible
-        if key = "back" or key = "OK"
-            m.account.visible = false
-            m.chooser.visible = true
-        end if
-        return true
-    end if
     if key = "left" or key = "right"
-        if key = "left" then m.selected = 0 else m.selected = 1
+        if key = "left" and m.selected > 0 then m.selected--
+        if key = "right" and m.selected < 2 then m.selected++
         updateSelection()
         return true
     else if key = "OK"
-        if m.selected = 0
-            m.top.action = "watch"
-        else if m.top.kids
-            m.top.action = "parentAccount"
-        else
-            m.chooser.visible = false
-            m.account.visible = true
-        end if
+        actions = ["watch", "signin", "signup"]
+        if m.top.signedIn then actions = ["watch", "profiles", "account"]
+        m.top.action = actions[m.selected]
         return true
     end if
-    ' Back may exit the app; other keys must not reach the hidden TV browser.
     return key <> "back"
 end function

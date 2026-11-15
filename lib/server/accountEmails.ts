@@ -1,4 +1,6 @@
 import "server-only";
+import { stripeClient } from "./billing";
+import { isMembershipNotice, membershipNoticeCurrent, type MembershipNoticeContext } from "../membershipNotices";
 import { accountEmail, type AccountEmailKind } from "../accountEmails";
 import { validEmail } from "../accountModel";
 import { createSupabaseAdminClient } from "./supabaseAdmin";
@@ -10,6 +12,7 @@ type OutboxEmail = {
   kind: AccountEmailKind;
   subscription_id: string | null;
   payload: EmailPayload | null;
+  context?: MembershipNoticeContext;
   attempts: number;
   lease_token: string;
 };
@@ -51,7 +54,7 @@ export async function deliverAccountEmails(userId?: string) {
           continue;
         }
         // Don't send an activation email if access was refunded/revoked while queued.
-        if (message.kind === "membership") {
+        if (message.kind === "membership" || message.kind === "membership_ending") {
           const member = await db.from("ttv_memberships").select("status,paid,current_period_end")
             .eq("subscription_id", message.subscription_id).eq("user_id", message.user_id).maybeSingle();
           if (member.error) throw new Error("membership_lookup_failed");
@@ -60,13 +63,35 @@ export async function deliverAccountEmails(userId?: string) {
             continue;
           }
         }
+        if (isMembershipNotice(message.kind)) {
+          if (!message.subscription_id || !message.context) throw new Error("notice_context_missing");
+          const subscription = await stripeClient().subscriptions.retrieve(message.subscription_id, { expand: ["latest_invoice"] });
+          const owner = await db.from("ttv_accounts").select("stripe_customer_id").eq("user_id", message.user_id).maybeSingle();
+          if (owner.error) throw new Error("notice_owner_lookup_failed");
+          const customer = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+          if (owner.data?.stripe_customer_id !== customer || subscription.metadata.application !== "tates-tv"
+            || subscription.metadata.user_id !== message.user_id || !membershipNoticeCurrent(message.kind, message.context, subscription)) {
+            await save({ status: "canceled", last_error: "notice_no_longer_current", lease_until: null });
+            continue;
+          }
+          if (message.kind === "membership_ended") {
+            const active = await db.from("ttv_memberships").select("subscription_id")
+              .eq("user_id", message.user_id).eq("status", "active").eq("paid", true)
+              .gt("current_period_end", new Date().toISOString()).limit(1).maybeSingle();
+            if (active.error) throw new Error("membership_lookup_failed");
+            if (active.data) {
+              await save({ status: "canceled", last_error: "membership_replaced", lease_until: null });
+              continue;
+            }
+          }
+        }
         let payload = message.payload;
         if (payload && (payload.to.length !== 1 || payload.to[0] !== recipient.email)) {
           await save({ status: "canceled", last_error: "recipient_changed", lease_until: null });
           continue;
         }
         if (!payload) {
-          payload = { from: config.sender, to: [recipient.email!], ...accountEmail(message.kind), ...(config.replyTo ? { reply_to: config.replyTo } : {}) };
+          payload = { from: config.sender, to: [recipient.email!], ...accountEmail(message.kind, message.context), ...(config.replyTo ? { reply_to: config.replyTo } : {}) };
           // Freeze the exact request before any network call. Retries keep the
           // same payload even when templates or sender settings change later.
           await save({ payload, first_attempt_at: new Date().toISOString() });
@@ -90,7 +115,7 @@ export async function deliverAccountEmails(userId?: string) {
         await save({ status: "accepted", provider_id: result.id, accepted_at: new Date().toISOString(), last_error: null, lease_until: null });
         accepted++;
       } catch (error) {
-        const known = error instanceof Error && /^(queue_write_failed|recipient_lookup_failed|membership_lookup_failed|provider_http_\d{3}|provider_invalid_response)$/.test(error.message);
+        const known = error instanceof Error && /^(queue_write_failed|recipient_lookup_failed|membership_lookup_failed|notice_context_missing|notice_owner_lookup_failed|provider_http_\d{3}|provider_invalid_response)$/.test(error.message);
         const reason = known ? (error as Error).message : "delivery_interrupted";
         try {
           await save({ status: "pending", last_error: reason, lease_until: null, next_attempt_at: new Date(Date.now() + Math.min(60, 2 ** Math.min(message.attempts, 6)) * 60_000).toISOString() });

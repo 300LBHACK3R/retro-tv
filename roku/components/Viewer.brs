@@ -18,8 +18,12 @@ sub onHomeAction()
     if m.home.action = "watch"
         ' Guest entry retains the saved Kids restriction.
         enterViewer()
-    else if m.home.action = "parentAccount"
-        showMessage("Ask a parent", ["Choose Watch for free to continue the approved Kids lineup.", "To set up an account, a parent must first choose Exit Kids and enter the parent PIN."])
+    else if m.home.action = "signin" or m.home.action = "signup"
+        startAccountAuth(m.home.action)
+    else if m.home.action = "profiles"
+        showAccountProfiles()
+    else if m.home.action = "account"
+        showAccountDetails()
     end if
 end sub
 

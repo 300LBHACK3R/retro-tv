@@ -1,12 +1,12 @@
-# Tate's TV — Roku v0.1.7 device-test build
+# Tate's TV — Roku v0.1.8 device-test build
 
 This is a native BrightScript/SceneGraph app, not a website wrapper. It is an unsigned development build. Compilation and server tests do not establish Roku hardware compatibility or store approval.
 
 ## Included
 
-- Normal app launch opens the profile-style Home screen with **Watch for free** and **Create account** cards. Watch for free opens the shared viewer and automatically starts live TV when the catalogue is ready. The saved Kids restriction still applies. Home and viewer show the installed version for device testing.
-- Logo, Christmas room, guest portrait and account QR code are packaged locally. Home in the menu and Back from the navigation menu return to the cards and stop playback.
-- Create account shows a scannable link to the existing website account screen. It explicitly describes website signup; it does not claim to link or sign in the Roku. A saved Kids session can continue free viewing but cannot open this account screen until a parent exits Kids with the PIN.
+- Normal app launch opens the profile-style Home screen with **Watch for free**, **Sign in** and **Create account** cards. Watch for free opens the shared viewer and automatically starts live TV when the catalogue is ready. The saved Kids restriction still applies. Home and viewer show the installed version for device testing.
+- Logo, Christmas room and guest portrait are packaged locally. Home in the menu and Back from the navigation menu return to the cards and stop playback.
+- Sign in and Create account use the existing website account system directly on the TV: Roku email sharing or manual email entry, password keyboard, signup verification code and password recovery. Household profiles and membership status come from the website. The TV restores its own session after restart and can sign out without signing out the website. See [account setup and acceptance checks](../docs/ROKU_ACCOUNTS.md).
 - A shared live viewer after Watch for free: inline video, now/next details, and a horizontal channel strip. It starts channel 1 when that channel is in the current audience's lineup, otherwise the first available channel.
 - A live Now/Next guide available from fullscreen with OK or Left/Right, from the inline player with Right, and from the Live guide menu. Five large rows fit on each page. Arrow keys browse and page through the filtered lineup; OK tunes the selected station fullscreen. Video keeps running in a small header preview. Back restores the previous layout without seeking or retuning.
 - Grouped on-demand library, four-column artwork grid, title search and resumed viewing. Library titles open fullscreen; Back returns to the same library.
@@ -19,7 +19,7 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 Fixed airtimes, day-specific campaigns and programme blocks use the Roku's configured time zone, including daylight-saving transitions. Ordinary browser dates keep their existing behaviour. The app reads the existing public programming database through `/api/roku/catalog` and `/api/roku/play`. Browsing refreshes every minute; the server coalesces reads for at most 15 seconds. New shows, posters and channel changes therefore require no app rebuild. Playback eligibility is checked again when tuning in. An expired cache is never used after a database failure.
 
-This first build uses device-local profiles and seven free styles. It does not yet include website account linking, paid-theme synchronization, memberships, show requests, watchlists, reactions, admin editing or a full time-grid guide. Those website features remain available on the website. No payment credentials or database credentials are packaged in the app.
+The TV can read existing household profiles, their parent PIN requirement and membership status. Profile editing, favourites, watchlists, show requests, reactions and administration remain website features; Roku viewing progress and theme changes are still device-local. The seven free styles are packaged; premium website themes fall back to the default on Roku until their native artwork/layouts are implemented. The guide is Now/Next, not a full time grid. No payment or database credentials are packaged in the app.
 
 ## Build
 
@@ -31,7 +31,7 @@ npm --prefix roku run build
 npm --prefix roku audit
 ```
 
-The output is `roku/dist/tates-tv-roku.zip`. The build derives the free theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. Premium themes remain excluded until account entitlement synchronization is implemented. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
+The output is `roku/dist/tates-tv-roku.zip`. The build derives the free theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. Premium themes remain excluded until their native assets and entitlement-aware theme picker are implemented. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
 The build removes obsolete generated theme images, verifies packaged assets and theme-to-node bindings, and checks at least 4.5:1 text contrast on the specified solid backgrounds. Translucent artwork, actual font sizing and TV display settings still require visual checks on a Roku.
 
@@ -43,6 +43,7 @@ brs --root tests components/ThemeStyle.brs components/LiveGuide.brs tests/guide.
 brs --root tests components/Playback.brs tests/playback.brs
 brs --root tests components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip.brs
 brs --root tests components/ThemeStyle.brs components/HomeScreen.brs tests/home.brs
+brs --root tests components/Accounts.brs tests/accounts.brs
 brs --root dist/staging components/ThemeStyle.brs components/Themes.brs components/TatesScene.brs tests/themes.brs
 brs --root dist/staging components/ThemeStyle.brs components/ArtworkCard.brs tests/theme-cards.brs
 brs --root dist/staging components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip-render.brs
@@ -54,8 +55,8 @@ That interpreter is not a build dependency and is not included in the ZIP. Check
 
 | Context | Control | Behaviour |
 | --- | --- | --- |
-| Home | Left/Right, OK | Choose free viewing or website account signup |
-| Account QR | OK or Back | Return to Home cards |
+| Home | Left/Right, OK | Choose free viewing, sign in, create account or select a household profile |
+| Account dialogs | Direction pad, OK, Back | Enter details, select a profile, submit or cancel |
 | Inline live player | OK | Open fullscreen; retry selected station if the clip failed |
 | Inline live player | Down | Focus channel strip |
 | Inline live player | Right | Open the live guide |
@@ -80,7 +81,7 @@ Live viewing follows the station clock and does not implement time-shifting. Pau
 
 ## Install on a test Roku
 
-1. Deploy the website update first. `https://www.tatestv.ca/api/roku/catalog?audience=all` must return `ok: true` and `version: 1`.
+1. Deploy this website revision first, including `/api/roku/account`. `https://www.tatestv.ca/api/roku/catalog?audience=all` must return `ok: true` and `version: 1`. Follow [ROKU_ACCOUNTS.md](../docs/ROKU_ACCOUNTS.md) for email configuration and the backend readiness check.
 2. Use a physical Roku on the same network as the computer, running Roku OS 11 or newer. Record its model and OS from **Settings → System → About**.
 3. On the remote press **Home three times, Up twice, Right, Left, Right, Left, Right**. Enable the developer installer, accept the displayed developer terms, set a developer password and restart.
 4. Open the device's displayed IP address in the computer's browser. Sign in as `rokudev` using the password set on the device. Upload `tates-tv-roku.zip` without unzipping it, then select **Install**.
@@ -94,7 +95,7 @@ Developer enrollment: https://developer.roku.com/enrollment/standard
 Record results and the Roku model/OS before calling this release ready:
 
 - Cold launch, warm launch, readable artwork, long titles, every menu and Back/Options behaviour.
-- Launch without an account: Home must open first. Check the installed version at bottom right. Select Watch for free: the viewer must open and begin playing without another keypress. Test highlighted cards, left/right/OK and account QR on a phone. Close the account screen with OK and Back; selection stays on Create account. Restart with networking disconnected: navigation and Home must remain usable, and the viewer must show a retry message. Deep links must still open their target directly instead of first playing the default station.
+- Launch without an account: Home must open first. Check the installed version at bottom right. Select Watch for free: the viewer must open and begin playing without another keypress. Test highlighted cards, left/right/OK, Sign in and Create account. Cancel keyboards and dialogs with Back; focus must return to the originating card. Restart with networking disconnected: navigation and Home must remain usable, and the viewer must show a retry message. Deep links must still open their target directly instead of first playing the default station.
 - From Watch for free, confirm live video starts inside the viewer and now/next matches the station. Press OK for fullscreen, then Back: playback should continue at the same position. Press Down for the channel strip, Left/Right to browse and OK to tune. Up returns to the player; Back returns to the menu.
 - In live fullscreen, press Up/Down through multiple channels and wrap at both ends. Confirm the picture stays fullscreen, each station matches its banner and the banner clears after five seconds. Open the guide with OK or Left/Right; browse with Up/Down and page with Left/Right. Back must restore the same fullscreen station without restarting. OK on the playing row must also return without restarting; OK on another row must tune it fullscreen. Repeat from the inline player using Right and from the Live guide menu. Check that delayed catalogue/play responses do not steal guide focus.
 - Open the guide and library during playback: confirm the small header player continues, text and focus borders are readable, and scrolling stays responsive. Open a library title, then Back to its episode grid. Test a slow channel response while moving between menu, guide and library: completion must not steal browsing focus.
@@ -105,7 +106,8 @@ Record results and the Roku model/OS before calling this release ready:
 - From the home screen in Kids mode, Watch for free must retain the Kids filter; Create account must show the parent notice and return focus to the cards, including when dismissed with Back.
 - Test approved Kids titles and blocked adult deep links. Review every programme and eligible ad before approving a Kids channel in the website admin.
 - Select every free theme and check its artwork, grid badge, guide, keyboard and PIN colours. Restart to confirm persistence. Check independent Household/Kids bookmarks. In Bright Cable, unfocused text must be dark and text on selected blue controls must be white.
-- For v0.1.7, confirm Themes says **7 free themes**. Select Christmas, open the guide and look for green panels, gold highlights and the Christmas backdrop. Browse away from the playing row: LIVE must stay on the tuned channel while the contrasting outline moves with the remote. Repeat with the other six styles, then open the library to check that theme badges do not persist on title cards. Switching themes must not restart the live video.
+- For v0.1.8, confirm Themes says **7 free themes**. Select Christmas, open the guide and look for green panels, gold highlights and the Christmas backdrop. Browse away from the playing row: LIVE must stay on the tuned channel while the contrasting outline moves with the remote. Repeat with the other six styles, then open the library to check that theme badges do not persist on title cards. Switching themes must not restart the live video.
+- Complete the signup, sign-in, recovery, session, profile and Kids checks in [ROKU_ACCOUNTS.md](../docs/ROKU_ACCOUNTS.md).
 - Run cold/warm deep links using a channel's `channel:<id>` with `mediaType=live`, an episode's `media:<id>` with `mediaType=episode`, and a movie with `mediaType=movie`. Series links open their episode list.
 - Measure startup/video performance on hardware. The compiler cannot certify performance or the native node layout.
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AccountTask" extends="Task">
+  <interface>
+    <field id="payload" type="assocarray" />
+    <field id="accessToken" type="string" />
+    <field id="requestId" type="integer" />
+    <field id="response" type="assocarray" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="AccountTask.brs" />
+</component>

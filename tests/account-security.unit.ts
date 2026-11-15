@@ -1,3 +1,4 @@
+import { membershipNotice } from "../lib/membershipNotices";
 import { test, expect } from "@playwright/test";
 import Stripe from "stripe";
 import { serverModule, jsonRequest } from "./server-harness";
@@ -353,7 +354,8 @@ test("payment fulfillment checks canonical Stripe customer, price, payment and r
       },
       "./accountData": {},
       "./accountAuth": {},
-      "../accountModel": model,
+      "../membershipNotices": { membershipNotice },
+    "../accountModel": model,
       "../themes": themes,
     },
     {
@@ -459,7 +461,8 @@ test("checkout fixes the price on the server and reuses an open session for the 
           ensureAccount: async () => ({ stripe_customer_id: "cus_alice" }),
         },
         "./accountAuth": { accountOrigin: () => "https://www.tatestv.ca" },
-        "../accountModel": model,
+        "../membershipNotices": { membershipNotice },
+    "../accountModel": model,
         "../themes": themes,
       },
       {
@@ -524,6 +527,7 @@ test("membership checkout validates all three prepaid intervals and expires a di
     "./supabaseAdmin": {},
     "./accountData": { ensureAccount: async () => ({ stripe_customer_id: "cus_alice" }) },
     "./accountAuth": { accountOrigin: () => "https://www.tatestv.ca" },
+    "../membershipNotices": { membershipNotice },
     "../accountModel": model, "../themes": themes,
   }, {
     NEXT_PUBLIC_THEME_BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_synthetic", STRIPE_WEBHOOK_SECRET: "whsec_test",
@@ -561,7 +565,8 @@ test("membership fulfillment honors each plan's paid end date and revokes refund
   const billing = serverModule("lib/server/billing.ts", {
     stripe: { default: class { constructor() { return stripe; } } },
     "./supabaseAdmin": { createSupabaseAdminClient: () => ({ from: () => query, rpc: async (_: string, data: Record<string, unknown>) => { writes.push(data); return { error: null }; } }) },
-    "./accountData": {}, "./accountAuth": {}, "../accountModel": model, "../themes": themes,
+    "./accountData": {}, "./accountAuth": {}, "../membershipNotices": { membershipNotice },
+    "../accountModel": model, "../themes": themes,
   }, { STRIPE_SECRET_KEY: "sk_test_synthetic", STRIPE_MEMBERSHIP_PRICE_ID: "price_monthly",
     STRIPE_MEMBERSHIP_6MONTH_PRICE_ID: "price_six-month", STRIPE_MEMBERSHIP_ANNUAL_PRICE_ID: "price_annual" });
   const event = { id: "evt_membership", created: 1793045809, type: "customer.subscription.updated", data: { object: { id: "sub_alice" } } };

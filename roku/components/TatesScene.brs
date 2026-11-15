@@ -39,6 +39,7 @@ sub init()
     m.home.kids = m.kids
     refreshCatalog()
     m.refreshTimer.control = "start"
+    initAccounts()
 end sub
 
 sub showHome()
@@ -157,12 +158,18 @@ sub buildMenu()
     content = CreateObject("roSGNode", "ContentNode")
     labels = ["Live TV", "Live guide", "Library", "Search", "Kids mode", "Themes", "Refresh", "Home"]
     if m.kids then labels[4] = "Exit Kids"
+    if m.account <> invalid then labels[4] = "Profiles"
     for each label in labels
         node = content.CreateChild("ContentNode")
         node.title = label
     end for
     m.menu.content = content
     m.profileLabel.text = "FREE VIEWING"
+    if m.account <> invalid
+        m.profileLabel.text = "SIGNED IN"
+        if m.account.member then m.profileLabel.text = "MEMBERSHIP ACTIVE"
+    end if
+    if m.activeAccountProfile <> invalid then m.profileLabel.text = m.activeAccountProfile.name
     if m.kids then m.profileLabel.text = "KIDS • PIN LOCKED"
 end sub
 
@@ -337,8 +344,12 @@ sub onDialogClosed(event as object)
     if dialog <> invalid
         if dialog.id <> event.GetNode() then return
     end if
+    if dialog <> invalid
+        if dialog.HasField("accountDialog") then cancelAccountFlow()
+    end if
     m.top.dialog = invalid
     m.newPinHash = invalid
+    m.pendingAccountProfile = invalid
     restoreFocus()
 end sub
 
@@ -348,6 +359,7 @@ sub closeMessage()
 end sub
 
 sub onRefresh()
+    refreshAccount()
     if not m.isLoadingPlayback and m.top.dialog = invalid then refreshCatalog()
 end sub
 

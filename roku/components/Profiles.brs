@@ -1,4 +1,12 @@
 sub changeProfile()
+    if m.account <> invalid
+        showAccountProfiles()
+        return
+    end if
+    if m.kids and m.registry.Read("kidsAccountOwner") <> ""
+        showMessage("Parent sign-in needed", ["Open Home and sign in to your household account to unlock this Kids profile."])
+        return
+    end if
     now = CreateObject("roDateTime").AsSeconds()
     blockedUntil = Val(m.registry.Read("pinBlockedUntil"))
     if m.kids and blockedUntil > now
@@ -65,13 +73,21 @@ sub onPin(event as object)
         m.registry.Flush()
         m.newPinHash = invalid
         dialog.close = true
-        setKids(true)
+        if m.pendingAccountProfile <> invalid
+            profile = m.pendingAccountProfile
+            m.pendingAccountProfile = invalid
+            activateAccountProfile(profile)
+        else
+            setKids(true)
+        end if
     else if m.pinAction = "unlock"
         if hash = m.registry.Read("parentPinHash")
             m.registry.Delete("pinAttempts")
             m.registry.Delete("pinBlockedUntil")
             dialog.close = true
+            m.activeAccountProfile = invalid
             setKids(false)
+            if m.account <> invalid then showAccountProfiles()
         else
             attempts = Val(m.registry.Read("pinAttempts")) + 1
             m.registry.Write("pinAttempts", attempts.ToStr())

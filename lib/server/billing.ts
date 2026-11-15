@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { membershipNotice, type MembershipNotice } from "../membershipNotices";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "./supabaseAdmin";
 import { ensureAccount } from "./accountData";
@@ -231,6 +232,7 @@ export async function applyBillingEvent(event: Stripe.Event) {
   let membership: Record<string, unknown> | null = null;
   let sessionId: string | null = null;
   let subscriptionId: string | null = null;
+  let notice: (MembershipNotice & { userId: string; subscriptionId: string }) | null = null;
   if (
     event.type === "checkout.session.completed" ||
     event.type === "checkout.session.async_payment_succeeded"
@@ -245,6 +247,7 @@ export async function applyBillingEvent(event: Stripe.Event) {
   } else if (event.type.startsWith("customer.subscription.")) {
     subscriptionId = (event.data.object as Stripe.Subscription).id;
   } else if (
+    event.type === "invoice.upcoming" ||
     event.type === "invoice.paid" ||
     event.type === "invoice.payment_failed"
   ) {
@@ -374,6 +377,11 @@ export async function applyBillingEvent(event: Stripe.Event) {
           paid = true;
       }
     }
+    if (item) {
+      const message = membershipNotice(subscription, item.current_period_end, event.type);
+      if (message && (message.kind !== "membership_ending" || paid))
+        notice = { ...message, userId: owner, subscriptionId: subscription.id };
+    }
     membership = {
       subscription_id: subscription.id,
       user_id: owner,
@@ -394,4 +402,11 @@ export async function applyBillingEvent(event: Stripe.Event) {
     },
   );
   if (error) throw new Error("Billing event could not be saved");
+  if (notice) {
+    const queued = await createSupabaseAdminClient().from("ttv_account_emails").upsert({
+      dedupe_key: notice.key, user_id: notice.userId, subscription_id: notice.subscriptionId,
+      kind: notice.kind, context: notice.context,
+    }, { onConflict: "dedupe_key", ignoreDuplicates: true });
+    if (queued.error) throw new Error("Membership notice could not be queued");
+  }
 }

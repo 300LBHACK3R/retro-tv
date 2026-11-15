@@ -1,7 +1,8 @@
+import { isMembershipNotice, membershipNoticeCurrent } from "../lib/membershipNotices";
 import { test, expect } from "@playwright/test";
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
-import { accountEmail } from "../lib/accountEmails";
+import { accountEmail, accountSecurityEmail } from "../lib/accountEmails";
 import { serverModule, jsonRequest } from "./server-harness";
 
 const migration = "supabase/migrations/20261111151806_account_welcome_emails.sql";
@@ -44,27 +45,37 @@ test("account email outbox queues once, isolates browser roles, leases work and 
 });
 
 function emailHarness() {
-  const message = { id: "message-one", user_id: alice, kind: "welcome", subscription_id: null, payload: null as null | Record<string, unknown>, attempts: 1, lease_token: "lease-one", status: "pending" };
+  const message = { id: "message-one", user_id: alice, kind: "welcome", subscription_id: null as string | null,
+    context: { periodEnd: 4102444800, invoiceId: "in_one" }, payload: null as null | Record<string, unknown>, attempts: 1, lease_token: "lease-one", status: "pending" };
   const calls: { body: string; key: string }[] = [];
   let confirmed = true;
   let fail = false;
   let email = "alice@example.test";
   let member = true;
+  let customer = "cus_one";
+  let replaced = false;
+  const subscription = { id: "sub_one", customer: "cus_one", metadata: { application: "tates-tv", user_id: alice },
+    status: "active", latest_invoice: { id: "in_one", status: "paid" }, items: { data: [{ current_period_end: 4102444800 }] }, cancel_at_period_end: false };
   const db = {
     rpc: async () => ({ data: [message], error: null }),
     auth: { admin: { getUserById: async () => ({ data: { user: { email, email_confirmed_at: confirmed ? "2026-11-11" : null } }, error: null }) } },
     from: (table: string) => {
       let update: Record<string, unknown> = {};
+      let activeLookup = false;
       const chain = {
         update: (values: Record<string, unknown>) => { update = values; return chain; },
         eq: () => chain,
-        select: () => table === "ttv_memberships" ? chain : (Object.assign(message, update), Promise.resolve({ data: [{ id: message.id }], error: null })),
-        maybeSingle: async () => ({ data: { status: member ? "active" : "canceled", paid: member, current_period_end: "2099-01-01" }, error: null }),
+        select: () => table !== "ttv_account_emails" ? chain : (Object.assign(message, update), Promise.resolve({ data: [{ id: message.id }], error: null })),
+        gt: () => { activeLookup = true; return chain; }, limit: () => chain,
+        maybeSingle: async () => ({ data: table === "ttv_accounts" ? { stripe_customer_id: customer }
+          : activeLookup ? (replaced ? { subscription_id: "sub_replacement" } : null)
+          : { status: member ? "active" : "canceled", paid: member, current_period_end: "2099-01-01" }, error: null }),
       };
       return chain;
     },
   };
   const worker = serverModule("lib/server/accountEmails.ts", {
+    "../membershipNotices": { isMembershipNotice, membershipNoticeCurrent }, "./billing": { stripeClient: () => ({ subscriptions: { retrieve: async () => subscription } }) },
     "../accountEmails": { accountEmail }, "../accountModel": { validEmail: (value: unknown) => typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) },
     "./supabaseAdmin": { createSupabaseAdminClient: () => db },
   }, { TTV_ACCOUNT_EMAILS_ENABLED: "true", RESEND_API_KEY: "synthetic-test-only", TTV_EMAIL_FROM: "Tate's TV <hello@example.test>" }, {
@@ -74,8 +85,45 @@ function emailHarness() {
       return new Response(JSON.stringify(fail ? { error: "no" } : { id: "email-one" }), { status: fail ? 503 : 200 });
     },
   });
-  return { worker, message, calls, confirm: (v: boolean) => { confirmed = v; }, fail: (v: boolean) => { fail = v; }, email: (v: string) => { email = v; }, member: (v: boolean) => { member = v; } };
+  return { worker, message, calls, subscription, confirm: (v: boolean) => { confirmed = v; }, fail: (v: boolean) => { fail = v; }, email: (v: string) => { email = v; }, member: (v: boolean) => { member = v; },
+    customer: (v: string) => { customer = v; }, replaced: () => { replaced = true; } };
 }
+
+test("membership notices recheck ownership, current billing and replacement memberships before delivery", async () => {
+  const active = emailHarness();
+  active.message.kind = "renewal_reminder";
+  active.message.subscription_id = "sub_one";
+  expect((await active.worker.deliverAccountEmails!(alice)).accepted).toBe(1);
+  expect(JSON.parse(active.calls[0]!.body).subject).toContain("renews soon");
+  const wrongOwner = emailHarness();
+  wrongOwner.message.kind = "renewal_reminder";
+  wrongOwner.message.subscription_id = "sub_one";
+  wrongOwner.customer("cus_someone_else");
+  await wrongOwner.worker.deliverAccountEmails!(alice);
+  expect(wrongOwner.message.status).toBe("canceled");
+  expect(wrongOwner.calls).toHaveLength(0);
+  const resolved = emailHarness();
+  resolved.message.kind = "payment_failed";
+  resolved.message.subscription_id = "sub_one";
+  await resolved.worker.deliverAccountEmails!(alice);
+  expect(resolved.message.status).toBe("canceled");
+  expect(resolved.calls).toHaveLength(0);
+  const ended = emailHarness();
+  ended.message.kind = "membership_ended";
+  ended.message.subscription_id = "sub_one";
+  ended.subscription.status = "canceled";
+  ended.replaced();
+  await ended.worker.deliverAccountEmails!(alice);
+  expect(ended.message.status).toBe("canceled");
+  expect(ended.calls).toHaveLength(0);
+  const refunded = emailHarness();
+  refunded.message.kind = "membership_ending";
+  refunded.message.subscription_id = "sub_one";
+  refunded.subscription.cancel_at_period_end = true;
+  refunded.member(false);
+  await refunded.worker.deliverAccountEmails!(alice);
+  expect(refunded.calls).toHaveLength(0);
+});
 
 test("email retries keep the original payload and idempotency key; unverified or changed recipients and revoked memberships never send", async () => {
   const h = emailHarness();
@@ -159,5 +207,18 @@ test("transactional emails include plain text, branded buttons and truthful memb
     expect(mail.text).toContain("doesn't subscribe you to marketing emails");
     expect(mail.html).not.toMatch(/<script|<form|token_hash|utm_/);
     expect(Buffer.byteLength(mail.html)).toBeLessThan(65536);
+  }
+});
+
+test("security emails keep codes out of links and website actions on the scanner-safe confirmation page", () => {
+  for (const purpose of ["signup", "recovery"] as const) {
+    const tv = accountSecurityEmail(purpose, "1234567890");
+    expect(tv.text).toContain("1234567890");
+    expect(tv.html).not.toContain("token_hash");
+    expect(tv.html).not.toMatch(/href="[^"]*1234567890/);
+    expect(() => accountSecurityEmail(purpose, '<script>')).toThrow();
+    const web = accountSecurityEmail(purpose);
+    expect(web.html).toContain("/auth/confirm?token_hash={{ .TokenHash }}&amp;type=");
+    expect(web.html).not.toContain(".ConfirmationURL");
   }
 });
