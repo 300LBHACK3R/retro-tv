@@ -98,7 +98,7 @@ export function accountSecurityEmail(purpose: "signup" | "recovery", code?: stri
   const title = signup ? "Your seat is ready." : "Let's get you back in.";
   const intro = signup
     ? "Welcome to Tate's TV! A little nostalgia, a world of television, and a place to make your own. Confirm your email to finish creating your free household account."
-    : "We received a request to reset your Tate's TV password. Your new password will work on both the website and Roku.";
+    : "We received a request to reset your Tate's TV password. Choose a new password to get back into your account.";
   const url = `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=${signup ? "email" : "recovery"}`;
   const label = signup ? "Verify my email" : "Reset my password";
   const instruction = code ? (signup ? "Enter this code on your Roku to finish creating your account." : "Enter this code on your Roku to choose a new password.")
