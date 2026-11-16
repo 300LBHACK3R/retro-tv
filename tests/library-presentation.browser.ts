@@ -75,7 +75,7 @@ test("poster library keeps filters, restores focus, groups seasons and plays a s
   const search = page.getByRole("searchbox", {
     name: "Search the Tate's TV library",
   });
-  await expect(page.locator(".ttv-profile-switch .ttv-profile-avatar")).toBeVisible();
+  await expect(page.locator(".ttv-library-shell .ttv-profile-switch .ttv-profile-avatar")).toBeVisible();
   await search.fill("Studio");
   const card = page.getByRole("button", {
     name: "Open Studio Sessions",

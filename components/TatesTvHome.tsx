@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -17,6 +18,7 @@ import { useSpatialNavigation } from "@/components/viewer/useSpatialNavigation";
 import SaveButton from "@/components/viewer/SaveButton";
 import ChannelOverlay from "@/components/ChannelOverlay";
 import ProfileGate from "@/components/viewer/ProfileGate";
+import { BrowsePlaybackProvider, useBrowsePlayback } from "@/components/viewer/BrowsePlaybackContext";
 import { useProfiles } from "@/lib/deviceProfiles";
 import { useGoogleCast } from "@/components/GoogleCastProvider";
 import MediaPreloader from "@/components/MediaPreloader";
@@ -75,16 +77,29 @@ function EmptyStationState() {
 
 export interface TatesTvHomeProps {
   tvMode?: boolean;
+  libraryView?: boolean;
+  children?: ReactNode;
 }
 
 export default function TatesTvHome(props: TatesTvHomeProps) {
   return (
     <ProfileGate>
-      <ProfileHome {...props} />
+      <BrowsePlaybackProvider><ProfileHome {...props} /></BrowsePlaybackProvider>
     </ProfileGate>
   );
 }
-function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
+function ProfileHome({ tvMode = false, libraryView = false, children }: TatesTvHomeProps) {
+  const [hasLiveSession, setHasLiveSession] = useState(!libraryView);
+  const [previewDismissed, setPreviewDismissed] = useState(false);
+  const { onDemandActive } = useBrowsePlayback();
+  const liveEnabled = !libraryView || hasLiveSession;
+  const previewVisible = libraryView && liveEnabled && !previewDismissed && !onDemandActive;
+  useEffect(() => {
+    if (!libraryView) {
+      setHasLiveSession(true);
+      setPreviewDismissed(false);
+    }
+  }, [libraryView]);
   const kids = useProfiles(
     (state) =>
       state.profiles.find((profile) => profile.id === state.activeId)?.kids ===
@@ -116,10 +131,16 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   const setMoreOpen = useStore((state) => state.setSettingsOpen);
 
   const [isChannelBrowserOpen, setChannelBrowserOpen] = useState(false);
+  useEffect(() => {
+    if (!libraryView) return;
+    closeGuide();
+    setMoreOpen(false);
+    setChannelBrowserOpen(false);
+  }, [libraryView, closeGuide, setMoreOpen]);
   // Use layout dimensions, not the shrinking visual viewport caused by a
   // phone keyboard. Do not change player mode, so Mini survives rotation.
   useEffect(() => {
-    if (!mobileLayout || tvMode) { setMobileLandscape(false); return; }
+    if (!mobileLayout || tvMode || libraryView) { setMobileLandscape(false); return; }
     let previousLandscape = false;
     const updateOrientation = () => {
       if (document.activeElement?.matches("input, textarea, [contenteditable=true]")) return;
@@ -139,7 +160,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
       window.removeEventListener("resize", updateOrientation);
       window.removeEventListener("orientationchange", updateOrientation);
     };
-  }, [mobileLayout, tvMode, closeGuide, setMoreOpen]);
+  }, [mobileLayout, tvMode, libraryView, closeGuide, setMoreOpen]);
 
   const channelFromUrlApplied = useRef(false);
   const liveSectionRef = useRef<HTMLElement | null>(null);
@@ -214,7 +235,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   }, [availableAds, enabledChannels, isGuideOpen, mediaById]);
 
   const isAnyOverlayOpen = isGuideOpen || isChannelBrowserOpen || isMoreOpen;
-  const landscapePlayback = mobileLandscape && !mobileGuideOpen && playerViewMode !== "mini";
+  const landscapePlayback = mobileLandscape && !isGuideOpen && !libraryView && playerViewMode !== "mini";
 
   const scrollToLive = useCallback(() => {
     liveSectionRef.current?.scrollIntoView({
@@ -229,19 +250,21 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
 
   const selectChannel = useCallback(
     (channelId: string, shouldScroll = true) => {
+      setHasLiveSession(true);
+      setPreviewDismissed(false);
       setChannel(channelId, { keepGuideOpen: mobileLayout });
 
-      if (shouldScroll) {
+      if (shouldScroll && !libraryView) {
         window.setTimeout(scrollToLive, 0);
       }
     },
-    [mobileLayout, scrollToLive, setChannel],
+    [mobileLayout, libraryView, scrollToLive, setChannel],
   );
 
   const numericTune = useNumericChannelTune(
     enabledChannels,
     selectChannel,
-    isAnyOverlayOpen,
+    isAnyOverlayOpen || libraryView,
   );
 
   const openGuide = useCallback(() => {
@@ -354,11 +377,17 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
   const playerFrameClass = getPlayerFrameClass(playerViewMode, tvMode);
 
   return (
+    <div className="ttv-watch-layout" data-library-view={libraryView} data-live-preview={previewVisible}>
     <main
       ref={viewerRootRef}
-      role={mobileGuideOpen ? "dialog" : undefined}
-      aria-modal={mobileGuideOpen ? true : undefined}
-      aria-labelledby={mobileGuideOpen ? "ttv-live-guide-title" : undefined}
+      role={isGuideOpen ? "dialog" : libraryView ? "complementary" : undefined}
+      aria-label={libraryView && !isGuideOpen ? "Live TV preview" : undefined}
+      aria-modal={isGuideOpen ? true : undefined}
+      aria-labelledby={isGuideOpen ? "ttv-live-guide-title" : undefined}
+      data-desktop-guide-open={isGuideOpen && !mobileLayout}
+      data-library-view={libraryView}
+      data-live-preview={previewVisible}
+      data-live-session={liveEnabled && !previewDismissed && !onDemandActive}
       data-mobile-layout={mobileLayout}
       data-mobile-landscape={mobileLandscape}
       data-mobile-guide-open={mobileGuideOpen}
@@ -376,7 +405,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
       <a className="ttv-skip-link" href="#ttv-live-player">
         Skip to player
       </a>
-      <MediaPreloader activeSchedule={activeSchedule} />
+      {liveEnabled && <MediaPreloader activeSchedule={activeSchedule} />}
 
       <div className="ttv-premium-frame">
         <ViewerTopBar
@@ -404,6 +433,15 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
                   className="ttv-live-stage"
                   aria-label="Live Tate's TV player"
                 >
+                  {(libraryView || isGuideOpen) && liveEnabled && (
+                    <div className="ttv-browse-playing-heading">
+                      <div><span>Now playing</span><strong>{activeChannel?.branding?.displayName || activeChannel?.name || "Live TV"}</strong></div>
+                      {libraryView && !isGuideOpen && <div className="ttv-browse-playing-actions">
+                        <Link href="/">Back to TV</Link>
+                        <button type="button" onClick={() => { setPreviewDismissed(true); disconnect(); }} aria-label="Stop live preview">×</button>
+                      </div>}
+                    </div>
+                  )}
                   {!tvMode && playerViewMode === "mini" ? (
                     <div className="ttv-mini-player-placeholder">
                       <span className="ttv-section-kicker">
@@ -423,7 +461,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
                     className={playerFrameClass}
                     style={{ borderColor: "var(--border)" }}
                   >
-                    {kids && activeSchedule.length === 0 ? (
+                    {!liveEnabled ? null : kids && activeSchedule.length === 0 ? (
                       <div className="ttv-kids-welcome">
                         <span className="ttv-section-kicker">
                           Channel 1 · Kids
@@ -443,13 +481,13 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
                         </button>
                       </div>
                     ) : (
-                      <Player schedule={activeSchedule} viewportFullscreen={landscapePlayback} />
+                      <Player schedule={activeSchedule} viewportFullscreen={landscapePlayback} suspended={onDemandActive || (libraryView && previewDismissed)} />
                     )}
-                    <ChannelOverlay
+                    {!libraryView && !isGuideOpen && <ChannelOverlay
                       compact={!tvMode && playerViewMode === "mini"}
-                    />
+                    />}
                     <StaticTransition trigger={activeChannel?.id ?? ""} />
-                    {tvMode || !mobileLayout ? <Remote tvMode={tvMode} /> : null}
+                    {!libraryView && !isGuideOpen && (tvMode || !mobileLayout) ? <Remote tvMode={tvMode} /> : null}
                   </div>
                 </section>
               </div>
@@ -492,13 +530,14 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
           </>
         )}
 
-        {!tvMode && !mobileGuideOpen && <ComingSoon compact />}
+        {!tvMode && !isGuideOpen && !libraryView && <ComingSoon compact />}
         {!tvMode ? <ViewerFooter /> : null}
       </div>
 
-      <ViewerGuideDialog open={isGuideOpen} onClose={closeGuide} inlineDialogRef={mobileGuideOpen ? viewerRootRef : undefined}>
+      <ViewerGuideDialog open={isGuideOpen} onClose={closeGuide} inlineDialogRef={viewerRootRef}>
         <MultiGuide
           data={channelGuideData}
+          onChannelSelect={(channel) => selectChannel(channel.id)}
           onProgramSelect={({
             channel,
           }: {
@@ -538,5 +577,7 @@ function ProfileHome({ tvMode = false }: TatesTvHomeProps) {
         />
       ) : null}
     </main>
+    <div className="ttv-watch-page" inert={isGuideOpen ? true : undefined} aria-hidden={isGuideOpen ? true : undefined}>{children}</div>
+    </div>
   );
 }

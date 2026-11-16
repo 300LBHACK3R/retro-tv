@@ -10,7 +10,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import ProfileGate, { ProfileButton } from "@/components/viewer/ProfileGate";
+import { ProfileButton } from "@/components/viewer/ProfileGate";
 import SaveButton from "@/components/viewer/SaveButton";
 import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import ComingSoon from "@/components/library/ComingSoon";
@@ -37,13 +37,6 @@ import { seasonSummary } from "@/lib/seriesMetadata";
 import styles from "./library/library.module.css";
 
 export default function PublicLibrary() {
-  return (
-    <ProfileGate>
-      <ProfileLibrary />
-    </ProfileGate>
-  );
-}
-function ProfileLibrary() {
   const { media, channels } = useViewerCatalog();
   const kids = useProfiles(
     (state) =>
@@ -198,6 +191,9 @@ function ProfileLibrary() {
             <div className={styles.headerActions}>
               <AccountLink />
               <ProfileButton />
+              <button className={styles.button} onClick={() => useStore.getState().toggleGuide()}>
+                TV Guide
+              </button>
               <Link href="/" className={styles.button}>
                 Live TV
               </Link>

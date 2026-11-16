@@ -1,5 +1,4 @@
 import { pageMetadata } from "@/lib/metadata";
-import TatesTvHome from "@/components/TatesTvHome";
 
 export const metadata = pageMetadata(
   "Watch on your TV",
@@ -9,5 +8,5 @@ export const metadata = pageMetadata(
 );
 
 export default function TvModePage() {
-  return <TatesTvHome tvMode />;
+  return null;
 }

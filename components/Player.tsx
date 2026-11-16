@@ -25,6 +25,7 @@ import type { BroadcastItem, Channel } from "@/lib/types";
 interface PlayerProps {
   schedule: BroadcastItem[];
   viewportFullscreen?: boolean;
+  suspended?: boolean;
 }
 
 type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "error";
@@ -523,10 +524,13 @@ function buildCastQueueEntries(
   return entries;
 }
 
-export default function Player({ schedule, viewportFullscreen = false }: PlayerProps) {
+export default function Player({ schedule, viewportFullscreen = false, suspended = false }: PlayerProps) {
   const mobileLayout = useMobileGuideLayout();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const suspendedRef = useRef(suspended);
+  const wasSuspendedRef = useRef(suspended);
+  const resumeAfterSuspendRef = useRef(false);
   const lastPlaybackKeyRef = useRef("");
   const lastHardSyncRef = useRef(0);
   const handledFullscreenRequestRef = useRef(0);
@@ -783,7 +787,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   const tryPlay = useCallback(async () => {
     const video = videoRef.current;
 
-    if (!video) {
+    if (!video || suspendedRef.current) {
       return;
     }
 
@@ -796,7 +800,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
 
     const attempt = ++playbackAttemptRef.current;
     const isCurrent = () =>
-      attempt === playbackAttemptRef.current && videoRef.current === video;
+      attempt === playbackAttemptRef.current && videoRef.current === video && !suspendedRef.current;
     try {
       configureVideoForAppPlayback(video);
       applyAudio();
@@ -821,6 +825,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
   }, [applyAudio, castRemote.isConnected]);
 
   const loadCurrentSource = useCallback((reload = false) => {
+    if (suspendedRef.current) return;
     const video = videoRef.current;
     const item = live.item;
 
@@ -872,12 +877,29 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     }
   }, [applyAudio, hardSyncPosition, live.item, tryPlay]);
 
+  // Browsing keeps the video mounted. On-demand playback temporarily owns audio.
+  // Remember a deliberate pause, and invalidate any pending autoplay promise.
+  useLayoutEffect(() => {
+    suspendedRef.current = suspended;
+    if (suspended === wasSuspendedRef.current) return;
+    wasSuspendedRef.current = suspended;
+    const video = videoRef.current;
+    if (suspended) {
+      resumeAfterSuspendRef.current = Boolean(video && (!video.paused || status === "loading"));
+      playbackAttemptRef.current += 1;
+      video?.pause();
+    } else if (resumeAfterSuspendRef.current) {
+      resumeAfterSuspendRef.current = false;
+      loadCurrentSource();
+    }
+  }, [suspended, loadCurrentSource, status]);
+
   const playbackMonitor = usePlaybackMonitor(videoRef, {
     sourceKey: playbackKey,
     channelId: currentChannelId,
     mediaId: live.item?.parentMediaId ?? live.item?.id ?? "",
     mode: "live",
-    disabled: castRemote.isConnected || nativeTv.connected,
+    disabled: suspended || castRemote.isConnected || nativeTv.connected,
     reload: () => {
       setNowMs(Date.now());
       loadCurrentSource(true);
@@ -1229,6 +1251,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     };
 
     const handlePlaying = () => {
+      if (suspendedRef.current) { video.pause(); return; }
       setStatus("playing");
       setMessage("");
     };
@@ -1516,7 +1539,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
       <video
         ref={videoRef}
         playsInline
-        autoPlay
+        autoPlay={!suspended}
         preload="auto"
         controls={false}
         muted={autoplayMuted || (!mobileLayout && (muted || volume <= 0))}

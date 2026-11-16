@@ -57,6 +57,7 @@ import {
 
 interface MultiGuideProps {
   data: GuideRowInput[];
+  onChannelSelect?: (channel: Channel) => void;
   onProgramSelect?: (payload: {
     channel: Channel;
     item: BroadcastItem;
@@ -100,7 +101,7 @@ function EmptyGuideState() {
   );
 }
 
-export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
+export default function MultiGuide({ data, onChannelSelect, onProgramSelect }: MultiGuideProps) {
   const favourites = useDeviceLibrary((state) => state.favouriteChannels);
   const [category, setCategory] = useState("");
   const [favouritesOnly, setFavouritesOnly] = useState(false);
@@ -732,7 +733,7 @@ export default function MultiGuide({ data, onProgramSelect }: MultiGuideProps) {
                   visibleWindow={visibleWindow}
                   nowLineLeft={nowLineLeft}
                   liveOffsetSec={secondsSinceWindowStart}
-                  onChannelSelect={() => setChannel(channel.id)}
+                  onChannelSelect={() => onChannelSelect ? onChannelSelect(channel) : setChannel(channel.id)}
                   onProgramSelect={(payload) => {
                     setChannel(payload.channel.id);
                     onProgramSelect?.(payload);
@@ -783,7 +784,6 @@ function GuideRow({
       ? "var(--guide-row-bg)"
       : "var(--guide-row-alt-bg)";
 
-  const firstCell = cells[0];
   const channelColor = isActive ? "var(--ttv-guide-active-text, var(--on-primary))" : "var(--text)";
   // Keep nearby cells ready without tripling the DOM on television screens.
   const overscan = Math.min(360, visibleWindow.width / 2);
@@ -792,16 +792,7 @@ function GuideRow({
     <>
       <button
         type="button"
-        onClick={() => {
-          onChannelSelect();
-
-          if (firstCell) {
-            onProgramSelect?.({
-              channel,
-              item: firstCell.item,
-            });
-          }
-        }}
+        onClick={onChannelSelect}
         className="ttv-guide-station sticky left-0 z-30 flex flex-col justify-center border-r border-b px-3 text-left transition hover:opacity-90"
         aria-pressed={isActive}
         style={{

@@ -1,0 +1,77 @@
+/* One live video remains mounted while its surrounding route changes. */
+.ttv-watch-layout { --ttv-browse-width: clamp(18rem, 26vw, 26rem); }
+.ttv-watch-page[inert] { visibility: hidden; }
+.ttv-browse-playing-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  min-height: 3.25rem; padding: .55rem .75rem;
+  color: var(--text); background: var(--panel-bg); border-bottom: 1px solid var(--border);
+}
+.ttv-browse-playing-heading > div:first-child { min-width: 0; }
+.ttv-browse-playing-heading span { display: block; color: var(--text-muted); font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; }
+.ttv-browse-playing-heading strong { display: block; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ttv-browse-playing-actions { display: flex; gap: .35rem; align-items: center; flex-shrink: 0; }
+.ttv-browse-playing-actions :is(a, button) { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .35rem .55rem; border-radius: .4rem; background: var(--button-bg); font-size: .75rem; }
+.ttv-browse-playing-actions button { min-width: 44px; font-size: 1.4rem; }
+
+/* Desktop Guide owns both the unchanged live video and the scrollable grid. */
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] {
+  position: fixed; inset: var(--ttv-dialog-top, 0px) 0 auto; z-index: 2147482500;
+  display: flex; flex-direction: column; width: 100%; height: var(--ttv-dialog-height, 100dvh);
+  min-height: 0; overflow: hidden; padding: .75rem; background: var(--panel-bg) !important;
+}
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] > .ttv-premium-frame { flex: 0 0 auto; width: 100%; max-width: none; min-height: 0; padding: 0 0 .5rem; gap: 0; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-premium-stage-grid { display: block; margin: 0; padding: 0; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-premium-stage-sidebar { display: none; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-live-stage { display: grid; grid-template-columns: minmax(0, 1fr) var(--ttv-browse-width); gap: 1rem; margin: 0; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-browse-playing-heading { padding: 1rem; border: 0; background: transparent; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-browse-playing-heading strong { font-size: clamp(1.25rem, 2.5vw, 2rem); }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] :is(.ttv-premium-topbar, .ttv-halloween-scene, .ttv-mini-player-placeholder, .ttv-channel-rail-section, .ttv-premium-footer, .ttv-skip-link, .ttv-mobile-viewer-nav, .ttv-remote-launcher, .ttv-remote-panel, .ttv-coming-soon) { display: none !important; }
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"] .ttv-premium-player-frame {
+  position: relative !important; inset: auto !important; width: 100% !important;
+  height: auto !important; min-height: 0; max-height: none !important; aspect-ratio: 16 / 9 !important;
+  border-radius: 0 0 .5rem .5rem; box-shadow: none !important;
+}
+.ttv-premium-viewer-shell[data-desktop-guide-open="true"][data-live-session="false"] > .ttv-premium-frame { display: none; }
+
+/* Library reserves a column for the live picture, so posters and filters stay usable. */
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) {
+  position: relative; z-index: 60; min-height: 0; height: 0; padding: 0; overflow: visible; background: transparent !important;
+}
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-premium-frame { min-height: 0; padding: 0; gap: 0; }
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-premium-stage-grid { display: block; margin: 0; }
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) :is(.ttv-premium-topbar, .ttv-halloween-scene, .ttv-premium-stage-sidebar, .ttv-mini-player-placeholder, .ttv-channel-rail-section, .ttv-premium-footer, .ttv-skip-link, .ttv-mobile-viewer-nav, .ttv-remote-launcher, .ttv-remote-panel, .ttv-coming-soon) { display: none !important; }
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-live-stage {
+  position: fixed; z-index: 60; top: max(1rem, env(safe-area-inset-top)); right: max(1rem, env(safe-area-inset-right));
+  width: var(--ttv-browse-width); margin: 0; border: 1px solid var(--border); border-radius: .65rem; overflow: hidden;
+  background: #000; box-shadow: 0 12px 42px #0008;
+}
+.ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-premium-player-frame {
+  position: relative !important; inset: auto !important; width: 100% !important; height: auto !important;
+  min-height: 0; max-height: none !important; aspect-ratio: 16 / 9 !important; border: 0 !important; border-radius: 0; box-shadow: none !important;
+}
+.ttv-premium-viewer-shell[data-library-view="true"][data-live-preview="false"]:not([role="dialog"]) { display: none; }
+.ttv-watch-layout[data-live-preview="true"] .ttv-library-shell { padding-right: calc(var(--ttv-browse-width) + 2rem); }
+.ttv-watch-layout[data-library-view="true"] .ttv-global-sync-status { z-index: 50; }
+
+/* Compact player controls fit the preview, including on touch screens. */
+.ttv-premium-viewer-shell:is([data-desktop-guide-open="true"], [data-library-view="true"]) .ttv-player-controls { gap: .2rem; padding: .3rem; }
+.ttv-premium-viewer-shell:is([data-desktop-guide-open="true"], [data-library-view="true"]) .ttv-player-controls > button { min-height: 44px; padding-inline: .5rem; font-size: .65rem; }
+.ttv-premium-viewer-shell:is([data-desktop-guide-open="true"], [data-library-view="true"]) .ttv-player-controls > div,
+.ttv-premium-viewer-shell:is([data-desktop-guide-open="true"], [data-library-view="true"]) .ttv-player-cast-label { display: none; }
+.ttv-premium-viewer-shell:is([data-desktop-guide-open="true"], [data-library-view="true"]) .ttv-player-cast-short { display: inline; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"] .ttv-browse-playing-heading { display: none; }
+.ttv-premium-viewer-shell[data-mobile-guide-open="true"][data-live-session="false"] > .ttv-premium-frame { display: none; }
+
+@media (max-width: 1024px), (pointer: coarse) and (max-width: 1366px) {
+  .ttv-watch-layout[data-live-preview="true"] .ttv-library-shell { padding-right: 0; }
+  .ttv-premium-viewer-shell[data-library-view="true"][data-live-preview="true"]:not([role="dialog"]) { position: sticky; top: 0; z-index: 60; height: auto; }
+  .ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-live-stage { position: relative; inset: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 56%); width: 100%; border-radius: 0; }
+  .ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-browse-playing-heading { flex-direction: column; justify-content: center; align-items: flex-start; padding: .3rem .5rem; }
+  .ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-browse-playing-heading strong { max-width: 34vw; }
+  .ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-premium-player-frame { height: min(31.5vw, 26dvh, 12rem) !important; aspect-ratio: auto !important; }
+  .ttv-premium-viewer-shell[data-library-view="true"]:not([role="dialog"]) .ttv-player-controls { display: none; }
+}
+
+@media (forced-colors: active) {
+  .ttv-browse-playing-heading, .ttv-browse-playing-actions :is(a, button) { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
+}

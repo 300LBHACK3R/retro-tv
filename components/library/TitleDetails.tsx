@@ -3,6 +3,7 @@ import { useProfiles } from "@/lib/deviceProfiles";
 import { reportPlaybackFailure } from "@/lib/reportPlaybackFailure";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -13,6 +14,8 @@ import ProgrammeArtwork from "@/components/viewer/ProgrammeArtwork";
 import SaveButton from "@/components/viewer/SaveButton";
 import { useModalDialog } from "@/components/viewer/useModalDialog";
 import { usePlaybackMonitor } from "@/components/viewer/usePlaybackMonitor";
+import { useBrowsePlayback } from "@/components/viewer/BrowsePlaybackContext";
+import { useGoogleCast } from "@/components/GoogleCastProvider";
 import {
   formatDuration,
   getTypeLabel,
@@ -52,6 +55,14 @@ export default function TitleDetails({
   const [episodeSearch, setEpisodeSearch] = useState("");
   const [episodeStatus, setEpisodeStatus] = useState("all");
   const [playing, setPlaying] = useState(!!playImmediately);
+  const { setOnDemandActive } = useBrowsePlayback();
+  const { disconnect } = useGoogleCast();
+  useLayoutEffect(() => {
+    if (!playing) return;
+    setOnDemandActive(true);
+    disconnect();
+    return () => setOnDemandActive(false);
+  }, [playing, setOnDemandActive, disconnect]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<HTMLDivElement | null>(null);
