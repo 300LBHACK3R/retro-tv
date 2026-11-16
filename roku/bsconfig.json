@@ -5,7 +5,7 @@
     "source/**/*",
     "components/**/*",
     "images/**/*",
-    "data/themes.json"
+    "data/*.json"
   ],
   "outFile": "dist/tates-tv-roku.zip",
   "stagingDir": "dist/staging",

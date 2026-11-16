@@ -12,14 +12,24 @@ function files(directory) {
   });
 }
 const paths = files(root).map(path => relative(root, path).replaceAll("\\", "/"));
-for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "components/HomeScreen.xml", "components/ProfileCard.xml", "components/Viewer.brs", "components/ChannelStrip.xml", "components/ArtworkCard.xml", "components/LiveGuide.xml", "components/LiveGuide.brs", "components/Guide.brs", "components/Themes.brs", "components/ThemeStyle.brs", "images/logo.png", "images/room.jpg", "images/guest.png", "components/AccountTask.xml", "components/Accounts.brs"])
+for (const required of ["manifest", "source/main.brs", "components/TatesScene.xml", "components/ApiTask.xml", "components/HomeScreen.xml", "components/ProfileCard.xml", "components/Viewer.brs", "components/ChannelStrip.xml", "components/ArtworkCard.xml", "components/LiveGuide.xml", "components/LiveGuide.brs", "components/Guide.brs", "components/Themes.brs", "components/ThemeStyle.brs", "images/logo.png", "images/room.jpg", "images/profile-sun.png", "components/AccountTask.xml", "components/Accounts.brs"])
   assert.ok(paths.includes(required), `Missing ${required}`);
 for (const path of paths)
-  assert.match(path, /^(manifest|data\/themes\.json|(?:source|components)\/[\w/-]+\.(?:brs|xml)|images\/[\w-]+\.(?:png|jpg))$/, `Unexpected package file: ${path}`);
+  assert.match(path, /^(manifest|data\/(?:themes|portraits)\.json|(?:source|components)\/[\w/-]+\.(?:brs|xml)|images\/[\w-]+\.(?:png|jpg))$/, `Unexpected package file: ${path}`);
 // bslib is emitted by the compiler; every other staged file must have a source.
-const sourcePaths = ["manifest", "data/themes.json", "source/bslib.brs", ...["source", "components", "images"].flatMap(files)]
+const sourcePaths = ["manifest", "data/themes.json", "data/portraits.json", "source/bslib.brs", ...["source", "components", "images"].flatMap(files)]
   .map(path => path.replaceAll("\\", "/"));
 assert.deepEqual([...paths].sort(), sourcePaths.sort(), "No stale generated files or removed code in the package");
+
+const portraits = JSON.parse(readFileSync(join(root, "data/portraits.json"), "utf8"));
+assert.equal(Object.keys(portraits).length, 22, "Every household portrait is packaged");
+for (const uri of Object.values(portraits)) {
+  assert.match(uri, /^pkg:\/images\/profile-[a-z0-9-]+\.png$/);
+  assert.ok(paths.includes(uri.slice(5)), `Missing portrait: ${uri}`);
+  const metadata = await sharp(join(root, uri.slice(5))).metadata();
+  assert.equal(metadata.width, 224);
+  assert.equal(metadata.height, 224);
+}
 
 function luminance(color) {
   assert.match(color, /^0x[\dA-F]{8}$/);

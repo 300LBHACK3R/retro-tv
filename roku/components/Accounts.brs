@@ -43,6 +43,7 @@ sub forgetAccount()
     applyTheme(m.themeCatalog.defaultId)
     m.home.signedIn = false
     m.home.accountStatus = ""
+    if m.profilePickerOpen = true then showHome()
     buildMenu()
 end sub
 
@@ -274,6 +275,9 @@ sub cancelAccountFlow()
     m.authCode = ""
     m.authChallenge = ""
     closeAccountDialog()
+    if m.profilePickerOpen = true and m.account <> invalid
+        m.authStage = "profiles"
+    end if
     restoreFocus()
 end sub
 
@@ -287,22 +291,6 @@ sub onAccountDialog(event as object)
         closeAccountDialog()
         m.authKind = "recover"
         accountRequest({ action: "recover", email: m.authEmail }, true)
-        return
-    end if
-    if stage = "profiles"
-        if index >= m.account.profiles.Count()
-            cancelAccountFlow()
-            return
-        end if
-        profile = m.account.profiles[index]
-        m.requestedAccountProfile = profile.id
-        closeAccountDialog()
-        if not profile.kids and m.account.parentPinRequired
-            m.authStage = "parentPin"
-            accountKeyboard("Your account's parent PIN", "Use the parent PIN from your Tate's TV account.", "numeric", true, 8)
-        else
-            accountRequest({ action: "profile", profileId: profile.id }, true)
-        end if
         return
     end if
     if stage = "account"
@@ -397,7 +385,7 @@ sub askAccountPassword()
 end sub
 
 sub showAccountProfiles()
-    if m.account = invalid then return
+    if m.account = invalid or m.accountBusy then return
     if m.kids and not m.account.parentPinRequired and m.registry.Read("parentPinHash") <> ""
         now = CreateObject("roDateTime").AsSeconds()
         if Val(m.registry.Read("pinBlockedUntil")) > now
@@ -408,15 +396,49 @@ sub showAccountProfiles()
         askPin("Parent PIN", "Enter your 4-digit PIN before switching profiles.")
         return
     end if
-    buttons = []
-    for each profile in m.account.profiles
-        label = profile.name
-        if profile.kids then label += " • Kids"
-        buttons.Push(label)
-    end for
-    buttons.Push("Cancel")
+    m.profilePickerReturnHome = m.home.visible
+    m.profilePickerPlaybackId = ""
+    if m.playing <> invalid then m.profilePickerPlaybackId = m.playing.id
+    if m.isLoadingPlayback = true then m.profilePickerPlaybackId = m.requestedId
+    showHome()
+    m.profilePickerOpen = true
     m.authStage = "profiles"
-    accountMessage("Who's watching?", ["Choose a profile from your Tate's TV household."], buttons)
+    activeId = ""
+    if m.activeAccountProfile <> invalid then activeId = m.activeAccountProfile.id
+    m.home.CallFunc("showProfiles", m.account.profiles, activeId)
+end sub
+
+sub onAccountProfileSelected()
+    if m.account = invalid or m.accountBusy or m.authStage <> "profiles" then return
+    ' Resolve against the current account, not a stale index from a prior page.
+    for each profile in m.account.profiles
+        if profile.id = m.home.selectedProfile
+            m.requestedAccountProfile = profile.id
+            if not profile.kids and m.account.parentPinRequired
+                m.authStage = "parentPin"
+                accountKeyboard("Your account's parent PIN", "Use the parent PIN from your Tate's TV account.", "numeric", true, 8)
+            else
+                accountRequest({ action: "profile", profileId: profile.id }, true)
+            end if
+            return
+        end if
+    end for
+end sub
+
+sub closeAccountProfiles()
+    m.profilePickerOpen = false
+    m.authStage = ""
+    if m.profilePickerReturnHome
+        showHome()
+    else
+        showBrowser()
+        renderList(false)
+        layoutVideo()
+        restoreFocus()
+        ' Cancel keeps the prior title/channel and audience. VOD uses its saved
+        ' position; live rejoins the station clock instead of starting Channel 1.
+        if m.profilePickerPlaybackId <> "" then requestPlayback(m.profilePickerPlaybackId)
+    end if
 end sub
 
 sub activateAccountProfile(profile as object)

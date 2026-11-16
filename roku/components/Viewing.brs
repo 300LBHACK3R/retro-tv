@@ -226,6 +226,10 @@ sub onSavedOption(event as object)
         ' Refresh canonical arrays after this idempotent change is acknowledged.
         m.viewingQueue.Push({ action: "state" })
     else if action = "favourites"
+        if m.catalog = invalid
+            showMessage("Channels are connecting", ["Your favourites are saved. Try again after the live lineup finishes loading."])
+            return
+        end if
         dialog = CreateObject("roSGNode", "StandardMessageDialog")
         dialog.title = "Favourite channels"
         dialog.message = ["Choose a channel to watch."]

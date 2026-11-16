@@ -25,6 +25,8 @@ sub onHomeAction()
         startAccountAuth(m.home.action)
     else if m.home.action = "profiles"
         showAccountProfiles()
+    else if m.home.action = "cancelProfiles"
+        closeAccountProfiles()
     else if m.home.action = "account"
         showAccountDetails()
     end if

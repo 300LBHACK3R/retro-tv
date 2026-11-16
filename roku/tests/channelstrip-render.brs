@@ -31,7 +31,7 @@ sub main()
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: channel-strip rendering, distinct remote focus, playing state and empty audience in all seven themes"
+    print "PASS: channel-strip rendering, distinct remote focus, playing state and empty audience in all packaged themes"
 end sub
 
 function node() as object

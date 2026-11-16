@@ -78,6 +78,19 @@ sub main()
     check(Instr(1, m.top.FindNode("room").uri, "haunted-arcade") > 0, "Seasonal themes use their own packaged room artwork")
     applyTheme("christmas")
     check(m.guide.themeColors.guideRowBg = "0x142A23FF" and m.guide.themeColors.guideHeaderBg = "0x203B31FF", "Christmas carries its green-and-gold style into the guide")
+    m.browser = node()
+    m.home.visible = true
+    applyTheme("christmas")
+    check(m.top.FindNode("room").opacity = 0.85, "Refreshing account/theme state keeps the entrance backdrop visible")
+    m.profilePickerOpen = true
+    m.authStage = ""
+    m.accountBusy = false
+    restoreFocus()
+    check(m.authStage = "profiles" and m.home.focused, "Canceling local PIN setup restores the portrait picker")
+    m.home.visible = false
+    applyTheme("telus-2008-inspired")
+    showBrowser()
+    check(m.top.FindNode("room").opacity = 1, "Returning to the viewer preserves the light theme's intended backdrop opacity")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop
@@ -88,6 +101,7 @@ end sub
 function node() as object
     return {
         children: []
+        SetFocus: sub(value): m.focused = value: end sub
         AddField: sub(name, kind, notify)
         end sub
         CreateChild: function(kind)

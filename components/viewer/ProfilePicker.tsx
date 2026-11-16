@@ -537,16 +537,16 @@ export default function ProfilePicker() {
       aria-labelledby="profile-heading"
     >
       <header className="ttv-profile-header">
-        <TatesTvLogo
-          width={1536}
-          height={1024}
-          sizes="160px"
-          className="ttv-profile-logo"
-          priority
-        />
         <AccountLink />
       </header>
       <div className="ttv-profile-content">
+        <TatesTvLogo
+          width={1536}
+          height={1024}
+          sizes="(max-width: 600px) 70vw, 416px"
+          className="ttv-profile-logo"
+          priority
+        />
         {screen.kind === "pin" ? (
           <PinEntry
             screen={screen}

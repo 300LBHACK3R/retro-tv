@@ -15,7 +15,7 @@
   height: 100%;
 }
 /* Shells include inline backgrounds. Theme scenery replaces just that backdrop. */
-:root[data-ttv-category="seasonal"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-profile-screen, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
+:root[data-ttv-category="seasonal"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page, .ttv-ops-screen, .ttv-launch-screen) {
   background: transparent !important;
 }
 :root[data-ttv-category="seasonal"] :is(.ttv-app-shell, .ttv-library-shell, .ttv-submit-page)::before,

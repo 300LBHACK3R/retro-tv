@@ -7,17 +7,19 @@
     <field id="signedIn" type="boolean" onChange="updateProfile" />
     <field id="accountStatus" type="string" alias="accountStatusLabel.text" />
     <function name="reset" />
+    <function name="showProfiles" />
+    <field id="selectedProfile" type="string" alwaysNotify="true" />
   </interface>
   <script type="text/brightscript" uri="HomeScreen.brs" />
   <script type="text/brightscript" uri="ThemeStyle.brs" />
   <children>
-    <Rectangle id="overlay" width="1280" height="720" color="0x090F1866" />
+    <Rectangle id="overlay" width="1280" height="720" color="0x090F1855" />
     <Poster translation="[525,30]" width="230" height="154" uri="pkg:/images/logo.png" loadDisplayMode="scaleToFit" />
     <Group id="chooser">
       <Label id="homeTitle" translation="[200,201]" width="880" height="50" horizAlign="center" text="Who's watching?" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
       <Label id="homeSubtitle" translation="[160,257]" width="960" height="36" horizAlign="center" text="Settle into something good. No account needed to watch." font="font:SmallSystemFont" color="0xE8E4DCFF" />
-      <ProfileCard id="watch" translation="[190,318]" title="Watch for free" subtitle="Jump into the full lineup" portrait="pkg:/images/guest.png" />
-      <ProfileCard id="signin" translation="[510,318]" title="Sign in" subtitle="Your existing Tate's TV account" portrait="pkg:/images/guest.png" />
+      <ProfileCard id="watch" translation="[190,318]" title="Watch for free" subtitle="Jump into the full lineup" portrait="pkg:/images/profile-sun.png" />
+      <ProfileCard id="signin" translation="[510,318]" title="Sign in" subtitle="Your existing Tate's TV account" portrait="pkg:/images/profile-sun.png" />
       <ProfileCard id="create" translation="[830,318]" title="Create account" subtitle="Make yourself at home" add="true" />
       <Label id="homeHelp" translation="[160,661]" width="960" height="30" horizAlign="center" text="Left / Right to choose   •   OK to select" font="font:SmallSystemFont" color="0xE7C584FF" />
     </Group>

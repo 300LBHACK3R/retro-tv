@@ -42,6 +42,11 @@ sub main()
     startViewing("new-grant")
     onViewingResponse(reply({ ok: false, requestId: m.viewingRequestId, status: 401, error: "Signed out" }))
     check(m.accountSession = invalid and m.kids, "A removed TV loses account access without escaping Kids mode")
+    m.top = { dialog: {} }
+    m.savedActions = ["favourites"]
+    m.catalog = invalid
+    onSavedOption(reply(0))
+    check(m.lastMessage = "Channels are connecting", "Opening favourites before the catalogue arrives is safe")
     if m.failed > 0 then stop
     print "PASS: profile isolation, resume, coalesced writes, ordered revisions, list refresh, conflicts and remote sign-out"
 end sub
@@ -51,7 +56,7 @@ sub refreshAccount(): end sub
 sub applyTheme(id): end sub
 sub renderList(preserve): end sub
 sub stopPlayback(): end sub
-sub showMessage(title, lines): end sub
+sub showMessage(title, lines): m.lastMessage = title: end sub
 sub revokeAccountSession(token): end sub
 sub forgetAccount(): resetViewing(): m.accountSession = invalid: end sub
 function resolveTheme(id, catalog) as object: return {}: end function

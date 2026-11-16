@@ -37,20 +37,10 @@ The output is `roku/dist/tates-tv-roku.zip`. The build derives the complete them
 
 The build removes obsolete generated theme images, verifies packaged assets and theme-to-node bindings, and checks at least 4.5:1 text contrast on the specified solid backgrounds. Translucent artwork, actual font sizing and TV display settings still require visual checks on a Roku.
 
-Optional regression harnesses run the actual component functions with mock nodes, network boundaries and time. Run from `roku/` with brs 0.45.0 in an isolated test environment:
+Native regression checks run the actual component functions with mock nodes, network boundaries and time. All eleven suites are required in CI after the package build. To run them locally from `roku/`:
 
 ```sh
-brs --root tests components/Viewer.brs components/Guide.brs tests/viewer.brs
-brs --root tests components/ThemeStyle.brs components/LiveGuide.brs tests/guide.brs
-brs --root tests components/Playback.brs tests/playback.brs
-brs --root tests components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip.brs
-brs --root tests components/ThemeStyle.brs components/HomeScreen.brs tests/home.brs
-brs --root tests components/Accounts.brs tests/accounts.brs
-brs --root tests components/AccountTask.brs tests/account-wire.brs
-brs --root tests components/Viewing.brs tests/viewing.brs
-brs --root dist/staging components/ThemeStyle.brs components/Themes.brs components/TatesScene.brs tests/themes.brs
-brs --root dist/staging components/ThemeStyle.brs components/ArtworkCard.brs tests/theme-cards.brs
-brs --root dist/staging components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip-render.brs
+npm exec --yes --ignore-scripts --package=brs@0.45.0 -- node scripts/test-native.mjs
 ```
 
 That interpreter is not a build dependency and is not included in the ZIP. Checks cover home/free/Kids entry, deferred tuning, deep-link priority, resizing, guide paging/selection/refresh, focus during delayed responses, Back, fullscreen channel arrows, strip navigation, selected-channel retry, commercial boundaries, decoder failure recovery, stale responses and VOD progress. They do not emulate SceneGraph rendering, networking, decoding or physical remote behaviour.
@@ -60,7 +50,8 @@ That interpreter is not a build dependency and is not included in the ZIP. Check
 | Context | Control | Behaviour |
 | --- | --- | --- |
 | Home | Left/Right, OK | Choose free viewing, sign in, create account or select a household profile |
-| Account dialogs | Direction pad, OK, Back | Enter details, select a profile, submit or cancel |
+| Household profiles | Left/Right, OK, Back | Browse portrait cards across pages, choose a profile, return |
+| Account dialogs | Direction pad, OK, Back | Enter details, submit or cancel |
 | Inline live player | OK | Open fullscreen; retry selected station if the clip failed |
 | Inline live player | Down | Focus channel strip |
 | Inline live player | Right | Open the live guide |

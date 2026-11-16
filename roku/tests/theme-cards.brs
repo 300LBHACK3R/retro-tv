@@ -33,7 +33,7 @@ sub main()
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: all seven preview palettes, selected badges, library reuse and empty-cell focus"
+    print "PASS: all packaged preview palettes, selected badges, library reuse and empty-cell focus"
 end sub
 
 sub check(condition as boolean, description as string)

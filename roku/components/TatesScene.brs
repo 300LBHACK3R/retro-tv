@@ -22,6 +22,7 @@ sub init()
     m.tunedChannelId = ""
     m.restoreTarget = "menu"
     m.home.ObserveField("action", "onHomeAction")
+    m.home.ObserveField("selectedProfile", "onAccountProfileSelected")
     m.menu.ObserveField("itemSelected", "onMenuSelected")
     m.guide.ObserveField("selectedId", "onGuideSelected")
     m.guide.ObserveField("closeRequested", "closeGuide")
@@ -44,6 +45,7 @@ sub init()
 end sub
 
 sub showHome()
+    m.profilePickerOpen = false
     dismissGuide()
     m.autoTune = false
     m.pendingLaunch = invalid
@@ -56,14 +58,16 @@ sub showHome()
 end sub
 
 sub showBrowser()
+    m.profilePickerOpen = false
     m.home.visible = false
-    m.top.FindNode("room").opacity = 0.4
+    m.top.FindNode("room").opacity = m.themeBackgroundOpacity
     m.browser.visible = true
     m.menu.SetFocus(true)
 end sub
 
 sub restoreFocus()
     if m.home.visible
+        if m.profilePickerOpen = true and not m.accountBusy and m.authStage = "" then m.authStage = "profiles"
         m.home.SetFocus(true)
     else if m.guide.visible
         m.guide.SetFocus(true)

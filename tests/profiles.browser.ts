@@ -135,8 +135,14 @@ test("profiles start on Channel 1, support names and avatars, and fit every conf
     page.getByRole("heading", { name: "Who’s watching?" }),
   ).toBeVisible();
   await expect(page.locator("video")).toHaveCount(0);
+  if (page.viewportSize()!.width > 600) {
+    await expect(page.getByRole("button", { name: "Manage profiles", exact: true })).toBeInViewport({ ratio: 1 });
+  }
   const logoBounds = await page.locator(".ttv-profile-logo").boundingBox();
-  expect(logoBounds!.height).toBeLessThanOrEqual(96);
+  const headingBounds = await page.getByRole("heading", { name: "Who’s watching?" }).boundingBox();
+  expect(logoBounds!.y + logoBounds!.height).toBeLessThanOrEqual(headingBounds!.y);
+  await expect(page.locator(".ttv-profile-chooser")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.locator(".ttv-profile-chooser")).toHaveCSS("border-top-width", "0px");
   await test.info().attach("profile-chooser", { body: await page.screenshot(), contentType: "image/png" });
   expect(
     await page.evaluate(
@@ -584,6 +590,7 @@ test("Christmas entrance starts November 1 while each profile keeps its chosen t
   await expect(page.getByRole("heading", { name: "Who’s watching?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-96-living-room");
   await expect(page.locator(".ttv-christmas96-world")).toBeVisible();
+  await expect(page.locator(".ttv-profile-screen")).toHaveCSS("background-image", /radial-gradient/);
   await expect(page.locator(".ttv-profile-logo")).toHaveAttribute("src", /tatestv-logo-christmas/);
   await page.locator(".ttv-profile-logo").evaluate((image: HTMLImageElement) => image.decode());
   await page.locator(".ttv-christmas96-art").evaluate((image: HTMLImageElement) => image.decode());

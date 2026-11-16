@@ -17,9 +17,9 @@ Never prefix service keys, passwords or signing secrets with `NEXT_PUBLIC_`. A s
 
 ## Project organization
 
-Keep this repository as one project folder. `app/` owns pages, API routes and styles; `components/` owns viewer/admin interfaces; `lib/` owns shared behavior, with privileged services in `lib/server/`. `public/` contains published assets, `supabase/migrations/` contains database history, `tests/` contains verification, and `docs/` contains operating instructions.
+Keep this repository as one project folder. `app/` owns pages, API routes and styles; `components/` owns viewer/admin interfaces; `lib/` owns shared behavior, with privileged services in `lib/server/`. `public/` contains published assets, `roku/` contains the native TV application and its checks, `supabase/migrations/` contains database history, `tests/` contains verification, and `docs/` contains operating instructions.
 
-Use `npm run clean` to remove generated builds, browser reports and caches. It preserves source, original artwork, environment files and database migrations. Historical channel-logo paths can be referenced by saved cloud programming even when they have no literal source-code reference.
+Use `npm run clean -- --dry-run` to preview generated-file cleanup, then `npm run clean` to remove web/Roku builds, resized portraits, browser reports and caches. Source, original artwork, environment files and database migrations are preserved. Historical channel-logo paths can be referenced by saved cloud programming even when they have no literal source-code reference.
 
 See [launch audit and remaining activation work](docs/LAUNCH_AUDIT.md) before advertising paid memberships.
 
@@ -180,6 +180,8 @@ npm run test:browser
 `Viewer quality` runs these gates in GitHub for pull requests, master and the release branches. Its seven browser profiles cover desktop Chromium, Firefox and WebKit, Android/iPhone/tablet emulation and a 1920×1080 TV viewport. Browser fixtures do not access production programming, analytics or Cast devices.
 
 `npm run typecheck` generates Next.js declarations before invoking TypeScript. This makes checks reproducible on a fresh checkout, including static image imports, without relying on a previous development server or build. Keep the generated `next-env.d.ts` file out of version control.
+
+Profile selection places the logo and portrait cards directly on the theme backdrop. Editing and PIN entry retain compact form panels. The website and Roku read one portrait catalogue in `lib/profilePortraits.ts`; the native build packages small copies of the original portraits.
 
 Profile styles are imported directly by the root layout. The build and HTTP checks verify that the CSS linked by `/`, `/library` and `/tv` actually contains the profile layout rules. Vercel uses the same build command, so an asset missing those styles fails the deployment build. Browser checks also assert styled cards and usable PIN controls; a successful click alone does not establish that the layout loaded.
 

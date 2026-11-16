@@ -6,14 +6,14 @@
     <field id="subtitle" type="string" alias="subtitleLabel.text" />
     <field id="portrait" type="string" alias="portraitImage.uri" />
     <field id="add" type="boolean" alias="addSymbol.visible" />
-    <field id="selected" type="boolean" onChange="updateFocus" />
+    <field id="selected" type="boolean" alwaysNotify="true" onChange="updateFocus" />
   </interface>
   <script type="text/brightscript" uri="ProfileCard.brs" />
   <script type="text/brightscript" uri="ThemeStyle.brs" />
   <children>
     <Rectangle id="border" translation="[14,0]" width="232" height="232" color="0x708078FF" />
     <Rectangle id="panel" translation="[18,4]" width="224" height="224" color="0x14231FFF" />
-    <Poster id="portraitImage" translation="[26,12]" width="208" height="208" loadDisplayMode="scaleToFit" />
+    <Poster id="portraitImage" translation="[18,4]" width="224" height="224" loadDisplayMode="scaleToFit" />
     <Group id="addSymbol" visible="false">
       <Rectangle id="addHorizontal" translation="[80,112]" width="100" height="8" color="0xFFF3D8FF" />
       <Rectangle id="addVertical" translation="[126,66]" width="8" height="100" color="0xFFF3D8FF" />

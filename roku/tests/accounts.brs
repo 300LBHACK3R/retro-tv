@@ -72,6 +72,38 @@ sub main()
     check(m.kids and m.registry.saved.kidsAccountOwner = "parent-one", "A shared parent-PIN profile remembers its owner across launch/session expiry")
     activateAccountProfile({ id: "main", name: "Main", kids: false })
     check(not m.kids and m.registry.saved.kidsAccountOwner = invalid, "An authorized adult selection removes the Kids owner lock")
+    resetAccounts()
+    m.kids = false
+    m.account = { parentPinRequired: true, profiles: [
+        { id: "parent", name: "Parent", kids: false },
+        { id: "child", name: "Child", kids: true }
+    ] }
+    m.authStage = "profiles"
+    m.home.selectedProfile = "parent"
+    onAccountProfileSelected()
+    check(m.authStage = "parentPin" and m.requestedAccountProfile = "parent", "Portrait selection still requires the shared parent PIN")
+    check(not m.accountBusy, "The adult profile is never requested before a PIN is supplied")
+    m.authStage = "profiles"
+    m.home.selectedProfile = "child"
+    onAccountProfileSelected()
+    check(m.accountBusy and m.accountTask.payload.profileId = "child", "A Kids portrait requests its server-authorized profile")
+    requestId = m.accountRequestId
+    m.home.selectedProfile = "parent"
+    onAccountProfileSelected()
+    check(m.accountRequestId = requestId, "Repeated selections cannot replace an in-flight account request")
+    m.accountBusy = false
+    m.authStage = "profiles"
+    m.home.selectedProfile = "deleted"
+    onAccountProfileSelected()
+    check(not m.accountBusy and m.authStage = "profiles", "A removed profile ID is not sent to the server")
+    m.profilePickerOpen = true
+    cancelAccountFlow()
+    check(m.authStage = "profiles" and m.accountCanceled, "Canceling a keyboard returns control to the portrait picker")
+    m.profilePickerReturnHome = false
+    m.profilePickerPlaybackId = "channel:7"
+    m.kids = true
+    closeAccountProfiles()
+    check(m.resumedId = "channel:7" and m.kids and not m.profilePickerOpen, "Back restores the previous channel without changing its audience")
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
@@ -100,17 +132,22 @@ sub resetAccounts()
     m.afterAccountRefresh = invalid
 end sub
 function testNode() as object
-    return { UnobserveField: sub(field): end sub, ObserveField: sub(field, callback): end sub,
+    return { textEditBox: {}, UnobserveField: sub(field): end sub, ObserveField: sub(field, callback): end sub,
         AddFields: sub(fields): m.Append(fields): end sub, HasField: function(field): return m.DoesExist(field): end function }
 end function
 function event(data) as object
     return { data: data, GetData: function(): return m.data: end function }
 end function
+sub presentDialog(dialog): m.top.dialog = dialog: end sub
+sub showHome(): m.profilePickerOpen = false: end sub
 sub buildMenu(): end sub
 sub restoreFocus(): end sub
 sub showMessage(title, lines): end sub
 sub showBrowser(): end sub
 sub enterViewer(): end sub
+sub renderList(preserve): end sub
+sub layoutVideo(): end sub
+sub requestPlayback(id): m.resumedId = id: end sub
 sub applyTheme(id): end sub
 sub setKids(enabled): m.kids = enabled: end sub
 sub check(condition as boolean, description as string)

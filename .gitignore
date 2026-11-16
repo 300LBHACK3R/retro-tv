@@ -89,3 +89,6 @@ public/media/
 /roku/images/theme-world-*.jpg
 /roku/images/theme-backdrop-*.jpg
 /roku/data/themes.json
+
+/roku/images/profile-*.png
+/roku/data/portraits.json

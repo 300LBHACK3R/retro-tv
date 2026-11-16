@@ -14,51 +14,35 @@
 }
 .ttv-profile-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 1rem;
   width: min(80rem, 100%);
   margin: 0 auto;
   min-height: 2.5rem;
 }
+/* The brand and profiles sit on the scenery; only editing/PIN forms use a panel. */
 .ttv-profile-logo {
   display: block;
-  width: min(35rem, 82vw, 60vh);
-  width: min(35rem, 82vw, 60svh);
-  max-width: 100%;
+  width: min(26rem, 70vw);
+  max-height: min(26svh, 15rem);
   height: auto;
-  margin: 0 auto clamp(0.5rem, 1.5vh, 1rem);
+  margin: 0 auto clamp(1rem, 3vh, 2rem);
   object-fit: contain;
-  border-radius: 0.75rem;
 }
-/* Keep the Christmas logo visible without crowding the profile chooser. */
-.ttv-profile-screen .ttv-profile-header .ttv-profile-logo {
+.ttv-profile-screen[data-view="form"] .ttv-profile-logo {
   width: 10rem;
-  max-width: 45%;
-  height: 5rem;
-  min-height: 0;
-  margin: 0;
-  object-fit: contain;
-  gap: 0.25rem;
-}
-.ttv-profile-device {
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  max-height: 6rem;
 }
 .ttv-profile-content {
   width: min(64rem, 100%);
   margin: auto;
-  padding: clamp(2rem, 6vh, 5rem) 0;
+  padding: clamp(1rem, 3vh, 2rem) 0;
   text-align: center;
 }
-.ttv-profile-screen[data-view="chooser"] .ttv-profile-content {
-  padding-block: clamp(2rem, 8vh, 5rem);
-}
-.ttv-profile-chooser {
-  padding: clamp(1.25rem, 4vw, 3rem);
-  border: 1px solid var(--border);
-  border-radius: 1.5rem;
-  background: var(--panel-bg);
+:root[data-ttv-category="seasonal"] .ttv-profile-screen {
+  background: radial-gradient(ellipse at center, #090d16a6, #090d1640) !important;
+  text-shadow: 0 2px 8px #000000a0;
 }
 .ttv-profile-screen h1 {
   margin: 0;
@@ -263,6 +247,10 @@
   margin-top: 1rem;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+.ttv-profile-feedback:empty {
+  min-height: 0;
+  margin: 0;
 }
 .ttv-profile-panel {
   width: min(28rem, 100%);
@@ -528,12 +516,8 @@
   margin: 0 auto;
 }
 @media (max-width: 600px) {
-  .ttv-profile-chooser { padding: 1.25rem 0.75rem; }
   .ttv-profile-screen[data-view="chooser"] .ttv-profile-content { padding-block: 1.25rem; }
   .ttv-profile-editor-preview { flex-wrap: wrap; gap: 0.65rem; }
-  .ttv-profile-device {
-    display: none;
-  }
   .ttv-profile-grid {
     gap: 1rem;
   }
@@ -603,6 +587,19 @@
   .ttv-profile-card {
     width: 7.5rem;
   }
+}
+/* Keep the entrance controls in view on 720p TVs and shorter laptops. */
+@media (min-width: 601px) and (max-height: 800px) {
+  .ttv-profile-screen[data-view="chooser"] .ttv-profile-content { padding-block: 0.5rem; }
+  .ttv-profile-screen[data-view="chooser"] .ttv-profile-logo {
+    max-height: 18svh;
+    margin-bottom: 1rem;
+  }
+  .ttv-profile-chooser h1 { font-size: 2.5rem; }
+  .ttv-profile-chooser .ttv-profile-intro { margin: 0.5rem auto 1.5rem; }
+  .ttv-profile-grid { margin-bottom: 1rem; }
+  .ttv-profile-card { width: 8rem; }
+  .ttv-profile-chooser .ttv-profile-actions { margin-top: 0.5rem; }
 }
 .ttv-profile-switch {
   display: flex;
@@ -789,4 +786,11 @@
 :root[data-ttv-reduced-motion="true"] .ttv-profile-avatar {
   transition: none;
   transform: none !important;
+}
+
+@media (forced-colors: active) {
+  :root[data-ttv-category="seasonal"] .ttv-profile-screen {
+    background: Canvas !important;
+    text-shadow: none;
+  }
 }

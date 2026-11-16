@@ -1,5 +1,10 @@
 sub main()
-    m.top = { kids: false, signedIn: false, action: "" }
+    m.top = { kids: false, signedIn: false, action: "", nodes: {},
+        FindNode: function(id): if m.nodes[id] = invalid then m.nodes[id] = {}
+            return m.nodes[id]
+        end function,
+        SetFocus: sub(value): end sub }
+    m.portraits = { sun: "pkg:/images/profile-sun.png", flower: "pkg:/images/profile-flower.png" }
     m.watch = {}
     m.signin = {}
     m.create = {}
@@ -20,6 +25,33 @@ sub main()
     check(not onKeyEvent("OK", false) and m.top.action = "", "Key releases never repeat actions")
     check(not onKeyEvent("back", true), "Back on Home may exit through Roku")
     check(onKeyEvent("play", true), "Home consumes transport keys before they reach the hidden viewer")
+    profiles = [
+        { id: "main", name: "Main", kids: false, avatar: "sun" },
+        { id: "kids", name: "Kids", kids: true, avatar: "flower" },
+        { id: "third", name: "Third", kids: false, avatar: "missing" },
+        { id: "fourth", name: "Fourth", kids: false, avatar: "sun" },
+        { id: "fifth", name: "Fifth", kids: false, avatar: "sun" }
+    ]
+    showProfiles(profiles, "kids")
+    check(m.selected = 1 and m.signin.selected and m.signin.portrait = m.portraits.flower, "Account picker restores the active portrait and highlight")
+    check(m.signin.subtitle = "Kids • Approved shows only" and not m.create.add, "Household cards use audience labels and real portraits")
+    check(m.create.portrait = "pkg:/images/profile-sun.png", "Unknown portrait IDs fall back safely")
+    check(onKeyEvent("OK", true) and m.top.selectedProfile = "kids", "OK emits the profile ID, never a page index")
+    onKeyEvent("right", true)
+    onKeyEvent("right", true)
+    check(m.watch.title = "Fourth" and m.watch.selected and not m.create.visible, "Fourth profile moves to a centered second page")
+    onKeyEvent("right", true)
+    onKeyEvent("right", true)
+    check(m.selected = 4 and m.signin.selected, "Account focus stops at the last profile")
+    onKeyEvent("OK", true)
+    check(m.top.selectedProfile = "fifth", "Second-page selection resolves the correct household profile")
+    check(onKeyEvent("back", true) and m.top.action = "cancelProfiles", "Back closes the picker instead of exiting Roku")
+    reset()
+    check(not m.profileMode and m.create.visible and m.create.add and m.signin.title = "Choose profile", "Returning home restores all action cards")
+    showProfiles([], "")
+    m.top.selectedProfile = ""
+    onKeyEvent("OK", true)
+    check(m.top.selectedProfile = "" and not m.watch.visible, "An empty household cannot submit a phantom profile")
     if m.failed > 0
         print "FAILED:"; m.failed
         stop

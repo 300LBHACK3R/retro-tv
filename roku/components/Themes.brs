@@ -24,12 +24,14 @@ sub applyTheme(id as string)
     theme = resolveTheme(id, m.themeCatalog)
     if not themeAllowed(theme) then theme = resolveTheme(m.themeCatalog.defaultId, m.themeCatalog)
     m.themeId = theme.id
+    m.themeBackgroundOpacity = theme.backgroundOpacity
     m.top.themeColors = theme.colors
     colors = theme.colors
     for each nodeId in ["room", "guideRoom"]
         room = m.top.FindNode(nodeId)
         room.uri = theme.background
         room.opacity = theme.backgroundOpacity
+        if nodeId = "room" and m.home.visible = true then room.opacity = 0.85
     end for
     paintTheme({ background: "appBg", menuPanel: "panelAltBg", listPanel: "panelBg", accent: "primary",
         heading: "text", profileLabel: "primary", status: "textMuted", channelTitle: "primary",
