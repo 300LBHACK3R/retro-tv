@@ -18,7 +18,7 @@ sub sendAccountRequest()
     if m.top.endpoint = "viewing" then path = "/api/roku/viewing"
     if m.top.endpoint = "diagnostics" then path = "/api/diagnostics"
     transfer.SetUrl("https://www.tatestv.ca" + path)
-    body = FormatJson(m.top.payload)
+    body = FormatJson(accountWirePayload(m.top.payload))
     m.top.payload = {}
     m.top.accessToken = ""
     result = { ok: false, status: 0, error: "Unable to connect to your account. Try again shortly. Free viewing is still available." }
@@ -26,16 +26,7 @@ sub sendAccountRequest()
         body = ""
         event = wait(30000, port)
         if type(event) = "roUrlEvent"
-            status = event.GetResponseCode()
-            response = event.GetString()
-            if Len(response) < 150000
-                data = ParseJson(response)
-                if type(data) = "roAssociativeArray"
-                    if data.ok = true or type(data.error) = "roString" then result = data
-                end if
-            end if
-            result.status = status
-            if status = 404 then result.error = "This TV account update is not available on the server yet. You can keep watching for free."
+            result = accountTransferResult(event.GetResponseCode(), event.GetString())
         else
             transfer.AsyncCancel()
         end if
@@ -43,3 +34,44 @@ sub sendAccountRequest()
     result.requestId = m.top.requestId
     m.top.response = result
 end sub
+
+' Unquoted AA keys and dot assignments are lowercased by BrightScript.
+' Restore the API's exact JSON spelling here, after the SceneGraph task handoff.
+' Bracket insertion preserves case; delete first so an existing lowercase key
+' cannot retain its spelling in a case-insensitive associative array.
+function accountWirePayload(payload as object) as object
+    wire = {}
+    for each key in payload
+        wire[key] = payload[key]
+    end for
+    for each key in ["refreshToken", "profileId", "profileGrant", "mediaId", "playbackId", "themeId"]
+        if wire.DoesExist(key)
+            value = wire[key]
+            wire.Delete(key)
+            wire[key] = value
+        end if
+    end for
+    return wire
+end function
+
+function accountTransferResult(status as integer, response as string) as object
+    fallback = "Unable to connect to your account. Try again shortly. Free viewing is still available."
+    result = { ok: false, error: fallback }
+    serverError = false
+    if Len(response) < 150000 and Left(response.Trim(), 1) = "{"
+        data = ParseJson(response)
+        if type(data) = "roAssociativeArray"
+            if type(data.error) = "roString" or type(data.error) = "String"
+                serverError = Len(data.error) > 0
+            end if
+            if data.ok = true or serverError then result = data
+        end if
+    end if
+    result.status = status
+    if status < 200 or status >= 300 then result.ok = false
+    if result.ok <> true and not serverError
+        result.error = fallback
+        if status = 404 then result.error = "The TV account connection could not be found. Please try again shortly."
+    end if
+    return result
+end function

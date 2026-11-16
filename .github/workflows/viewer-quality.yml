@@ -2,7 +2,7 @@ name: Viewer quality
 on:
   pull_request:
   push:
-    branches: [master, 'refactor/**', 'feature/**']
+    branches: [master, 'refactor/**', 'feature/**', 'fix/**']
 permissions:
   contents: read
 concurrency:
@@ -21,6 +21,9 @@ jobs:
           cache-dependency-path: roku/package-lock.json
       - run: npm --prefix roku ci
       - run: npm --prefix roku audit
+      - name: Verify Roku account JSON contract
+        working-directory: roku
+        run: npm exec --yes --ignore-scripts --package=brs@0.45.0 -- brs --root tests components/AccountTask.brs tests/account-wire.brs
       - run: npm --prefix roku run build
       - uses: actions/upload-artifact@v6
         with:

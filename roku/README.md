@@ -46,6 +46,7 @@ brs --root tests components/Playback.brs tests/playback.brs
 brs --root tests components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip.brs
 brs --root tests components/ThemeStyle.brs components/HomeScreen.brs tests/home.brs
 brs --root tests components/Accounts.brs tests/accounts.brs
+brs --root tests components/AccountTask.brs tests/account-wire.brs
 brs --root tests components/Viewing.brs tests/viewing.brs
 brs --root dist/staging components/ThemeStyle.brs components/Themes.brs components/TatesScene.brs tests/themes.brs
 brs --root dist/staging components/ThemeStyle.brs components/ArtworkCard.brs tests/theme-cards.brs
