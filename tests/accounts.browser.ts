@@ -57,6 +57,9 @@ async function fixture(page: Page, initial: AccountView) {
         }),
       );
   });
+    await page.route("**/api/account/viewing?*", route => route.fulfill({ json: { progress: {} } }));
+    await page.route("**/api/account/viewing", route => route.fulfill({ json: { revision: 1, updatedAt: Date.now() } }));
+    await page.route("**/api/account/devices", route => route.fulfill({ json: { devices: [] } }));
   await page.route("**/api/account", (route) => route.fulfill({ json: state }));
   await page.route("**/api/account/show-requests?*", route => route.fulfill({ json: { requests: [], total: 0, page: 0 } }));
   await page.route("**/api/account/auth", async (route) => {
@@ -728,4 +731,37 @@ test("free accounts see the membership explanation without a show request form",
   await expect(page.getByText("A perk for paid members", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Send show request", exact: true })).toHaveCount(0);
   await expect(page.locator("#show-requests").getByRole("link", { name: "View membership" })).toHaveAttribute("href", "#membership");
+});
+
+test("connected TV devices can be named and individually signed out", async ({ page }) => {
+  await fixture(page, account());
+  let devices = [{ id: "33333333-3333-4333-8333-333333333333", name: "Roku TV", kind: "roku", lastSeenAt: "2026-11-15T12:00:00Z", current: false }];
+  await page.route("**/api/account/devices", async route => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { devices } });
+    const input = route.request().postDataJSON();
+    devices = input.action === "revoke" ? [] : devices.map(d => ({ ...d, name: input.name }));
+    await route.fulfill({ json: { ok: true, signedOut: false } });
+  });
+  await page.goto("/account");
+  const section = page.locator("#your-devices");
+  await section.getByRole("textbox", { name: "Name for Roku TV" }).fill("Living room TV");
+  await section.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(section.getByRole("textbox", { name: "Name for Living room TV" })).toHaveValue("Living room TV");
+  await section.getByRole("button", { name: "Sign out", exact: true }).click();
+  await section.getByRole("button", { name: "Confirm sign out", exact: true }).click();
+  await expect(section.getByText("No connected devices were found.")).toBeVisible();
+  await noOverflow(page);
+});
+
+test("connected TV progress appears in Continue Watching and updates when the screen returns", async ({ page }) => {
+  await fixture(page, account());
+  let position = 25;
+  await page.route("**/api/account/viewing?*", route => route.fulfill({ json: { progress: { "qa-show-a": { position, duration: 60, revision: 2, updatedAt: Date.now() } } } }));
+  await page.goto("/library");
+  await page.getByRole("button", { name: "Watch as Alice", exact: true }).click();
+  const continuing = page.getByRole("region", { name: /Continue/i });
+  await expect(continuing.getByText("0:25 watched")).toBeVisible();
+  position = 42;
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(continuing.getByText("0:42 watched")).toBeVisible();
 });

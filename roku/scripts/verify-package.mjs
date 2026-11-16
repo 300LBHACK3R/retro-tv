@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import sharp from "sharp";
-import { defaultThemeId, freeThemes, nativeColors } from "./theme-catalog.mjs";
+import { defaultThemeId, nativeThemes, nativeColors } from "./theme-catalog.mjs";
 
 const root = "dist/staging";
 function files(directory) {
@@ -33,10 +33,11 @@ function contrast(a, b) {
 }
 const catalog = JSON.parse(readFileSync(join(root, "data/themes.json"), "utf8"));
 assert.equal(catalog.defaultId, defaultThemeId);
-assert.deepEqual(catalog.themes.map(theme => theme.id), freeThemes.map(theme => theme.id), "Package every free website theme and no premium themes");
+assert.deepEqual(catalog.themes.map(theme => theme.id), nativeThemes.map(theme => theme.id), "Package every website theme with entitlement metadata");
 for (const theme of catalog.themes) {
-  const website = freeThemes.find(item => item.id === theme.id);
+  const website = nativeThemes.find(item => item.id === theme.id);
   assert.equal(theme.name, website.name);
+  assert.equal(theme.isPremium, !!website.isPremium);
   assert.deepEqual(theme.colors, nativeColors(website));
   assert.ok(theme.background && theme.background !== theme.poster, "Backdrops must not be guide screenshots");
   assert.ok(theme.backgroundOpacity > 0 && theme.backgroundOpacity <= 1);
@@ -82,4 +83,4 @@ const archive = readFileSync("dist/tates-tv-roku.zip");
 assert.equal(archive.readUInt32LE(0), 0x04034b50, "ZIP signature");
 assert.ok(statSync("dist/tates-tv-roku.zip").size < 10_000_000, "Keep the beta package under 10 MB");
 console.log(`PASS: native package contains ${paths.length} expected files; no credentials, source maps, or development dependencies.`);
-console.log(`PASS: all ${catalog.themes.length} free themes have complete artwork, valid UI bindings and text contrast of at least 4.5:1 on tested solid surfaces.`);
+console.log(`PASS: all ${catalog.themes.length} account-aware themes have complete artwork, valid UI bindings and text contrast of at least 4.5:1 on tested solid surfaces.`);

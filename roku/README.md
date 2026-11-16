@@ -1,6 +1,8 @@
-# Tate's TV — Roku v0.1.8 device-test build
+# Tate's TV — Roku v0.1.9 device-test build
 
 This is a native BrightScript/SceneGraph app, not a website wrapper. It is an unsigned development build. Compilation and server tests do not establish Roku hardware compatibility or store approval.
+
+Read [CONNECTED_TV.md](../docs/CONNECTED_TV.md) for the required database migration, release order and connected-device acceptance checklist.
 
 ## Included
 
@@ -19,7 +21,7 @@ This is a native BrightScript/SceneGraph app, not a website wrapper. It is an un
 
 Fixed airtimes, day-specific campaigns and programme blocks use the Roku's configured time zone, including daylight-saving transitions. Ordinary browser dates keep their existing behaviour. The app reads the existing public programming database through `/api/roku/catalog` and `/api/roku/play`. Browsing refreshes every minute; the server coalesces reads for at most 15 seconds. New shows, posters and channel changes therefore require no app rebuild. Playback eligibility is checked again when tuning in. An expired cache is never used after a database failure.
 
-The TV can read existing household profiles, their parent PIN requirement and membership status. Profile editing, favourites, watchlists, show requests, reactions and administration remain website features; Roku viewing progress and theme changes are still device-local. The seven free styles are packaged; premium website themes fall back to the default on Roku until their native artwork/layouts are implemented. The guide is Now/Next, not a full time grid. No payment or database credentials are packaged in the app.
+The TV shares household profiles, saved lists, favourites, resume positions and theme preferences with the website. Profile editing, show requests, reactions and administration remain website features. All fourteen themes have native designs and account-checked premium access. The guide is Now/Next, not a full time grid. No payment or database credentials are packaged in the app.
 
 ## Build
 
@@ -31,7 +33,7 @@ npm --prefix roku run build
 npm --prefix roku audit
 ```
 
-The output is `roku/dist/tates-tv-roku.zip`. The build derives the free theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. Premium themes remain excluded until their native assets and entitlement-aware theme picker are implemented. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
+The output is `roku/dist/tates-tv-roku.zip`. The build derives the complete theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. All fourteen themes have native artwork, including Neon Noel. Premium themes require current account ownership or membership; labels distinguish Owned, Included and Locked. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
 The build removes obsolete generated theme images, verifies packaged assets and theme-to-node bindings, and checks at least 4.5:1 text contrast on the specified solid backgrounds. Translucent artwork, actual font sizing and TV display settings still require visual checks on a Roku.
 
@@ -44,6 +46,7 @@ brs --root tests components/Playback.brs tests/playback.brs
 brs --root tests components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip.brs
 brs --root tests components/ThemeStyle.brs components/HomeScreen.brs tests/home.brs
 brs --root tests components/Accounts.brs tests/accounts.brs
+brs --root tests components/Viewing.brs tests/viewing.brs
 brs --root dist/staging components/ThemeStyle.brs components/Themes.brs components/TatesScene.brs tests/themes.brs
 brs --root dist/staging components/ThemeStyle.brs components/ArtworkCard.brs tests/theme-cards.brs
 brs --root dist/staging components/ThemeStyle.brs components/ChannelStrip.brs tests/channelstrip-render.brs
@@ -106,7 +109,7 @@ Record results and the Roku model/OS before calling this release ready:
 - From the home screen in Kids mode, Watch for free must retain the Kids filter; Create account must show the parent notice and return focus to the cards, including when dismissed with Back.
 - Test approved Kids titles and blocked adult deep links. Review every programme and eligible ad before approving a Kids channel in the website admin.
 - Select every free theme and check its artwork, grid badge, guide, keyboard and PIN colours. Restart to confirm persistence. Check independent Household/Kids bookmarks. In Bright Cable, unfocused text must be dark and text on selected blue controls must be white.
-- For v0.1.8, confirm Themes says **7 free themes**. Select Christmas, open the guide and look for green panels, gold highlights and the Christmas backdrop. Browse away from the playing row: LIVE must stay on the tuned channel while the contrasting outline moves with the remote. Repeat with the other six styles, then open the library to check that theme badges do not persist on title cards. Switching themes must not restart the live video.
+- For v0.1.9, confirm Themes shows **14 themes**, with seven free styles and account-checked premium access. Select Christmas, open the guide and look for green panels, gold highlights and the Christmas backdrop. Browse away from the playing row: LIVE must stay on the tuned channel while the contrasting outline moves with the remote. Repeat with the other six styles, then open the library to check that theme badges do not persist on title cards. Switching themes must not restart the live video.
 - Complete the signup, sign-in, recovery, session, profile and Kids checks in [ROKU_ACCOUNTS.md](../docs/ROKU_ACCOUNTS.md).
 - Run cold/warm deep links using a channel's `channel:<id>` with `mediaType=live`, an episode's `media:<id>` with `mediaType=episode`, and a movie with `mediaType=movie`. Series links open their episode list.
 - Measure startup/video performance on hardware. The compiler cannot certify performance or the native node layout.

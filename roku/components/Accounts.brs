@@ -33,12 +33,14 @@ sub saveAccountSession(session as object)
 end sub
 
 sub forgetAccount()
+    resetViewing()
     m.accountSession = invalid
     m.account = invalid
     m.activeAccountProfile = invalid
     m.accountRefreshRetried = false
     m.registry.Delete("accountSession")
     m.registry.Flush()
+    applyTheme(m.themeCatalog.defaultId)
     m.home.signedIn = false
     m.home.accountStatus = ""
     buildMenu()
@@ -49,6 +51,8 @@ sub refreshAccount()
     now = CreateObject("roDateTime").AsSeconds()
     if m.accountSession.expiresAt < now + 120
         accountRequest({ action: "refresh", refreshToken: m.accountSession.refreshToken }, false)
+    else if m.activeAccountProfile = invalid
+        accountRequest({ action: "state" }, false)
     end if
 end sub
 
@@ -152,6 +156,7 @@ sub onAccountResponse(event as object)
         m.accountRefreshRetried = false
         acceptAccount(data.account)
         if m.account = invalid then return
+        m.pendingProfileGrant = data.profileGrant
         profile = data.profile
         if profile.kids and not m.account.parentPinRequired and m.registry.Read("parentPinHash") = ""
             m.pendingAccountProfile = profile
@@ -415,6 +420,7 @@ sub showAccountProfiles()
 end sub
 
 sub activateAccountProfile(profile as object)
+    stopPlayback()
     if profile.kids and m.account.parentPinRequired
         m.registry.Write("kidsAccountOwner", m.account.user.id)
     else
@@ -422,6 +428,7 @@ sub activateAccountProfile(profile as object)
     end if
     m.registry.Flush()
     m.activeAccountProfile = profile
+    startViewing(m.pendingProfileGrant)
     if profile.theme <> invalid then applyTheme(profile.theme)
     showBrowser()
     setKids(profile.kids)

@@ -8,6 +8,7 @@
   <script type="text/brightscript" uri="TatesScene.brs" />
   <script type="text/brightscript" uri="Profiles.brs" />
   <script type="text/brightscript" uri="Accounts.brs" />
+  <script type="text/brightscript" uri="Viewing.brs" />
   <script type="text/brightscript" uri="Playback.brs" />
   <script type="text/brightscript" uri="Viewer.brs" />
   <script type="text/brightscript" uri="Guide.brs" />

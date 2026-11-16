@@ -1,4 +1,9 @@
 sub requestPlayback(id as string)
+    if Left(id, 6) = "media:" and cloudProfile() and (not m.viewingReady or m.viewingBlocked)
+        showMessage("Connecting saved viewing", ["Your resume position is still loading. Try again shortly, or choose your profile again if this message persists."])
+        flushViewing()
+        return
+    end if
     saveProgress()
     cancelTask("playTask")
     m.segmentTimer.control = "stop"
@@ -106,6 +111,7 @@ sub onVideoState()
     if m.playing = invalid then return
     state = m.video.state
     if state = "error"
+        reportVideoFailure()
         ' Read diagnostics before stop resets the Video fields. Never expose URLs.
         detail = videoFailureCode(m.video.errorCode, m.video.errorInfo)
         if m.playing.mediaType = "live"
@@ -181,6 +187,13 @@ function progressRegistry() as object
 end function
 
 function readProgress() as object
+    if cloudProfile()
+        data = {}
+        for each id in m.cloudProgress
+            data["media:" + id] = m.cloudProgress[id].position
+        end for
+        return data
+    end if
     registry = progressRegistry()
     data = {}
     for each key in registry.GetKeyList()
@@ -195,6 +208,11 @@ sub saveProgress()
     if m.video.state <> "playing" and m.video.state <> "paused" then return
     position = Int(m.video.position)
     if position < 0 then return
+    if cloudProfile()
+        cloudSaveProgress(m.playing.id, position, m.playing.duration)
+        m.lastSavedPosition = position
+        return
+    end if
     registry = progressRegistry()
     registry.Delete(m.playing.id)
     if position >= 10 and position < m.playing.duration - 15
@@ -223,6 +241,10 @@ sub saveProgress()
 end sub
 
 sub clearProgress(id as string)
+    if cloudProfile() and m.playing <> invalid
+        cloudSaveProgress(id, m.playing.duration, m.playing.duration)
+        return
+    end if
     registry = progressRegistry()
     registry.Delete(id)
     registry.Flush()

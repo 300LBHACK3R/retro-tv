@@ -1,9 +1,12 @@
+import { recordServiceEvent } from "@/lib/server/serviceHealth";
 import { after } from "next/server";
 import { randomUUID } from "node:crypto";
 import { validEmail, validPassword } from "@/lib/accountModel";
 import { accountView } from "@/lib/server/accountData";
 import { accountEmailConfiguration, deliverAccountEmails } from "@/lib/server/accountEmails";
 import { createSupabaseAdminClient } from "@/lib/server/supabaseAdmin";
+import { touchAccountDevice } from "@/lib/server/accountDevices";
+import { viewingGrant } from "@/lib/server/accountViewing";
 import { privateJson, readBoundedJson } from "@/lib/server/http";
 import { deviceAccount, deviceSession, issueChallenge, loadDeviceAccount, parentPinMatches,
   readChallenge, rokuAccountGuard, rokuAuthClient, sendRokuCode } from "@/lib/server/rokuAccount";
@@ -46,6 +49,7 @@ export async function POST(request: Request) {
       const { data, error } = await client.auth.signInWithPassword({ email, password: body.password });
       if (error || !data.session || !data.user?.email_confirmed_at)
         return failure(error?.code === "email_not_confirmed" ? "Confirm your email first, then sign in. You can restart Create account to request a TV verification code." : "Email or password did not match. Try again, or choose Forgot password.", 401);
+      if (!await touchAccountDevice(data.user, data.session.access_token, "roku", "Roku TV")) return failure("Please sign in again.", 401);
       return privateJson({ ok: true, session: deviceSession(data.session) });
     }
     if (action === "verify" || action === "reset") {
@@ -63,6 +67,7 @@ export async function POST(request: Request) {
         }
         await client.auth.signOut({ scope: "others" });
       }
+      if (!await touchAccountDevice(data.user, data.session.access_token, "roku", "Roku TV")) return failure("Please sign in again.", 401);
       return privateJson({ ok: true, session: deviceSession(data.session) });
     }
     if (action === "refresh") {
@@ -74,6 +79,7 @@ export async function POST(request: Request) {
       }
       // Return rotated credentials before loading profiles. A database outage
       // must never strand the TV with an already-consumed refresh token.
+      // Device revocation is checked separately by state/viewing after rotation.
       return privateJson({ ok: true, session: deviceSession(data.session) });
     }
     const token = request.headers.get("authorization")?.match(/^Bearer ([^\s]+)$/)?.[1];
@@ -85,6 +91,10 @@ export async function POST(request: Request) {
       if (error) return failure("Sign-out could not reach the server. This TV can still forget its sign-in.", 503);
       return privateJson({ ok: true });
     }
+    if (!await touchAccountDevice(auth.user, token, "roku", "Roku TV")) {
+      await createSupabaseAdminClient().auth.admin.signOut(token, "local");
+      return failure("This TV was signed out from your account. Please sign in again.", 401);
+    }
     if (action === "profile") {
       const view = await accountView(auth.user);
       const account = deviceAccount(view);
@@ -95,12 +105,13 @@ export async function POST(request: Request) {
         if (pinGuard) return pinGuard;
         if (!await parentPinMatches(view, body.pin)) return failure("Enter the parent PIN set on your Tate's TV account.", 403);
       }
-      return privateJson({ ok: true, profile, account });
+      return privateJson({ ok: true, profile, account, profileGrant: viewingGrant(view, token, profile.id) });
     }
     const account = await loadDeviceAccount(auth.user);
     after(() => deliverAccountEmails(auth.user!.id));
     return privateJson({ ok: true, account });
-  } catch {
+  } catch (error) {
+    after(() => recordServiceEvent("server", "account", error instanceof Error && error.message === "Email unavailable" ? "email_failed" : "account_unavailable"));
     return failure("Account services are temporarily unavailable. Please try again shortly.", 503);
   }
 }

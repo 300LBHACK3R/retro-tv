@@ -109,7 +109,7 @@ function syncHarness(storageFallback = false) {
     "./deviceLibrary": { useDeviceLibrary: library },
     "./themePreferences": {}, "./themes": {},
   }, {}, {
-    clearTimeout, setTimeout, BroadcastChannel: FakeChannel,
+    clearTimeout, setTimeout, clearInterval, setInterval, document: { visibilityState: "visible", addEventListener: () => {}, removeEventListener: () => {} }, BroadcastChannel: FakeChannel,
     fetch: async () => { reads++; return Response.json(server); },
     window: {
       addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener),

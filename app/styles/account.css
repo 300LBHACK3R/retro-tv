@@ -325,3 +325,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ttv-account-dashboard button { transition: none; }
 }
+
+.ttv-device-list { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 1rem; }
+.ttv-device-list > li { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; min-width: 0; }
+.ttv-device-list form { max-width: 100%; }
+.ttv-device-list p { overflow-wrap: anywhere; }

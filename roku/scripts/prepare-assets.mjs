@@ -1,7 +1,7 @@
 import { copyFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import { backdropSvg, defaultThemeId, freeThemes, nativeColors, worlds } from "./theme-catalog.mjs";
+import { backdropSvg, defaultThemeId, nativeThemes, nativeColors, worlds } from "./theme-catalog.mjs";
 
 const images = new URL("../images/", import.meta.url);
 mkdirSync(images, { recursive: true });
@@ -19,7 +19,7 @@ await sharp(fileURLToPath(new URL("../../public/avatars/boyfox.png", import.meta
 
 
 const themes = [];
-for (const theme of freeThemes) {
+for (const theme of nativeThemes) {
   if (!/^[a-z0-9-]+$/.test(theme.id)) throw new Error(`Invalid theme id: ${theme.id}`);
   const world = worlds[theme.id];
   const artwork = new URL(`../../public/themes/${world ?? `previews/${theme.id}.webp`}`, import.meta.url);
@@ -41,7 +41,7 @@ for (const theme of freeThemes) {
     background = `pkg:/images/${filename}`;
   }
   themes.push({
-    id: theme.id, name: theme.name,
+    id: theme.id, name: theme.name, isPremium: !!theme.isPremium,
     title: theme.name.split(":")[0],
     poster: `pkg:/images/${preview}`, background,
     backgroundOpacity: world ? 0.4 : 1,
@@ -51,4 +51,4 @@ for (const theme of freeThemes) {
 const data = new URL("../data/", import.meta.url);
 mkdirSync(data, { recursive: true });
 writeFileSync(new URL("themes.json", data), JSON.stringify({ defaultId: defaultThemeId, themes }, null, 2) + "\n");
-console.log(`Prepared ${themes.length} free themes from the website catalogue.`);
+console.log(`Prepared ${themes.length} account-aware themes from the website catalogue.`);

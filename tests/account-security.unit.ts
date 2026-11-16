@@ -21,6 +21,7 @@ test("account guards fail closed; recovery is signed, expiring, user-bound and H
   const auth = serverModule(
     "lib/server/accountAuth.ts",
     {
+      "./accountDevices": {},
       "next/headers": {
         cookies: async () => ({
           get: (name: string) => ({ value: jar.get(name) }),

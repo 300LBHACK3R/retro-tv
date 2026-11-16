@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { browserDeviceName, touchAccountDevice } from "./accountDevices";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createSupabaseAdminClient } from "./supabaseAdmin";
 import { getClientAddress, isSameOriginRequest } from "./requestSecurity";
@@ -50,7 +51,12 @@ export async function verifiedAccount() {
   const client = await accountClient();
   const { data, error } = await client.auth.getUser();
   if (error || !data.user?.email_confirmed_at) return { client, user: null };
-  return { client, user: data.user };
+  // getUser verifies Auth first; the session token is only decoded afterward.
+  const { data: session } = await client.auth.getSession();
+  const token = session.session?.access_token;
+  const deviceId = token ? await touchAccountDevice(data.user, token, "web", browserDeviceName((await headers()).get("user-agent") ?? "")) : null;
+  if (!deviceId) return { client, user: null, deviceId: null };
+  return { client, user: data.user, deviceId };
 }
 export async function accountMutationGuard(
   request: Request,

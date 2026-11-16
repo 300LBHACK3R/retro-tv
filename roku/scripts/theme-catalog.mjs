@@ -7,11 +7,13 @@ import { stripTypeScriptTypes } from "node:module";
 const source = readFileSync(new URL("../../lib/themes.ts", import.meta.url), "utf8");
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString("base64")}`;
 const { THEMES, DEFAULT_THEME_ID } = await import(moduleUrl);
+export const nativeThemes = THEMES;
 export const freeThemes = THEMES.filter(theme => !theme.isPremium);
 export const defaultThemeId = DEFAULT_THEME_ID;
 assert.ok(freeThemes.some(theme => theme.id === defaultThemeId), "The Roku default must be free");
 
 export const worlds = {
+  "christmas-neon-noel": "christmas-neon-noel-world.webp",
   "christmas-96-living-room": "christmas-96-world.webp",
   "halloween-90s-night": "halloween-90s-world.webp",
   "halloween-night": "halloween-after-dark-world.webp",

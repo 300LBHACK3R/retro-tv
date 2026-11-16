@@ -1,3 +1,13 @@
+function themeAllowed(theme as object) as boolean
+    if theme.isPremium <> true then return true
+    if m.account = invalid then return false
+    if m.account.ownedThemeIds = invalid then return false
+    for each id in m.account.ownedThemeIds
+        if id = theme.id then return true
+    end for
+    return false
+end function
+
 function resolveTheme(id as string, catalog as object) as object
     if id = "christmas" then id = "christmas-96-living-room"
     if id = "retro" then id = "shaw-2006"
@@ -12,6 +22,7 @@ end function
 sub applyTheme(id as string)
     if m.themeCatalog = invalid then m.themeCatalog = ParseJson(ReadAsciiFile("pkg:/data/themes.json"))
     theme = resolveTheme(id, m.themeCatalog)
+    if not themeAllowed(theme) then theme = resolveTheme(m.themeCatalog.defaultId, m.themeCatalog)
     m.themeId = theme.id
     m.top.themeColors = theme.colors
     colors = theme.colors

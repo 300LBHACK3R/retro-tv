@@ -1,4 +1,6 @@
 "use client";
+import { useProfiles } from "@/lib/deviceProfiles";
+import { reportPlaybackFailure } from "@/lib/reportPlaybackFailure";
 import {
   useEffect,
   useRef,
@@ -219,6 +221,7 @@ export default function TitleDetails({
         {playing && (
           <div ref={playerRef} className={styles.player}>
             <video
+              onError={() => reportPlaybackFailure(useProfiles.getState().profiles.find(p => p.id === useProfiles.getState().activeId)?.kids ? "" : selected.media.id)}
               ref={videoRef}
               key={selected.media.id}
               src={selected.media.file}

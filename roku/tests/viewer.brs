@@ -301,3 +301,5 @@ end sub
 sub markLaunchComplete()
     m.launchComplete = true
 end sub
+
+sub resetViewing(): end sub

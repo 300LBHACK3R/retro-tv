@@ -17,6 +17,9 @@ end function
 sub onHomeAction()
     if m.home.action = "watch"
         ' Guest entry retains the saved Kids restriction.
+        stopPlayback()
+        resetViewing()
+        m.activeAccountProfile = invalid
         enterViewer()
     else if m.home.action = "signin" or m.home.action = "signup"
         startAccountAuth(m.home.action)
@@ -190,7 +193,7 @@ sub showViewerOptions()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = "Your TV. Your way."
     dialog.message = ["Use the player for fullscreen viewing, or keep watching while you browse the guide and library."]
-    dialog.buttons = ["Watch fullscreen", "Live guide", "Search library", "Help", "Back"]
+    dialog.buttons = ["Watch fullscreen", "Live guide", "Search library", "Help", "Saved viewing", "Back"]
     dialog.ObserveField("buttonSelected", "onViewerOption")
     presentDialog(dialog)
 end sub
@@ -206,6 +209,8 @@ sub onViewerOption(event as object)
         showSearch()
     else if selection = 3
         showMessage("Remote controls", ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: Up/Down browse, Left/Right page, OK watch fullscreen, Back return without tuning. Library fullscreen retains Roku's Play/Pause, seeking and Replay. * opens caption/audio options where available.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
+    else if selection = 4
+        showSavedOptions()
     else
         restoreFocus()
     end if

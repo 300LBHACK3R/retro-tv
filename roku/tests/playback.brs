@@ -154,3 +154,6 @@ sub hideLiveBanner()
 end sub
 sub updateLiveBanner()
 end sub
+
+function cloudProfile() as boolean: return false: end function
+sub reportVideoFailure(): end sub

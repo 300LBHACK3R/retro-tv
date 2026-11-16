@@ -1,14 +1,14 @@
 # Shared website and Roku accounts
 
-Roku v0.1.8 signs in to the existing Supabase account used by tatestv.ca. It does not create a second customer identity or a second subscription. Watch for free remains available without an account. Household profile selection opens live TV automatically.
+Roku v0.1.9 signs in to the existing Supabase account used by tatestv.ca. It does not create a second customer identity or a second subscription. Watch for free remains available without an account. Household profile selection opens live TV automatically.
 
 ## Deploy before installing
 
-1. Publish this revision to the website. GitHub connector writes were denied in the preparation environment; the downloadable bundle/updater is for the repository owner's authenticated Git installation. No remote branch or production deployment was created during preparation.
+1. Apply the connected TV migration described in [CONNECTED_TV.md](CONNECTED_TV.md), then publish this revision to the website. GitHub connector writes were denied in the preparation environment; the downloadable bundle/updater is for the repository owner's authenticated Git installation. No remote branch or production deployment was created during preparation.
 2. Production already has migration `20261115042157_account_membership_notices`. A fresh environment needs the repository migrations, including the existing account rate-limit function. The account route requires the existing `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TTV_ACCOUNTS_ENABLED=true` and trusted site origin. It does not introduce another signing secret.
 3. Review [ACCOUNT_EMAILS.md](ACCOUNT_EMAILS.md). Existing accounts can sign in without Resend, but new TV accounts and recovery need a configured sender/key. The outbox sending flag controls welcome and membership notices; it does not disable user-requested security codes. The production webhook already includes `invoice.upcoming`. The website confirmation/reset email templates were published in Supabase's Auth dashboard on November 15, 2026; actual inbox delivery still needs acceptance testing.
 4. Check `POST https://www.tatestv.ca/api/roku/account` with JSON `{"action":"check"}`. A deployed route returns HTTP 400 with `Choose a supported account action.`; a 404/HTML response means the new code is absent. This only checks route availability, not credentials or sending.
-5. Upload `tates-tv-roku-v0.1.8.zip` to the office TV's developer installer at `http://192.168.1.168`, then choose **Replace with zip**. Keep the ZIP intact. Verify **v0.1.8** on Home before testing.
+5. Upload `tates-tv-roku-v0.1.9.zip` to the office TV's developer installer at `http://192.168.1.168`, then choose **Replace with zip**. Keep the ZIP intact. Verify **v0.1.9** on Home before testing.
 
 ## Account flow
 
@@ -30,7 +30,7 @@ An account-backed Kids lock retains its household owner through expiry/sign-out.
 
 ## Current feature boundaries
 
-Roku reads household profiles, membership status and theme ownership. All seven free native themes remain available. A profile's theme is applied when that style is packaged; premium website themes use the default fallback. Premium native theme assets/picker are not part of v0.1.8. Editing profiles, favourites, watchlists and show requests remain on the website. Roku viewing progress and theme changes remain local to the device.
+Roku shares per-profile progress, watchlists and favourite channels with the website. Open *** → Saved viewing** from a browse screen. Fourteen native themes are packaged, including Neon Noel; paid designs require account access. The website’s Your devices section names and revokes sessions. Admin → Service Health shows the email queue, playback reports and saved-video checks. See [CONNECTED_TV.md](CONNECTED_TV.md) before deploying; the new database migration is required. Physical Roku and real-inbox acceptance is still pending.
 
 ## Acceptance on the TV and a real inbox
 

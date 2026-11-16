@@ -9,6 +9,7 @@ function PanelLoading() { return <div className="ttv-admin-card" role="status">O
 const LibraryPresentationPanel = dynamic(() => import("./LibraryPresentationPanel"), { loading: PanelLoading });
 const ChannelLineupPanel = dynamic(() => import("./ChannelLineupPanel"), { loading: PanelLoading });
 const AudiencePanel = dynamic(() => import("./AudiencePanel"), { loading: PanelLoading });
+const ServiceHealthPanel = dynamic(() => import("./ServiceHealthPanel"), { loading: PanelLoading });
 const StationInsightsPanel = dynamic(() => import("./StationInsightsPanel"), { loading: PanelLoading });
 const ProgrammeBlocksPanel = dynamic(() => import("./ProgrammeBlocksPanel"), { loading: PanelLoading });
 const ChannelBrandingPanel = dynamic(() => import("./ChannelBrandingPanel"), { loading: PanelLoading });
@@ -34,6 +35,7 @@ type AdminTab =
   | "quick-edit"
   | "add"
   | "submissions"
+  | "health"
   | "show-requests"
   | "show-organization"
   | "programming"
@@ -67,6 +69,7 @@ const REQUIRED_LAUNCH_CHANNEL_COUNT = 23;
 
 const TABS: AdminTabMeta[] = [
   { id: "show-organization", label: "Show Organization", shortLabel: "Seasons", description: "Group series, review missing season numbers and correct episode order." },
+  { id: "health", label: "Service Health", shortLabel: "Health", description: "Check accounts, email delivery, playback reports and unavailable videos." },
   { id: "show-requests", label: "Show Requests", shortLabel: "Requests", description: "Review paid-member show suggestions, update progress and reply to members." },
   { id: "batch", label: "Batch Import", shortLabel: "Batch Import", description: "Upload multiple episodes, reuse R2 links, detect runtimes and assign a channel in one review." },
   { id: "commercials", label: "Commercials", shortLabel: "Commercials", description: "Upload ads, assign campaigns, configure breaks and preview the schedule." },
@@ -142,7 +145,7 @@ const TABS: AdminTabMeta[] = [
 const TOOL_GROUPS: { name: string; tabs: AdminTab[] }[] = [
   { name: "Content & campaigns", tabs: ["batch", "add", "commercials", "quick-edit", "library", "show-organization", "artwork", "show-requests", "submissions"] },
   { name: "Channels & scheduling", tabs: ["lineup", "programming", "blocks", "audience", "branding"] },
-  { name: "Station health & safety", tabs: ["insights", "launch", "config"] },
+  { name: "Station health & safety", tabs: ["health", "insights", "launch", "config"] },
 ];
 
 function isAdminTab(value: string | null): value is AdminTab {
@@ -887,6 +890,7 @@ export default function AdminDashboard() {
         }} /> : null}
         {activeTab === "artwork" ? <LibraryPresentationPanel /> : null}
         {activeTab === "audience" ? <AudiencePanel /> : null}
+        {activeTab === "health" ? <ServiceHealthPanel /> : null}
         {activeTab === "insights" ? <StationInsightsPanel /> : null}
         {activeTab === "blocks" ? <ProgrammeBlocksPanel /> : null}
         {activeTab === "add" ? <UploadPanel /> : null}

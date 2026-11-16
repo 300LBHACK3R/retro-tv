@@ -1,4 +1,5 @@
 "use client";
+import { reportPlaybackFailure } from "@/lib/reportPlaybackFailure";
 
 import { formatDurationClock } from "@/lib/mediaUtils";
 import { sortEnabledChannels } from "@/lib/viewer";
@@ -1247,6 +1248,7 @@ export default function Player({ schedule, viewportFullscreen = false }: PlayerP
     };
 
     const handleError = () => {
+      reportPlaybackFailure();
       if (isCastingRef.current) {
         return;
       }

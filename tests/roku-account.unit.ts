@@ -29,10 +29,12 @@ function setup() {
   const accountData = { accountView: record('accountView', () => currentView) };
   const configuration = { ready: true, sender: "Tate's TV <hello@mail.tatestv.ca>" };
   const emailService = { accountEmailConfiguration: () => configuration, deliverAccountEmails: record('welcome', {}) };
+  const viewing = { viewingProfiles: (v: typeof view) => v.household?.profiles ?? defaults.filter(p => !p.kids), viewingGrant: () => "verified-profile-grant" };
   const helper = serverModule('lib/server/rokuAccount.ts', {
     '@supabase/supabase-js': { createClient: () => ({ auth }) },
     './accountAuth': { accountsEnabled: () => true, accountOrigin: () => 'https://www.tatestv.ca' },
     './supabaseAdmin': { createSupabaseAdminClient: () => db },
+    './accountViewing': viewing,
     './accountData': accountData, './accountEmails': emailService,
     '../accountEmails': { accountSecurityEmail },
     './requestSecurity': { getClientAddress: () => '192.0.2.1' }, './http': { privateJson }, '../profiles': { defaults },
@@ -44,6 +46,9 @@ function setup() {
     'next/server': { after: (fn: () => unknown) => fn() },
     '@/lib/accountModel': { validEmail, validPassword },
     '@/lib/server/accountData': accountData,
+    '@/lib/server/accountViewing': viewing,
+    '@/lib/server/accountDevices': { touchAccountDevice: async () => 'verified-session' },
+    '@/lib/server/serviceHealth': { recordServiceEvent: async () => {} },
     '@/lib/server/accountEmails': emailService,
     '@/lib/server/supabaseAdmin': { createSupabaseAdminClient: () => db },
     '@/lib/server/http': { privateJson, readBoundedJson: async (req: Request) => req.json() },

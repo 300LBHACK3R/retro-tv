@@ -1,4 +1,5 @@
 "use client";
+import AccountDevices from "./AccountDevices";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -608,6 +609,7 @@ export default function AccountPage({
                 <p>Review suggestions, update their progress and reply to members in Administration → Show Requests.</p>
                 <div className="ttv-account-actions"><Link href="/admin">Open administration</Link></div>
               </section> : <ShowRequests key={account.user!.id} member={account.member} />}
+              <AccountDevices key={account.user!.id} />
               <section id="account-settings" className="ttv-account-card">
                 <p className="ttv-account-eyebrow">You’re in control</p>
                 <h2>Account settings</h2>

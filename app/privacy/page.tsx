@@ -15,14 +15,18 @@ export default function PrivacyPage() {
       <h1>Privacy & saved preferences</h1>
       <p>
         Your household profiles, favourites, watchlist and theme choices sync
-        with your parent account. Playback settings and resume positions stay
-        on the current device. Clearing browser storage removes those local
+        with your parent account. Signed-in resume positions also sync between
+        the website and Roku. Playback settings remain on the current device. Clearing browser storage removes those local
         settings but does not delete your account or its saved parent PIN.
       </p>
       <h2>Parent accounts and optional purchases</h2>
-      <p>A verified parent account is required to use the viewer and library. Paid membership is optional. Children use Kids profiles inside a parent’s household rather than separate email accounts. Email addresses and password authentication are managed by Supabase. We do not store your plaintext password. Account sessions use secure HttpOnly cookies. When signed in, your household profiles, salted parent-PIN hash, favourites, watchlist and theme choices are stored with your account and sync across devices. Device-only profiles are imported only when you choose to import them. Playback resume positions remain on the current device.</p>
+      <p>A verified parent account is required to use the viewer and library. Paid membership is optional. Children use Kids profiles inside a parent’s household rather than separate email accounts. Email addresses and password authentication are managed by Supabase. We do not store your plaintext password. Account sessions use secure HttpOnly cookies. When signed in, your household profiles, salted parent-PIN hash, favourites, watchlist and theme choices are stored with your account and sync across devices. Device-only profiles are imported only when you choose to import them. Signed-in resume positions are saved separately for each household profile, up to 300 titles. Roku guest bookmarks stay on that TV.</p>
       <p>Stripe handles checkout, payment details, receipts and subscription billing. Tate’s TV keeps purchase and membership identifiers and status to provide access. Card details are not stored by Tate’s TV. Cancelling membership stops future renewals; individually purchased themes remain available. Signed-in purchases and account pages are excluded from optional viewing analytics.</p>
       <p>You can sign out, request a password reset or delete your account from Account settings. Account deletion removes synced household data and cancels membership. Payment providers may retain transaction records for their own legal and accounting requirements. Clearing browser storage alone does not delete a registered account or cancel a subscription.</p>
+      <h2>Your connected devices</h2>
+      <p>Your account stores a verified session identifier, a device name, its type and last activity. You can rename devices or sign one out from Your devices. An online TV checks account access regularly; an offline TV may keep playing until it reconnects. Browser sessions use HttpOnly cookies and Roku saves its access and refresh credentials in its application registry.</p>
+      <h2>Service health</h2>
+      <p>Service health stores daily counts of playback and account-service errors for up to 30 days. These records have no customer identifier, email, IP address, raw device description or credentials. Playback reports can include a programme identifier to help repair a video; Kids reports omit it. Website playback reports respect your analytics choice and browser privacy settings. Account email delivery status is kept separately so failed service emails can be retried.</p>
       <h2>Profiles & Kids mode</h2>
       <p>
         Each profile has separate saved items, in the signed-in household account. The parent PIN is

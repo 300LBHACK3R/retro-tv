@@ -33,6 +33,7 @@ sub init()
     m.video.ObserveField("position", "onVideoPosition")
     m.refreshTimer.ObserveField("fire", "onRefresh")
     m.segmentTimer.ObserveField("fire", "onSegmentEnd")
+    resetViewing()
     applyTheme(m.registry.Read("theme"))
     buildMenu()
     m.top.FindNode("buildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
@@ -184,6 +185,7 @@ sub onMenuSelected()
         openGuide()
         return
     else if index = 2
+        m.libraryFilter = "all"
         m.view = "library"
         m.group = invalid
         m.search = ""
@@ -224,7 +226,7 @@ sub renderList(preserve as boolean)
         updateNowNext()
         return
     else if m.view = "themes"
-        m.heading.text = "Your style. " + m.themeCatalog.themes.Count().ToStr() + " free themes."
+        m.heading.text = "Your style. " + m.themeCatalog.themes.Count().ToStr() + " themes."
         m.entries = m.themeCatalog.themes
         if selectedId = "" then selectedId = m.themeId
     else if m.catalog <> invalid
@@ -233,9 +235,11 @@ sub renderList(preserve as boolean)
             m.entries = m.group.items
         else
             m.heading.text = "Your library. Your evening."
+            if m.libraryFilter = "continue" then m.heading.text = "Continue Watching"
+            if m.libraryFilter = "watchlist" then m.heading.text = "Your watchlist"
             if m.search <> "" then m.heading.text = "Search: " + m.search
             for each group in m.catalog.library
-                if m.search = "" or Instr(1, LCase(group.title), LCase(m.search)) > 0 then m.entries.Push(group)
+                if (m.search = "" or Instr(1, LCase(group.title), LCase(m.search)) > 0) and groupMatchesSaved(group) then m.entries.Push(group)
             end for
         end if
     end if
@@ -250,7 +254,27 @@ sub renderList(preserve as boolean)
         if m.view = "themes"
             node.viewerColors = entry.colors
             node.themeBadge = "Free"
+            if entry.isPremium
+                node.themeBadge = "Locked"
+                if themeAllowed(entry)
+                    node.themeBadge = "Included with account"
+                    if m.account.member then node.themeBadge = "Included with membership"
+                    if m.account.purchasedThemeIds <> invalid
+                        if arrayHas(m.account.purchasedThemeIds, entry.id) then node.themeBadge = "Owned"
+                    end if
+                end if
+            end if
             if entry.id = m.themeId then node.themeBadge = "Selected"
+        end if
+        if m.view = "episodes" and cloudProfile()
+            saved = m.cloudProgress[Mid(entry.id, 7)]
+            if saved <> invalid
+                if saved.position >= saved.duration - 10
+                    node.themeBadge = "Watched"
+                else if saved.position >= 10
+                    node.themeBadge = "Resume at " + Int(saved.position / 60).ToStr() + " min"
+                end if
+            end if
         end if
         node.title = entry.title
         node.HDPosterUrl = "pkg:/images/logo.png"
@@ -284,6 +308,14 @@ sub onGridSelected()
     if index < 0 or index >= m.entries.Count() then return
     entry = m.entries[index]
     if m.view = "themes"
+        if not themeAllowed(entry)
+            showMessage("Theme unavailable", ["Sign in to an account with access to this theme. Your seven free themes are always available."])
+            return
+        end if
+        if cloudProfile()
+            queueViewing({ action: "theme", themeId: entry.id })
+            return
+        end if
         applyTheme(entry.id)
         m.registry.Write("theme", m.themeId)
         m.registry.Flush()
@@ -311,6 +343,7 @@ end sub
 sub onSearch(event as object)
     dialog = m.top.dialog
     if event.GetData() = 0
+        m.libraryFilter = "all"
         m.search = Left(dialog.text, 100)
         m.view = "library"
         m.group = invalid
@@ -360,6 +393,7 @@ end sub
 
 sub onRefresh()
     refreshAccount()
+    flushViewing()
     if not m.isLoadingPlayback and m.top.dialog = invalid then refreshCatalog()
 end sub
 

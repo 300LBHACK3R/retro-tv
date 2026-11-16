@@ -86,6 +86,7 @@ sub resetAccounts()
         return m.saved[key]
         end function, Write: sub(key, value): m.saved[key] = value: end sub,
         Delete: sub(key): m.saved.Delete(key): end sub, Flush: sub(): end sub }
+    m.themeCatalog = { defaultId: "shaw-2006" }
     m.kids = true
     m.account = invalid
     m.accountSession = invalid
@@ -118,3 +119,7 @@ sub check(condition as boolean, description as string)
     m.failed++
     print "FAIL: "; description
 end sub
+
+sub resetViewing(): end sub
+sub startViewing(grant): end sub
+sub stopPlayback(): end sub

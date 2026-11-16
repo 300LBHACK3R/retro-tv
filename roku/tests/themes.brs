@@ -36,7 +36,14 @@ sub main()
     applyTheme("missing-theme")
     check(m.themeId = "christmas-96-living-room", "An unavailable saved theme safely uses the free default")
     renderList(false)
-    check(m.entries.Count() = 7, "All seven free website themes are selectable")
+    check(m.entries.Count() = 14, "All fourteen website themes have native TV designs")
+    applyTheme("christmas-neon-noel")
+    check(m.themeId = m.themeCatalog.defaultId, "A guest cannot activate premium Neon Noel")
+    owned = []
+    for each theme in m.themeCatalog.themes
+        owned.Push(theme.id)
+    end for
+    m.account = { ownedThemeIds: owned, purchasedThemeIds: owned, member: false }
     for i = 0 to m.entries.Count() - 1
         expected = m.entries[i]
         m.libraryGrid.itemSelected = i
@@ -63,7 +70,7 @@ sub main()
     end for
     applyTheme("telus-2008-inspired")
     renderList(false)
-    check(m.libraryGrid.jumpToItem = 6, "Opening Themes highlights the current choice")
+    check(m.entries[m.libraryGrid.jumpToItem].id = "telus-2008-inspired", "Opening Themes highlights the current choice")
     check(m.menu.color = "0x10233BFF" and m.menu.focusedColor = "0xFFFFFFFF", "Bright Cable uses dark text and white focused text")
     check(Instr(1, m.top.FindNode("room").uri, "theme-backdrop-telus") > 0 and m.top.FindNode("room").opacity = 1, "Bright Cable gets its own full-screen backdrop, not a guide thumbnail")
     check(m.top.palette.colors.DialogTextColor = "0x10233BFF", "Keyboard and PIN dialogs receive the light palette")
@@ -75,7 +82,7 @@ sub main()
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: seven free themes, legacy preferences, saved selection, light palette and uninterrupted playback"
+    print "PASS: fourteen themes, premium guest denial, legacy preferences, saved selection, light palette and uninterrupted playback"
 end sub
 
 function node() as object
@@ -97,3 +104,11 @@ sub check(condition as boolean, description as string)
     m.failed++
     print "FAIL: "; description
 end sub
+
+function cloudProfile() as boolean: return false: end function
+function arrayHas(values, id) as boolean
+ for each value in values
+  if value = id then return true
+ end for
+ return false
+end function

@@ -26,6 +26,9 @@ export async function waitForHouseholdSave(page: Page) {
 export const test = base.extend<{ householdSession: void }>({
   householdSession: [async ({ context }, use) => {
     let state: AccountView | null = null;
+    await context.route("**/api/account/viewing?*", route => route.fulfill({ json: { progress: {} } }));
+    await context.route("**/api/account/viewing", route => route.fulfill({ json: { revision: 1, updatedAt: Date.now() } }));
+    await context.route("**/api/account/devices", route => route.fulfill({ json: { devices: [] } }));
     await context.route("**/api/account", async route => {
       if (!state) {
         const device = await route.request().frame().evaluate(() => {

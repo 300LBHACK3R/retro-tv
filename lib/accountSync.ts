@@ -236,10 +236,15 @@ export function watchAccountChanges() {
       event.returnValue = "";
     }
   };
+  const poll = () => { if (document.visibilityState === "visible" && useAccount.getState().user) void refreshAccount().catch(() => { useAccount.setState({ error: "Account connection interrupted. Retrying shortly." }); }); };
+  const refreshTimer = setInterval(poll, 60_000);
+  document.addEventListener("visibilitychange", poll);
   window.addEventListener("beforeunload", beforeUnload);
   window.addEventListener("storage", storageChanged);
   return () => {
     clearTimeout(timer);
+    clearInterval(refreshTimer);
+    document.removeEventListener("visibilitychange", poll);
     unsubscribers.forEach((unsubscribe) => unsubscribe());
     window.removeEventListener("beforeunload", beforeUnload);
     window.removeEventListener("storage", storageChanged);

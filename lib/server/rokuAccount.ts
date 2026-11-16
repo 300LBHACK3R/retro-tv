@@ -8,9 +8,9 @@ import { accountView } from "./accountData";
 import { accountEmailConfiguration } from "./accountEmails";
 import { getClientAddress } from "./requestSecurity";
 import { privateJson } from "./http";
-import { defaults } from "../profiles";
 import type { AccountView } from "../accountModel";
 import { accountSecurityEmail } from "../accountEmails";
+import { viewingProfiles } from "./accountViewing";
 
 const derivePin = promisify(pbkdf2);
 export type CodePurpose = "signup" | "recovery";
@@ -49,7 +49,7 @@ export async function rokuAccountGuard(request: Request, action: string, subject
   if (origin && origin !== accountOrigin()) return privateJson({ ok: false, error: "Request origin rejected." }, 403);
   if (!accountsEnabled()) return privateJson({ ok: false, error: "Account services are temporarily unavailable. You can still watch for free." }, 503);
   const sensitive = ["signup", "recover", "verify", "reset", "parent-pin"].includes(action);
-  const limit = sensitive ? 20 : action === "signin" ? 30 : 120;
+  const limit = sensitive ? 20 : action === "signin" ? 30 : action === "viewing" ? 360 : 120;
   const buckets = [{ value: `ip:${getClientAddress(request)}`, limit }];
   if (subject) buckets.push({ value: `subject:${subject}`, limit: sensitive ? 5 : 10 });
   for (const bucket of buckets) {
@@ -67,8 +67,8 @@ export function deviceSession(session: Session) {
 }
 export function deviceAccount(view: AccountView) {
   return {
-    user: view.user, member: view.member, ownedThemeIds: view.ownedThemeIds,
-    profiles: view.household?.profiles ?? defaults.map(profile => ({ ...profile })),
+    user: view.user, member: view.member, ownedThemeIds: view.ownedThemeIds, purchasedThemeIds: view.purchasedThemeIds,
+    profiles: viewingProfiles(view),
     parentPinRequired: !!view.household?.pin,
   };
 }
