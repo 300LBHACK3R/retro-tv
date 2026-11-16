@@ -80,7 +80,7 @@ function ProfileLibrary() {
     mediaId?: string;
     play?: boolean;
   } | null>(null);
-  const { progress, updateProgress, ready: progressReady, error: progressError, reload: reloadProgress, flush: flushProgress } = useViewingProgress();
+  const { progress, updateProgress, ready: progressReady, error: progressError, reload: reloadProgress, flush: flushProgress } = useViewingProgress(!!selection);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const requestedRef = useRef(false);

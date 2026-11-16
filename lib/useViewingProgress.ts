@@ -5,12 +5,14 @@ import { useProfiles } from "./deviceProfiles";
 import { sanitizeProgress, type ProgressEntry, type ProgressMap } from "./libraryCatalog";
 
 /** Each mounted profile owns its queue. A late response cannot cross accounts. */
-export function useViewingProgress() {
+export function useViewingProgress(titleOpen = false) {
   const ownerId = useAccount(s => s.user?.id);
   const profileId = useProfiles(s => s.activeId);
   const [progress, setProgress] = useState<ProgressMap>({});
   const [ready, setReady] = useState(!ownerId);
   const [error, setError] = useState("");
+  const titleOpenRef = useRef(titleOpen);
+  useEffect(() => { titleOpenRef.current = titleOpen; }, [titleOpen]);
   const actions = useRef<{ update: (id: string, entry: ProgressEntry | null) => void; reload: () => void; flush: () => void } | null>(null);
   useEffect(() => {
     let live = true, loaded = !ownerId, busy = false, blocked = false;
@@ -45,7 +47,10 @@ export function useViewingProgress() {
       finally { busy = false; }
     }
     async function load() {
-      if (!ownerId || !profileId || !current() || busy || pending.size || blocked) return;
+      // Keep a playing/paused title's observed revision. A background read must
+      // not silently grant its old player position permission to replace a
+      // newer position saved on another screen.
+      if (!ownerId || !profileId || !current() || busy || pending.size || blocked || (loaded && titleOpenRef.current)) return;
       busy = true;
       try {
         const response = await fetch(`/api/account/viewing?profile=${encodeURIComponent(profileId)}`, { cache: "no-store", signal: AbortSignal.timeout(12_000) });
