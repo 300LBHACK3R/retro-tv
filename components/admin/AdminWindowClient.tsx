@@ -166,16 +166,6 @@ export default function AdminWindowClient() {
     router.push("/");
   };
 
-  const closeAdmin = () => {
-    window.close();
-
-    window.setTimeout(() => {
-      if (!window.closed) {
-        router.push("/");
-      }
-    }, 150);
-  };
-
   return (
     <main
       className={`ttv-admin-shell ttv-app-shell ${themeLayoutClass} min-h-screen overflow-x-hidden`}
@@ -190,7 +180,7 @@ export default function AdminWindowClient() {
 
       <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-4 p-3 sm:p-5">
         <header
-          className="flex flex-col gap-4 rounded-2xl border p-4 shadow-2xl shadow-black/30 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-4 rounded-2xl border p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
           style={{
             background: "var(--panel-bg)",
             borderColor: "var(--border)",
@@ -200,7 +190,7 @@ export default function AdminWindowClient() {
             <TatesTvLogo
               width={220}
               height={147}
-              className="h-auto w-full max-w-[180px]"
+              className="h-auto w-full max-w-[76px]"
               priority
             />
 
@@ -212,11 +202,11 @@ export default function AdminWindowClient() {
                 className="text-[11px] font-black uppercase tracking-[0.22em]"
                 style={{ color: "var(--primary)" }}
               >
-                Tate’s TV Administration
+                Tate’s TV
               </div>
 
               <h1 className="mt-1 truncate text-xl font-black tracking-tight sm:text-2xl">
-                Admin Control Centre
+                Admin
               </h1>
 
               <p
@@ -260,13 +250,7 @@ export default function AdminWindowClient() {
               </button>
             ) : null}
 
-            <button
-              type="button"
-              onClick={closeAdmin}
-              className="ttv-action-button ttv-touch-target rounded-xl px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"
-            >
-              Close Admin
-            </button>
+
           </div>
         </header>
 
@@ -285,7 +269,7 @@ export default function AdminWindowClient() {
 
         {!authorized && status !== "checking" ? (
           <section
-            className="mx-auto w-full max-w-xl rounded-2xl border p-5 shadow-2xl shadow-black/30"
+            className="mx-auto w-full max-w-xl rounded-2xl border p-5 shadow-sm"
             style={{
               background: "var(--panel-bg)",
               borderColor: "var(--border)",

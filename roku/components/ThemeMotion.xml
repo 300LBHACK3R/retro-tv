@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ThemeMotion" extends="Group">
+  <interface><field id="enabled" type="boolean" onChange="updateMotion" /></interface>
+  <script type="text/brightscript" uri="ThemeMotion.brs" />
+  <children>
+    <Group id="snow" />
+    <Poster id="glow" translation="[662,118]" width="120" height="120" uri="pkg:/images/winter-glow.png" opacity="0.15" />
+    <Animation id="fall" duration="24" repeat="true" easeFunction="linear">
+      <Vector2DFieldInterpolator key="[0,1]" keyValue="[[0,-720],[32,0]]" fieldToInterp="snow.translation" />
+    </Animation>
+    <Animation id="flicker" duration="8" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator key="[0,.2,.25,.32,.55,.6,.7,1]" keyValue="[.1,.2,.12,.18,.13,.22,.15,.1]" fieldToInterp="glow.opacity" />
+    </Animation>
+  </children>
+</component>

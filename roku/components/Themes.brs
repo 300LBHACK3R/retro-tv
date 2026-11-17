@@ -27,6 +27,9 @@ sub applyTheme(id as string)
     m.themeBackgroundOpacity = theme.backgroundOpacity
     m.top.themeColors = theme.colors
     colors = theme.colors
+    m.guide.winter = theme.id = "christmas-2005-home"
+    m.top.FindNode("winterMotion").enabled = m.guide.winter and m.fullscreen <> true and m.guide.visible <> true
+    m.top.FindNode("guideWinterMotion").enabled = m.guide.winter and m.guide.visible = true
     for each nodeId in ["room", "guideRoom"]
         room = m.top.FindNode(nodeId)
         room.uri = theme.background

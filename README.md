@@ -23,6 +23,10 @@ Use `npm run clean -- --dry-run` to preview generated-file cleanup, then `npm ru
 
 See [launch audit and remaining activation work](docs/LAUNCH_AUDIT.md) before advertising paid memberships.
 
+## Latest release
+
+See [Premium Roku, Christmas 2005 and Admin](docs/PREMIUM_ROKU.md) for v0.1.13, deployment order and device acceptance.
+
 ## Viewer features
 
 - Live playback with bounded connection retries, offline recovery, autoplay prompts and programme reporting.

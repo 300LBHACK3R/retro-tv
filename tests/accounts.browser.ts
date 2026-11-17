@@ -548,7 +548,7 @@ test("@billing premium access comes from verified purchases, not local saved own
       "retro-tv-programming-v1",
       JSON.stringify({
         version: 6,
-        state: { ownedPremiumThemes: ["midas-gold"], themeId: "midas-gold" },
+        state: { ownedPremiumThemes: ["christmas-2005-home"], themeId: "christmas-2005-home" },
       }),
     ),
   );
@@ -560,17 +560,17 @@ test("@billing premium access comes from verified purchases, not local saved own
     .getByRole("button", { name: "Open theme library", exact: true })
     .click();
   await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
-  await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
-  await expect(page).toHaveURL(/\/account\?theme=midas-gold$/);
-  await expect(page.locator('[data-theme-buy="midas-gold"]')).toHaveText(
+  await page.locator('.theme-card[data-theme-id="christmas-2005-home"]').click();
+  await expect(page).toHaveURL(/\/account\?theme=christmas-2005-home$/);
+  await expect(page.locator('[data-theme-buy="christmas-2005-home"]')).toHaveText(
     "Buy · C$3.00",
   );
   const state = f.state();
-  state.ownedThemeIds.push("midas-gold");
-  state.purchasedThemeIds.push("midas-gold");
+  state.ownedThemeIds.push("christmas-2005-home");
+  state.purchasedThemeIds.push("christmas-2005-home");
   f.setState(state);
   await page.reload();
-  await expect(page.locator('[data-theme-buy="midas-gold"]')).toHaveText(
+  await expect(page.locator('[data-theme-buy="christmas-2005-home"]')).toHaveText(
     "Owned",
   );
   await page.getByRole("link", { name: "Watch TV", exact: true }).click();
@@ -584,13 +584,13 @@ test("@billing premium access comes from verified purchases, not local saved own
       response.request().method() === "PUT" &&
       response.ok(),
   );
-  await page.locator('.theme-card[data-theme-id="midas-gold"]').click();
+  await page.locator('.theme-card[data-theme-id="christmas-2005-home"]').click();
   await saved;
-  expect(f.state().household?.profiles[0]?.theme).toBe("midas-gold");
+  expect(f.state().household?.profiles[0]?.theme).toBe("christmas-2005-home");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-ttv-theme",
-    "midas-gold",
+    "christmas-2005-home",
   );
   state.ownedThemeIds = allowedThemeIds([], false);
   state.purchasedThemeIds = [];
@@ -598,9 +598,9 @@ test("@billing premium access comes from verified purchases, not local saved own
   await page.reload();
   await expect(page.locator("html")).not.toHaveAttribute(
     "data-ttv-theme",
-    "midas-gold",
+    "christmas-2005-home",
   );
-  expect(f.state().household?.profiles[0]?.theme).toBe("midas-gold");
+  expect(f.state().household?.profiles[0]?.theme).toBe("christmas-2005-home");
   await expect(
     page.getByRole("button", { name: "Open theme library", exact: true }),
   ).toBeVisible();

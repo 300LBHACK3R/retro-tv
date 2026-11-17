@@ -1,4 +1,4 @@
-import { viewerCatalog } from "./audience";
+import { channelCategory, viewerCatalog } from "./audience";
 import { buildLibrary } from "./libraryCatalog";
 import { safeArtworkUrl } from "./libraryPresentation";
 import { getLiveState } from "./liveEngine";
@@ -26,12 +26,12 @@ export function rokuStream(item: MediaItem): Stream | null {
   }
 }
 
-function poster(value?: string) {
+export function rokuPoster(value?: string) {
   const safe = safeArtworkUrl(value);
   return safe ? new URL(safe, SITE_ORIGIN).href : FALLBACK_POSTER;
 }
 
-function programmeIds(channel: Channel) {
+export function programmeIds(channel: Channel) {
   return [...new Set([
     ...channel.mediaIds,
     ...(channel.programmeBlocks ?? []).flatMap(block => block.mediaIds),
@@ -62,7 +62,7 @@ export function rokuLineup(
   return { channels, media };
 }
 
-function scheduleFor(channel: Channel, media: MediaItem[], now: Date) {
+export function rokuSchedule(channel: Channel, media: MediaItem[], now: Date) {
   const ids = new Set(programmeIds(channel));
   return buildSchedule(media.filter(item => ids.has(item.id)), {
     channel,
@@ -82,19 +82,19 @@ export function buildRokuCatalog(
     snapshot.libraryArtwork, audience === "kids").filter(group => group.type !== "music").map(group => ({
     id: `series:${group.key}`,
     title: group.title,
-    poster: poster(group.poster),
+    poster: rokuPoster(group.poster),
     type: group.type,
     items: group.items.map(({ media, displayTitle, season }) => ({
       id: `media:${media.id}`,
       title: group.type === "show" ? `${group.title} — ${displayTitle}` : group.title,
       description: media.description ?? "",
-      poster: poster(group.seasonPosters[season] || group.poster || media.poster),
+      poster: rokuPoster(group.seasonPosters[season] || group.poster || media.poster),
       duration: media.duration,
       mediaType: media.type === "movie" ? "movie" : "episode",
     })),
   }));
   const channels = lineup.channels.flatMap(channel => {
-    const schedule = scheduleFor(channel, lineup.media, now);
+    const schedule = rokuSchedule(channel, lineup.media, now);
     const live = getLiveState(schedule, now.getTime());
     if (!live.item) return [];
     const next = schedule[(live.index + 1) % schedule.length];
@@ -103,7 +103,8 @@ export function buildRokuCatalog(
       title: channel.branding?.displayName || channel.name,
       number: channel.number ?? (Number(channel.id) || 0),
       description: channel.branding?.description ?? "",
-      poster: poster(channel.branding?.logoUrl),
+      poster: rokuPoster(channel.branding?.logoUrl),
+      category: channelCategory(channel),
       now: live.item.sourceTitle || live.item.title,
       next: next?.sourceTitle || next?.title || "",
       remaining: live.remaining,
@@ -133,7 +134,7 @@ export function rokuPlayback(
   if (id.startsWith("channel:")) {
     const channel = lineup.channels.find(entry => `channel:${entry.id}` === id);
     if (!channel) return null;
-    const state = getLiveState(scheduleFor(channel, lineup.media, now), now.getTime());
+    const state = getLiveState(rokuSchedule(channel, lineup.media, now), now.getTime());
     if (!state.item) return null;
     const stream = rokuStream(state.item);
     if (!stream) return null;

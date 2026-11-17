@@ -13,6 +13,7 @@ export const defaultThemeId = DEFAULT_THEME_ID;
 assert.ok(freeThemes.some(theme => theme.id === defaultThemeId), "The Roku default must be free");
 
 export const worlds = {
+  "christmas-2005-home": "christmas-2005-world.webp",
   "christmas-neon-noel": "christmas-neon-noel-world.webp",
   "christmas-96-living-room": "christmas-96-world.webp",
   "halloween-90s-night": "halloween-90s-world.webp",

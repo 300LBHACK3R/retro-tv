@@ -29,6 +29,11 @@ for (const [id, portrait] of Object.entries(PROFILE_PORTRAITS)) {
   portraits[id] = `pkg:/images/${filename}`;
 }
 
+for (const [name, file, width, height] of [["winter-trim", "christmas-2005-snowcap.svg", 1176, 18], ["winter-ornaments", "christmas-2005-ornaments.svg", 120, 64]]) {
+  await sharp(fileURLToPath(new URL(`../../public/themes/${file}`, import.meta.url))).resize(width, height, { fit: "fill" }).png().toFile(fileURLToPath(new URL(`${name}.png`, images)));
+}
+await sharp(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#ffffff"/></svg>')).png().toFile(fileURLToPath(new URL("winter-flake.png", images)));
+await sharp(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><defs><radialGradient id="g"><stop stop-color="#ffd08a"/><stop offset="1" stop-color="#ffd08a" stop-opacity="0"/></radialGradient></defs><circle cx="60" cy="60" r="60" fill="url(#g)"/></svg>')).png().toFile(fileURLToPath(new URL("winter-glow.png", images)));
 const themes = [];
 for (const theme of nativeThemes) {
   if (!/^[a-z0-9-]+$/.test(theme.id)) throw new Error(`Invalid theme id: ${theme.id}`);
@@ -52,10 +57,10 @@ for (const theme of nativeThemes) {
     background = `pkg:/images/${filename}`;
   }
   themes.push({
-    id: theme.id, name: theme.name, isPremium: !!theme.isPremium,
+    id: theme.id, name: theme.name, isPremium: !!theme.isPremium, priceLabel: theme.priceLabel,
     title: theme.name.split(":")[0],
     poster: `pkg:/images/${preview}`, background,
-    backgroundOpacity: world ? 0.4 : 1,
+    backgroundOpacity: world ? 0.65 : 1,
     colors: nativeColors(theme),
   });
 }

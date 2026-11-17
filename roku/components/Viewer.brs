@@ -85,7 +85,7 @@ sub focusPlayer()
 end sub
 
 sub onPlayerFocus()
-    m.playerFocus.visible = m.playerTarget.HasFocus() and not m.fullscreen
+    m.playerFocus.visible = m.playerTarget.HasFocus() and m.fullscreen <> true
 end sub
 
 sub onChannelSelected()
@@ -144,10 +144,17 @@ sub updateNowNext()
 end sub
 
 sub layoutVideo()
+    for each id in ["winterMotion", "guideWinterMotion"]
+        motion = m.top.FindNode(id)
+        if motion <> invalid
+            motion.enabled = m.themeId = "christmas-2005-home" and m.guide.visible <> true and m.fullscreen <> true
+            if id = "guideWinterMotion" then motion.enabled = m.themeId = "christmas-2005-home" and m.guide.visible
+        end if
+    end for
     if m.guide.visible
-        m.video.translation = [1020,48]
-        m.video.width = 176
-        m.video.height = 99
+        m.video.translation = [920,36]
+        m.video.width = 320
+        m.video.height = 180
         m.video.enableUI = false
         m.playerFocus.visible = false
     else if m.fullscreen
@@ -165,9 +172,9 @@ sub layoutVideo()
         onPlayerFocus()
     else
         ' Keep one decoder running while the guide or library is open.
-        m.video.translation = [1020,48]
-        m.video.width = 176
-        m.video.height = 99
+        m.video.translation = [1000,42]
+        m.video.width = 224
+        m.video.height = 126
         m.video.enableUI = false
         m.playerFocus.visible = false
     end if
@@ -210,7 +217,7 @@ sub onViewerOption(event as object)
     else if selection = 2
         showSearch()
     else if selection = 3
-        showMessage("Remote controls", ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: Up/Down browse, Left/Right page, OK watch fullscreen, Back return without tuning. Library fullscreen retains Roku's Play/Pause, seeking and Replay. * opens caption/audio options where available.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
+        showMessage("Remote controls", ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: arrows browse programmes; Up above the first channel reaches days and filters. Rewind/FF moves three hours; Replay returns to Now. OK watches the selected channel LIVE, even on a future listing. Back closes without tuning. Library fullscreen retains Play/Pause, seeking and Replay.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
     else if selection = 4
         showSavedOptions()
     else

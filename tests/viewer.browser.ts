@@ -509,6 +509,7 @@ for (const theme of THEMES) {
       const nineties = theme.id === "halloween-90s-night";
       const christmas = theme.id === "christmas-96-living-room";
       const neonNoel = theme.id === "christmas-neon-noel";
+      const home2005 = theme.id === "christmas-2005-home";
       const world = page.locator(".ttv-seasonal-world");
       await expect(world).toHaveCount(1);
       await expect(world).toBeVisible();
@@ -528,15 +529,17 @@ for (const theme of THEMES) {
       expect(Math.abs(layout.height - layout.viewportHeight)).toBeLessThanOrEqual(1);
       const portrait = await page.evaluate((christmas) => matchMedia(christmas
         ? "(orientation: portrait)"
-        : "(max-width: 760px) and (orientation: portrait)").matches, christmas || neonNoel);
-      const imageName = `${neonNoel ? "christmas-neon-noel" : christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
+        : "(max-width: 760px) and (orientation: portrait)").matches, christmas || neonNoel || home2005);
+      const imageName = `${home2005 ? "christmas-2005" : neonNoel ? "christmas-neon-noel" : christmas ? "christmas-96" : afterDark ? "halloween-after-dark" : nineties ? "halloween-90s" : "haunted-arcade"}-${portrait ? "mobile" : "world"}`;
       await expect.poll(() => world.locator("img").evaluate((image: HTMLImageElement, name) =>
         image.complete && image.naturalWidth > 0 && image.currentSrc.includes(name), imageName,
       )).toBe(true);
       await expect(page.locator(".ttv-halloween-scene")).toHaveCount(0);
       expect(await page.locator(".ttv-library-shell").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
       await page.emulateMedia({ reducedMotion: "reduce" });
-      for (const selector of neonNoel
+      for (const selector of home2005
+        ? [".ttv-christmas2005-snow i"]
+        : neonNoel
         ? [".ttv-noel-aurora", ".ttv-noel-snow i"]
         : christmas
         ? [".ttv-christmas96-tree-glow", ".ttv-christmas96-tv-glow", ".ttv-christmas96-lights i", ".ttv-christmas96-snow i"]
@@ -1291,4 +1294,35 @@ test("TV picker survives delayed Cast startup, opens on the first tap and treats
   await expect.poll(async () => (await readState()).stop).toBe(1);
   await expect(dialog.getByRole("button", { name: "Choose TV — Google Cast", exact: true })).toBeVisible();
   await noPageOverflow(page);
+});
+
+test("Christmas 2005 motion and festive guide remain readable and respect reduced motion", async ({ page }, info) => {
+  await page.route("**/api/programming", route => route.fulfill({ json: { ok: true, source: "database", programming: { ...programming, media: programming.media.map(item => ({ ...item, duration: 1800 })) } } }));
+  await page.goto("/?ch=24");
+  await page.getByRole("button", { name: "Open theme library", exact: true }).click();
+  await page.getByRole("button", { name: "Browse all themes", exact: true }).click();
+  await page.locator('.theme-card[data-theme-id="christmas-2005-home"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-2005-home");
+  const world = page.locator(".ttv-christmas2005-art");
+  await expect.poll(() => world.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator(".ttv-christmas2005-snow i")).toHaveCount(18);
+  await expect(page.locator(".ttv-christmas2005-glow")).toHaveCSS("animation-name", "ttv-home-light");
+  const desktop = page.getByRole("button", { name: "Open live guide", exact: true });
+  const mobile = page.getByRole("navigation", { name: "Mobile viewer navigation" }).getByRole("button", { name: "Guide", exact: true });
+  await desktop.or(mobile).filter({ visible: true }).click();
+  await expect(page.getByRole("dialog", { name: "Live Guide", exact: true }).locator(".ttv-mobile-guide, .ttv-desktop-guide")).toBeVisible();
+  const guide = page.getByRole("dialog", { name: "Live Guide", exact: true });
+  const mobileLayout = await guide.locator(".ttv-mobile-guide").isVisible();
+  if (mobileLayout) await guide.getByRole("button", { name: "Find", exact: true }).click();
+  await guide.getByRole("searchbox", { name: "Find a channel in the guide" }).fill("Studio");
+  await expect(guide.locator(mobileLayout ? ".ttv-mobile-channel" : ".ttv-guide-station")).toHaveCount(1);
+  if (!mobileLayout) await expect(guide.locator(".ttv-guide-cell").first()).toBeVisible();
+  const header = page.locator(".ttv-guide-dialog-header");
+  expect(await header.evaluate(e => getComputedStyle(e, "::after").backgroundImage)).toContain("christmas-2005-snowcap.svg");
+  expect(await header.evaluate(e => getComputedStyle(e, "::before").backgroundImage)).toContain("christmas-2005-ornaments.svg");
+  await noPageOverflow(page);
+  await page.screenshot({ path: info.outputPath("christmas-2005-guide.png") });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator(".ttv-christmas2005-glow")).toHaveCSS("animation-name", "none");
+  await expect(page.locator(".ttv-christmas2005-snow")).toBeHidden();
 });

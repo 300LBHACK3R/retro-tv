@@ -15,6 +15,7 @@ async function fixture(page: Page) {
   await page.route("https://media.example/**", route => route.fulfill({contentType:"video/webm",body:video}));
   await page.goto("/admin");
   await expect(page.getByText(/Global (loaded|sync active)/)).toBeVisible();
+  await page.getByLabel("Find an admin tool", { exact: true }).fill("Batch Import");
   await page.getByRole("button", {name:"Batch Import",exact:true}).click();
   await page.getByLabel("Assign batch to channel").selectOption(programming.channels[0]!.id);
   return () => saved;

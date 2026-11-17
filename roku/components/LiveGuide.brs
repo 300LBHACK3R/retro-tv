@@ -1,95 +1,149 @@
 sub init()
     m.index = 0
     m.ids = []
+    m.filtered = []
+    m.zone = "grid"
+    m.tool = 0
+    m.day = 0
+    m.compact = false
+    m.favouritesOnly = false
+    m.data = invalid
+    m.start = 0
+    m.cursor = 0
+    m.sequence = 0
     m.rows = m.top.FindNode("rows")
+    m.top.FindNode("tick").ObserveField("fire", "refreshGuide")
 end sub
 
-sub updateChannels()
-    previousId = ""
-    if m.index >= 0 and m.index < m.ids.Count() then previousId = m.ids[m.index]
-    m.ids = []
-    m.index = 0
-    if m.top.channels <> invalid
-        for each channel in m.top.channels
-            m.ids.Push(channel.id)
-            if channel.id = previousId then m.index = m.ids.Count() - 1
-        end for
+sub shutdown()
+    m.sequence++
+    if m.task <> invalid
+        m.task.UnobserveField("response")
+        m.task.control = "stop"
+        m.task = invalid
     end if
-    render()
+    m.top.FindNode("tick").control = "stop"
 end sub
 
 sub open()
+    shutdown()
+    m.data = invalid
+    m.start = 0
+    m.cursor = 0
+    m.zone = "grid"
+    m.day = 0
+    m.favouritesOnly = false
+    m.top.query = ""
+    m.top.category = ""
+    updateChannels()
     for i = 0 to m.ids.Count() - 1
         if m.ids[i] = m.top.channelId then m.index = i
     end for
     render()
     m.top.SetFocus(true)
+    refreshGuide()
+    m.top.FindNode("tick").control = "start"
 end sub
 
-sub updateColors()
-    paintTheme({ title: "text", subtitle: "textMuted", panel: "guideHeaderBg", channelHeading: "text",
-        nowHeading: "text", nextHeading: "text", empty: "text", position: "textMuted", help: "primary", accentLine: "primary" })
+sub updateChannels()
+    if m.ids = invalid then return
+    previous = ""
+    if m.index < m.ids.Count() then previous = m.ids[m.index]
+    m.ids = []
+    m.filtered = []
+    m.index = 0
+    if m.top.channels <> invalid
+        for each channel in m.top.channels
+            matches = true
+            if m.top.query <> "" then matches = Instr(1, LCase(channel.title + " " + channel.number.ToStr()), LCase(m.top.query)) > 0
+            if m.top.category <> "" and channel.category <> m.top.category then matches = false
+            if m.favouritesOnly and not isFavourite(channel.id) then matches = false
+            if matches
+                m.ids.Push(channel.id)
+                m.filtered.Push(channel)
+                if channel.id = previous then m.index = m.ids.Count() - 1
+            end if
+        end for
+    end if
     render()
 end sub
 
-sub render()
-    if m.rows = invalid then return
-    m.rows.RemoveChildrenIndex(m.rows.GetChildCount(), 0)
-    count = m.ids.Count()
-    m.top.FindNode("empty").visible = count = 0
-    m.top.FindNode("position").text = ""
-    if count = 0 then return
-    first = Int(m.index / 5) * 5
-    last = first + 4
-    if last >= count then last = count - 1
-    m.top.FindNode("position").text = (first + 1).ToStr() + "–" + (last + 1).ToStr() + " of " + count.ToStr()
-    for i = first to last
-        channel = m.top.channels[i]
-        row = m.rows.CreateChild("Rectangle")
-        row.translation = [0, (i - first) * 79]
-        row.width = 1176
-        row.height = 72
-        row.color = themeColor("border", "0x314257FF")
-        inset = row.CreateChild("Rectangle")
-        inset.translation = [3,3]
-        inset.width = 1170
-        inset.height = 66
-        inset.color = themeColor("guideRowBg", "0x132538FF")
-        if i mod 2 = 1 then inset.color = themeColor("guideRowAltBg", "0x132538FF")
-        textColor = themeColor("text", "0xFFF3D8FF")
-        numberColor = themeColor("primary", "0xF1CA83FF")
-        if channel.id = m.top.channelId
-            inset.color = themeColor("guideCurrentBg", "0x224236FF")
-            textColor = themeColor("onPrimary", "0xFFF3D8FF")
-            numberColor = textColor
-        end if
-        if i = m.index
-            inset.color = themeColor("guideActiveBg", "0xF1CA83FF")
-            textColor = themeColor("onPrimary", "0x18261BFF")
-            numberColor = textColor
-            row.color = textColor
-        end if
-        number = "CH " + channel.number.ToStr()
-        if channel.id = m.top.channelId then number = number + " • LIVE"
-        addLabel(row, number, 12, 5, 224, 27, numberColor)
-        addLabel(row, channel.title, 12, 34, 224, 30, textColor)
-        addLabel(row, channel.now, 256, 6, 434, 60, textColor)
-        addLabel(row, channel.next, 718, 6, 434, 60, textColor)
-    end for
+function isFavourite(id as string) as boolean
+    if m.top.favourites <> invalid
+        for each saved in m.top.favourites
+            if id = "channel:" + saved then return true
+        end for
+    end if
+    return false
+end function
+
+sub refreshGuide()
+    if not m.top.visible then return
+    if m.task <> invalid
+        m.task.UnobserveField("response")
+        m.task.control = "stop"
+    end if
+    m.sequence++
+    task = CreateObject("roSGNode", "ApiTask")
+    task.path = "guide?audience=" + m.top.audience + "&start=" + m.start.ToStr()
+    task.requestId = m.sequence
+    task.ObserveField("response", "onGuideData")
+    m.task = task
+    m.top.FindNode("status").text = "Updating listings..."
+    task.control = "run"
 end sub
 
-sub addLabel(parent as object, text as string, x as integer, y as integer, width as integer, height as integer, color as dynamic)
-    label = parent.CreateChild("Label")
-    label.translation = [x,y]
-    label.width = width
-    label.height = height
-    label.text = text
-    label.wrap = height > 30
-    label.maxLines = 2
-    label.vertAlign = "center"
-    label.font.size = 22
-    label.color = color
+sub onGuideData(event as object)
+    data = event.GetData()
+    if data.requestId <> m.sequence or not m.top.visible then return
+    if data.ok <> true or data.audience <> m.top.audience
+        m.top.FindNode("status").text = "Guide offline. Press Replay to retry. You can still watch live."
+        return
+    end if
+    if type(data.channels) <> "roArray" or type(data.days) <> "roArray" or type(data.slots) <> "roArray" then return
+    m.data = data
+    m.start = data.start
+    if m.cursor < data.start or m.cursor >= data.end
+        m.cursor = data.start
+        if data.now >= data.start and data.now < data.end then m.cursor = data.now
+    end if
+    m.top.FindNode("status").text = data.date + "   •   Local time   •   72-hour guide"
+    render()
 end sub
+
+sub changeWindow(start as dynamic)
+    if m.data <> invalid
+        if start < m.data.minStart then start = m.data.minStart
+        if start > m.data.maxStart then start = m.data.maxStart
+    end if
+    if start = m.start and m.data <> invalid then return
+    m.start = start
+    m.cursor = start
+    m.data = invalid
+    render()
+    refreshGuide()
+end sub
+
+function selectedCells() as object
+    if m.index >= m.ids.Count() then return []
+    return cellsFor(m.ids[m.index])
+end function
+
+function cellsFor(id as string) as object
+    if m.data <> invalid
+        for each channel in m.data.channels
+            if channel.id = id then return channel.cells
+        end for
+    end if
+    return []
+end function
+
+function selectedCellIndex(cells as object) as integer
+    for i = 0 to cells.Count() - 1
+        if cells[i].end > m.cursor then return i
+    end for
+    return cells.Count() - 1
+end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
@@ -97,23 +151,76 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.top.closeRequested = true
         return true
     end if
-    count = m.ids.Count()
-    if count = 0 then return false
-    if key = "up" or key = "down" or key = "channelup" or key = "channeldown"
-        stepBy = 1
-        if key = "up" or key = "channelup" then stepBy = -1
-        m.index = (m.index + stepBy + count) mod count
-    else if key = "left" or key = "right"
-        stepBy = 5
-        if key = "left" then stepBy = -5
-        m.index = m.index + stepBy
-        if m.index < 0 then m.index = 0
-        if m.index >= count then m.index = count - 1
-    else if key = "OK" or key = "play" or key = "playonly"
-        m.top.selectedId = m.ids[m.index]
+    if key = "replay"
+        m.start = 0
+        m.cursor = 0
+        m.data = invalid
+        m.day = 0
+        render()
+        refreshGuide()
         return true
+    end if
+    if key = "rewind" or key = "fastforward"
+        if m.data <> invalid
+            amount = 10800
+            if key = "rewind" then amount = -10800
+            changeWindow(m.start + amount)
+        end if
+        return true
+    end if
+    count = m.ids.Count()
+    if m.zone = "tools"
+        if key = "left" and m.tool > 0 then m.tool--
+        if key = "right" and m.tool < 3 then m.tool++
+        if key = "down" then m.zone = "days"
+        if key = "OK"
+            if m.tool = 0 then m.top.action = "search"
+            if m.tool = 1 then m.top.action = "category"
+            if m.tool = 2
+                m.favouritesOnly = not m.favouritesOnly
+                updateChannels()
+            end if
+            if m.tool = 3 then m.compact = not m.compact
+        end if
+    else if m.zone = "days"
+        if key = "up" then m.zone = "tools"
+        if key = "down" and count > 0 then m.zone = "grid"
+        if m.data = invalid and key = "OK" then refreshGuide()
+        if m.data <> invalid
+            if key = "left" and m.day > 0 then m.day--
+            if key = "right" and m.day < m.data.days.Count() - 1 then m.day++
+            if key = "OK"
+                target = m.data.days[m.day].start
+                changeWindow(target)
+            end if
+        end if
     else
-        return false
+        if key = "up"
+            if m.index > 0 then m.index-- else m.zone = "days"
+        else if key = "down" and m.index < count - 1
+            m.index++
+        else if key = "channelup" or key = "channeldown"
+            amount = pageSize()
+            if key = "channelup" then amount = -amount
+            m.index = m.index + amount
+            if m.index < 0 then m.index = 0
+            if m.index >= count then m.index = count - 1
+            if m.index < 0 then m.index = 0
+        else if key = "left" or key = "right"
+            cells = selectedCells()
+            selected = selectedCellIndex(cells)
+            stepBy = 1
+            if key = "left" then stepBy = -1
+            target = selected + stepBy
+            if target >= 0 and target < cells.Count()
+                m.cursor = cells[target].start
+            else if m.data <> invalid
+                changeWindow(m.start + stepBy * 10800)
+            end if
+        else if key = "OK" or key = "play" or key = "playonly"
+            if count > 0 then m.top.selectedId = m.ids[m.index]
+            return true
+        end if
     end if
     render()
     return true

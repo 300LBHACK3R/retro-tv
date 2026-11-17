@@ -86,15 +86,20 @@ test("admin tools load their separate panels without changing saved programming"
     ["Programme Blocks", "Signature programming"],
     ["Submissions", "Submissions Inbox"],
     ["Station Insights", "Station insights"],
-    ["Launch Check", "Station Preflight"],
     ["Backups & Restore", "Station Config"],
   ] as const;
   for (const [label, heading] of panels) {
+    await page.getByLabel("Find an admin tool", { exact: true }).fill(label);
     const button = page.getByRole("navigation", { name: "Admin tools" }).getByRole("button", { name: label, exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
   }
+  await page.getByRole("button", { name: "Library section", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Quick Edit", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backups & Restore", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("admin-workspace.png"), fullPage: true });
   expect(errors).toEqual([]);
   expect(writes).toEqual([]);
 });

@@ -476,7 +476,7 @@ function findNextVisibleGuideItem(
   return undefined;
 }
 
-function buildDisplayCellsForWindow(
+export function buildDisplayCellsForWindow(
   schedule: BroadcastItem[],
   windowStartBroadcastSeconds: number,
   windowDurationSeconds: number,

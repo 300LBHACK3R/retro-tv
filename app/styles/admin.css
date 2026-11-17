@@ -6,11 +6,6 @@
 }
 
 /* Task-based tools and commercial workflow; admin routes only. */
-.ttv-admin-tools { display: grid; gap: 1.1rem; }
-.ttv-admin-tools > label { display: grid; gap: .4rem; font-size: .85rem; font-weight: 650; }
-.ttv-admin-tools > label input { border: 1px solid var(--border); border-radius: .75rem; padding: .8rem 1rem; width: 100%; }
-.ttv-admin-tools h3 { margin-bottom: .55rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--text-muted); }
-.ttv-admin-tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: .5rem; }
 .ttv-commercials { display: grid; gap: 1.2rem; max-width: 100%; }
 .ttv-admin-card { display: grid; gap: 1rem; min-width: 0; padding: clamp(1rem, 2.5vw, 1.8rem); background: var(--panel-bg); border: 1px solid var(--border); border-radius: 1.25rem; }
 .ttv-admin-card h2 { font-size: clamp(1.35rem, 2.7vw, 2rem); font-weight: 750; line-height: 1.2; }
@@ -42,9 +37,8 @@
 .ttv-admin-preview li { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) 4rem; gap: .7rem; padding: .7rem; border-bottom: 1px solid var(--border); }
 .ttv-admin-preview li[data-commercial=true] { background: color-mix(in srgb, var(--primary) 12%, var(--panel-bg)); }
 @media (max-width: 760px) {
-  .ttv-admin-tools > label input, .ttv-admin-card :is(input:not([type=checkbox]), select) { font-size: 16px; }
+  .ttv-admin-search input, .ttv-admin-card :is(input:not([type=checkbox]), select) { font-size: 16px; }
   .ttv-admin-workspace-grid, .ttv-admin-form-grid, .ttv-admin-steps { grid-template-columns: 1fr; }
-  .ttv-admin-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .ttv-batch-import { display: grid; gap: 1.2rem; min-width: 0; }

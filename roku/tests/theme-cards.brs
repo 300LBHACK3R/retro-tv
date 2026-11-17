@@ -17,8 +17,9 @@ sub main()
         m.top.itemContent.themeBadge = "Free"
         updateContent()
         check(m.top.FindNode("badgePanel").color = theme.colors.panelBg and m.top.FindNode("badge").color = theme.colors.textMuted, "Recycled cards clear the former selected badge colours")
-        m.top.itemContent = { title: "Library title", HDPosterUrl: "library.jpg", viewerColors: theme.colors }
+        m.top.itemContent = { title: "Library title", HDPosterUrl: "library.jpg", portraitCard: true, viewerColors: theme.colors }
         updateContent()
+        check(m.top.FindNode("poster").width = 162 and m.top.FindNode("poster").height = 243 and m.top.FindNode("border").height = 344, "Library art uses real 2:3 portrait proportions")
         check(not m.top.FindNode("badge").visible and not m.top.FindNode("badgePanel").visible, "Library cards never inherit a theme badge")
         m.top.itemHasFocus = false
         showFocus()

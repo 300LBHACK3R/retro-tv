@@ -24,6 +24,7 @@ test("admin reorders, saves and programmes separate Halloween channels", async (
   await page.route("**/_vercel/**", route => route.fulfill({ status: 204 }));
   await page.goto("/admin");
   await expect(page.locator(".ttv-global-sync-status button")).toBeEnabled();
+  await page.getByLabel("Find an admin tool", { exact: true }).fill("Channel Lineup");
   await page.getByRole("button", { name: "Channel Lineup", exact: true }).click();
   await expect(page.getByRole("list", { name: "Station channel order" })).toHaveCSS("display", "grid");
   const rowThree = page.locator('.ttv-lineup-list > [data-channel-id="3"]');
@@ -41,6 +42,7 @@ test("admin reorders, saves and programmes separate Halloween channels", async (
   await page.reload();
   const cloud = await (await reloaded).json();
   expect(cloud.programming.channels.find((channel: { id: string }) => channel.id === "3").number).toBe(4);
+  await page.getByLabel("Find an admin tool", { exact: true }).fill("Channel Lineup");
   await page.getByRole("button", { name: "Channel Lineup", exact: true }).click();
   await expect(rowThree.locator(".ttv-lineup-number")).toHaveText("CH 4");
 

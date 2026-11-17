@@ -25,6 +25,8 @@ sub main()
             m.flushes++
         end sub
     }
+    m.fullscreen = false
+    m.guide.visible = false
     m.view = "themes"
     m.entries = []
     m.libraryGrid.itemFocused = 0
@@ -36,7 +38,7 @@ sub main()
     applyTheme("missing-theme")
     check(m.themeId = "christmas-96-living-room", "An unavailable saved theme safely uses the free default")
     renderList(false)
-    check(m.entries.Count() = 14, "All fourteen website themes have native TV designs")
+    check(m.entries.Count() = 15, "All fifteen website themes have native TV designs")
     applyTheme("christmas-neon-noel")
     check(m.themeId = m.themeCatalog.defaultId, "A guest cannot activate premium Neon Noel")
     owned = []
@@ -44,6 +46,16 @@ sub main()
         owned.Push(theme.id)
     end for
     m.account = { ownedThemeIds: owned, purchasedThemeIds: owned, member: false }
+    applyTheme("christmas-2005-home")
+    check(m.top.FindNode("winterMotion").enabled and not m.top.FindNode("guideWinterMotion").enabled, "Owned winter motion starts only on the visible screen")
+    m.guide.visible = true
+    applyTheme("christmas-2005-home")
+    check(not m.top.FindNode("winterMotion").enabled and m.top.FindNode("guideWinterMotion").enabled, "Opening guide transfers motion to its backdrop")
+    m.guide.visible = false
+    m.fullscreen = true
+    applyTheme("christmas-2005-home")
+    check(not m.top.FindNode("winterMotion").enabled and not m.top.FindNode("guideWinterMotion").enabled, "Fullscreen video suspends decorative work")
+    m.fullscreen = false
     for i = 0 to m.entries.Count() - 1
         expected = m.entries[i]
         m.libraryGrid.itemSelected = i
@@ -95,7 +107,7 @@ sub main()
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: fourteen themes, premium guest denial, legacy preferences, saved selection, light palette and uninterrupted playback"
+    print "PASS: fifteen themes, premium guest denial, legacy preferences, saved selection, light palette and uninterrupted playback"
 end sub
 
 function node() as object

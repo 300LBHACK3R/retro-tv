@@ -9,6 +9,7 @@ sub resetViewing()
     m.cloudProgress = {}
     m.cloudWatchlist = []
     m.cloudFavourites = []
+    if m.guide <> invalid then m.guide.favourites = []
     m.profileGrant = ""
     m.libraryFilter = "all"
     m.viewingRequestId = -1
@@ -98,6 +99,7 @@ sub onViewingResponse(event as object)
         m.cloudProgress = data.progress
         m.cloudWatchlist = data.watchlist
         m.cloudFavourites = data.favouriteChannels
+        if m.guide <> invalid then m.guide.favourites = m.cloudFavourites
         m.viewingReady = true
         m.status.text = "Saved viewing is up to date."
     else

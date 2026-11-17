@@ -1,27 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="LiveGuide" extends="Group">
   <interface>
+    <field id="winter" type="boolean" onChange="updateColors" />
     <field id="themeColors" type="assocarray" onChange="updateColors" />
     <field id="channels" type="array" onChange="updateChannels" />
     <field id="channelId" type="string" onChange="render" />
+    <field id="audience" type="string" value="all" />
+    <field id="favourites" type="array" onChange="updateChannels" />
+    <field id="query" type="string" onChange="updateChannels" />
+    <field id="category" type="string" onChange="updateChannels" />
+    <field id="action" type="string" alwaysNotify="true" />
     <field id="selectedId" type="string" alwaysNotify="true" />
     <field id="closeRequested" type="boolean" alwaysNotify="true" />
     <function name="open" />
+    <function name="shutdown" />
   </interface>
   <script type="text/brightscript" uri="LiveGuide.brs" />
+  <script type="text/brightscript" uri="GuideRender.brs" />
   <script type="text/brightscript" uri="ThemeStyle.brs" />
   <children>
-    <Rectangle id="accentLine" translation="[40,154]" width="1200" height="3" color="0xF1CA83FF" />
-    <Poster uri="pkg:/images/logo.png" translation="[52,48]" width="155" height="100" loadDisplayMode="scaleToFit" />
-    <Label id="title" translation="[255,60]" width="730" height="44" text="Live guide" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
-    <Label id="subtitle" translation="[255,112]" width="730" height="32" text="On now. Up next. Find your channel." font="font:SmallSystemFont" color="0xD5DDDBFF" />
-    <Rectangle id="panel" translation="[40,165]" width="1200" height="460" color="0x102035FF" />
-    <Label id="channelHeading" translation="[64,177]" width="224" height="28" text="CHANNEL" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-    <Label id="nowHeading" translation="[308,177]" width="434" height="28" text="ON NOW" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-    <Label id="nextHeading" translation="[770,177]" width="434" height="28" text="UP NEXT" font="font:SmallBoldSystemFont" color="0xE7C584FF" />
-    <Group id="rows" translation="[52,215]" />
-    <Label id="empty" translation="[125,330]" width="1030" height="100" wrap="true" maxLines="3" horizAlign="center" text="No channels available yet. Press Back, then choose Refresh to try again." font="font:MediumSystemFont" color="0xFFF3D8FF" visible="false" />
-    <Label id="position" translation="[1000,633]" width="220" height="30" horizAlign="right" font="font:SmallSystemFont" color="0xD5DDDBFF" />
-    <Label id="help" translation="[52,667]" width="1170" height="30" text="Up/Down browse   •   Left/Right page   •   OK watch fullscreen   •   Back close" font="font:SmallSystemFont" color="0xE7C584FF" />
+    <Poster uri="pkg:/images/logo.png" translation="[52,36]" width="106" height="70" loadDisplayMode="scaleToFit" />
+    <Label id="title" translation="[180,42]" width="480" height="42" text="Live Guide" font="font:LargeBoldSystemFont" />
+    <Label id="clock" translation="[670,49]" width="210" height="32" horizAlign="right" font="font:SmallBoldSystemFont" />
+    <Label id="detailTitle" translation="[52,115]" width="820" height="65" wrap="true" maxLines="2" font="font:MediumBoldSystemFont" />
+    <Label id="detailMeta" translation="[52,186]" width="820" height="28" font="font:SmallSystemFont" />
+    <Label id="previewLabel" translation="[920,219]" width="320" height="26" horizAlign="right" text="KEEP WATCHING" font="font:SmallSystemFont" />
+    <Group id="tools" translation="[52,244]" />
+    <Group id="days" translation="[52,300]" />
+    <Rectangle id="panel" translation="[52,350]" width="1176" height="294" />
+    <Poster id="winterTrim" translation="[52,341]" width="1176" height="18" uri="pkg:/images/winter-trim.png" visible="false" />
+    <Poster id="winterOrnaments" translation="[531,38]" width="94" height="50" uri="pkg:/images/winter-ornaments.png" visible="false" />
+    <Group id="slots" translation="[52,350]" />
+    <Group id="rows" translation="[52,390]" />
+    <Rectangle id="nowLine" translation="[276,390]" width="2" height="250" visible="false" />
+    <Label id="empty" translation="[110,430]" width="1060" height="110" wrap="true" maxLines="3" horizAlign="center" font="font:MediumSystemFont" visible="false" />
+    <Label id="position" translation="[950,650]" width="278" height="28" horizAlign="right" font="font:SmallSystemFont" />
+    <Label id="status" translation="[52,650]" width="880" height="28" font="font:SmallSystemFont" />
+    <Label id="help" translation="[52,684]" width="1176" height="26" text="Arrows browse   •   OK watch live   •   Rewind / FF time   •   Replay now   •   Back close" font="font:SmallSystemFont" />
+    <Timer id="tick" duration="60" repeat="true" />
   </children>
 </component>

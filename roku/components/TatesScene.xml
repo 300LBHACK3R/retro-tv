@@ -17,6 +17,7 @@
   <children>
     <Rectangle id="background" width="1280" height="720" color="0x10271FFF" />
     <Poster id="room" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" opacity="0.4" uri="pkg:/images/room.jpg" />
+    <ThemeMotion id="winterMotion" />
     <Group id="browser" visible="false">
       <Rectangle id="browserHeader" translation="[40,52]" width="1200" height="106" opacity="0.92" />
       <Rectangle id="browserFooter" translation="[40,635]" width="1200" height="58" opacity="0.92" />
@@ -50,8 +51,9 @@
     <Group id="guideBackdrop" visible="false">
       <Rectangle id="guideBackground" width="1280" height="720" color="0x0D1C17FF" />
       <Poster id="guideRoom" width="1280" height="720" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFill" />
-      <Rectangle id="guideHeaderShield" translation="[40,42]" width="1200" height="112" opacity="0.92" />
-      <Rectangle id="guideFooterShield" translation="[40,630]" width="1200" height="68" opacity="0.92" />
+      <ThemeMotion id="guideWinterMotion" />
+      <Rectangle id="guideHeaderShield" translation="[40,30]" width="860" height="198" opacity="0.94" />
+      <Rectangle id="guideFooterShield" translation="[40,645]" width="1200" height="67" opacity="0.96" />
     </Group>
     <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
     <Group id="liveBanner" visible="false">

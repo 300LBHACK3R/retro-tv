@@ -549,6 +549,7 @@ export default function StationConfigPanel({
         </div>
       </div>
 
+      <details className="mb-3"><summary className="cursor-pointer py-3 font-bold">Backup contents</summary>
       <div
         className="mb-3 grid gap-2 rounded-2xl border p-3 sm:grid-cols-2 xl:grid-cols-7"
         style={{
@@ -561,40 +562,7 @@ export default function StationConfigPanel({
         ))}
       </div>
 
-      <div
-        className="rounded-2xl border p-3"
-        style={{
-          background: "var(--panel-alt-bg)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div
-          className="mb-2 text-xs font-black uppercase tracking-[0.14em]"
-          style={{ color: "var(--primary)" }}
-        >
-          Layout Snapshot
-        </div>
-
-        <div
-          className="grid gap-2 text-xs sm:grid-cols-3"
-          style={{ color: "var(--text-muted)" }}
-        >
-          <div>
-            Sidebar Width:{" "}
-            <span style={{ color: "var(--text)" }}>{sidebarWidth}px</span>
-          </div>
-
-          <div>
-            Guide Height:{" "}
-            <span style={{ color: "var(--text)" }}>{guideHeight}px</span>
-          </div>
-
-          <div>
-            Current Mode:{" "}
-            <span style={{ color: "var(--text)" }}>{appMode}</span>
-          </div>
-        </div>
-      </div>
+      </details>
 
       {embeddedAdCount > 0 ? (
         <div

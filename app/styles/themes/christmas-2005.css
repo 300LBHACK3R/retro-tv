@@ -1,0 +1,41 @@
+/* Warm incandescent light and quiet winter blues, carried through every route. */
+:root[data-ttv-theme="christmas-2005-home"] {
+  --ttv-radius-shell: 1rem;
+  --ttv-radius-panel: .85rem;
+  --ttv-radius-control: .6rem;
+  --ttv-radius-player: 1rem;
+  --ttv-shadow-panel: inset 0 1px #fff1db1c, 0 14px 32px #03091270;
+  --ttv-guide-active-text: #fff7e9;
+  --ttv-guide-station-active-bg: #263b52;
+  --ttv-guide-cell-live-bg: #263b52;
+  --ttv-guide-live-accent: #f5cc91;
+  --ttv-guide-live-shadow: inset 3px 0 #f5cc91;
+  --ttv-guide-cell-gap: 6px;
+}
+.ttv-christmas2005-world { background: #0a1425; }
+:root:not([data-ttv-theme="christmas-2005-home"]) .ttv-christmas2005-world { display: none; }
+.ttv-christmas2005-art { object-fit: cover; object-position: center; }
+.ttv-christmas2005-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #0a14251a, #0a14250d 40%, #0a142538); }
+.ttv-christmas2005-snow { position: absolute; inset: 0; }
+.ttv-christmas2005-snow i { position: absolute; top: -10px; left: 9%; width: 3px; height: 3px; border-radius: 50%; background: #fff9eb; opacity: 0; animation: ttv-home-snow 21s linear infinite; }
+@keyframes ttv-home-snow { 0% { transform: translate(0,0); opacity: 0; } 12%,85% { opacity: .6; } 100% { transform: translate(30px,100vh); opacity: 0; } }
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-premium-topbar, .ttv-mobile-viewer-nav, .ttv-guide-dialog-header, .theme-dialog__header) {
+  background: linear-gradient(110deg, #162840f5, #19283af5 65%, #44372af5);
+  border-color: #697988;
+  box-shadow: inset 0 1px #f5cc9133, 0 8px 28px #03091270;
+}
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-premium-frame, .ttv-library-intro) { background: transparent; }
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-guide-shell, .ttv-profile-panel, .ttv-glass-panel, .ttv-glass-panel-strong, .theme-dialog, .ttv-viewer-more-dialog) {
+  background: #101e32f5;
+  border-color: #526780;
+}
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-profile-chooser, .ttv-library-shell) { background: transparent; box-shadow: none; }
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-profile-title, .ttv-profile-subtitle) { text-shadow: 0 2px 8px #000; }
+.ttv-christmas2005-glow { position: absolute; inset: 0; background: radial-gradient(circle at 56.4% 24.8%, #ffc57540, transparent 8%); animation: ttv-home-light 8s linear infinite; }
+@keyframes ttv-home-light { 0%,100% { opacity: .3; } 20%,32%,60% { opacity: .7; } 25%,55%,70% { opacity: .4; } }
+:root[data-ttv-theme="christmas-2005-home"] :is(.ttv-guide-dialog-header, .ttv-guide-time-header) { position: relative; }
+:root[data-ttv-theme="christmas-2005-home"] .ttv-guide-dialog-header { padding-bottom: 1.5rem; }
+:root[data-ttv-theme="christmas-2005-home"] .ttv-guide-dialog-header::after { content: ""; position: absolute; inset: auto 0 0; height: 18px; background: url("/themes/christmas-2005-snowcap.svg") bottom / 400px 18px repeat-x; pointer-events: none; }
+:root[data-ttv-theme="christmas-2005-home"] .ttv-guide-dialog-header::before { content: ""; width: 92px; height: 50px; background: url("/themes/christmas-2005-ornaments.svg") center / contain no-repeat; flex: 0 0 92px; pointer-events: none; }
+@media (max-width: 600px) { :root[data-ttv-theme="christmas-2005-home"] .ttv-guide-dialog-header::before { width: 54px; height: 32px; flex-basis: 54px; } .ttv-christmas2005-glow { background: radial-gradient(circle at 62% 23%, #ffc57532, transparent 12%); } }
+@media (prefers-reduced-motion: reduce) { .ttv-christmas2005-snow { display: none; } .ttv-christmas2005-glow { animation: none; opacity: .3; } }

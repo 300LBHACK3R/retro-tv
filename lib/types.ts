@@ -9,6 +9,7 @@ export type PlayerViewMode = "normal" | "mini" | "theater";
 export type ThemeId =
   | "christmas-96-living-room"
   | "christmas-neon-noel"
+  | "christmas-2005-home"
   | "halloween-night"
   | "halloween-haunted-arcade"
   | "halloween-90s-night"

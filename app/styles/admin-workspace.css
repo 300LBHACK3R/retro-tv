@@ -1,0 +1,23 @@
+/* One work area at a time; secondary tasks remain searchable. */
+.ttv-admin-workspace { display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 20px; align-items: start; }
+.ttv-admin-navigation { padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-bg); position: sticky; top: 16px; }
+.ttv-admin-search { display: grid; gap: 8px; font-size: 13px; font-weight: 700; }
+.ttv-admin-search input { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--app-bg); font-weight: 400; }
+.ttv-admin-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+.ttv-admin-groups button { padding: 9px 11px; min-height: 44px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; background: var(--button-bg); }
+.ttv-admin-groups button[aria-pressed=true] { background: var(--primary); color: var(--on-primary); }
+.ttv-admin-tool-list { display: grid; gap: 6px; }
+.ttv-admin-tool-list button { text-align: left; padding: 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; }
+.ttv-admin-tool-list button[aria-pressed=true] { background: var(--panel-alt-bg); border-color: var(--primary); }
+.ttv-admin-tool-list button:hover { background: var(--button-hover); }
+.ttv-admin-tool-list span { display: block; font-size: 14px; font-weight: 700; }
+.ttv-admin-tool-list small { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-top: 5px; }
+.ttv-admin-tool-content { min-width: 0; }
+@media (max-width: 950px) {
+ .ttv-admin-workspace { grid-template-columns: minmax(0,1fr); gap: 12px; }
+ .ttv-admin-navigation { position: static; }
+ .ttv-admin-tool-list { display: flex; flex-wrap: wrap; }
+ .ttv-admin-tool-list button { min-height: 44px; padding: 10px 12px; border-color: var(--border); }
+ .ttv-admin-tool-list small { display: none; }
+ .ttv-admin-groups { margin: 12px 0; }
+}

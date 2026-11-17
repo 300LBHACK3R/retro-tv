@@ -20,6 +20,7 @@ async function fixture(page: Page) {
   await page.route("https://www.gstatic.com/**", route => route.fulfill({ contentType: "application/javascript", body: "" }));
   await page.goto("/admin");
   await waitForAdminProgramming(page);
+  await page.getByLabel("Find an admin tool", { exact: true }).fill("Commercials");
   await page.getByRole("button", { name: "Commercials", exact: true }).click();
   return () => saved;
 }
@@ -43,6 +44,7 @@ test("commercial campaign saves, configures breaks, previews and pauses without 
   await waitForHouseholdSave(page);
   await page.reload();
   await waitForAdminProgramming(page);
+  await page.getByLabel("Find an admin tool", { exact: true }).fill("Commercials");
   await page.getByRole("button", { name: "Commercials", exact: true }).click();
   await expect(workspace.getByLabel("Advertiser", { exact: true })).toHaveValue("Local business");
   await workspace.getByRole("checkbox", { name: /CH 24/ }).uncheck();

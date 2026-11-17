@@ -1,8 +1,10 @@
-# Tate's TV — Roku v0.1.9 device-test build
+# Tate's TV — Roku v0.1.13 device-test build
 
 This is a native BrightScript/SceneGraph app, not a website wrapper. It is an unsigned development build. Compilation and server tests do not establish Roku hardware compatibility or store approval.
 
 Read [CONNECTED_TV.md](../docs/CONNECTED_TV.md) for the required database migration, release order and connected-device acceptance checklist.
+
+See [v0.1.13 release notes](../docs/PREMIUM_ROKU.md) for the timeline guide, larger browse previews, portrait artwork, paid Christmas motion theme and deployment order.
 
 ## Included
 
@@ -10,8 +12,8 @@ Read [CONNECTED_TV.md](../docs/CONNECTED_TV.md) for the required database migrat
 - Logo, Christmas room and guest portrait are packaged locally. Home in the menu and Back from the navigation menu return to the cards and stop playback.
 - Sign in and Create account use the existing website account system directly on the TV: Roku email sharing or manual email entry, password keyboard, signup verification code and password recovery. Household profiles and membership status come from the website. The TV restores its own session after restart and can sign out without signing out the website. See [account setup and acceptance checks](../docs/ROKU_ACCOUNTS.md).
 - A shared live viewer after Watch for free: inline video, now/next details, and a horizontal channel strip. It starts channel 1 when that channel is in the current audience's lineup, otherwise the first available channel.
-- A live Now/Next guide available from fullscreen with OK or Left/Right, from the inline player with Right, and from the Live guide menu. Five large rows fit on each page. Arrow keys browse and page through the filtered lineup; OK tunes the selected station fullscreen. Video keeps running in a small header preview. Back restores the previous layout without seeking or retuning.
-- Grouped on-demand library, four-column artwork grid, title search and resumed viewing. Library titles open fullscreen; Back returns to the same library.
+- A live timeline guide available from fullscreen with OK or Left/Right, from the inline player with Right, and from the Live guide menu. Four comfortable rows or five compact rows fit on each page, with a three-hour timeline across the next 72 hours. Arrow keys browse channels and programmes; OK tunes the selected station fullscreen. Search, categories and favourites filter the lineup. Video keeps running in a 320×180 header preview. Back restores the previous layout without seeking or retuning.
+- Grouped on-demand library, five-column portrait artwork grid, title search and resumed viewing. Library titles open fullscreen; Back returns to the same library.
 - OK on the inline player opens fullscreen. Up/Down change live channels without leaving fullscreen; a five-second banner identifies the station and its controls. Back restores the browsing layout without replacing the Video node or seeking. Library playback retains native Roku transport; fullscreen Options remains available for captions/audio.
 - Persistent Kids mode with a local four-digit parent PIN, bounded retry lockout, separate viewing history, and server-filtered channels, programmes and artwork.
 - All seven free website themes: Christmas '96, Halloween '95, Halloween After Dark, Haunted Arcade, Neon CRT, Classic Cable 2006 and Bright Cable 2008. Seasonal room artwork and theme previews are packaged locally. Home, viewer, guide, cards, keyboard and PIN dialogs use the selected palette, including dark text for Bright Cable. Selection is saved on the device and marked in the theme grid; older Christmas/Classic Blue preferences migrate automatically.
@@ -21,7 +23,7 @@ Read [CONNECTED_TV.md](../docs/CONNECTED_TV.md) for the required database migrat
 
 Fixed airtimes, day-specific campaigns and programme blocks use the Roku's configured time zone, including daylight-saving transitions. Ordinary browser dates keep their existing behaviour. The app reads the existing public programming database through `/api/roku/catalog` and `/api/roku/play`. Browsing refreshes every minute; the server coalesces reads for at most 15 seconds. New shows, posters and channel changes therefore require no app rebuild. Playback eligibility is checked again when tuning in. An expired cache is never used after a database failure.
 
-The TV shares household profiles, saved lists, favourites, resume positions and theme preferences with the website. Profile editing, show requests, reactions and administration remain website features. All fourteen themes have native designs and account-checked premium access. The guide is Now/Next, not a full time grid. No payment or database credentials are packaged in the app.
+The TV shares household profiles, saved lists, favourites, resume positions and theme preferences with the website. Profile editing, show requests, reactions and administration remain website features. All fifteen themes have native designs and account-checked premium access. The guide uses the shared schedule with local-time date tabs and half-hour markers. No payment or database credentials are packaged in the app.
 
 ## Build
 
@@ -33,11 +35,11 @@ npm --prefix roku run build
 npm --prefix roku audit
 ```
 
-The output is `roku/dist/tates-tv-roku.zip`. The build derives the complete theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and static artwork; website CSS effects and animations are not ported. All fourteen themes have native artwork, including Neon Noel. Premium themes require current account ownership or membership; labels distinguish Owned, Included and Locked. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
+The output is `roku/dist/tates-tv-roku.zip`. The build derives the complete theme catalogue and colours from `lib/themes.ts`; a missing preview or seasonal background fails the build instead of hiding the theme. Roku uses native layouts and packaged artwork. Christmas 2005 includes native falling snow and soft light flicker; web CSS is not executed on the TV. All fifteen themes have native artwork, including Neon Noel. Premium themes require current account ownership or membership; labels distinguish Owned, Included and Locked. A generated copy of the existing Christmas logo is included during the build; do not commit `roku/images/logo.png`, `dist`, signing keys or signed packages. The compiler version and dependencies are locked. CI compiles and checks the package on each feature/master push.
 
 The build removes obsolete generated theme images, verifies packaged assets and theme-to-node bindings, and checks at least 4.5:1 text contrast on the specified solid backgrounds. Translucent artwork, actual font sizing and TV display settings still require visual checks on a Roku.
 
-Native regression checks run the actual component functions with mock nodes, network boundaries and time. All eleven suites are required in CI after the package build. To run them locally from `roku/`:
+Native regression checks run the actual component functions with mock nodes, network boundaries and time. All twelve suites are required in CI after the package build. To run them locally from `roku/`:
 
 ```sh
 npm exec --yes --ignore-scripts --package=brs@0.45.0 -- node scripts/test-native.mjs
@@ -58,14 +60,16 @@ That interpreter is not a build dependency and is not included in the ZIP. Check
 | Channel strip | Left/Right, OK, Up | Browse, tune, return to player |
 | Menu | Up/Down, OK or Right | Browse navigation and open its content |
 | Browse screens | Play | Open the current video fullscreen |
-| Live guide | Up/Down, Left/Right | Browse channels, page by five |
+| Live guide | Up/Down, Left/Right | Browse channels and programmes; reach dates and filters above the first row |
+| Live guide | Rewind / Fast Forward, Replay | Move three hours; return to now |
+| Live guide | Channel Up/Down | Page by four or five filtered channels |
 | Live guide | OK, Back | Watch selected channel fullscreen, return without tuning |
 | Library | Direction pad, OK | Browse and select titles |
 | Episode list | Back | Return to its library |
 | Browse screens | Back | Return to menu, then Home |
 | Supported remotes | Channel Up/Down | Cycle the allowed live lineup, wrapping at the ends |
 | Fullscreen live TV | Up/Down | Next/previous allowed channel, with wrapping |
-| Fullscreen live TV | OK or Left/Right | Open the Now/Next guide with a video preview |
+| Fullscreen live TV | OK or Left/Right | Open the timeline guide with a video preview |
 | Fullscreen | Back | Return to the viewer without seeking or restarting |
 | Fullscreen library video | Play/Pause, Rewind, Fast Forward, Replay | Roku's native transport controls |
 | Fullscreen | * | Roku's native caption/audio options where available |
@@ -76,7 +80,7 @@ Live viewing follows the station clock and does not implement time-shifting. Pau
 
 ## Install on a test Roku
 
-1. Deploy this website revision first, including `/api/roku/account`. `https://www.tatestv.ca/api/roku/catalog?audience=all` must return `ok: true` and `version: 1`. Follow [ROKU_ACCOUNTS.md](../docs/ROKU_ACCOUNTS.md) for email configuration and the backend readiness check.
+1. Deploy this website revision first, including `/api/roku/account` and `/api/roku/guide`. `https://www.tatestv.ca/api/roku/catalog?audience=all` must return `ok: true` and `version: 1`. Follow [ROKU_ACCOUNTS.md](../docs/ROKU_ACCOUNTS.md) for email configuration and the backend readiness check.
 2. Use a physical Roku on the same network as the computer, running Roku OS 11 or newer. Record its model and OS from **Settings → System → About**.
 3. On the remote press **Home three times, Up twice, Right, Left, Right, Left, Right**. Enable the developer installer, accept the displayed developer terms, set a developer password and restart.
 4. Open the device's displayed IP address in the computer's browser. Sign in as `rokudev` using the password set on the device. Upload `tates-tv-roku.zip` without unzipping it, then select **Install**.

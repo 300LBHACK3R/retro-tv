@@ -1,82 +1,118 @@
-' Exercise the guide's real navigation and row rendering with lightweight node stubs.
+' Runs the actual guide renderer, navigation and request lifecycle without hardware.
 sub main()
-    rows = node()
+    _brs_.mockFunction("CreateObject", function(kind, name)
+        return node()
+    end function)
     m.top = node()
-    m.top.nodes = { rows: rows, empty: {}, position: {} }
-    m.top.FindNode = function(id)
-        return m.nodes[id]
-    end function
-    m.top.SetFocus = sub(value)
-        m.focused = value
-    end sub
+    m.top.visible = true
+    m.top.query = ""
+    m.top.category = ""
+    m.top.audience = "all"
+    m.top.favourites = ["7"]
     init()
     channels = []
+    data = { ok: true, audience: "all", start: 1800000000, end: 1800010800, now: 1800000600, minStart: 1800000000, maxStart: 1800248400, clock: "7:40 pm", date: "Mon, Nov 16", slots: ["7:30 pm", "8:00 pm", "8:30 pm", "9:00 pm", "9:30 pm", "10:00 pm"], days: [{ label: "Now", start: 1800000000 }, { label: "Tomorrow", start: 1800018000 }], channels: [] }
     for i = 1 to 12
-        channels.Push({ id: "channel:" + i.ToStr(), number: i, title: "Station " + i.ToStr(), now: "Current show", next: "Next show" })
+        channels.Push({ id: "channel:" + i.ToStr(), number: i, title: "Station " + i.ToStr(), now: "Current show", next: "Next show", poster: "logo.png", category: "Entertainment" })
+        cells = []
+        for j = 0 to 5
+            cells.Push({ title: "Programme " + j.ToStr(), type: "SHOW", start: data.start + j * 1800, end: data.start + (j+1)*1800, minutes: 30 })
+        end for
+        data.channels.Push({ id: "channel:" + i.ToStr(), cells: cells })
     end for
     m.top.channels = channels
-    updateChannels()
     m.top.channelId = "channel:7"
     open()
+    data.requestId = m.sequence
+    onGuideData(event(data))
     check(m.index = 6 and m.top.focused, "Opening highlights the tuned station")
-    check(rows.children.Count() = 5 and m.top.nodes.position.text = "6–10 of 12", "Only one bounded page of readable rows is built")
-    check(rows.children[1].children[1].text = "CH 7 • LIVE", "The playing station is visibly marked")
-    check(rows.children[1].children[3].text = "Current show" and rows.children[1].children[4].text = "Next show", "Guide rows display real Now and Next metadata")
-    m.top.themeColors = { text: "0x10233BFF", onPrimary: "0xFFFFFFFF", guideRowBg: "0xF8FBFFFF", guideCurrentBg: "0x1769C2FF", guideActiveBg: "0x1769C2FF" }
-    render()
-    check(rows.children[1].children[0].color = "0x1769C2FF" and rows.children[1].children[3].color = "0xFFFFFFFF", "The tuned row keeps white text on Bright Cable's blue background")
-    check(rows.children[0].children[3].color = "0x10233BFF", "Other light-theme rows use dark programme text")
-    check(onKeyEvent("down", true) and m.index = 7, "Down browses without tuning")
-    check(rows.children[2].color = "0xFFFFFFFF" and rows.children[1].color <> "0xFFFFFFFF", "A contrasting outline distinguishes remote focus from the playing row")
-    check(rows.children[1].children[1].text = "CH 7 • LIVE" and rows.children[2].children[1].text = "CH 8", "Browsing keeps the LIVE marker on the playing station")
+    check(m.rows.children.Count() = 4, "Only a bounded page of four rows is built")
+    check(m.top.FindNode("nowLine").visible, "Current-time line is shown in the live window")
+    check(m.top.FindNode("detailTitle").text = "Programme 0", "Full selected title is shown above the grid")
+    check(onKeyEvent("right", true) and m.cursor = data.start + 1800, "Right moves through programmes without retuning")
     check(m.top.selectedId = invalid, "Browsing does not emit a playback selection")
-    m.top.channels = channels
+    onKeyEvent("down", true)
+    check(m.index = 7 and m.cursor = data.start + 1800, "Vertical browsing preserves the selected time")
     updateChannels()
-    check(m.index = 7, "Minute refresh preserves the browsed row instead of jumping to the playing station")
-    check(onKeyEvent("right", true) and m.index = 11, "Right advances a page and clamps at the final channel")
-    check(rows.children.Count() = 2, "The final page does not create empty selectable rows")
-    check(onKeyEvent("down", true) and m.index = 0, "Down wraps at the last allowed channel")
-    check(onKeyEvent("up", true) and m.index = 11, "Up wraps at the first allowed channel")
-    check(onKeyEvent("left", true) and m.index = 6, "Left pages backward")
-    check(not onKeyEvent("OK", false) and m.top.selectedId = invalid, "Key releases cannot select a channel")
-    check(onKeyEvent("OK", true) and m.top.selectedId = "channel:7", "OK emits the permanent channel identifier")
-    check(onKeyEvent("back", true) and m.top.closeRequested, "Back asks the viewer to restore its previous layout")
-
+    check(m.index = 7, "Catalogue refresh preserves the browsed channel")
+    onKeyEvent("OK", true)
+    check(m.top.selectedId = "channel:8", "Future programme selection tunes its channel live")
+    m.top.selectedId = ""
+    check(not onKeyEvent("OK", false) and m.top.selectedId = "", "Key releases cannot tune")
+    onKeyEvent("channeldown", true)
+    check(m.index = 11, "Channel Down pages channels and clamps to final row")
+    m.index = 0
+    onKeyEvent("up", true)
+    check(m.zone = "days", "Up from first row reaches day tabs")
+    onKeyEvent("up", true)
+    check(m.zone = "tools", "Up from day tabs reaches filters")
+    m.tool = 2
+    onKeyEvent("OK", true)
+    check(m.ids.Count() = 1 and m.ids[0] = "channel:7", "Favourites use the selected profile's saved channel IDs")
+    onKeyEvent("OK", true)
+    m.top.query = "12"
+    updateChannels()
+    check(m.ids.Count() = 1 and m.ids[0] = "channel:12", "Search matches channel numbers")
+    m.top.query = "no match"
+    updateChannels()
+    check(m.rows.children.Count() = 0 and m.top.FindNode("empty").visible, "Empty filters remove all old programme rows")
+    m.zone = "grid"
+    onKeyEvent("OK", true)
+    check(m.top.selectedId = "", "Empty filtered guide cannot select a stale station")
+    onKeyEvent("up", true)
+    check(m.zone = "days", "Empty guide still lets viewers reach filters")
+    m.top.query = ""
+    updateChannels()
+    m.compact = true
+    render()
+    check(m.rows.children.Count() = 5, "Compact mode fits five readable rows")
+    savedData = m.data
+    onGuideData(event({ ok: false, requestId: m.sequence }))
+    check(m.data.start = savedData.start and Instr(1,m.top.FindNode("status").text,"offline") > 0, "A failed refresh retains current listings and offers retry")
+    onGuideData(event({ ok: true, audience: "kids", requestId: m.sequence, channels: [] }))
+    check(m.data.start = savedData.start, "A reply for another audience cannot replace the guide")
+    onGuideData(event({ ok: true, audience: "all", requestId: m.sequence - 1, channels: [] }))
+    check(m.data.start = savedData.start, "Old requests cannot overwrite newer guide data")
+    changeWindow(data.maxStart + 10800)
+    check(m.start = data.maxStart and m.data = invalid, "Horizon clamps and old programme labels disappear while a new window loads")
+    check(not m.top.FindNode("nowLine").visible, "No stale Now line appears on a loading future window")
+    onKeyEvent("replay", true)
+    check(m.start = 0 and m.cursor = 0, "Replay requests current listings")
     m.top.channels = [channels[1]]
     updateChannels()
-    check(m.index = 0 and rows.children.Count() = 1, "Removing the highlighted channel leaves a valid selection")
-    onKeyEvent("OK", true)
-    check(m.top.selectedId = "channel:2", "Selection after a lineup change uses the new allowed channel")
-    m.top.channels = []
-    updateChannels()
-    m.top.selectedId = ""
-    check(rows.children.Count() = 0 and m.top.nodes.empty.visible, "An empty audience clears old rows and shows a recovery message")
-    check(not onKeyEvent("OK", true) and m.top.selectedId = "", "An empty guide cannot tune a stale channel")
-    check(onKeyEvent("back", true), "Back still closes an empty guide")
+    check(m.index = 0 and m.ids[0] = "channel:2", "Removed channels cannot survive lineup updates")
+    shutdown()
+    check(m.task = invalid and m.top.FindNode("tick").control = "stop", "Closing stops background guide work")
+    check(onKeyEvent("back", true) and m.top.closeRequested, "Back returns without changing the stream")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: guide paging, selection, refresh, rendering and empty audience"
+    print "PASS: guide timeline, filters, focus, paging, request races, empty states and lifecycle"
 end sub
-
+function event(data as object) as object
+    return { value: data, GetData: function(): return m.value: end function }
+end function
 function node() as object
     return {
-        children: [], font: {}
-        GetChildCount: function()
-            return m.children.Count()
+        children: [], nodes: {}, font: {}
+        FindNode: function(id)
+            if m.nodes[id] = invalid then m.nodes[id] = node()
+            return m.nodes[id]
         end function
-        RemoveChildrenIndex: sub(count, index)
-            m.children = []
-        end sub
+        SetFocus: sub(value): m.focused = value: end sub
+        ObserveField: sub(a,b): end sub
+        UnobserveField: sub(a): end sub
+        GetChildCount: function(): return m.children.Count(): end function
+        RemoveChildrenIndex: sub(count, index): m.children = []: end sub
         CreateChild: function(kind)
             child = node()
+            child.kind = kind
             m.children.Push(child)
             return child
         end function
     }
 end function
-
 sub check(condition as boolean, description as string)
     if condition then return
     if m.failed = invalid then m.failed = 0

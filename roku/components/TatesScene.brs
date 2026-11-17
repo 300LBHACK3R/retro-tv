@@ -25,6 +25,7 @@ sub init()
     m.home.ObserveField("selectedProfile", "onAccountProfileSelected")
     m.menu.ObserveField("itemSelected", "onMenuSelected")
     m.guide.ObserveField("selectedId", "onGuideSelected")
+    m.guide.ObserveField("action", "onGuideAction")
     m.guide.ObserveField("closeRequested", "closeGuide")
     m.bannerTimer.ObserveField("fire", "hideLiveBanner")
     m.libraryGrid.ObserveField("itemSelected", "onGridSelected")
@@ -219,6 +220,17 @@ sub renderList(preserve as boolean)
     if preserve and focused >= 0 and focused < m.entries.Count() then selectedId = m.entries[focused].id
     m.liveStage.visible = m.view = "live"
     m.libraryGrid.visible = m.view = "library" or m.view = "episodes" or m.view = "themes"
+    portrait = m.view = "library" or m.view = "episodes"
+    m.top.FindNode("listPanel").opacity = 1
+    m.libraryGrid.itemSize = [214,200]
+    m.libraryGrid.numColumns = 4
+    m.libraryGrid.numRows = 2
+    if portrait
+        m.top.FindNode("listPanel").opacity = 0
+        m.libraryGrid.itemSize = [174,344]
+        m.libraryGrid.numColumns = 5
+        m.libraryGrid.numRows = 1
+    end if
     m.emptyMessage.visible = false
     m.entries = []
     m.heading.text = "Good TV. Your way."
@@ -254,12 +266,15 @@ sub renderList(preserve as boolean)
         node = content.CreateChild("ContentNode")
         node.AddField("viewerColors", "assocarray", false)
         node.viewerColors = m.top.themeColors
+        node.AddField("portraitCard", "boolean", false)
+        node.portraitCard = portrait
         node.AddField("themeBadge", "string", false)
         if m.view = "themes"
             node.viewerColors = entry.colors
             node.themeBadge = "Free"
             if entry.isPremium
                 node.themeBadge = "Locked"
+                if entry.priceLabel <> invalid then node.themeBadge = entry.priceLabel + " • Locked"
                 if themeAllowed(entry)
                     node.themeBadge = "Included with account"
                     if m.account.member then node.themeBadge = "Included with membership"
@@ -313,7 +328,7 @@ sub onGridSelected()
     entry = m.entries[index]
     if m.view = "themes"
         if not themeAllowed(entry)
-            showMessage("Theme unavailable", ["Sign in to an account with access to this theme. Your seven free themes are always available."])
+            showMessage("Make it yours", ["Visit tatestv.ca/account to purchase this theme, then sign in or Refresh on your TV. Memberships include premium themes. Your free themes are always available."])
             return
         end if
         if cloudProfile()

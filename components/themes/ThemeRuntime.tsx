@@ -18,6 +18,7 @@ const HauntedArcadeScene = dynamic(() => import("@/components/themes/HauntedArca
 const HalloweenAfterDark = dynamic(() => import("@/components/themes/HalloweenAfterDark"), { ssr: false });
 const Halloween90sScene = dynamic(() => import("@/components/themes/Halloween90sScene"), { ssr: false });
 const NeonNoelScene = dynamic(() => import("@/components/themes/NeonNoelScene"), { ssr: false });
+const Christmas2005Scene = dynamic(() => import("@/components/themes/Christmas2005Scene"), { ssr: false });
 
 const MANAGED_THEME_META_SELECTOR = 'meta[name="theme-color"]';
 const THEME_CHANGE_EVENT = "ttv:theme-change";
@@ -128,6 +129,7 @@ export default function ThemeRuntime() {
     };
   }, []);
 
+  if (theme.id === "christmas-2005-home") return <Christmas2005Scene />;
   if (theme.id === "christmas-neon-noel") return <NeonNoelScene />;
   if (theme.id === "christmas-96-living-room") return <Christmas96Scene />;
   if (theme.id === "halloween-night") return <HalloweenAfterDark />;

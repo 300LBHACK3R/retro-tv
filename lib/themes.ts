@@ -122,6 +122,27 @@ export const THEME_CATEGORY_META: readonly ThemeCategoryMeta[] = [
 
 export const THEMES = [
   {
+    id: "christmas-2005-home",
+    name: "Christmas 2005: Home After School",
+    shortName: "Christmas 2005",
+    description: "The walk home in falling snow. Warm streetlights, colourful house lights, snowmen, reindeer and a glowing Nativity. Falling snow, gently flickering lights and a snowy festive guide, with midnight-blue menus and candlelight accents.",
+    priceLabel: "C$3",
+    isPremium: true,
+    category: "seasonal",
+    season: "christmas",
+    layout: "cinematic-premium",
+    appearance: "dark",
+    previewGradient: "linear-gradient(145deg, #0a1425, #25374f 60%, #b97d46)",
+    recommendedFor: ["Christmas", "2005", "snow", "nostalgia", "Nativity", "neighbourhood"],
+    colors: {
+      appBg: "#0a1425", panelBg: "#101e32", panelAltBg: "#1c3048", border: "#526780",
+      text: "#fff7e9", textMuted: "#c4d2e3", buttonBg: "#203851", buttonHover: "#2b4865",
+      primary: "#f5cc91", secondary: "#a9d7eb", onPrimary: "#101c2c", focusRing: "#f5cc91",
+      guideHeaderBg: "#1b2b42", guideRowBg: "#101e32", guideRowAltBg: "#16283e",
+      guideActiveBg: "#f5cc91", guideCurrentBg: "#f5cc91",
+    },
+  },
+  {
     id: "christmas-neon-noel",
     name: "Cyberpunk Christmas: Neon Noël",
     shortName: "Neon Noël",

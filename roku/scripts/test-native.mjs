@@ -2,8 +2,9 @@ import { spawnSync } from "node:child_process";
 
 // brs is a test-only interpreter supplied by npm exec, never shipped to Roku.
 const suites = [
+  ["tests", "ThemeMotion", "motion"],
   ["tests", "Viewer", "Guide", "viewer"],
-  ["tests", "ThemeStyle", "LiveGuide", "guide"],
+  ["tests", "ThemeStyle", "GuideRender", "LiveGuide", "guide"],
   ["tests", "Playback", "playback"],
   ["tests", "ThemeStyle", "ChannelStrip", "channelstrip"],
   ["tests", "ThemeStyle", "HomeScreen", "home"],

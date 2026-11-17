@@ -2,6 +2,9 @@ sub openGuide()
     if m.home.visible then return
     hideLiveBanner()
     m.guide.channelId = m.tunedChannelId
+    m.guide.audience = "all"
+    if m.kids then m.guide.audience = "kids"
+    m.guide.favourites = m.cloudFavourites
     m.guide.channels = []
     if m.catalog <> invalid then m.guide.channels = m.catalog.channels
     m.guide.visible = true
@@ -12,8 +15,55 @@ sub openGuide()
 end sub
 
 sub dismissGuide()
+    m.guide.CallFunc("shutdown")
     m.guide.visible = false
     m.guideBackdrop.visible = false
+end sub
+
+sub onGuideAction()
+    if not m.guide.visible then return
+    if m.guide.action = "search"
+        dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
+        dialog.title = "Search channel name or number"
+        dialog.text = m.guide.query
+        dialog.buttons = ["Search", "Clear search", "Cancel"]
+        dialog.ObserveField("buttonSelected", "onGuideSearch")
+        presentDialog(dialog)
+    else if m.guide.action = "category"
+        m.guideCategories = ["All categories"]
+        if m.catalog <> invalid
+            for each channel in m.catalog.channels
+                if channel.category <> invalid
+                    if not arrayHas(m.guideCategories, channel.category) then m.guideCategories.Push(channel.category)
+                end if
+            end for
+        end if
+        dialog = CreateObject("roSGNode", "StandardMessageDialog")
+        dialog.title = "Channel categories"
+        dialog.buttons = m.guideCategories
+        dialog.ObserveField("buttonSelected", "onGuideCategory")
+        presentDialog(dialog)
+    end if
+end sub
+
+sub onGuideSearch(event as object)
+    if not m.guide.visible then return
+    if event.GetData() = 0 then m.guide.query = Left(m.top.dialog.text, 100)
+    if event.GetData() = 1 then m.guide.query = ""
+    m.top.dialog.close = true
+    restoreFocus()
+end sub
+
+sub onGuideCategory(event as object)
+    if not m.guide.visible then return
+    index = event.GetData()
+    if index = 0
+        m.guide.category = ""
+    else if index > 0 and index < m.guideCategories.Count()
+        m.guide.category = m.guideCategories[index]
+    end if
+    m.top.dialog.close = true
+    restoreFocus()
 end sub
 
 sub closeGuide()
