@@ -1012,7 +1012,15 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   await testInfo.attach("theme-collections-mobile", { body: await page.screenshot(), contentType: "image/png" });
   await christmasTile.click();
   await expect(dialog.getByRole("heading", { name: "Christmas", exact: true })).toBeFocused();
-  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  // Check identities, not the old two-theme count: both Christmas entry points
+  // must include Home After School and exclude unrelated seasonal designs.
+  const expectChristmasCollection = async () => {
+    await expect.poll(() => dialog.locator(".theme-card").evaluateAll(elements =>
+      elements.map(element => element.getAttribute("data-theme-id")).sort(),
+    )).toEqual(["christmas-2005-home", "christmas-96-living-room", "christmas-neon-noel"]);
+    await expect(dialog.locator('[data-theme-id="christmas-2005-home"]')).toBeVisible();
+  };
+  await expectChristmasCollection();
   await dialog.getByRole("button", { name: "← Collections", exact: true }).click();
   await expect(dialog.getByRole("heading", { name: "Find your style", exact: true })).toBeFocused();
   await collections.getByRole("button", { name: "Browse Gold themes", exact: true }).click();
@@ -1047,7 +1055,7 @@ test("mobile themes are free, open without the keyboard, and remember both the s
   }
   const holidays = dialog.getByRole("group", { name: "Seasonal holidays" });
   await holidays.getByRole("button", { name: "Christmas", exact: true }).click();
-  await expect(dialog.locator(".theme-card")).toHaveCount(2);
+  await expectChristmasCollection();
   await expect(dialog.locator('[data-theme-id="christmas-96-living-room"]')).toBeVisible();
   await expect(dialog.locator('[data-theme-id="christmas-neon-noel"]')).toBeVisible();
   await expect(holidays.getByRole("button", { name: "Christmas", exact: true })).toHaveAttribute("aria-pressed", "true");
