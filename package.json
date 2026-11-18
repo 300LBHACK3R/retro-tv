@@ -18,7 +18,10 @@
     "audit:prod": "npm audit --omit=dev",
     "test:unit": "playwright test --config tests/unit.config.ts",
     "test:browser": "playwright test",
-    "test:http": "node tests/http.mjs"
+    "test:http": "node tests/http.mjs",
+    "postinstall": "node scripts/security/picomatch.mjs",
+    "audit:security": "node scripts/security/audit.mjs",
+    "test:security": "node --test tests/dependency-security.test.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

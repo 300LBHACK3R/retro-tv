@@ -6,7 +6,9 @@
     "check": "bsc --create-package false --copy-to-staging false",
     "build": "bsc && node scripts/verify-package.mjs",
     "precheck": "node scripts/prepare-assets.mjs",
-    "prebuild": "node scripts/prepare-assets.mjs"
+    "prebuild": "node scripts/prepare-assets.mjs",
+    "postinstall": "node ../scripts/security/picomatch.mjs",
+    "audit:security": "node ../scripts/security/audit.mjs"
   },
   "devDependencies": {
     "brighterscript": "0.73.8",

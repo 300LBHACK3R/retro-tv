@@ -20,7 +20,7 @@ jobs:
           cache: npm
           cache-dependency-path: roku/package-lock.json
       - run: npm --prefix roku ci
-      - run: npm --prefix roku audit
+      - run: npm --prefix roku run audit:security
       - run: npm --prefix roku run build
       - name: Verify native navigation, playback and account contracts
         working-directory: roku
@@ -60,7 +60,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:unit
-      - run: npm audit
+      - run: npm run test:security
+      - run: npm run audit:security
       - run: npm run build
       - run: npm run test:http
       - run: git diff --check
