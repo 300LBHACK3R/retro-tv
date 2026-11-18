@@ -315,6 +315,10 @@ test("Cyberpunk Christmas persists its premium guide, channels, settings and lib
   await picker.getByRole("button", { name: "Seasonal", exact: true }).click();
   await picker.getByRole("group", { name: "Seasonal holidays" }).getByRole("button", { name: "Christmas", exact: true }).click();
   const card = picker.locator('[data-theme-id="christmas-neon-noel"]');
+  // The third Christmas design puts this card below the fold on iPhone.
+  // Scroll like a viewer before checking the lazily loaded preview image.
+  await card.scrollIntoViewIfNeeded();
+  await expect(card).toBeInViewport();
   await expect.poll(() => card.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   await card.click();
   await expect(page.locator("html")).toHaveAttribute("data-ttv-theme", "christmas-neon-noel");
