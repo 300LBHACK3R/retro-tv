@@ -26,7 +26,8 @@ See [launch audit and remaining activation work](docs/LAUNCH_AUDIT.md) before ad
 ## Latest release
 
 See [Premium Roku, Christmas 2005 and Admin](docs/PREMIUM_ROKU.md) for v0.1.13, deployment order and device acceptance.
-The [browser release repair](docs/PREMIUM_ROKU_BROWSER_FIX.md) covers the latest v0.1.13 publisher and full-suite CI checks.
+The [browser release repair](docs/PREMIUM_ROKU_BROWSER_FIX.md) covers the v0.1.13 full-suite CI checks.
+The [live broadcast alignment repair](docs/LIVE_BROADCAST_SYNC.md) includes the latest publisher and keeps Roku's daily rotation aligned with the website.
 
 ## Viewer features
 

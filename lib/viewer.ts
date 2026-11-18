@@ -1,4 +1,5 @@
 import { cleanDisplayText } from "./textClean";
+import { copyScheduleDate } from "./scheduleDate";
 import type { Channel, MediaItem, PlayerViewMode } from "./types";
 
 const DEFAULT_CHANNEL_ACCENT = "#37d8ff";
@@ -21,7 +22,9 @@ export function isCommercialInventoryItem(item: MediaItem): boolean {
 }
 
 export function createBroadcastDayAnchor(now = new Date()): Date {
-  const anchor = new Date(now);
+  // Roku supplies a timezone-aware date. Retain that zone when the server
+  // creates the same local-midnight anchor used by the browser player.
+  const anchor = copyScheduleDate(now);
   anchor.setHours(0, 0, 0, 0);
   return anchor;
 }

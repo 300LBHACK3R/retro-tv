@@ -5,6 +5,7 @@ import { getLiveState } from "./liveEngine";
 import type { ProgrammingSnapshot } from "./programmingSnapshot";
 import { buildSchedule, couldAdvertiseOnChannel } from "./scheduler";
 import type { Channel, MediaItem } from "./types";
+import { createBroadcastDayAnchor } from "./viewer";
 
 const SITE_ORIGIN = "https://www.tatestv.ca";
 const FALLBACK_POSTER = `${SITE_ORIGIN}/tatestv-logo-christmas.png`;
@@ -66,7 +67,9 @@ export function rokuSchedule(channel: Channel, media: MediaItem[], now: Date) {
   const ids = new Set(programmeIds(channel));
   return buildSchedule(media.filter(item => ids.has(item.id)), {
     channel,
-    now,
+    // Match the website's broadcast day. Using the current UTC date switches
+    // daily-random stations early during the viewer's local evening.
+    now: createBroadcastDayAnchor(now),
     availableAds: media.filter(item => item.type === "commercial" || item.type === "bumper"),
   });
 }
