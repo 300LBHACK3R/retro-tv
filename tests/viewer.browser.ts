@@ -988,6 +988,10 @@ test("mobile guide fits narrow screens, landscape and larger text with reachable
 });
 
 test("mobile themes are free, open without the keyboard, and remember both the selected theme and reduced motion", async ({ page }, testInfo) => {
+  // This full journey includes collection/filter navigation, two saved
+  // preferences, several reloads and rotation. WebKit can exceed the default
+  // 45s total while every action succeeds; keep each assertion's 10s limit.
+  test.setTimeout(90000);
   test.skip(testInfo.project.name === "television");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/?ch=24");

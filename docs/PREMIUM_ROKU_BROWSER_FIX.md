@@ -19,7 +19,14 @@ first, asserts that the card is in view, and still requires the image to load
 with nonzero natural width before applying the theme. No image-loading assertion
 or application behavior was removed.
 
-Both checks run in the early smoke group. The complete browser suite now runs
+The complete isolated browser run also reproduced the long mobile-theme
+journey exceeding its 45-second total budget on iPhone. Both attempts progressed
+through successful individual actions; neither was stalled on a failed UI
+assertion. That scenario now has a bounded 90-second total budget, matching
+other long theme journeys. The 10-second assertion limit, all assertions,
+reloads, rotation checks and normal retry policy remain unchanged.
+
+Both original failure checks and the mobile-theme journey run in the early smoke group. The complete browser suite now runs
 in three required parallel jobs, followed by paid-theme rebuilds and checks
 in each job. See [browser CI setup](CI_BROWSER_IMAGE.md) for coverage and reports.
 Typecheck, lint, unit, security, build, HTTP and native checks remain required.
