@@ -15,6 +15,7 @@ function isPlaybackLaunch(args as dynamic) as boolean
 end function
 
 sub onHomeAction()
+    if m.storeEdition = true and m.home.action <> "watch" then return
     if m.home.action = "watch"
         ' Guest entry retains the saved Kids restriction.
         stopPlayback()
@@ -203,6 +204,7 @@ sub showViewerOptions()
     dialog.title = "Your TV. Your way."
     dialog.message = ["Use the player for fullscreen viewing, or keep watching while you browse the guide and library."]
     dialog.buttons = ["Watch fullscreen", "Live guide", "Search library", "Help", "Saved viewing", "Back"]
+    if m.storeEdition = true then dialog.buttons = ["Watch fullscreen", "Live guide", "Search library", "Help", "Back"]
     dialog.ObserveField("buttonSelected", "onViewerOption")
     presentDialog(dialog)
 end sub
@@ -217,8 +219,14 @@ sub onViewerOption(event as object)
     else if selection = 2
         showSearch()
     else if selection = 3
-        showMessage("Remote controls", ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: arrows browse programmes; Up above the first channel reaches days and filters. Rewind/FF moves three hours; Replay returns to Now. OK watches the selected channel LIVE, even on a future listing. Back closes without tuning. Library fullscreen retains Play/Pause, seeking and Replay.", "Kids mode needs the parent PIN to exit. Support: tatestv.ca/help"])
-    else if selection = 4
+        help = ["Live fullscreen: Up/Down change channels. OK or Left/Right opens the live guide. Back returns to the viewer. From the inline player, Right opens the guide; Down opens the channel strip.", "Guide: arrows browse programmes; Up above the first channel reaches days and filters. Rewind/FF moves three hours; Replay returns to Now. OK watches the selected channel LIVE, even on a future listing. Back closes without tuning. Library fullscreen retains Play/Pause, seeking and Replay."]
+        if m.storeEdition = true
+            help.Push("Support: tatestv.ca/help")
+        else
+            help.Push("Kids mode needs the parent PIN to exit. Support: tatestv.ca/help")
+        end if
+        showMessage("Remote controls", help)
+    else if selection = 4 and m.storeEdition <> true
         showSavedOptions()
     else
         restoreFocus()

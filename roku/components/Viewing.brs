@@ -271,6 +271,7 @@ sub onFavouriteSelected(event as object)
 end sub
 
 sub reportVideoFailure()
+    if m.storeEdition = true then return
     task = CreateObject("roSGNode", "AccountTask")
     task.endpoint = "diagnostics"
     mediaId = ""

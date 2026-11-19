@@ -183,7 +183,31 @@ function videoFailureCode(code as integer, info as dynamic) as string
 end function
 
 function progressRegistry() as object
+    if m.storeEdition = true then return CreateObject("roRegistrySection", "ttv-store-progress")
     return CreateObject("roRegistrySection", "ttv-progress-" + audience())
+end function
+
+function storeSeriesEpisode(group as object) as dynamic
+    if group.items.Count() = 0 then return invalid
+    registry = progressRegistry()
+    newestIndex = -1
+    newestStamp = 0
+    completed = false
+    for index = 0 to group.items.Count() - 1
+        entry = registry.Read(group.items[index].id)
+        separator = Instr(1, entry, ":")
+        if separator > 1
+            stamp = Val(Mid(entry, separator + 1))
+            if stamp > 0 and stamp >= newestStamp
+                newestIndex = index
+                newestStamp = stamp
+                completed = Val(Left(entry, separator - 1)) = -1
+            end if
+        end if
+    end for
+    if newestIndex < 0 then return group.items[0]
+    if completed then newestIndex = (newestIndex + 1) mod group.items.Count()
+    return group.items[newestIndex]
 end function
 
 function readProgress() as object
@@ -213,11 +237,20 @@ sub saveProgress()
         m.lastSavedPosition = position
         return
     end if
-    registry = progressRegistry()
-    registry.Delete(m.playing.id)
+    rememberedPosition = invalid
     if position >= 10 and position < m.playing.duration - 15
+        rememberedPosition = position
+    end if
+    if m.storeEdition <> true or rememberedPosition <> invalid then writeLocalProgress(m.playing.id, rememberedPosition)
+    m.lastSavedPosition = position
+end sub
+
+sub writeLocalProgress(id as string, position as dynamic)
+    registry = progressRegistry()
+    registry.Delete(id)
+    if position <> invalid
         stamp = CreateObject("roDateTime").AsSeconds()
-        registry.Write(m.playing.id, position.ToStr() + ":" + stamp.ToStr())
+        registry.Write(id, position.ToStr() + ":" + stamp.ToStr())
     end if
     ' Bound both profiles together below Roku's 32 KB app registry quota.
     keys = registry.GetKeyList()
@@ -237,7 +270,6 @@ sub saveProgress()
         keys = registry.GetKeyList()
     end while
     registry.Flush()
-    m.lastSavedPosition = position
 end sub
 
 sub clearProgress(id as string)
@@ -245,7 +277,11 @@ sub clearProgress(id as string)
         cloudSaveProgress(id, m.playing.duration, m.playing.duration)
         return
     end if
-    registry = progressRegistry()
-    registry.Delete(id)
-    registry.Flush()
+    if m.storeEdition = true
+        writeLocalProgress(id, -1)
+    else
+        registry = progressRegistry()
+        registry.Delete(id)
+        registry.Flush()
+    end if
 end sub

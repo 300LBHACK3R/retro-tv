@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { buildRokuGuide } from "../lib/rokuGuide";
 import { rokuClock } from "../lib/rokuClock";
-import { rokuPlayback } from "../lib/rokuCatalog";
+import { programmeIds, rokuPlayback, rokuStream } from "../lib/rokuCatalog";
+import { viewerCatalog } from "../lib/audience";
 import { programming } from "./programming-fixture";
 import { serverModule } from "./server-harness";
 
@@ -69,10 +70,15 @@ test("guide folds commercials into listings without exposing ad titles or changi
 });
 test("guide endpoint validates before storage, limits data and masks outages", async () => {
   let calls = 0; let fail = false;
+  const loader = serverModule("lib/server/rokuStoreProgramming.ts", {
+    "../audience": { viewerCatalog },
+    "../rokuCatalog": { programmeIds, rokuStream },
+    "./rokuProgramming": { rokuChannelAllowlist: () => ["24"], rokuProgramming: async () => { calls++; if (fail) throw Error("private provider detail"); return snapshot(); } },
+  });
   const handler = serverModule("app/api/roku/guide/route.ts", {
     "@/lib/rokuGuide": { buildRokuGuide }, "@/lib/rokuClock": { rokuClock },
     "@/lib/server/http": serverModule("lib/server/http.ts"),
-    "@/lib/server/rokuProgramming": { rokuChannelAllowlist: () => ["24"], rokuProgramming: async () => { calls++; if (fail) throw Error("private provider detail"); return snapshot(); } },
+    "@/lib/server/rokuStoreProgramming": loader,
   });
   const get = (query: string) => handler.GET!(new Request(`https://www.tatestv.ca/api/roku/guide?${query}`));
   for (const query of ["audience=admin", "start=-1", "start=Infinity", "start=1.5", "start=999999999999", "tz=missing"]) expect((await get(query)).status).toBe(400);

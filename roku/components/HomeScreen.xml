@@ -3,6 +3,7 @@
   <interface>
     <field id="themeColors" type="assocarray" onChange="updateColors" />
     <field id="action" type="string" alwaysNotify="true" />
+    <field id="storeEdition" type="boolean" />
     <field id="kids" type="boolean" onChange="updateProfile" />
     <field id="signedIn" type="boolean" onChange="updateProfile" />
     <field id="accountStatus" type="string" alias="accountStatusLabel.text" />

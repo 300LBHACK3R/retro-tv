@@ -44,13 +44,20 @@ sub renderControls()
     clearNodes(tools)
     clearNodes(days)
     clearNodes(slots)
-    labels = ["Search channels", "All categories", "Favourites", "Compact rows"]
+    labels = ["Search channels", "All categories"]
+    if m.top.storeEdition <> true
+        favouriteLabel = "Favourites"
+        if m.favouritesOnly then favouriteLabel = "Favourites: On"
+        labels.Push(favouriteLabel)
+    end if
+    rowModeLabel = "Compact rows"
+    if m.compact then rowModeLabel = "Comfortable rows"
+    labels.Push(rowModeLabel)
     if m.top.query <> "" then labels[0] = "Search: " + m.top.query
     if m.top.category <> "" then labels[1] = m.top.category
-    if m.favouritesOnly then labels[2] = "Favourites: On"
-    if m.compact then labels[3] = "Comfortable rows"
-    for i = 0 to 3
-        drawButton(tools, labels[i], i * 296, 0, 288, 44, m.zone = "tools" and m.tool = i)
+    stride = Int(1184 / labels.Count())
+    for i = 0 to labels.Count() - 1
+        drawButton(tools, labels[i], i * stride, 0, stride - 8, 44, m.zone = "tools" and m.tool = i)
     end for
     if m.data <> invalid
         m.top.FindNode("clock").text = m.data.clock

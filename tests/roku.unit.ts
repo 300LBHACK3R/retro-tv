@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
+import { viewerCatalog } from "../lib/audience";
 import { buildRokuCatalog, rokuLineup, rokuPlayback, rokuStream } from "../lib/rokuCatalog";
+import { buildRokuGuide } from "../lib/rokuGuide";
 import { BROADCAST_EPOCH_MS, getLiveState } from "../lib/liveEngine";
 import { buildSchedule } from "../lib/scheduler";
 import { programming } from "./programming-fixture";
@@ -138,14 +140,19 @@ test("Roku HTTP handlers validate first, enforce profile access, and mask provid
   let failed = false;
   const data = snapshot();
   data.channels[1]!.adultOnly = true;
+  const provider = {
+    rokuChannelAllowlist: () => undefined,
+    rokuProgramming: async () => { calls++; if (failed) throw new Error("private database detail"); return data; },
+  };
   const imports = {
     "@/lib/rokuCatalog": rokuModel,
     "@/lib/rokuClock": { rokuClock },
     "@/lib/server/http": serverModule("lib/server/http.ts"),
-    "@/lib/server/rokuProgramming": {
-      rokuChannelAllowlist: () => undefined,
-      rokuProgramming: async () => { calls++; if (failed) throw new Error("private database detail"); return data; },
-    },
+    "@/lib/server/rokuStoreProgramming": serverModule("lib/server/rokuStoreProgramming.ts", {
+      "../audience": { viewerCatalog },
+      "../rokuCatalog": rokuModel,
+      "./rokuProgramming": provider,
+    }),
   };
   const catalog = serverModule("app/api/roku/catalog/route.ts", imports);
   const play = serverModule("app/api/roku/play/route.ts", imports);
@@ -166,6 +173,113 @@ test("Roku HTTP handlers validate first, enforce profile access, and mask provid
   const outage = await play.GET!(get("play?id=media:qa-movie"));
   expect(outage.status).toBe(503);
   expect(await outage.text()).not.toContain("private database detail");
+});
+
+test("Store edition only exposes approved short-form video across guide, live and Library requests", async () => {
+  const data = snapshot();
+  const studio = data.channels[0]!;
+  studio.commercialBreakMode = "end-only";
+  studio.adPolicy = { enabled: true };
+  studio.defaultSlotLengthSeconds = 1800;
+  studio.mediaIds = [...studio.mediaIds, "qa-ad", "qa-bumper", "qa-unreviewed", "qa-unsupported"];
+  studio.programmeBlocks = [
+    { id: "with-short", title: "Short slot", startTime: "00:00", days: [], durationMinutes: 30, mediaIds: ["qa-block", "qa-unreviewed"] },
+    { id: "without-short", title: "Unreleased slot", startTime: "01:00", days: [], durationMinutes: 30, mediaIds: ["qa-unreviewed"] },
+  ];
+  Object.assign(data.media[0]!, { duration: 899, slotLengthSeconds: 1800, fillSlotWithCommercials: true, breakpoints: [120], breakDurations: [30] });
+  data.media[1]!.duration = 900;
+  data.media.push(
+    { id: "qa-ad", type: "commercial", title: "Station sponsor", duration: 30, file: "https://media.example/ad.mp4" },
+    { id: "qa-bumper", type: "bumper", title: "Station bumper", duration: 5, file: "https://media.example/bumper.mp4" },
+    { id: "qa-unreviewed", type: "show", title: "Unreviewed show", duration: 30, file: "https://media.example/unreviewed.mp4" },
+    { id: "qa-unsupported", type: "movie", title: "Unsupported movie", duration: 40, file: "https://media.example/unsupported.webm" },
+    { id: "qa-block", type: "show", title: "Scheduled Short S01E01", duration: 123, file: "https://media.example/short.mp4", kidsApproved: true },
+  );
+
+  let reads = 0;
+  const storeModules = (env: Record<string, string>) => {
+    const loader = serverModule("lib/server/rokuStoreProgramming.ts", {
+      "../audience": { viewerCatalog },
+      "../rokuCatalog": rokuModel,
+      "./rokuProgramming": {
+        rokuChannelAllowlist: () => undefined,
+        rokuProgramming: async () => { reads++; return data; },
+      },
+    }, env);
+    const imports = {
+      "@/lib/rokuCatalog": rokuModel,
+      "@/lib/rokuGuide": { buildRokuGuide },
+      "@/lib/rokuClock": { rokuClock: (zone: string | null) => rokuClock(zone, now) },
+      "@/lib/server/http": serverModule("lib/server/http.ts"),
+      "@/lib/server/rokuStoreProgramming": loader,
+    };
+    const handlers = {
+      catalog: serverModule("app/api/roku/catalog/route.ts", imports).GET!,
+      guide: serverModule("app/api/roku/guide/route.ts", imports).GET!,
+      play: serverModule("app/api/roku/play/route.ts", imports).GET!,
+    };
+    return {
+      loader,
+      get: (route: keyof typeof handlers, query: string) =>
+        handlers[route](new Request(`https://www.tatestv.ca/api/roku/${route}?${query}`)),
+    };
+  };
+
+  const allButUnreviewed = "qa-show-a,qa-show-b,qa-movie,qa-ad,qa-bumper,qa-unsupported,qa-block";
+  const { get, loader } = storeModules({
+    TTV_ROKU_STORE_CHANNEL_IDS: "24",
+    TTV_ROKU_STORE_MEDIA_IDS: allButUnreviewed,
+  });
+  expect((await get("catalog", "edition=preview")).status).toBe(400);
+  expect((await get("guide", "edition=store&edition=preview")).status).toBe(400);
+  expect((await get("play", "edition=&id=media:qa-show-a")).status).toBe(400);
+  expect(reads).toBe(0);
+
+  const storeSnapshot = (await loader.rokuEditionProgramming!("store", "all")).snapshot as ProgrammingSnapshot;
+  expect(storeSnapshot.channels[0]).toMatchObject({
+    id: "24",
+    mediaIds: ["qa-show-a"],
+    programmeBlocks: [{ id: "with-short", mediaIds: ["qa-block"] }],
+    commercialBreakMode: "none",
+    adPolicy: { enabled: false },
+  });
+  expect(storeSnapshot.channels[0]!.defaultSlotLengthSeconds).toBeUndefined();
+  expect(storeSnapshot.media[0]!.slotLengthSeconds).toBeUndefined();
+  expect(storeSnapshot.media[0]!.breakpoints).toBeUndefined();
+  expect(data.media[0]!.breakpoints).toEqual([120]);
+
+  const catalogResponse = await get("catalog", "edition=store");
+  expect(catalogResponse.headers.get("cache-control")).toContain("no-store");
+  const catalog = await catalogResponse.json();
+  expect(catalog.edition).toBe("store");
+  expect(catalog.channels.map((channel: { id: string }) => channel.id)).toEqual(["channel:24"]);
+  expect(catalog.library.flatMap((group: { items: { id: string }[] }) => group.items.map(item => item.id)).sort())
+    .toEqual(["media:qa-block", "media:qa-show-a"]);
+  const guide = await (await get("guide", "edition=store")).json();
+  expect(guide.edition).toBe("store");
+  expect(guide.channels.map((row: { id: string }) => row.id)).toEqual(["channel:24"]);
+  expect(JSON.stringify(guide)).not.toMatch(/Station sponsor|Station bumper|Unreviewed show/);
+  const live = await (await get("play", "edition=store&id=channel:24")).json();
+  expect(live.edition).toBe("store");
+  expect(live.playback.url).toMatch(/\/(qa-show-a|short)\.mp4$/);
+  expect((await get("play", "edition=store&id=media:qa-show-a")).status).toBe(200);
+  for (const id of ["media:qa-show-b", "media:qa-movie", "media:qa-ad", "media:qa-bumper", "media:qa-unreviewed", "media:qa-unsupported", "channel:25"])
+    expect((await get("play", `edition=store&id=${id}`)).status).toBe(404);
+  const standard = await get("play", "id=media:qa-show-b");
+  expect(standard.status).toBe(200);
+  expect((await standard.json()).edition).toBeUndefined();
+
+  const unconfiguredAllowLists: Record<string, string>[] = [
+    { TTV_ROKU_STORE_CHANNEL_IDS: "24", TTV_ROKU_STORE_MEDIA_IDS: "" },
+    { TTV_ROKU_STORE_CHANNEL_IDS: "", TTV_ROKU_STORE_MEDIA_IDS: "qa-show-a" },
+    {},
+  ];
+  for (const env of unconfiguredAllowLists) {
+    const closed = storeModules(env);
+    expect(await (await closed.get("catalog", "edition=store")).json()).toMatchObject({ edition: "store", channels: [], library: [] });
+    expect(await (await closed.get("guide", "edition=store")).json()).toMatchObject({ edition: "store", channels: [] });
+    expect((await closed.get("play", "edition=store&id=media:qa-show-a")).status).toBe(404);
+  }
 });
 
 test("Roku programming coalesces reads and retries failed reads without serving stale approval", async () => {

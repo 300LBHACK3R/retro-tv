@@ -52,11 +52,19 @@ sub main()
     m.top.selectedProfile = ""
     onKeyEvent("OK", true)
     check(m.top.selectedProfile = "" and not m.watch.visible, "An empty household cannot submit a phantom profile")
+    m.top.storeEdition = true
+    reset()
+    check(m.watch.visible and m.watch.selected and m.watch.translation[0] = 510, "Store Home centers the guest card")
+    check(not m.signin.visible and not m.create.visible, "Store Home suppresses account entry")
+    onKeyEvent("right", true)
+    check(onKeyEvent("OK", true) and m.top.action = "watch", "Store guest entry cannot switch to account actions")
+    showProfiles(profiles, "kids")
+    check(not m.profileMode and not onKeyEvent("back", true), "Store Home bypasses account profiles and leaves Back to Roku")
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: guest and signed-in home cards, bounded focus and free viewing"
+    print "PASS: guest and signed-in home cards, bounded focus and Store guest entry"
 end sub
 sub check(condition as boolean, description as string)
     if m.failed = invalid then m.failed = 0

@@ -10,6 +10,7 @@ const suites = [
   ["tests", "ThemeStyle", "HomeScreen", "home"],
   ["tests", "Accounts", "accounts"],
   ["tests", "AccountTask", "account-wire"],
+  ["tests", "ApiTask", "api-wire"],
   ["tests", "Viewing", "viewing"],
   ["dist/staging", "ThemeStyle", "Themes", "TatesScene", "themes"],
   ["dist/staging", "ThemeStyle", "ArtworkCard", "theme-cards"],

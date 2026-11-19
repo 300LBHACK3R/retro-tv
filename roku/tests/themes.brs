@@ -10,7 +10,7 @@ sub main()
         if m.nodes[id] = invalid then m.nodes[id] = node()
         return m.nodes[id]
     end function
-    for each id in ["home", "menu", "guide", "channels", "libraryGrid", "playerFocus", "liveStage", "emptyMessage", "heading"]
+    for each id in ["home", "menu", "guide", "channels", "libraryGrid", "playerFocus", "liveStage", "emptyMessage", "heading", "profileLabel"]
         m[id] = m.top.FindNode(id)
     end for
     m.registry = {
@@ -103,17 +103,41 @@ sub main()
     applyTheme("telus-2008-inspired")
     showBrowser()
     check(m.top.FindNode("room").opacity = 1, "Returning to the viewer preserves the light theme's intended backdrop opacity")
+    m.storeEdition = true
+    applyTheme("christmas-neon-noel")
+    check(m.themeId = m.themeCatalog.defaultId, "Store edition denies a premium theme even with cached entitlements")
+    renderList(false)
+    check(m.entries.Count() = 7, "Store edition only lists the free themes")
+    m.account = invalid
+    m.kids = false
+    buildMenu()
+    check(m.menuActions.Count() = 7 and m.menuActions[4] = "themes", "Store menu retains free themes and excludes household/PIN access")
+    m.catalog = { channels: [{ id: "channel:1", number: 1 }], library: [{ id: "series:show", type: "show", title: "Show", items: [{ id: "media:one", mediaType: "episode", duration: 50, title: "Episode" }] }] }
+    m.pendingLaunch = { id: "channel:1", mediaType: "livefeed" }
+    dispatchLaunch()
+    check(m.requested = "channel:1" and m.fullscreen, "Store livefeed links immediately start live television")
+    m.pendingLaunch = { id: "media:one", mediaType: "shortformvideo" }
+    dispatchLaunch()
+    check(m.requested = "media:one" and m.fullscreen, "Store short-form link goes directly to playback")
+    m.pendingLaunch = { id: "series:show", mediaType: "series" }
+    dispatchLaunch()
+    check(m.requested = "media:one" and m.fullscreen, "Store series links go directly to a selected episode")
+    m.requested = ""
+    m.pendingLaunch = { id: "media:one", mediaType: "unsupported" }
+    dispatchLaunch()
+    check(m.home.visible and not m.browser.visible and m.requested = "", "Wrong media type returns to Home without playback")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: fifteen themes, premium guest denial, legacy preferences, saved selection, light palette and uninterrupted playback"
+    print "PASS: native themes, legacy preferences, uninterrupted playback, Store menu and platform deep links"
 end sub
 
 function node() as object
     return {
         children: []
         SetFocus: sub(value): m.focused = value: end sub
+        CallFunc: sub(name): end sub
         AddField: sub(name, kind, notify)
         end sub
         CreateChild: function(kind)
@@ -132,6 +156,11 @@ sub check(condition as boolean, description as string)
 end sub
 
 function cloudProfile() as boolean: return false: end function
+sub requestPlayback(id as string): m.requested = id: end sub
+sub dismissGuide(): end sub
+sub stopPlayback(): m.fullscreen = false: end sub
+function storeSeriesEpisode(group as object) as dynamic: return group.items[0]: end function
+sub updateNowNext(): end sub
 function arrayHas(values, id) as boolean
  for each value in values
   if value = id then return true

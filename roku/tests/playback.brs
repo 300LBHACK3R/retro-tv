@@ -94,11 +94,26 @@ sub main()
     onVideoState()
     check(m.playing = invalid and m.dialogShown, "On-demand errors stop with a recoverable message")
 
+    _brs_.mockFunction("progressRegistry", function()
+        return { values: m.storeBookmarks, Read: function(id)
+            if m.values[id] = invalid then return ""
+            return m.values[id]
+        end function }
+    end function)
+    series = { items: [{ id: "media:one" }, { id: "media:two" }, { id: "media:three" }] }
+    m.storeBookmarks = {}
+    check(storeSeriesEpisode(series).id = "media:one", "A new Store series starts with the first episode")
+    m.storeBookmarks["media:one"] = "-1:50"
+    m.storeBookmarks["media:two"] = "30:60"
+    check(storeSeriesEpisode(series).id = "media:two", "A Store series resumes the most recent unfinished episode")
+    m.storeBookmarks["media:two"] = "-1:75"
+    check(storeSeriesEpisode(series).id = "media:three", "A Store series advances after a completed episode")
+
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
     end if
-    print "PASS: live boundaries, ad errors, stale responses and VOD progress"
+    print "PASS: live boundaries, ad errors, stale responses, VOD progress and Store smart bookmarks"
 end sub
 
 sub resetPlayback()

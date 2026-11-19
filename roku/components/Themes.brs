@@ -1,5 +1,6 @@
 function themeAllowed(theme as object) as boolean
     if theme.isPremium <> true then return true
+    if m.storeEdition = true then return false
     if m.account = invalid then return false
     if m.account.ownedThemeIds = invalid then return false
     for each id in m.account.ownedThemeIds

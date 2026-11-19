@@ -170,17 +170,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     count = m.ids.Count()
     if m.zone = "tools"
+        lastTool = 3
+        if m.top.storeEdition = true then lastTool = 2
         if key = "left" and m.tool > 0 then m.tool--
-        if key = "right" and m.tool < 3 then m.tool++
+        if key = "right" and m.tool < lastTool then m.tool++
         if key = "down" then m.zone = "days"
         if key = "OK"
             if m.tool = 0 then m.top.action = "search"
             if m.tool = 1 then m.top.action = "category"
-            if m.tool = 2
+            if m.tool = 2 and m.top.storeEdition <> true
                 m.favouritesOnly = not m.favouritesOnly
                 updateChannels()
             end if
-            if m.tool = 3 then m.compact = not m.compact
+            if m.tool = lastTool then m.compact = not m.compact
         end if
     else if m.zone = "days"
         if key = "up" then m.zone = "tools"

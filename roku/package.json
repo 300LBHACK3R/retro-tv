@@ -5,8 +5,10 @@
   "scripts": {
     "check": "bsc --create-package false --copy-to-staging false",
     "build": "bsc && node scripts/verify-package.mjs",
+    "build:store": "node scripts/build-store.mjs",
     "precheck": "node scripts/prepare-assets.mjs",
     "prebuild": "node scripts/prepare-assets.mjs",
+    "prebuild:store": "node scripts/prepare-assets.mjs",
     "postinstall": "node ../scripts/security/picomatch.mjs",
     "audit:security": "node ../scripts/security/audit.mjs"
   },

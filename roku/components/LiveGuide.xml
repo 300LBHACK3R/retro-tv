@@ -7,6 +7,7 @@
     <field id="channelId" type="string" onChange="render" />
     <field id="audience" type="string" value="all" />
     <field id="favourites" type="array" onChange="updateChannels" />
+    <field id="storeEdition" type="boolean" />
     <field id="query" type="string" onChange="updateChannels" />
     <field id="category" type="string" onChange="updateChannels" />
     <field id="action" type="string" alwaysNotify="true" />

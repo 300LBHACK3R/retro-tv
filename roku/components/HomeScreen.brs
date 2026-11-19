@@ -27,6 +27,13 @@ sub reset()
     m.signin.add = false
     m.create.add = true
     m.top.FindNode("homeHelp").text = "Left / Right to choose   •   OK to select"
+    if m.top.storeEdition = true
+        m.watch.translation = [510,318]
+        m.signin.visible = false
+        m.create.visible = false
+        m.top.FindNode("homeTitle").text = "Tate’s TV"
+        m.top.FindNode("homeHelp").text = "OK to start watching"
+    end if
     updateProfile()
     updateSelection()
     m.top.SetFocus(true)
@@ -36,6 +43,11 @@ sub updateProfile()
     if m.watch = invalid or m.profileMode = true then return
     m.watch.title = "Watch for free"
     m.watch.subtitle = "Jump into the full lineup"
+    if m.top.storeEdition = true
+        m.watch.subtitle = "Live TV and on-demand shows"
+        m.top.FindNode("homeSubtitle").text = "Free viewing starts here."
+        return
+    end if
     if m.top.kids then m.watch.subtitle = "Kids • Approved shows only"
     m.signin.title = "Sign in"
     m.signin.subtitle = "Your existing Tate's TV account"
@@ -68,6 +80,10 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if m.top.storeEdition = true
+        if key = "OK" then m.top.action = "watch"
+        return key <> "back"
+    end if
     if m.profileMode = true then return profileKeyEvent(key)
     if key = "left" or key = "right"
         if key = "left" and m.selected > 0 then m.selected--
@@ -86,6 +102,7 @@ end function
 ' Reuse the home cards instead of a system dialog. At most three portraits are
 ' rendered at once, so larger households remain readable on a 720p screen.
 sub showProfiles(profiles as object, activeId as string)
+    if m.top.storeEdition = true then return
     m.profileMode = true
     m.profiles = profiles
     m.selected = 0

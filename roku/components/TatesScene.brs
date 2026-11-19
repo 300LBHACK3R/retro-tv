@@ -2,8 +2,14 @@ sub init()
     for each id in ["home", "browser", "menu", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guide", "guideBackdrop", "liveBanner", "bannerTimer", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer"]
         m[id] = m.top.FindNode(id)
     end for
-    m.registry = CreateObject("roRegistrySection", "tates-tv-v1")
-    m.kids = m.registry.Read("kids") = "true"
+    appInfo = CreateObject("roAppInfo")
+    m.storeEdition = appInfo.GetValue("ttv_store_edition") = "1"
+    registryName = "tates-tv-v1"
+    if m.storeEdition then registryName = "tates-tv-store-v1"
+    m.registry = CreateObject("roRegistrySection", registryName)
+    m.kids = not m.storeEdition and m.registry.Read("kids") = "true"
+    m.home.storeEdition = m.storeEdition
+    m.guide.storeEdition = m.storeEdition
     m.catalog = invalid
     m.entries = []
     m.view = "live"
@@ -38,11 +44,11 @@ sub init()
     resetViewing()
     applyTheme(m.registry.Read("theme"))
     buildMenu()
-    m.top.FindNode("buildLabel").text = "v" + CreateObject("roAppInfo").GetVersion()
+    m.top.FindNode("buildLabel").text = "v" + appInfo.GetVersion()
     m.home.kids = m.kids
     refreshCatalog()
     m.refreshTimer.control = "start"
-    initAccounts()
+    if not m.storeEdition then initAccounts()
 end sub
 
 sub showHome()
@@ -162,12 +168,19 @@ end sub
 
 sub buildMenu()
     content = CreateObject("roSGNode", "ContentNode")
-    labels = ["Live TV", "Live guide", "Library", "Search", "Kids mode", "Themes", "Refresh", "Home"]
-    if m.kids then labels[4] = "Exit Kids"
-    if m.account <> invalid then labels[4] = "Profiles"
-    for each label in labels
+    entries = [{ id: "live", label: "Live TV" }, { id: "guide", label: "Live guide" }, { id: "library", label: "Library" }, { id: "search", label: "Search" }]
+    if m.storeEdition <> true
+        profileLabel = "Kids mode"
+        if m.kids = true then profileLabel = "Exit Kids"
+        if m.account <> invalid then profileLabel = "Profiles"
+        entries.Push({ id: "profile", label: profileLabel })
+    end if
+    entries.Append([{ id: "themes", label: "Themes" }, { id: "refresh", label: "Refresh" }, { id: "home", label: "Home" }])
+    m.menuActions = []
+    for each entry in entries
         node = content.CreateChild("ContentNode")
-        node.title = label
+        node.title = entry.label
+        m.menuActions.Push(entry.id)
     end for
     m.menu.content = content
     m.profileLabel.text = "FREE VIEWING"
@@ -181,31 +194,33 @@ end sub
 
 sub onMenuSelected()
     index = m.menu.itemSelected
+    if index < 0 or index >= m.menuActions.Count() then return
+    action = m.menuActions[index]
     m.autoTune = false
-    if index = 0
+    if action = "live"
         openLive()
         return
-    else if index = 1
+    else if action = "guide"
         m.restoreTarget = "menu"
         openGuide()
         return
-    else if index = 2
+    else if action = "library"
         m.libraryFilter = "all"
         m.view = "library"
         m.group = invalid
         m.search = ""
-    else if index = 3
+    else if action = "search"
         showSearch()
         return
-    else if index = 4
+    else if action = "profile"
         changeProfile()
         return
-    else if index = 5
+    else if action = "themes"
         m.view = "themes"
-    else if index = 6
+    else if action = "refresh"
         refreshCatalog()
         return
-    else if index = 7
+    else if action = "home"
         showHome()
         return
     end if
@@ -242,8 +257,10 @@ sub renderList(preserve as boolean)
         updateNowNext()
         return
     else if m.view = "themes"
-        m.heading.text = "Your style. " + m.themeCatalog.themes.Count().ToStr() + " themes."
-        m.entries = m.themeCatalog.themes
+        for each theme in m.themeCatalog.themes
+            if m.storeEdition <> true or theme.isPremium <> true then m.entries.Push(theme)
+        end for
+        m.heading.text = "Your style. " + m.entries.Count().ToStr() + " themes."
         if selectedId = "" then selectedId = m.themeId
     else if m.catalog <> invalid
         if m.view = "episodes" and m.group <> invalid
@@ -328,6 +345,7 @@ sub onGridSelected()
     entry = m.entries[index]
     if m.view = "themes"
         if not themeAllowed(entry)
+            if m.storeEdition = true then return
             showMessage("Make it yours", ["Visit tatestv.ca/account to purchase this theme, then sign in or Refresh on your TV. Memberships include premium themes. Your free themes are always available."])
             return
         end if
@@ -411,8 +429,10 @@ sub closeMessage()
 end sub
 
 sub onRefresh()
-    refreshAccount()
-    flushViewing()
+    if m.storeEdition <> true
+        refreshAccount()
+        flushViewing()
+    end if
     if not m.isLoadingPlayback and m.top.dialog = invalid then refreshCatalog()
 end sub
 
@@ -431,6 +451,10 @@ end sub
 sub dispatchLaunch()
     link = m.pendingLaunch
     m.pendingLaunch = invalid
+    if m.storeEdition = true
+        if not dispatchStoreLaunch(link) then showHome()
+        return
+    end if
     if link.mediaType = "live"
         for each channel in m.catalog.channels
             if channel.id = link.id
@@ -464,12 +488,7 @@ sub dispatchLaunch()
                         m.restoreTarget = "content"
                         m.libraryGrid.SetFocus(true)
                     else if link.mediaType = item.mediaType or link.mediaType = "short-form"
-                        m.view = "episodes"
-                        m.group = group
-                        renderList(false)
-                        m.restoreTarget = "content"
-                        m.fullscreen = true
-                        requestPlayback(item.id)
+                        startLinkedVod(group, item)
                     end if
                     return
                 end if
@@ -477,4 +496,57 @@ sub dispatchLaunch()
         end for
     end if
     showMessage("Programme unavailable", ["This programme is not available in the current profile."])
+end sub
+
+function dispatchStoreLaunch(link as object) as boolean
+    if link.mediaType = "livefeed" or link.mediaType = "live"
+        for each channel in m.catalog.channels
+            if channel.id = link.id
+                m.view = "live"
+                renderList(false)
+                m.fullscreen = true
+                requestPlayback(channel.id)
+                return true
+            end if
+        end for
+        return false
+    end if
+
+    for each group in m.catalog.library
+        if link.mediaType = "series" and group.id = link.id
+            item = storeSeriesEpisode(group)
+            if item = invalid then return false
+            startLinkedVod(group, item)
+            return true
+        end if
+        for each item in group.items
+            if item.id = link.id
+                if link.mediaType = "series" and group.type = "show"
+                    episode = storeSeriesEpisode(group)
+                    if episode = invalid then return false
+                    startLinkedVod(group, episode)
+                    return true
+                end if
+                matches = link.mediaType = item.mediaType
+                if link.mediaType = "shortformvideo" or link.mediaType = "short-form"
+                    matches = item.duration <= 900
+                else if link.mediaType = "tvspecial"
+                    matches = group.type = "movie"
+                end if
+                if not matches then return false
+                startLinkedVod(group, item)
+                return true
+            end if
+        end for
+    end for
+    return false
+end function
+
+sub startLinkedVod(group as object, item as object)
+    m.view = "episodes"
+    m.group = group
+    renderList(false)
+    m.restoreTarget = "content"
+    m.fullscreen = true
+    requestPlayback(item.id)
 end sub
