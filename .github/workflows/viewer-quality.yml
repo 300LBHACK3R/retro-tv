@@ -25,10 +25,20 @@ jobs:
       - name: Verify native navigation, playback and account contracts
         working-directory: roku
         run: npm exec --yes --ignore-scripts --package=brs@0.45.0 -- node scripts/test-native.mjs
+      - name: Build the full Roku review candidate
+        run: npm --prefix roku run build:store:full
       - uses: actions/upload-artifact@v6
         with:
           name: tates-tv-roku-beta
           path: roku/dist/tates-tv-roku.zip
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        with:
+          name: tates-tv-roku-full-review-candidate
+          path: |
+            roku/dist/tates-tv-roku-store-full.zip
+            roku/dist/tates-tv-roku-store-poster.png
           if-no-files-found: error
           retention-days: 14
   verify:

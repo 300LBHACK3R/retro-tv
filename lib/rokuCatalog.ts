@@ -2,7 +2,7 @@ import { channelCategory, viewerCatalog } from "./audience";
 import { buildLibrary } from "./libraryCatalog";
 import { safeArtworkUrl } from "./libraryPresentation";
 import { getLiveState } from "./liveEngine";
-import type { ProgrammingSnapshot } from "./programmingSnapshot";
+import { sanitizeRokuSeekIndex, type ProgrammingSnapshot } from "./programmingSnapshot";
 import { buildSchedule, couldAdvertiseOnChannel } from "./scheduler";
 import type { Channel, MediaItem } from "./types";
 import { createBroadcastDayAnchor } from "./viewer";
@@ -160,10 +160,12 @@ export function rokuPlayback(
   if (!item || item.duration <= 0) return null;
   const stream = rokuStream(item);
   if (!stream) return null;
+  const seekIndex = sanitizeRokuSeekIndex(item.rokuSeekIndex, item.file);
   return {
     id, ...stream, title: item.title,
     mediaType: item.type === "movie" ? "movie" : "episode",
     start: 0, end: item.duration, remaining: item.duration,
     duration: item.duration, generatedAt: now.toISOString(),
+    ...(seekIndex && { hdBifUrl: seekIndex.hdBifUrl }),
   };
 }

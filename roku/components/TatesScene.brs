@@ -3,7 +3,9 @@ sub init()
         m[id] = m.top.FindNode(id)
     end for
     appInfo = CreateObject("roAppInfo")
-    m.storeEdition = appInfo.GetValue("ttv_store_edition") = "1"
+    edition = appInfo.GetValue("ttv_store_edition")
+    m.storeEdition = edition = "1"
+    m.fullStoreEdition = edition = "full"
     registryName = "tates-tv-v1"
     if m.storeEdition then registryName = "tates-tv-store-v1"
     m.registry = CreateObject("roRegistrySection", registryName)
@@ -157,7 +159,7 @@ sub onCatalog(event as object)
     else
         startDefaultChannel()
     end if
-    if not m.isLoadingPlayback then markLaunchComplete()
+    if not m.isLoadingPlayback and m.pendingLaunch = invalid then markLaunchComplete()
 end sub
 
 sub markLaunchComplete()
@@ -291,7 +293,7 @@ sub renderList(preserve as boolean)
             node.themeBadge = "Free"
             if entry.isPremium
                 node.themeBadge = "Locked"
-                if entry.priceLabel <> invalid then node.themeBadge = entry.priceLabel + " • Locked"
+                if m.fullStoreEdition <> true and entry.priceLabel <> invalid then node.themeBadge = entry.priceLabel + " • Locked"
                 if themeAllowed(entry)
                     node.themeBadge = "Included with account"
                     if m.account.member then node.themeBadge = "Included with membership"
@@ -346,7 +348,13 @@ sub onGridSelected()
     if m.view = "themes"
         if not themeAllowed(entry)
             if m.storeEdition = true then return
-            showMessage("Make it yours", ["Visit tatestv.ca/account to purchase this theme, then sign in or Refresh on your TV. Memberships include premium themes. Your free themes are always available."])
+            if m.fullStoreEdition = true
+                message = "Choose a free theme or one that’s included with your account."
+                if m.account = invalid then message = "Sign in on this TV to use themes already available to your account."
+                showMessage("Theme locked", [message])
+            else
+                showMessage("Make it yours", ["Visit tatestv.ca/account to purchase this theme, then sign in or Refresh on your TV. Memberships include premium themes. Your free themes are always available."])
+            end if
             return
         end if
         if cloudProfile()
@@ -450,9 +458,15 @@ end sub
 
 sub dispatchLaunch()
     link = m.pendingLaunch
+    if m.fullStoreEdition = true and link.mediaType <> "livefeed" and link.mediaType <> "live"
+        if cloudProfile() and m.viewingBusy and not m.viewingReady then return
+    end if
     m.pendingLaunch = invalid
-    if m.storeEdition = true
-        if not dispatchStoreLaunch(link) then showHome()
+    if m.storeEdition = true or m.fullStoreEdition = true
+        if not dispatchStoreLaunch(link)
+            showHome()
+            markLaunchComplete()
+        end if
         return
     end if
     if link.mediaType = "live"
@@ -513,7 +527,7 @@ function dispatchStoreLaunch(link as object) as boolean
     end if
 
     for each group in m.catalog.library
-        if link.mediaType = "series" and group.id = link.id
+        if link.mediaType = "series" and group.id = link.id and group.type = "show"
             item = storeSeriesEpisode(group)
             if item = invalid then return false
             startLinkedVod(group, item)

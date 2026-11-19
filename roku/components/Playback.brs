@@ -73,6 +73,7 @@ sub onPlayback(event as object)
         m.segmentTimer.duration = m.segmentSeconds
         m.segmentTimer.control = "start"
     else
+        if item.hdBifUrl <> invalid then content.HDBifUrl = item.hdBifUrl
         progress = readProgress()
         if progress.DoesExist(item.id)
             saved = progress[item.id]
@@ -189,20 +190,33 @@ end function
 
 function storeSeriesEpisode(group as object) as dynamic
     if group.items.Count() = 0 then return invalid
-    registry = progressRegistry()
     newestIndex = -1
     newestStamp = 0
     completed = false
+    scopedToProfile = cloudProfile()
+    if not scopedToProfile then registry = progressRegistry()
     for index = 0 to group.items.Count() - 1
-        entry = registry.Read(group.items[index].id)
-        separator = Instr(1, entry, ":")
-        if separator > 1
-            stamp = Val(Mid(entry, separator + 1))
-            if stamp > 0 and stamp >= newestStamp
-                newestIndex = index
-                newestStamp = stamp
-                completed = Val(Left(entry, separator - 1)) = -1
+        item = group.items[index]
+        stamp = 0
+        finished = false
+        if scopedToProfile
+            metadata = m.cloudProgress[Mid(item.id, 7)]
+            if metadata <> invalid and metadata.updatedAt <> invalid
+                stamp = metadata.updatedAt
+                finished = metadata.position >= metadata.duration - 10
             end if
+        else
+            entry = registry.Read(item.id)
+            separator = Instr(1, entry, ":")
+            if separator > 1
+                stamp = Val(Mid(entry, separator + 1))
+                finished = Val(Left(entry, separator - 1)) = -1
+            end if
+        end if
+        if stamp > 0 and stamp >= newestStamp
+            newestIndex = index
+            newestStamp = stamp
+            completed = finished
         end if
     end for
     if newestIndex < 0 then return group.items[0]
@@ -241,7 +255,7 @@ sub saveProgress()
     if position >= 10 and position < m.playing.duration - 15
         rememberedPosition = position
     end if
-    if m.storeEdition <> true or rememberedPosition <> invalid then writeLocalProgress(m.playing.id, rememberedPosition)
+    if (m.storeEdition <> true and m.fullStoreEdition <> true) or rememberedPosition <> invalid then writeLocalProgress(m.playing.id, rememberedPosition)
     m.lastSavedPosition = position
 end sub
 
@@ -277,7 +291,7 @@ sub clearProgress(id as string)
         cloudSaveProgress(id, m.playing.duration, m.playing.duration)
         return
     end if
-    if m.storeEdition = true
+    if m.storeEdition = true or m.fullStoreEdition = true
         writeLocalProgress(id, -1)
     else
         registry = progressRegistry()

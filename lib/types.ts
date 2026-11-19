@@ -131,6 +131,9 @@ export interface MediaItem {
   duration: number;
   file: string;
 
+  /** Roku seek previews generated from this exact video file. */
+  rokuSeekIndex?: { sourceFile: string; hdBifUrl: string };
+
   mimeType?: string;
   originalName?: string;
 

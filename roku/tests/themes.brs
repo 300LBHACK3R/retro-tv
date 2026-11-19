@@ -4,7 +4,12 @@ sub main()
     _brs_.mockFunction("CreateObject", function(kind, name)
         return node()
     end function)
+    _brs_.mockFunction("showMessage", sub(title, lines)
+        m.messageTitle = title
+        m.messageLines = lines
+    end sub)
     m.top = node()
+    m.top.SignalBeacon = sub(name): end sub
     m.top.nodes = {}
     m.top.FindNode = function(id)
         if m.nodes[id] = invalid then m.nodes[id] = node()
@@ -126,6 +131,39 @@ sub main()
     m.pendingLaunch = { id: "media:one", mediaType: "unsupported" }
     dispatchLaunch()
     check(m.home.visible and not m.browser.visible and m.requested = "", "Wrong media type returns to Home without playback")
+    m.storeEdition = false
+    m.fullStoreEdition = true
+    m.view = "themes"
+    buildMenu()
+    check(m.menuActions.Count() = 8 and m.menuActions[4] = "profile", "Full Store keeps the profiles menu")
+    renderList(false)
+    check(m.entries.Count() = 15, "Full Store lists both free and premium themes")
+    for i = 0 to m.entries.Count() - 1
+        if m.entries[i].id = "christmas-neon-noel" then m.libraryGrid.itemSelected = i
+    end for
+    check(m.libraryGrid.content.children[m.libraryGrid.itemSelected].themeBadge = "Locked", "Full Store hides off-device purchase prices")
+    onGridSelected()
+    check(m.messageTitle = "Theme locked" and Instr(1, m.messageLines[0], "Sign in on this TV") > 0, "Full Store locked theme offers on-device sign-in for existing entitlements")
+    m.account = { ownedThemeIds: ["christmas-neon-noel"], member: false }
+    onGridSelected()
+    check(m.themeId = "christmas-neon-noel", "Full Store can activate an already owned theme")
+    m.pendingLaunch = { id: "channel:1", mediaType: "livefeed" }
+    dispatchLaunch()
+    check(m.requested = "channel:1" and m.fullscreen, "Full Store supports Roku livefeed links")
+    m.pendingLaunch = { id: "series:show", mediaType: "series" }
+    dispatchLaunch()
+    check(m.requested = "media:one" and m.fullscreen, "Full Store series links play a selected episode")
+    m.cloudMode = true
+    m.cloudProgress = {}
+    m.viewingBusy = true
+    m.viewingReady = false
+    m.requested = ""
+    m.pendingLaunch = { id: "series:show", mediaType: "series" }
+    dispatchLaunch()
+    check(m.pendingLaunch <> invalid and m.requested = "", "Full Store defers a series link while the selected profile’s bookmarks are loading")
+    m.viewingReady = true
+    dispatchLaunch()
+    check(m.pendingLaunch = invalid and m.requested = "media:one", "The queued series link plays once the selected profile’s bookmarks are available")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop
@@ -155,7 +193,7 @@ sub check(condition as boolean, description as string)
     print "FAIL: "; description
 end sub
 
-function cloudProfile() as boolean: return false: end function
+function cloudProfile() as boolean: return m.cloudMode = true: end function
 sub requestPlayback(id as string): m.requested = id: end sub
 sub dismissGuide(): end sub
 sub stopPlayback(): m.fullscreen = false: end sub

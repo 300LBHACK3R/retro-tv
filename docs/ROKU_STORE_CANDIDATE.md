@@ -1,5 +1,19 @@
 # Tate’s TV Roku Store candidate
 
+## Full Tate’s TV review candidate
+
+Run `npm --prefix roku run build:store:full` to build `roku/dist/tates-tv-roku-store-full.zip`. The full candidate uses the standard feed, household accounts, profiles, and theme catalogue. It accepts Roku platform playback links and uses publishing-sized icon and splash artwork. Use this ZIP for physical device checks before signing a package for Roku.
+
+Before public submission:
+
+- Confirm the authorized programming and distribution territories. The review candidate reads the standard feed, so approve the full inventory and configure a Store-specific feed if the authorized slate differs.
+- Generate HD BIF sidecars for long on-demand content and publish them on HTTPS. Store each sidecar under the media entry’s `rokuSeekIndex` with `sourceFile` equal to the current video URL and `hdBifUrl` equal to the sidecar URL. Use a new video URL when replacing the video. Verify thumbnails and 30-day bookmark retention on-device.
+- Integrate Roku Advertising Framework for the scheduled video commercials. Review any advertising shown while a Kids profile is active.
+- Configure Roku Pay and verify purchase, restore and existing theme entitlements, or confirm the applicable requirements with Roku before offering premium features. Keep purchase flows inside the app.
+- Capture full-build listing screenshots, package the verified build on the Roku, and run Static Analysis and App Behavior Analysis from a Public app listing. Use representative live, series, episode, and movie IDs from the launch catalogue.
+
+## Limited Store candidate
+
 The first Store candidate is a free, ad-free guest app with Live TV, Guide, Search, on-demand Library and free themes. The standard development ZIP continues to use the full lineup and existing features. The Store ZIP only accepts catalog, guide and playback responses marked for the Store edition.
 
 ## Choose and verify the Canadian launch slate

@@ -64,6 +64,12 @@ sub onViewingResponse(event as object)
     m.viewingTask = invalid
     sent = m.viewingSent
     if data.ok <> true
+        if m.fullStoreEdition = true and m.catalog <> invalid and m.pendingLaunch <> invalid
+            if m.pendingLaunch.mediaType <> "livefeed" and m.pendingLaunch.mediaType <> "live"
+                m.pendingLaunch = invalid
+                markLaunchComplete()
+            end if
+        end if
         if data.status = 401
             token = m.accountSession.accessToken
             forgetAccount()
@@ -93,7 +99,10 @@ sub onViewingResponse(event as object)
         for each queued in m.viewingQueue
             if queued.action = "progress"
                 if data.progress.DoesExist(queued.mediaId) then queued.revision = data.progress[queued.mediaId].revision
-                data.progress[queued.mediaId] = { position: queued.position, duration: queued.duration, revision: queued.revision }
+                updatedAt = 0
+                cached = m.cloudProgress[queued.mediaId]
+                if cached <> invalid and cached.updatedAt <> invalid then updatedAt = cached.updatedAt
+                data.progress[queued.mediaId] = { position: queued.position, duration: queued.duration, revision: queued.revision, updatedAt: updatedAt }
             end if
         end for
         m.cloudProgress = data.progress
@@ -117,6 +126,7 @@ sub onViewingResponse(event as object)
         end if
     end if
     if m.view = "library" or m.view = "themes" then renderList(true)
+    if m.fullStoreEdition = true and m.pendingLaunch <> invalid and m.catalog <> invalid and m.viewingReady then dispatchLaunch()
     if m.viewingQueue.Count() > 0 then flushViewing()
 end sub
 
@@ -149,7 +159,8 @@ sub cloudSaveProgress(id as string, position as float, duration as float)
     revision = 0
     if m.cloudProgress.DoesExist(mediaId) then revision = m.cloudProgress[mediaId].revision
     m.viewingSequence++
-    m.cloudProgress[mediaId] = { position: position, duration: duration, revision: revision }
+    updatedAt = CreateObject("roDateTime").AsSeconds() * 1000#
+    m.cloudProgress[mediaId] = { position: position, duration: duration, revision: revision, updatedAt: updatedAt }
     queueViewing({ action: "progress", mediaId: mediaId, position: position, duration: duration, revision: revision, playbackId: m.viewingPlaybackId, sequence: m.viewingSequence })
 end sub
 

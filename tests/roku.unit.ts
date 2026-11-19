@@ -129,6 +129,30 @@ test("playback accepts only supported HTTPS media and never credentials in URLs"
   expect(rokuPlayback(snapshot(), "all", "media:missing", now)).toBeNull();
 });
 
+test("Roku seek previews are valid HTTPS BIF files bound to the on-demand video", () => {
+  const data = snapshot();
+  const item = data.media[0]!;
+  const mediaId = `media:${item.id}`;
+  const hdBifUrl = "https://media.example/seek/episode-v1.bif";
+  expect(rokuPlayback(data, "all", mediaId, now)).not.toHaveProperty("hdBifUrl");
+
+  item.rokuSeekIndex = { sourceFile: item.file, hdBifUrl };
+  const saved = programmingModel.sanitizeProgrammingSnapshot(data)!;
+  expect(saved.media[0]!.rokuSeekIndex).toEqual(item.rokuSeekIndex);
+  expect(rokuPlayback(saved, "all", mediaId, now)).toMatchObject({ hdBifUrl });
+  expect(rokuPlayback(saved, "all", "channel:24", now)).not.toHaveProperty("hdBifUrl");
+
+  item.file = "https://media.example/replacement.mp4";
+  expect(programmingModel.sanitizeProgrammingSnapshot(data)!.media[0]!.rokuSeekIndex).toBeUndefined();
+  expect(rokuPlayback(data, "all", mediaId, now)).not.toHaveProperty("hdBifUrl");
+
+  for (const invalidUrl of ["/episode.bif", "http://media.example/v.bif", "https://user:pass@media.example/v.bif", "https://media.example/v.mp4"]) {
+    item.rokuSeekIndex = { sourceFile: item.file, hdBifUrl: invalidUrl };
+    expect(programmingModel.sanitizeProgrammingSnapshot(data)!.media[0]!.rokuSeekIndex).toBeUndefined();
+    expect(rokuPlayback(data, "all", mediaId, now)).not.toHaveProperty("hdBifUrl");
+  }
+});
+
 test("disabled channels cannot be tuned by ID", () => {
   const data = snapshot();
   data.channels[0]!.isEnabled = false;

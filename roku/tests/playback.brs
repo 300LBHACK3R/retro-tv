@@ -109,6 +109,21 @@ sub main()
     m.storeBookmarks["media:two"] = "-1:75"
     check(storeSeriesEpisode(series).id = "media:three", "A Store series advances after a completed episode")
 
+    m.cloudMode = true
+    m.cloudProgress = { one: { position: 50, duration: 100, updatedAt: 1760000005000# }, three: { position: 25, duration: 100, updatedAt: 1760000000000# } }
+    check(storeSeriesEpisode(series).id = "media:one", "Full Store prioritizes the current profile's most recent cloud bookmark")
+    m.cloudProgress.one.position = 100
+    check(storeSeriesEpisode(series).id = "media:two", "A completed cloud bookmark advances the current profile to the next episode")
+    m.cloudMode = false
+    resetPlayback()
+    m.isLoadingPlayback = true
+    m.playRequest = 4
+    m.requestedId = "media:episode"
+    bif = "https://example.invalid/episode.bif"
+    episode = { id: "media:episode", title: "Episode", url: "https://example.invalid/episode.mp4", streamFormat: "mp4", duration: 1200, start: 0, mediaType: "episode", hdBifUrl: bif }
+    onPlayback(response({ requestId: 4, ok: true, playback: episode }))
+    check(m.video.content.HDBifUrl = bif and m.video.enableTrickPlay, "VOD forwards published seek thumbnails to Roku's trick-play UI")
+
     if m.failed > 0
         print "FAILED:"; m.failed
         stop
@@ -170,5 +185,5 @@ end sub
 sub updateLiveBanner()
 end sub
 
-function cloudProfile() as boolean: return false: end function
+function cloudProfile() as boolean: return m.cloudMode = true: end function
 sub reportVideoFailure(): end sub

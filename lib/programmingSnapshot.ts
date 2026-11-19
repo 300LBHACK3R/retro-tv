@@ -1,4 +1,4 @@
-import { sanitizeLibraryArtwork, sanitizeUpcomingTitles, type LibraryArtwork, type UpcomingTitle } from "./libraryPresentation";
+import { safeArtworkUrl, sanitizeLibraryArtwork, sanitizeUpcomingTitles, type LibraryArtwork, type UpcomingTitle } from "./libraryPresentation";
 import { validChannelCategory } from "./audience";
 import { sanitizeProgrammeBlocks } from "./programmeBlocks";
 import type {
@@ -428,6 +428,15 @@ function sanitizeAdPolicy(value: unknown): ChannelAdPolicy {
   };
 }
 
+export function sanitizeRokuSeekIndex(value: unknown, file: string): MediaItem["rokuSeekIndex"] {
+  if (!isObject(value) || value.sourceFile !== file) return undefined;
+  const hdBifUrl = safeArtworkUrl(value.hdBifUrl);
+  if (!hdBifUrl.startsWith("https://")) return undefined;
+  const url = new URL(hdBifUrl);
+  if (url.hash || !url.pathname.toLowerCase().endsWith(".bif")) return undefined;
+  return { sourceFile: file, hdBifUrl };
+}
+
 function sanitizeMediaItem(value: unknown): MediaItem | null {
   if (!isObject(value)) {
     return null;
@@ -469,6 +478,7 @@ function sanitizeMediaItem(value: unknown): MediaItem | null {
     type,
     duration,
     file,
+    rokuSeekIndex: isCommercial ? undefined : sanitizeRokuSeekIndex(value.rokuSeekIndex, file),
 
     mimeType: inferMimeType(file, value.mimeType),
     originalName: validOptionalString(value.originalName),
