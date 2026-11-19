@@ -2,18 +2,15 @@
 
 import { formatDurationClock } from "@/lib/mediaUtils";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isHiddenGuideItem } from "@/lib/guideSchedule";
 import { BROADCAST_EPOCH_MS, getLiveState } from "@/lib/liveEngine";
 import { cleanDisplayText } from "@/lib/textClean";
 import type { BroadcastItem, Channel } from "@/lib/types";
 
-type NowNextBarVariant = "default" | "compact";
-
 interface NowNextBarProps {
   channel: Channel | undefined;
   schedule: BroadcastItem[];
-  variant?: NowNextBarVariant;
 }
 
 const LIVE_TICK_MS = 2_000;
@@ -49,18 +46,6 @@ function formatLongClock(seconds: number): string {
   }
 
   return `${remainingSeconds}s`;
-}
-
-function getChannelLabel(channel: Channel): string {
-  return `CH ${channel.number ?? channel.id}`;
-}
-
-function getChannelName(channel: Channel): string {
-  return cleanDisplayText(channel.branding?.displayName ?? channel.name);
-}
-
-function getChannelCallsign(channel: Channel): string {
-  return cleanDisplayText(channel.branding?.callsign || channel.name || "LIVE");
 }
 
 function getCleanItemTitle(item: BroadcastItem): string {
@@ -298,37 +283,16 @@ function getProgressPercent(elapsed: number, duration: number): number {
   return Math.min(100, Math.max(0, (elapsed / duration) * 100));
 }
 
-function getScheduleModeLabel(channel: Channel): string {
-  return channel.scheduleMode === "daily-random" ? "Daily Random" : "Ordered";
-}
-
-function getBreakModeLabel(channel: Channel): string {
-  const mode = channel.commercialBreakMode ?? "none";
-
-  if (mode === "none") return "No Breaks";
-  if (mode === "end-only") return "End Breaks";
-  if (mode === "midpoint-and-end") return "Midpoint + End";
-  if (mode === "classic-tv") return "Classic TV";
-
-  return cleanDisplayText(String(mode));
-}
-
 function EmptyNowNextState({
   title,
   message,
-  variant,
 }: {
   title: string;
   message: string;
-  variant: NowNextBarVariant;
 }) {
   return (
     <section
-      className={
-        variant === "compact"
-          ? "ttv-now-next-compact ttv-now-next-empty"
-          : "ttv-glass-panel rounded-2xl p-4"
-      }
+      className="ttv-now-next-compact ttv-now-next-empty"
       style={{ color: "var(--text)" }}
     >
       <div className="text-sm font-black">{title}</div>
@@ -340,25 +304,9 @@ function EmptyNowNextState({
   );
 }
 
-function InfoPill({ children }: { children: ReactNode }) {
-  return (
-    <span
-      className="rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
-      style={{
-        borderColor: "var(--border)",
-        background: "rgba(255,255,255,0.04)",
-        color: "var(--text-muted)",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
 export default function NowNextBar({
   channel,
   schedule,
-  variant = "default",
 }: NowNextBarProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => BROADCAST_EPOCH_MS);
@@ -393,7 +341,6 @@ export default function NowNextBar({
       <EmptyNowNextState
         title="Loading channel data..."
         message="Preparing live schedule information."
-        variant={variant}
       />
     );
   }
@@ -403,7 +350,6 @@ export default function NowNextBar({
       <EmptyNowNextState
         title="No active channel data"
         message="Check another channel while this schedule is being updated."
-        variant={variant}
       />
     );
   }
@@ -425,204 +371,49 @@ export default function NowNextBar({
     currentDuration,
   );
 
-  const channelMode = getScheduleModeLabel(channel);
-  const breakMode = getBreakModeLabel(channel);
-
   const nextTitle = nextVisibleItem
     ? getCleanItemTitle(nextVisibleItem)
     : "Nothing queued";
 
   const nextDuration = getSafeDuration(nextVisibleItem);
 
-  if (variant === "compact") {
-    return (
-      <section
-        className="ttv-now-next-compact"
-        aria-label="Now and next programming"
-      >
-        <div className="ttv-now-next-compact-header">
-          <span className="ttv-section-kicker">Now playing</span>
-          <span className="ttv-now-next-live">Live</span>
-        </div>
-
-        <div className="ttv-now-next-current">
-          <strong title={nowTitle}>{nowTitle}</strong>
-          <span>
-            {getDisplayTypeLabel(publicCurrentItem)} ·{" "}
-            {formatDurationClock(currentElapsed)} / {formatDurationClock(currentDuration)}
-          </span>
-        </div>
-
-        <div
-          className="ttv-now-next-progress"
-          role="progressbar"
-          aria-label={`${nowTitle} progress`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progressPercent)}
-        >
-          <span style={{ width: `${progressPercent}%` }} />
-        </div>
-
-        <div className="ttv-now-next-up-next">
-          <span>Up next</span>
-          <strong title={nextTitle}>{nextTitle}</strong>
-          <small>
-            {nextVisibleItem
-              ? `${getDisplayTypeLabel(nextVisibleItem)} · ${formatLongClock(nextDuration)}`
-              : "Nothing else is queued"}
-          </small>
-        </div>
-
-      </section>
-    );
-  }
-
   return (
     <section
-      className="ttv-now-next-panel ttv-glass-panel-strong relative overflow-hidden rounded-2xl p-3 shadow-2xl shadow-black/20 sm:p-4"
-      style={{ color: "var(--text)" }}
+      className="ttv-now-next-compact"
       aria-label="Now and next programming"
     >
-      <div
-        className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full opacity-20 blur-3xl"
-        style={{ background: "var(--primary)" }}
-        aria-hidden="true"
-      />
+      <div className="ttv-now-next-compact-header">
+        <span className="ttv-section-kicker">Now playing</span>
+        <span className="ttv-now-next-live">Live</span>
+      </div>
+
+      <div className="ttv-now-next-current">
+        <strong title={nowTitle}>{nowTitle}</strong>
+        <span>
+          {getDisplayTypeLabel(publicCurrentItem)} ·{" "}
+          {formatDurationClock(currentElapsed)} / {formatDurationClock(currentDuration)}
+        </span>
+      </div>
 
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, var(--primary), transparent)",
-        }}
-        aria-hidden="true"
-      />
+        className="ttv-now-next-progress"
+        role="progressbar"
+        aria-label={`${nowTitle} progress`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progressPercent)}
+      >
+        <span style={{ width: `${progressPercent}%` }} />
+      </div>
 
-      <div className="relative grid gap-3 lg:grid-cols-[0.95fr_1.6fr_0.95fr]">
-        <div
-          className="min-w-0 rounded-2xl border p-3"
-          style={{
-            background: "var(--panel-alt-bg)",
-            borderColor: "var(--border)",
-          }}
-        >
-          <div
-            className="text-[11px] font-black uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Channel
-          </div>
-
-          <div className="mt-1 truncate text-base font-black">
-            {getChannelLabel(channel)} / {getChannelName(channel)}
-          </div>
-
-          <div
-            className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {getChannelCallsign(channel)}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <InfoPill>{channelMode}</InfoPill>
-            <InfoPill>{breakMode}</InfoPill>
-          </div>
-        </div>
-
-        <div
-          className="min-w-0 rounded-2xl border p-3"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.045), transparent 45%), var(--panel-alt-bg)",
-            borderColor: "var(--border)",
-          }}
-        >
-          <div
-            className="flex items-center justify-between gap-3 text-[11px] font-black uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <span>Now Playing</span>
-            <span style={{ color: "var(--primary)" }}>Live</span>
-          </div>
-
-          <div className="mt-1 truncate text-lg font-black" title={nowTitle}>
-            {nowTitle}
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-            {isCurrentHidden ? (
-              <>
-                <span style={{ color: "var(--text-muted)" }}>
-                  {getDisplayTypeLabel(publicCurrentItem)}
-                </span>
-
-                <span style={{ color: "var(--text-muted)" }}>/</span>
-
-                <span style={{ color: "var(--text-muted)" }}>
-                  Live programming continues
-                </span>
-              </>
-            ) : (
-              <span style={{ color: "var(--text-muted)" }}>
-                {formatDurationClock(currentElapsed)} / {formatDurationClock(currentDuration)}
-              </span>
-            )}
-          </div>
-
-          <div
-            className="mt-3 h-2 overflow-hidden rounded-full"
-            style={{ background: "var(--button-bg)" }}
-            aria-hidden="true"
-          >
-            <div
-              className="h-full rounded-full transition-[width] duration-500"
-              style={{
-                width: `${progressPercent}%`,
-                background: "var(--primary)",
-                boxShadow:
-                  "0 0 18px color-mix(in srgb, var(--primary) 45%, transparent)",
-              }}
-            />
-          </div>
-        </div>
-
-        <div
-          className="min-w-0 rounded-2xl border p-3"
-          style={{
-            background: "var(--panel-alt-bg)",
-            borderColor: "var(--border)",
-          }}
-        >
-          <div
-            className="text-[11px] font-black uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Next Up
-          </div>
-
-          <div className="mt-1 truncate text-base font-black" title={nextTitle}>
-            {nextTitle}
-          </div>
-
-          {nextVisibleItem ? (
-            <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              {getDisplayTypeLabel(nextVisibleItem)}{" / "}
-              {formatLongClock(nextDuration)}
-            </div>
-          ) : (
-            <div className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              Add more media to continue the schedule.
-            </div>
-          )}
-
-          {nextVisibleItem?.airStartTime ? (
-            <div className="mt-3">
-              <InfoPill>Scheduled {nextVisibleItem.airStartTime}</InfoPill>
-            </div>
-          ) : null}
-        </div>
+      <div className="ttv-now-next-up-next">
+        <span>Up next</span>
+        <strong title={nextTitle}>{nextTitle}</strong>
+        <small>
+          {nextVisibleItem
+            ? `${getDisplayTypeLabel(nextVisibleItem)} · ${formatLongClock(nextDuration)}`
+            : "Nothing else is queued"}
+        </small>
       </div>
     </section>
   );

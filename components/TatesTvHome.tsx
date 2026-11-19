@@ -497,7 +497,7 @@ function ProfileHome({ tvMode = false, libraryView = false, children }: TatesTvH
                   className="ttv-premium-stage-sidebar"
                   aria-label="Current channel and upcoming programming"
                 >
-                  <ViewerHeader channel={activeChannel} variant="compact" />
+                  <ViewerHeader channel={activeChannel} />
                   {activeChannel && (
                     <div className="ttv-channel-favourite">
                       <SaveButton
@@ -513,7 +513,6 @@ function ProfileHome({ tvMode = false, libraryView = false, children }: TatesTvH
                   <NowNextBar
                     channel={activeChannel}
                     schedule={activeSchedule}
-                    variant="compact"
                   />
                 </aside>
               ) : null}
