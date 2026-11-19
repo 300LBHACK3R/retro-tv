@@ -43,21 +43,36 @@ function profileIn(view: AccountView, id: unknown) {
   if (!profile) throw new ViewingError("Choose an available household profile.", 403);
   return profile;
 }
+async function readProfileProgress(userId: string, profileId: string) {
+  const db = createSupabaseAdminClient();
+  const pageSize = 300;
+  const rows: { media_id: string; position: number; duration: number; revision: number; updated_at: string }[] = [];
+  let after = "";
+  while (true) {
+    // Use a stable key so a concurrent bookmark update cannot move a row between pages.
+    const query = db.from("ttv_profile_progress").select("media_id,position,duration,revision,updated_at")
+      .eq("user_id", userId).eq("profile_id", profileId).order("media_id").limit(pageSize);
+    const { data, error } = await (after ? query.gt("media_id", after) : query);
+    if (error) throw new ViewingError("Saved viewing is temporarily unavailable.", 503);
+    rows.push(...data);
+    if (data.length < pageSize) return rows;
+    after = data[data.length - 1]!.media_id;
+  }
+}
 export async function readViewing(view: AccountView, profileId: string) {
   const profile = profileIn(view, profileId);
-  const [result, snapshot] = await Promise.all([
-    createSupabaseAdminClient().from("ttv_profile_progress").select("media_id,position,duration,revision,updated_at")
-      .eq("user_id", view.user!.id).eq("profile_id", profile.id).order("updated_at", { ascending: false }).limit(300),
+  const [progressRows, snapshot] = await Promise.all([
+    readProfileProgress(view.user!.id, profile.id),
     readStationProgramming(),
   ]);
-  if (result.error || !snapshot) throw new ViewingError("Saved viewing is temporarily unavailable.", 503);
+  if (!snapshot) throw new ViewingError("Saved viewing is temporarily unavailable.", 503);
   const visible = viewerCatalog(snapshot.channels, snapshot.media, !!profile.kids);
   const groups = buildLibrary(visible.media, snapshot.libraryArtwork, !!profile.kids);
   const media = new Set(groups.flatMap(g => g.items.map(i => i.media.id)));
   const channels = new Set(visible.channels.filter(c => c.isEnabled !== false).map(c => c.id));
   const keys = new Set(groups.flatMap(g => [g.key, ...g.aliasKeys]));
   const saved = view.household?.library[profile.id];
-  const progress = Object.fromEntries(result.data.filter(r => media.has(r.media_id)).map(r => [r.media_id, {
+  const progress = Object.fromEntries(progressRows.filter(r => media.has(r.media_id)).map(r => [r.media_id, {
     position: r.position, duration: r.duration, revision: Number(r.revision), updatedAt: Date.parse(r.updated_at),
   }]));
   return { progress, favouriteChannels: (saved?.favouriteChannels ?? []).filter(id => channels.has(id)),

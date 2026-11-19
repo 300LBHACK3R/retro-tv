@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { viewerCatalog } from "../lib/audience";
 import { buildRokuCatalog, rokuLineup, rokuPlayback, rokuStream } from "../lib/rokuCatalog";
 import { buildRokuGuide } from "../lib/rokuGuide";
@@ -21,6 +22,12 @@ function snapshot(): ProgrammingSnapshot {
   };
 }
 const now = new Date(BROADCAST_EPOCH_MS + 25_000);
+
+function advertisingModule(metadata = "{}") {
+  return serverModule("lib/server/rokuAdvertising.ts", {
+    "../rokuCatalog": rokuModel,
+  }, { TTV_ROKU_AD_VIDEO_METADATA: metadata });
+}
 
 test("Roku uses the same current programme and source offset as the website", () => {
   const data = snapshot();
@@ -172,6 +179,7 @@ test("Roku HTTP handlers validate first, enforce profile access, and mask provid
     "@/lib/rokuCatalog": rokuModel,
     "@/lib/rokuClock": { rokuClock },
     "@/lib/server/http": serverModule("lib/server/http.ts"),
+    "@/lib/server/rokuAdvertising": advertisingModule(),
     "@/lib/server/rokuStoreProgramming": serverModule("lib/server/rokuStoreProgramming.ts", {
       "../audience": { viewerCatalog },
       "../rokuCatalog": rokuModel,
@@ -235,6 +243,7 @@ test("Store edition only exposes approved short-form video across guide, live an
       "@/lib/rokuGuide": { buildRokuGuide },
       "@/lib/rokuClock": { rokuClock: (zone: string | null) => rokuClock(zone, now) },
       "@/lib/server/http": serverModule("lib/server/http.ts"),
+      "@/lib/server/rokuAdvertising": advertisingModule(),
       "@/lib/server/rokuStoreProgramming": loader,
     };
     const handlers = {
@@ -369,4 +378,94 @@ test("Roku clock handles Canadian aliases and half-hour zones without changing t
   expect(rokuClock("__proto__", now)).toBeNull();
   expect(rokuClock("Other/UTC+99", now)).toBeNull();
   expect(rokuClock(null, now)!.getHours()).toBe(12);
+});
+
+test("Full Store identifies RAF breaks and preserves the underlying station clock", async () => {
+  const data = snapshot();
+  const channel = data.channels[0]!;
+  channel.adPolicy = { enabled: true, placements: ["mid-roll"], targetBreakSeconds: 30, maxAdsPerBreak: 2 };
+  const programme = data.media[0]!;
+  programme.duration = 960;
+  programme.breakpoints = [480];
+  programme.breakDurations = [30];
+  const adFile = "https://media.example/sponsor.mp4?lang=en&quality=hd";
+  data.media.push({ id: "sponsor-ad", title: "Sponsor & Co.", duration: 15, file: adFile,
+    type: "commercial", kidsApproved: true, adChannelIds: [channel.id], adPlacements: ["mid-roll"] });
+  const clock = new Date(BROADCAST_EPOCH_MS + 480_000);
+  const mediaKey = createHash("sha256").update(adFile).digest("hex");
+  const adModule = advertisingModule(JSON.stringify({ [mediaKey]: { width: 1920, height: 1080, duration: 15 } }));
+  const http = serverModule("lib/server/http.ts");
+  let wallTime = clock.getTime();
+  class FakeDate extends Date { static override now() { return wallTime; } }
+  const dependencies = {
+    "@/lib/rokuClock": { rokuClock: (zone: string | null, date = new Date(wallTime)) => rokuClock(zone, date) },
+    "@/lib/rokuCatalog": rokuModel,
+    "@/lib/server/http": http,
+    "@/lib/server/rokuAdvertising": adModule,
+    "@/lib/server/rokuStoreProgramming": {
+      rokuEdition: (params: URLSearchParams) => params.get("edition") ?? "standard",
+      rokuEditionProgramming: async () => ({ snapshot: data }),
+    },
+  };
+  const play = serverModule("app/api/roku/play/route.ts", dependencies);
+  const events: unknown[] = [];
+  const ad = serverModule("app/api/roku/ad/route.ts", dependencies, {}, {
+    Date: FakeDate, console: { info: (_label: string, event: unknown) => events.push(event) },
+  });
+  const request = new Request(`https://www.tatestv.ca/api/roku/play?audience=kids&tz=America%2FEdmonton&id=channel:${channel.id}&raf=1`);
+  const response = await play.GET!(request);
+  expect(response.status).toBe(200);
+  const initial = await response.json();
+  expect(initial).toMatchObject({ advertising: "raf", playback: { scheduledAd: true, start: 0,
+    end: 15, remaining: 15, kidsContent: true } });
+  expect(initial.playback.url).toBeUndefined();
+  const tag = new URL(initial.playback.vastUrl);
+  tag.searchParams.set("rida", "test-ad-id");
+  const rendered = await ad.GET!(new Request(tag));
+  expect(rendered.status).toBe(200);
+  expect(rendered.headers.get("content-type")).toContain("application/xml");
+  const xml: string = await rendered.text();
+  expect(xml).toContain("Sponsor &amp; Co.");
+  expect(xml).toContain("lang=en&amp;quality=hd");
+  expect(xml).toContain('<Tracking event="complete">');
+  expect(xml).not.toContain("test-ad-id");
+  const event = new URL(initial.playback.vastUrl);
+  event.searchParams.set("event", "complete");
+  wallTime += 15_000;
+  expect((await ad.GET!(new Request(tag))).status).toBe(400);
+  expect((await ad.GET!(new Request(event))).status).toBe(204);
+  expect(events).toEqual([{ event: "complete", channel: `channel:${channel.id}`, creative: mediaKey }]);
+
+  wallTime = clock.getTime() + 8_000;
+  const midway = await (await play.GET!(request)).json();
+  expect(midway.playback).toMatchObject({ scheduledAd: true, start: 8, end: 15, remaining: 7 });
+  expect(midway.playback.vastUrl).toBeUndefined();
+  expect(midway.playback.url).toBeUndefined();
+  const legacy = await (await play.GET!(new Request(request.url.replace("&raf=1", "")))).json();
+  expect(legacy.playback.url).toBe(adFile);
+
+  wallTime = clock.getTime();
+  data.media.at(-1)!.file = "https://media.example/replacement.mp4";
+  expect((await ad.GET!(new Request(tag))).status).toBe(404);
+  const unknown = await (await play.GET!(request)).json();
+  expect(unknown.playback).toMatchObject({ scheduledAd: true, remaining: 15 });
+  expect(unknown.playback.vastUrl).toBeUndefined();
+});
+
+test("RAF rejects sliced creatives and closely spaced breaks without changing schedule boundaries", () => {
+  const data = snapshot();
+  const channel = data.channels[0]!;
+  channel.adPolicy = { enabled: true, placements: ["mid-roll"], targetBreakSeconds: 10 };
+  data.media[0]!.duration = 600;
+  data.media[0]!.breakpoints = [60, 510];
+  data.media[0]!.breakDurations = [10, 10];
+  data.media.push({ id: "long-ad", title: "Long ad", type: "commercial", duration: 30,
+    file: "https://media.example/ad.mp4", kidsApproved: true, allowCommercialSlicing: true,
+    adChannelIds: [channel.id], adPlacements: ["mid-roll"] });
+  const close = rokuPlayback(data, "all", `channel:${channel.id}`, new Date(BROADCAST_EPOCH_MS + 60_000), undefined, true)!;
+  const later = rokuPlayback(data, "all", `channel:${channel.id}`, new Date(BROADCAST_EPOCH_MS + 520_000), undefined, true)!;
+  expect(close.adSlot).toMatchObject({ whole: false, eligibleBreak: false });
+  expect(later.adSlot).toMatchObject({ whole: false, eligibleBreak: true });
+  expect(close.remaining).toBe(10);
+  expect(later.remaining).toBe(10);
 });

@@ -7,7 +7,6 @@ sub sendAccountRequest()
     port = CreateObject("roMessagePort")
     transfer.SetMessagePort(port)
     transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    transfer.InitClientCertificates()
     transfer.EnablePeerVerification(true)
     transfer.EnableHostVerification(true)
     transfer.RetainBodyOnError(true)
@@ -26,7 +25,9 @@ sub sendAccountRequest()
         body = ""
         event = wait(30000, port)
         if type(event) = "roUrlEvent"
-            result = accountTransferResult(event.GetResponseCode(), event.GetString())
+            responseLimit = 150000
+            if m.top.endpoint = "viewing" then responseLimit = 1000000
+            result = accountTransferResult(event.GetResponseCode(), event.GetString(), responseLimit)
         else
             transfer.AsyncCancel()
         end if
@@ -54,11 +55,11 @@ function accountWirePayload(payload as object) as object
     return wire
 end function
 
-function accountTransferResult(status as integer, response as string) as object
+function accountTransferResult(status as integer, response as string, responseLimit = 150000 as integer) as object
     fallback = "Unable to connect to your account. Try again shortly. Free viewing is still available."
     result = { ok: false, error: fallback }
     serverError = false
-    if Len(response) < 150000 and Left(response.Trim(), 1) = "{"
+    if Len(response) < responseLimit and Left(response.Trim(), 1) = "{"
         data = ParseJson(response)
         if type(data) = "roAssociativeArray"
             if type(data.error) = "roString" or type(data.error) = "String"

@@ -25,6 +25,14 @@ sub shutdown()
     m.top.FindNode("tick").control = "stop"
 end sub
 
+sub releaseCachedGuide()
+    if m.top.visible then return
+    m.data = invalid
+    for each id in ["tools", "days", "slots", "rows"]
+        clearNodes(m.top.FindNode(id))
+    end for
+end sub
+
 sub open()
     shutdown()
     m.data = invalid

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ScheduledAdTask" extends="Task">
+  <interface>
+    <field id="url" type="string" />
+    <field id="genre" type="string" />
+    <field id="kidsContent" type="boolean" />
+    <field id="channelId" type="string" />
+    <field id="startWindow" type="float" />
+    <field id="view" type="node" />
+    <field id="requestId" type="integer" />
+    <field id="response" type="assocarray" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="ScheduledAdTask.brs" />
+</component>

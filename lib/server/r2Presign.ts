@@ -165,12 +165,16 @@ function createPresignedUrl({
   objectKey,
   expiresInSeconds,
   contentType,
+  contentLength,
+  createOnly,
 }: {
   method: R2Method;
   target: R2Target;
   objectKey: string;
   expiresInSeconds: number;
   contentType?: string;
+  contentLength?: number;
+  createOnly?: boolean;
 }): R2PresignedObject {
   const config = getR2Config(target);
   const now = new Date();
@@ -192,7 +196,12 @@ function createPresignedUrl({
   query.set("X-Amz-Content-Sha256", "UNSIGNED-PAYLOAD");
 
   const normalizedContentType = contentType?.trim().toLowerCase();
-  const signedHeaders = normalizedContentType ? "content-type;host" : "host";
+  const headers = new Map<string, string>([["host", host]]);
+  if (normalizedContentType) headers.set("content-type", normalizedContentType);
+  if (contentLength !== undefined) headers.set("content-length", String(contentLength));
+  if (createOnly) headers.set("if-none-match", "*");
+  const headerNames = [...headers.keys()].sort();
+  const signedHeaders = headerNames.join(";");
   query.set("X-Amz-SignedHeaders", signedHeaders);
 
   const canonicalQuery = [...query.entries()]
@@ -200,9 +209,7 @@ function createPresignedUrl({
     .map(([key, value]) => `${encodeRfc3986(key)}=${encodeRfc3986(value)}`)
     .join("&");
 
-  const canonicalHeaders = normalizedContentType
-    ? `content-type:${normalizedContentType}\nhost:${host}\n`
-    : `host:${host}\n`;
+  const canonicalHeaders = headerNames.map(name => `${name}:${headers.get(name)}\n`).join("");
   const canonicalRequest = [
     method,
     canonicalUri,
@@ -239,6 +246,8 @@ export function createR2UploadUrl(
   options: {
     contentType: string;
     expiresInSeconds?: number;
+    contentLength?: number;
+    createOnly?: boolean;
   },
 ): R2PresignedObject {
   return createPresignedUrl({
@@ -248,6 +257,8 @@ export function createR2UploadUrl(
     expiresInSeconds:
       options.expiresInSeconds ?? DEFAULT_UPLOAD_EXPIRY_SECONDS,
     contentType: options.contentType,
+    contentLength: options.contentLength,
+    createOnly: options.createOnly,
   });
 }
 

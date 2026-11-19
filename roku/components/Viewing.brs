@@ -64,6 +64,15 @@ sub onViewingResponse(event as object)
     m.viewingTask = invalid
     sent = m.viewingSent
     if data.ok <> true
+        if m.launchProfilePending = true
+            if data.status = 401
+                token = m.accountSession.accessToken
+                forgetAccount()
+                revokeAccountSession(token)
+            end if
+            finishLaunchProfile(false)
+            return
+        end if
         if m.fullStoreEdition = true and m.catalog <> invalid and m.pendingLaunch <> invalid
             if m.pendingLaunch.mediaType <> "livefeed" and m.pendingLaunch.mediaType <> "live"
                 m.pendingLaunch = invalid
@@ -126,7 +135,11 @@ sub onViewingResponse(event as object)
         end if
     end if
     if m.view = "library" or m.view = "themes" then renderList(true)
-    if m.fullStoreEdition = true and m.pendingLaunch <> invalid and m.catalog <> invalid and m.viewingReady then dispatchLaunch()
+    if m.launchProfilePending = true and m.viewingReady
+        finishLaunchProfile(true)
+    else if m.fullStoreEdition = true and m.pendingLaunch <> invalid and m.catalog <> invalid and m.viewingReady
+        dispatchLaunch()
+    end if
     if m.viewingQueue.Count() > 0 then flushViewing()
 end sub
 

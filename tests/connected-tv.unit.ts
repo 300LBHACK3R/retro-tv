@@ -15,6 +15,7 @@ test("cloud progress orders retries, permits backward seeks and rejects stale wr
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key);");
     await db.exec(readFileSync("supabase/migrations/20261116014623_connected_tv_experience.sql", "utf8"));
+    await db.exec(readFileSync("supabase/migrations/20261119062000_roku_bookmark_retention.sql", "utf8"));
     await db.query("insert into auth.users values ($1),($2)", [alice, bob]);
     await db.exec("set role service_role");
     const save = async (playback: string, revision: number, sequence: number, position: number, profile = "main") => (await db.query<{ result: { accepted: boolean; entry: { revision: number; position: number } } }>("select ttv_save_progress($1,$2,'episode', $3,600,$4,$5,$6) as result", [alice, profile, position, revision, playback, sequence])).rows[0]!.result;
@@ -47,6 +48,63 @@ test("cloud progress orders retries, permits backward seeks and rejects stale wr
     expect((await db.query("select * from ttv_account_devices")).rows).toHaveLength(0);
   } finally { await db.close(); }
 });
+test("cloud bookmarks are protected for 30 days even beyond 300 newer saves", async () => {
+  const db = new PGlite();
+  try {
+    await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key);");
+    await db.exec(readFileSync("supabase/migrations/20261116014623_connected_tv_experience.sql", "utf8"));
+    await db.query("insert into auth.users values ($1),($2)", [alice, bob]);
+    await db.query(`insert into ttv_profile_progress(user_id,profile_id,media_id,position,duration,playback_id,sequence,updated_at)
+      values ($1,'main','expired',30,600,$2,1,now()-interval '745 hours'),
+      ($3,'main','expired',30,600,$2,1,now()-interval '745 hours')`, [alice, first, bob]);
+    await db.exec(readFileSync("supabase/migrations/20261119062000_roku_bookmark_retention.sql", "utf8"));
+    expect((await db.query("select media_id from ttv_profile_progress where user_id=$1", [alice])).rows).toEqual([{ media_id: "expired" }]);
+    await db.exec("begin; set local role service_role;");
+    await db.query(`insert into ttv_profile_progress(user_id,profile_id,media_id,position,duration,playback_id,sequence,updated_at)
+      select $1,'main','fresh-'||i,30,600,$2,1,now()-interval '720 hours' from generate_series(1,330) i`, [alice, first]);
+    await db.query("select ttv_save_progress($1,'main','new',40,600,0,$2,1)", [alice, first]);
+    expect((await db.query("select media_id from ttv_profile_progress where user_id=$1", [alice])).rows).toHaveLength(331);
+    expect((await db.query("select media_id from ttv_profile_progress where user_id=$1 and media_id='expired'", [alice])).rows).toEqual([]);
+    expect((await db.query("select media_id from ttv_profile_progress where user_id=$1", [bob])).rows).toEqual([{ media_id: "expired" }]);
+    await db.exec("commit;");
+  } finally { await db.close(); }
+});
+
+test("signed-in history includes eligible bookmarks beyond the first 300", async () => {
+  const rows = Array.from({ length: 305 }, (_, i) => ({
+    media_id: `episode-${String(i).padStart(3, "0")}`, position: 45, duration: 1200, revision: 1, updated_at: "2026-11-16T12:00:00Z",
+  }));
+  const cursors: string[] = [];
+  const visibleRows = rows.filter(row => row.media_id !== "episode-304");
+  function progressQuery() {
+    let after = "";
+    let limit = 0;
+    const query = {
+      select: () => query, eq: () => query, order: () => query,
+      limit: (value: number) => { limit = value; return query; },
+      gt: (column: string, value: string) => { expect(column).toBe("media_id"); after = value; return query; },
+      then: (resolve: (value: { data: typeof rows; error: null }) => unknown) => {
+        cursors.push(after);
+        return resolve({ data: rows.filter(row => row.media_id > after).slice(0, limit), error: null });
+      },
+    };
+    return query;
+  }
+  const viewing = serverModule("lib/server/accountViewing.ts", {
+    "../profiles": { defaults }, "../themes": { isThemeId }, "./accountData": {}, "./accountDevices": {},
+    "../libraryCatalog": { buildLibrary: () => [{ key: "show", aliasKeys: [], items: visibleRows.map(row => ({ media: { id: row.media_id } })) }] },
+    "../audience": { viewerCatalog: () => ({ channels: [], media: [] }) },
+    "./stationHealth": { readStationProgramming: async () => ({}) },
+    "./supabaseAdmin": { createSupabaseAdminClient: () => ({ from: progressQuery }) },
+  });
+  const view = { user: { id: alice }, profileLimit: 5, revision: 1 };
+  const result = await viewing.readViewing!(view, "main");
+  expect(cursors).toEqual(["", "episode-299"]);
+  expect(Object.keys(result.progress)).toHaveLength(304);
+  expect(result.progress["episode-303"].position).toBe(45);
+  expect(result.progress["episode-304"]).toBeUndefined();
+});
+
 test("TV profile grants bind the verified identity, session, profile and current parent PIN", () => {
   const devices = serverModule("lib/server/accountDevices.ts", { "./supabaseAdmin": {} });
   const viewing = serverModule("lib/server/accountViewing.ts", {

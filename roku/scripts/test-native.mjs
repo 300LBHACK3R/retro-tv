@@ -6,6 +6,7 @@ const suites = [
   ["tests", "Viewer", "Guide", "viewer"],
   ["tests", "ThemeStyle", "GuideRender", "LiveGuide", "guide"],
   ["tests", "Playback", "playback"],
+  ["tests", "Playback", "bookmarks"],
   ["tests", "ThemeStyle", "ChannelStrip", "channelstrip"],
   ["tests", "ThemeStyle", "HomeScreen", "home"],
   ["tests", "Accounts", "accounts"],

@@ -13,6 +13,7 @@ const args = process.argv.slice(2);
 assert.ok(args.length === 0 || (args.length === 1 && args[0] === "--full"), "Expected --full or no arguments");
 const fullEdition = args[0] === "--full";
 const archive = fullEdition ? "tates-tv-roku-store-full.zip" : "tates-tv-roku-store.zip";
+const buildVersion = fullEdition ? 17 : 15;
 const staging = mkdtempSync(join(tmpdir(), "tates-tv-roku-store-"));
 const sourceLogo = join(root, "../public/tatestv-logo.png");
 const background = "#10271f";
@@ -30,6 +31,9 @@ async function brandCanvas(width, height) {
 try {
   for (const directory of ["source", "components"]) {
     cpSync(join(root, directory), join(staging, directory), { recursive: true });
+  }
+  if (fullEdition) {
+    cpSync(join(root, "store-components"), join(staging, "components"), { recursive: true });
   }
   mkdirSync(join(staging, "images"));
   mkdirSync(join(staging, "data"));
@@ -80,11 +84,13 @@ try {
   }
 
   const manifest = readFileSync(join(root, "manifest"), "utf8")
-    .replace(/^build_version=\d+$/m, "build_version=15")
-    .replace(/^(?:mm_icon_\w+|splash_screen_\w+)=.*\r?\n/gm, "");
+    .replace(/^build_version=\d+$/m, `build_version=${buildVersion}`)
+    .replace(/^(?:mm_icon_\w+|splash_screen_\w+|rsg_version)=.*\r?\n/gm, "");
   assert.match(manifest, /^supports_input_launch=1$/m);
   const edition = fullEdition ? "full" : "1";
-  writeFileSync(join(staging, "manifest"), `${manifest.trimEnd()}\n${artworkManifest.join("\n")}\nttv_store_edition=${edition}\n`);
+  const storeManifest = [...artworkManifest, "rsg_version=1.3", `ttv_store_edition=${edition}`];
+  if (fullEdition) storeManifest.push("bs_libs_required=roku_ads_lib");
+  writeFileSync(join(staging, "manifest"), `${manifest.trimEnd()}\n${storeManifest.join("\n")}\n`);
   const config = JSON.parse(readFileSync(join(root, "bsconfig.json"), "utf8"));
   writeFileSync(join(staging, "bsconfig.json"), JSON.stringify({ ...config, outFile: `dist/${archive}` }));
 

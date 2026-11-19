@@ -1,6 +1,8 @@
 sub startApp(args as dynamic)
     if isPlaybackLaunch(args)
+        prepareLaunchProfile(LCase(args.mediaType))
         m.top.launch = args
+        requestLaunchProfile()
         return
     end if
     showHome()
@@ -21,6 +23,10 @@ sub onHomeAction()
         stopPlayback()
         resetViewing()
         m.activeAccountProfile = invalid
+        if m.fullStoreEdition = true and m.registry.Read("lastAdultProfile") <> ""
+            m.registry.Delete("lastAdultProfile")
+            m.registry.Flush()
+        end if
         enterViewer()
     else if m.home.action = "signin" or m.home.action = "signup"
         startAccountAuth(m.home.action)
@@ -179,16 +185,23 @@ sub layoutVideo()
         m.video.enableUI = false
         m.playerFocus.visible = false
     end if
+    adSurface = m.top.FindNode("scheduledAdSurface")
+    if adSurface <> invalid and adSurface.visible
+        if m.adTask <> invalid and (not m.fullscreen or m.guide.visible) then releaseScheduledAd()
+        adSurface.translation = m.video.translation
+        adSurface.scale = [m.video.width / 1280.0, m.video.height / 720.0]
+    end if
     m.profileLabel.visible = not m.video.visible or m.view = "live"
     m.top.FindNode("hint").text = "OK select   •   Back return   •   * viewer options"
     if m.view = "live" then m.top.FindNode("hint").text = "OK fullscreen   •   Right guide   •   Down channels   •   Back menu"
 end sub
 
 sub enterFullscreen()
-    if not m.video.visible and not m.isLoadingPlayback then return
+    adSlate = m.playing <> invalid and m.playing.scheduledAd = true
+    if not m.video.visible and not m.isLoadingPlayback and not adSlate then return
     m.fullscreen = true
     layoutVideo()
-    m.video.SetFocus(true)
+    if adSlate then m.top.SetFocus(true) else m.video.SetFocus(true)
     showLiveBanner()
 end sub
 
@@ -237,6 +250,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not press or m.home.visible then return false
     if m.top.dialog <> invalid then return false
     if m.guide.visible then return false
+    adSlate = m.playing <> invalid and m.playing.scheduledAd = true
     if key = "channelup" or key = "channeldown"
         direction = 1
         if key = "channeldown" then direction = -1
@@ -282,7 +296,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         showViewerOptions()
         return true
     else if key = "play" or key = "playonly"
-        if m.view = "live" and not m.video.visible and not m.isLoadingPlayback
+        if m.view = "live" and not adSlate and not m.video.visible and not m.isLoadingPlayback
             retryLiveChannel()
         else
             enterFullscreen()
@@ -291,7 +305,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     if m.playerTarget.HasFocus()
         if key = "OK"
-            if not m.video.visible and not m.isLoadingPlayback
+            if not adSlate and not m.video.visible and not m.isLoadingPlayback
                 retryLiveChannel()
             else
                 enterFullscreen()

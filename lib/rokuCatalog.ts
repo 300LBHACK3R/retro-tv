@@ -1,16 +1,46 @@
 import { channelCategory, viewerCatalog } from "./audience";
 import { buildLibrary } from "./libraryCatalog";
 import { safeArtworkUrl } from "./libraryPresentation";
-import { getLiveState } from "./liveEngine";
+import { getLiveState, safeDuration } from "./liveEngine";
 import { sanitizeRokuSeekIndex, type ProgrammingSnapshot } from "./programmingSnapshot";
 import { buildSchedule, couldAdvertiseOnChannel } from "./scheduler";
-import type { Channel, MediaItem } from "./types";
+import type { BroadcastItem, Channel, MediaItem } from "./types";
 import { createBroadcastDayAnchor } from "./viewer";
 
 const SITE_ORIGIN = "https://www.tatestv.ca";
 const FALLBACK_POSTER = `${SITE_ORIGIN}/tatestv-logo-christmas.png`;
 export type RokuAudience = "all" | "kids";
 type Stream = { url: string; streamFormat: "mp4" | "mkv" | "hls" | "dash" };
+export const ROKU_AD_START_GRACE_SECONDS = 3;
+type RokuPlayback = Stream & {
+  id: string;
+  title: string;
+  mediaType: "live" | "movie" | "episode";
+  start: number;
+  end: number;
+  remaining: number;
+  duration: number;
+  generatedAt: string;
+  hdBifUrl?: string;
+  adSlot?: { id: string; whole: boolean; eligibleBreak: boolean; category: string; kids: boolean };
+};
+
+function isAd(item: BroadcastItem) {
+  return item.type === "commercial" || item.type === "bumper";
+}
+
+function isEligibleRokuAdBreak(schedule: BroadcastItem[], index: number) {
+  // Serve one intact spot in each break, spaced seven minutes from the previous
+  // scheduled break. The website timeline and programme offsets are unchanged.
+  let programmeSeconds = 0;
+  for (let step = 1; step < schedule.length; step++) {
+    const item = schedule[(index - step + schedule.length) % schedule.length]!;
+    if (isAd(item)) return false;
+    programmeSeconds += safeDuration(item);
+    if (programmeSeconds >= 7 * 60 + ROKU_AD_START_GRACE_SECONDS) return true;
+  }
+  return false;
+}
 
 export function rokuStream(item: MediaItem): Stream | null {
   try {
@@ -132,27 +162,40 @@ export function rokuPlayback(
   id: string,
   now = new Date(),
   channelIds?: readonly string[],
-) {
+  identifyAds = false,
+): RokuPlayback | null {
   const lineup = rokuLineup(snapshot, audience, channelIds);
   if (id.startsWith("channel:")) {
     const channel = lineup.channels.find(entry => `channel:${entry.id}` === id);
     if (!channel) return null;
-    const state = getLiveState(rokuSchedule(channel, lineup.media, now), now.getTime());
-    if (!state.item) return null;
-    const stream = rokuStream(state.item);
+    const schedule = rokuSchedule(channel, lineup.media, now);
+    const state = getLiveState(schedule, now.getTime());
+    const item = state.item;
+    if (!item) return null;
+    const stream = rokuStream(item);
     if (!stream) return null;
-    const source = lineup.media.find(item => item.id === (state.item!.parentMediaId || state.item!.id));
+    const source = lineup.media.find(entry => entry.id === (item.parentMediaId || item.id));
+    const scheduledAd = identifyAds && isAd(item);
+    const category = channelCategory(channel);
+    const kidsContent = audience === "kids" || category === "Kids & Family" || channel.kidsApproved === true;
     return {
       id, ...stream,
-      title: state.item.sourceTitle || state.item.title,
+      title: item.sourceTitle || item.title,
       mediaType: "live",
       start: state.sourceElapsed,
       // Roku's Video node plays the source file. The app must switch at the
       // scheduled segment boundary, including mid-roll and filler boundaries.
       end: state.sourceElapsed + state.remaining,
       remaining: state.remaining,
-      duration: source?.duration ?? Math.max(state.item.duration, state.sourceElapsed + state.remaining),
+      duration: source?.duration ?? Math.max(item.duration, state.sourceElapsed + state.remaining),
       generatedAt: now.toISOString(),
+      ...(scheduledAd && { adSlot: {
+        id: item.id,
+        whole: !!source && state.sourceStart === 0 && safeDuration(item) === Math.floor(source.duration),
+        eligibleBreak: (!kidsContent || item.kidsApproved === true) && isEligibleRokuAdBreak(schedule, state.index),
+        category,
+        kids: kidsContent,
+      } }),
     };
   }
   const item = lineup.media.find(entry => `media:${entry.id}` === id &&

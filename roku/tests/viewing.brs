@@ -42,6 +42,16 @@ sub main()
     startViewing("new-grant")
     onViewingResponse(reply({ ok: false, requestId: m.viewingRequestId, status: 401, error: "Signed out" }))
     check(m.accountSession = invalid and m.kids, "A removed TV loses account access without escaping Kids mode")
+    m.accountSession = { accessToken: "private-token", expiresAt: 9000 }
+    m.activeAccountProfile = { id: "adult" }
+    m.launchProfilePending = true
+    startViewing("restore-grant")
+    onViewingResponse(reply({ ok: true, requestId: m.viewingRequestId, progress: { movie: { position: 130 } }, watchlist: [], favouriteChannels: [] }))
+    check(not m.launchProfilePending and m.resumePositionOnLaunch = 130, "Cold playback is released with the cloud bookmark already loaded")
+    m.launchProfilePending = true
+    startViewing("restore-grant")
+    onViewingResponse(reply({ ok: false, requestId: m.viewingRequestId, status: 503, error: "Offline" }))
+    check(not m.launchProfilePending and m.resumePositionOnLaunch = invalid, "An unavailable bookmark request releases the public deep link")
     m.top = { dialog: {} }
     m.savedActions = ["favourites"]
     m.catalog = invalid
@@ -59,6 +69,11 @@ sub stopPlayback(): end sub
 sub showMessage(title, lines): m.lastMessage = title: end sub
 sub revokeAccountSession(token): end sub
 sub forgetAccount(): resetViewing(): m.accountSession = invalid: end sub
+sub finishLaunchProfile(restored)
+    m.launchProfilePending = false
+    m.resumePositionOnLaunch = invalid
+    if restored then m.resumePositionOnLaunch = m.cloudProgress.movie.position
+end sub
 function resolveTheme(id, catalog) as object: return {}: end function
 function themeAllowed(theme) as boolean: return true: end function
 sub check(condition as boolean, description as string)

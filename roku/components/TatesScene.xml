@@ -3,6 +3,7 @@
   <interface>
     <field id="themeColors" type="assocarray" />
     <function name="startApp" />
+    <function name="releaseInactiveMemory" />
     <field id="launch" type="assocarray" alwaysNotify="true" onChange="onLaunch" />
   </interface>
   <script type="text/brightscript" uri="TatesScene.brs" />
@@ -56,6 +57,14 @@
       <Rectangle id="guideFooterShield" translation="[40,645]" width="1200" height="67" opacity="0.96" />
     </Group>
     <Video id="video" width="1280" height="720" visible="false" notificationInterval="1" enableUI="false" />
+    <Group id="scheduledAdSurface" visible="false">
+      <Group id="scheduledAdSlate">
+        <Rectangle width="1280" height="720" color="0x060C14FF" />
+        <Label translation="[0,260]" width="1280" height="78" text="Commercial break" horizAlign="center" font="font:LargeBoldSystemFont" color="0xFFF3D8FF" />
+        <Label id="scheduledAdCountdown" translation="[0,340]" width="1280" height="64" horizAlign="center" font="font:MediumSystemFont" color="0xE7C584FF" />
+        <Label translation="[0,420]" width="1280" height="60" text="Up / Down change channel   •   Back to viewer" horizAlign="center" font="font:MediumSystemFont" color="0xD5DDDBFF" />
+      </Group>
+    </Group>
     <Group id="liveBanner" visible="false">
       <Rectangle id="bannerPanel" translation="[40,550]" width="1200" height="134" color="0x102035F0" />
       <Label id="bannerChannel" translation="[64,562]" width="1152" height="34" font="font:MediumBoldSystemFont" color="0xE7C584FF" />
@@ -66,5 +75,7 @@
     <Timer id="bannerTimer" duration="5" repeat="false" />
     <Timer id="refreshTimer" duration="60" repeat="true" />
     <Timer id="segmentTimer" duration="30" repeat="false" />
+    <Timer id="scheduledAdTimer" duration="1" repeat="true" />
+    <Timer id="launchProfileTimer" duration="3" repeat="false" />
   </children>
 </component>

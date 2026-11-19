@@ -106,6 +106,7 @@ function isLivePlayback() as boolean
 end function
 
 sub showLiveBanner()
+    if m.adRendering = true then return
     if not m.fullscreen or m.guide.visible or not isLivePlayback() then return
     updateLiveBanner()
     m.liveBanner.visible = true

@@ -72,6 +72,72 @@ sub main()
     check(m.kids and m.registry.saved.kidsAccountOwner = "parent-one", "A shared parent-PIN profile remembers its owner across launch/session expiry")
     activateAccountProfile({ id: "main", name: "Main", kids: false })
     check(not m.kids and m.registry.saved.kidsAccountOwner = invalid, "An authorized adult selection removes the Kids owner lock")
+    check(ParseJson(m.registry.saved.lastAdultProfile).profileId = "main", "An authorized adult selection saves the household-bound launch profile")
+    activateAccountProfile({ id: "kids", name: "Kids", kids: true })
+    check(ParseJson(m.registry.saved.lastAdultProfile).profileId = "main", "A Kids selection never becomes the default launch profile")
+
+    resetAccounts()
+    m.kids = false
+    m.fullStoreEdition = true
+    m.registry.saved.accountSession = FormatJson(session)
+    m.registry.saved.lastAdultProfile = FormatJson({ accountId: "parent-one", profileId: "main" })
+    adult = { id: "main", kids: false }
+    child = { id: "child", kids: true }
+    household = { user: { id: "parent-one", email: "parent@example.com" }, parentPinRequired: false, profiles: [adult, child] }
+    initAccounts()
+    check(m.accountAction = "state", "A saved launch profile can reuse an unexpired access token")
+    prepareLaunchProfile("live")
+    check(not m.launchProfilePending, "Live deep links do not wait for a saved profile")
+    prepareLaunchProfile("movie")
+    m.pendingLaunch = { id: "media:movie" }
+    m.catalog = {}
+    check(m.launchProfilePending and m.launchProfileTimer.control = "start", "Cold VOD waits briefly for its saved profile")
+    onAccountResponse(event({ ok: true, requestId: m.accountRequestId, account: household }))
+    check(m.accountAction = "profile" and m.accountTask.payload.profileId = "main", "Profile is selected only after authenticating the saved household")
+    onAccountResponse(event({ ok: true, requestId: m.accountRequestId, account: household, profile: adult, profileGrant: "valid-grant" }))
+    check(m.activeAccountProfile.id = "main" and m.testViewingGrant = "valid-grant", "The server grant connects saved viewing for the selected profile")
+    check(m.launchProfilePending and m.resumedId = "", "The link continues waiting until cloud viewing is available")
+    finishLaunchProfile(true)
+    check(m.resumedId = "media:movie" and m.activeAccountProfile.id = "main", "Loaded progress releases the unchanged deep link with the active profile")
+    check(m.launchProfileTimer.control = "stop", "Successful restore stops the fallback timer")
+
+    m.kids = true
+    prepareLaunchProfile("movie")
+    check(not m.launchProfilePending, "A cold launch cannot bypass an active Kids restriction")
+    m.kids = false
+    m.account.parentPinRequired = true
+    check(eligibleLaunchProfile() = invalid, "A parent-PIN profile cannot be reopened without authorization")
+    m.account.parentPinRequired = false
+    m.registry.saved.lastAdultProfile = FormatJson({ accountId: "different-household", profileId: "main" })
+    check(eligibleLaunchProfile() = invalid, "Launch preference cannot cross household boundaries")
+    m.registry.saved.lastAdultProfile = FormatJson({ accountId: "parent-one", profileId: "child" })
+    check(eligibleLaunchProfile() = invalid, "A Kids profile cannot become the default even with a saved ID")
+    m.registry.saved.lastAdultProfile = FormatJson({ accountId: "parent-one", profileId: "main" })
+    m.account.profiles = [child]
+    check(eligibleLaunchProfile() = invalid, "A removed profile cannot be restored")
+    m.account.profiles = [adult, child]
+    m.activeAccountProfile = invalid
+    prepareLaunchProfile("movie")
+    m.pendingLaunch = { id: "media:movie" }
+    requestLaunchProfile()
+    onAccountResponse(event({ ok: true, requestId: m.accountRequestId, account: household, profile: child, profileGrant: "other-grant" }))
+    check(m.activeAccountProfile = invalid and not m.launchProfilePending, "A grant for a mismatched profile cannot restore viewing")
+
+    prepareLaunchProfile("movie")
+    m.pendingLaunch = { id: "media:movie" }
+    m.resumedId = ""
+    requestLaunchProfile()
+    onAccountResponse(event({ ok: true, requestId: m.accountRequestId, account: household, profile: adult, profileGrant: "valid-grant" }))
+    onLaunchProfileTimeout()
+    check(m.activeAccountProfile = invalid and m.testViewingGrant = "", "A timeout clears provisional profile access before public playback")
+    check(not m.launchProfilePending and m.resumedId = "media:movie", "A timeout releases the link without blocking free viewing")
+    m.accountAction = "profile"
+    m.accountTask = testNode()
+    onAccountResponse(event({ ok: true, requestId: m.accountRequestId, account: household, profile: adult, profileGrant: "late-grant" }))
+    check(m.activeAccountProfile = invalid and m.testViewingGrant = "", "A late response cannot attach a profile to guest playback")
+    forgetAccount()
+    check(m.registry.saved.lastAdultProfile = invalid, "Sign-out clears the cold-launch profile preference")
+
     resetAccounts()
     m.kids = false
     m.account = { parentPinRequired: true, profiles: [
@@ -130,6 +196,13 @@ sub resetAccounts()
     m.sequence = 0
     m.activeAccountProfile = invalid
     m.afterAccountRefresh = invalid
+    m.fullStoreEdition = false
+    m.launchProfilePending = false
+    m.launchProfileTimer = { control: "stop" }
+    m.pendingLaunch = invalid
+    m.catalog = invalid
+    m.resumedId = ""
+    m.testViewingGrant = ""
 end sub
 function testNode() as object
     return { textEditBox: {}, UnobserveField: sub(field): end sub, ObserveField: sub(field, callback): end sub,
@@ -157,6 +230,10 @@ sub check(condition as boolean, description as string)
     print "FAIL: "; description
 end sub
 
-sub resetViewing(): end sub
-sub startViewing(grant): end sub
+sub dispatchLaunch()
+    m.resumedId = m.pendingLaunch.id
+    m.pendingLaunch = invalid
+end sub
+sub resetViewing(): m.testViewingGrant = "": end sub
+sub startViewing(grant): m.testViewingGrant = grant: end sub
 sub stopPlayback(): end sub

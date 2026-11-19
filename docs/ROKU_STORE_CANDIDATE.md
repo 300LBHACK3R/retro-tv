@@ -7,9 +7,9 @@ Run `npm --prefix roku run build:store:full` to build `roku/dist/tates-tv-roku-s
 Before public submission:
 
 - Confirm the authorized programming and distribution territories. The review candidate reads the standard feed, so approve the full inventory and configure a Store-specific feed if the authorized slate differs.
-- Generate HD BIF sidecars for long on-demand content and publish them on HTTPS. Store each sidecar under the media entry’s `rokuSeekIndex` with `sourceFile` equal to the current video URL and `hdBifUrl` equal to the sidecar URL. Use a new video URL when replacing the video. Verify thumbnails and 30-day bookmark retention on-device.
-- Integrate Roku Advertising Framework for the scheduled video commercials. Review any advertising shown while a Kids profile is active.
-- Configure Roku Pay and verify purchase, restore and existing theme entitlements, or confirm the applicable requirements with Roku before offering premium features. Keep purchase flows inside the app.
+- Publish the HD BIF sidecars for long on-demand content using [the BIF workflow](ROKU_BIF.md). Verify fast-forward and rewind thumbnails and bookmark restoration on-device.
+- Deploy the RAF-enabled playback and VAST routes, set the app’s actual advertising model in Roku, and provide `https://www.tatestv.ca/app-ads.txt` for the direct-sold spots. On device, check the Roku ad label, RAF beacons, Back, countdown navigation and wall-clock return to programming. Use approved short creatives, including child-directed approvals for Kids programming.
+- Verify that account holders can sign in and use their existing theme entitlements. The review build has no purchase UI. Enable in-app purchases in the listing only after implementing Roku Pay checkout and restore.
 - Capture full-build listing screenshots, package the verified build on the Roku, and run Static Analysis and App Behavior Analysis from a Public app listing. Use representative live, series, episode, and movie IDs from the launch catalogue.
 
 ## Limited Store candidate

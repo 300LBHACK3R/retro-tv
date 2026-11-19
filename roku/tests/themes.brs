@@ -150,7 +150,12 @@ sub main()
     m.pendingLaunch = { id: "channel:1", mediaType: "livefeed" }
     dispatchLaunch()
     check(m.requested = "channel:1" and m.fullscreen, "Full Store supports Roku livefeed links")
+    m.requested = ""
+    m.launchProfilePending = true
     m.pendingLaunch = { id: "series:show", mediaType: "series" }
+    dispatchLaunch()
+    check(m.pendingLaunch <> invalid and m.requested = "", "Cold Full Store links defer while a saved profile is restoring")
+    m.launchProfilePending = false
     dispatchLaunch()
     check(m.requested = "media:one" and m.fullscreen, "Full Store series links play a selected episode")
     m.cloudMode = true

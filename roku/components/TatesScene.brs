@@ -1,5 +1,5 @@
 sub init()
-    for each id in ["home", "browser", "menu", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guide", "guideBackdrop", "liveBanner", "bannerTimer", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer"]
+    for each id in ["home", "browser", "menu", "libraryGrid", "channels", "playerTarget", "playerFocus", "playerMessage", "liveStage", "guide", "guideBackdrop", "liveBanner", "bannerTimer", "emptyMessage", "status", "heading", "profileLabel", "video", "refreshTimer", "segmentTimer", "launchProfileTimer"]
         m[id] = m.top.FindNode(id)
     end for
     appInfo = CreateObject("roAppInfo")
@@ -43,6 +43,7 @@ sub init()
     m.video.ObserveField("position", "onVideoPosition")
     m.refreshTimer.ObserveField("fire", "onRefresh")
     m.segmentTimer.ObserveField("fire", "onSegmentEnd")
+    m.launchProfileTimer.ObserveField("fire", "onLaunchProfileTimeout")
     resetViewing()
     applyTheme(m.registry.Read("theme"))
     buildMenu()
@@ -58,12 +59,18 @@ sub showHome()
     dismissGuide()
     m.autoTune = false
     m.pendingLaunch = invalid
+    if m.launchProfilePending = true then finishLaunchProfile(false)
     stopPlayback()
     m.browser.visible = false
     m.top.FindNode("room").opacity = 0.85
     m.home.kids = m.kids
     m.home.visible = true
     m.home.CallFunc("reset")
+end sub
+
+sub releaseInactiveMemory()
+    if not m.libraryGrid.visible then m.libraryGrid.content = invalid
+    if not m.guide.visible then m.guide.CallFunc("releaseCachedGuide")
 end sub
 
 sub showBrowser()
@@ -81,7 +88,11 @@ sub restoreFocus()
     else if m.guide.visible
         m.guide.SetFocus(true)
     else if m.fullscreen
-        m.video.SetFocus(true)
+        if m.playing <> invalid and m.playing.scheduledAd = true
+            m.top.SetFocus(true)
+        else
+            m.video.SetFocus(true)
+        end if
     else if m.restoreTarget = "player" and m.view = "live"
         m.playerTarget.SetFocus(true)
     else if m.restoreTarget = "channels" and m.view = "live"
@@ -452,6 +463,10 @@ sub onLaunch()
     m.autoTune = false
     showBrowser()
     m.restoreTarget = "player"
+    if m.pendingLaunch <> invalid and m.launchProfilePending = true
+        m.pendingLaunch = invalid
+        finishLaunchProfile(false)
+    end if
     m.pendingLaunch = { id: args.contentId, mediaType: LCase(args.mediaType) }
     if m.catalog <> invalid then dispatchLaunch()
 end sub
@@ -459,6 +474,7 @@ end sub
 sub dispatchLaunch()
     link = m.pendingLaunch
     if m.fullStoreEdition = true and link.mediaType <> "livefeed" and link.mediaType <> "live"
+        if m.launchProfilePending = true then return
         if cloudProfile() and m.viewingBusy and not m.viewingReady then return
     end if
     m.pendingLaunch = invalid

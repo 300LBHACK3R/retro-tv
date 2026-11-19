@@ -11,7 +11,15 @@ sub initAccounts()
     m.accountCanceled = false
     m.accountRefreshRetried = false
     m.chooseAfterAccount = false
-    if m.accountSession <> invalid then accountRequest({ action: "refresh", refreshToken: m.accountSession.refreshToken }, false)
+    m.launchProfilePending = false
+    if m.accountSession <> invalid
+        if m.fullStoreEdition = true and not m.kids and m.registry.Read("lastAdultProfile") <> ""
+            ' State can reuse an unexpired token. Account requests still refresh it when needed.
+            accountRequest({ action: "state" }, false)
+        else
+            accountRequest({ action: "refresh", refreshToken: m.accountSession.refreshToken }, false)
+        end if
+    end if
 end sub
 
 function validAccountSession(value as dynamic) as boolean
@@ -39,6 +47,7 @@ sub forgetAccount()
     m.activeAccountProfile = invalid
     m.accountRefreshRetried = false
     m.registry.Delete("accountSession")
+    m.registry.Delete("lastAdultProfile")
     m.registry.Flush()
     applyTheme(m.themeCatalog.defaultId)
     m.home.signedIn = false
@@ -108,6 +117,21 @@ sub onAccountResponse(event as object)
     end if
     if canceled
         m.afterAccountRefresh = invalid
+        finishLaunchProfile(false)
+        return
+    end if
+    if action = "profile" and not foreground
+        if m.launchProfilePending <> true then return
+        if data.ok = true then acceptAccount(data.account)
+        profile = eligibleLaunchProfile()
+        if data.ok <> true or profile = invalid or not accountString(data.profileGrant) or data.profileGrant = ""
+            finishLaunchProfile(false)
+        else if type(data.profile) <> "roAssociativeArray" or data.profile.id <> profile.id or data.profile.kids <> false
+            finishLaunchProfile(false)
+        else
+            m.activeAccountProfile = profile
+            startViewing(data.profileGrant)
+        end if
         return
     end if
     if data.ok <> true
@@ -127,6 +151,7 @@ sub onAccountResponse(event as object)
             m.authStage = "error"
             accountMessage("Let's try that again", [data.error], ["Start again", "Cancel"])
         end if
+        finishLaunchProfile(false)
         return
     end if
     if action = "signup" or action = "recover"
@@ -152,6 +177,8 @@ sub onAccountResponse(event as object)
         if m.chooseAfterAccount and foreground
             m.chooseAfterAccount = false
             showAccountProfiles()
+        else if not foreground
+            requestLaunchProfile()
         end if
     else if action = "profile"
         m.accountRefreshRetried = false
@@ -167,6 +194,55 @@ sub onAccountResponse(event as object)
             activateAccountProfile(profile)
         end if
     end if
+end sub
+
+sub prepareLaunchProfile(mediaType as string)
+    if m.fullStoreEdition <> true or m.kids or m.accountSession = invalid then return
+    if mediaType <> "movie" and mediaType <> "episode" and mediaType <> "series" and mediaType <> "shortformvideo" and mediaType <> "short-form" and mediaType <> "tvspecial" then return
+    if not m.accountBusy and m.account = invalid then return
+    preference = ParseJson(m.registry.Read("lastAdultProfile"))
+    if type(preference) <> "roAssociativeArray" then return
+    m.launchProfilePending = true
+    m.launchProfileTimer.control = "start"
+end sub
+
+function eligibleLaunchProfile() as dynamic
+    ' The TV remembers a preference only. The current account and profile API authorize access.
+    if m.kids or m.account = invalid then return invalid
+    if m.account.parentPinRequired <> false then return invalid
+    preference = ParseJson(m.registry.Read("lastAdultProfile"))
+    if type(preference) <> "roAssociativeArray" then return invalid
+    if preference.accountId <> m.account.user.id then return invalid
+    for each profile in m.account.profiles
+        if profile.id = preference.profileId and profile.kids = false then return profile
+    end for
+    return invalid
+end function
+
+sub requestLaunchProfile()
+    if m.launchProfilePending <> true or m.accountBusy then return
+    profile = eligibleLaunchProfile()
+    if profile = invalid
+        finishLaunchProfile(false)
+    else
+        accountRequest({ action: "profile", profileId: profile.id }, false)
+    end if
+end sub
+
+sub onLaunchProfileTimeout()
+    finishLaunchProfile(false)
+end sub
+
+sub finishLaunchProfile(restored as boolean)
+    if m.launchProfilePending <> true then return
+    m.launchProfilePending = false
+    m.launchProfileTimer.control = "stop"
+    if not restored and m.activeAccountProfile <> invalid
+        ' Discard the provisional profile and invalidate its pending viewing response.
+        resetViewing()
+        m.activeAccountProfile = invalid
+    end if
+    if m.pendingLaunch <> invalid and m.catalog <> invalid then dispatchLaunch()
 end sub
 
 sub acceptAccount(account as dynamic)
@@ -447,6 +523,9 @@ sub activateAccountProfile(profile as object)
         m.registry.Write("kidsAccountOwner", m.account.user.id)
     else
         m.registry.Delete("kidsAccountOwner")
+    end if
+    if not profile.kids
+        m.registry.Write("lastAdultProfile", FormatJson({ accountId: m.account.user.id, profileId: profile.id }))
     end if
     m.registry.Flush()
     m.activeAccountProfile = profile

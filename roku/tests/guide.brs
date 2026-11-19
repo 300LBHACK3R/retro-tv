@@ -29,6 +29,8 @@ sub main()
     check(m.rows.children.Count() = 4, "Only a bounded page of four rows is built")
     check(m.top.FindNode("nowLine").visible, "Current-time line is shown in the live window")
     check(m.top.FindNode("detailTitle").text = "Programme 0", "Full selected title is shown above the grid")
+    releaseCachedGuide()
+    check(m.data.start = data.start and m.rows.children.Count() = 4, "Memory pressure preserves the visible guide")
     check(onKeyEvent("right", true) and m.cursor = data.start + 1800, "Right moves through programmes without retuning")
     check(m.top.selectedId = invalid, "Browsing does not emit a playback selection")
     onKeyEvent("down", true)
@@ -84,6 +86,15 @@ sub main()
     shutdown()
     check(m.task = invalid and m.top.FindNode("tick").control = "stop", "Closing stops background guide work")
     check(onKeyEvent("back", true) and m.top.closeRequested, "Back returns without changing the stream")
+    m.top.visible = false
+    m.data = savedData
+    releaseCachedGuide()
+    check(m.data = invalid and m.rows.children.Count() = 0, "Memory pressure releases listings and rendered rows for a hidden guide")
+    updateChannels()
+    check(m.rows.children.Count() = 0, "A catalogue update does not recreate the hidden guide")
+    m.top.visible = true
+    open()
+    check(m.rows.children.Count() = 1 and m.task <> invalid, "Opening a released guide rebuilds the lineup and refreshes listings")
     if m.failed <> invalid
         print "FAILED:"; m.failed
         stop

@@ -94,7 +94,7 @@ sub drawButton(parent as object, text as string, x as integer, y as integer, wid
 end sub
 
 sub render()
-    if m.rows = invalid then return
+    if m.rows = invalid or not m.top.visible then return
     renderControls()
     clearNodes(m.rows)
     count = m.ids.Count()

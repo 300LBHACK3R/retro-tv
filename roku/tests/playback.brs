@@ -7,8 +7,8 @@ sub main()
     _brs_.mockFunction("saveProgress", sub()
         m.saves++
     end sub)
-    _brs_.mockFunction("readProgress", function()
-        return {}
+    _brs_.mockFunction("readProgressPosition", function(id)
+        return invalid
     end function)
 
     resetPlayback()
@@ -83,6 +83,32 @@ sub main()
     check(m.video.control = "play", "Live segments continue playing while the guide is open")
 
     resetPlayback()
+    m.fullStoreEdition = true
+    m.isLoadingPlayback = true
+    m.playRequest = 4
+    m.requestedId = "channel:1"
+    onPlayback(response({ requestId: 4, ok: true, playback: item }))
+    check(m.playing = invalid and m.dialogShown, "Store playback rejects a backend that has no RAF protocol")
+
+    resetPlayback()
+    m.fullStoreEdition = true
+    m.isLoadingPlayback = true
+    m.playRequest = 5
+    m.requestedId = "channel:1"
+    item.scheduledAd = true
+    item.startGrace = 3
+    onPlayback(response({ requestId: 5, ok: true, advertising: "raf", playback: item }))
+    check(m.top.nodes.scheduledAdSurface.visible and m.launchComplete, "Store mid-break join displays a usable timed slate")
+    check(m.video.content = invalid and m.segmentTimer.duration = 45, "Store never gives a scheduled ad to the programme Video node")
+    m.segmentClock = clockAt(45000)
+    m.adRendering = true
+    onSegmentEnd()
+    check(m.requestCount = 0 and m.segmentTimer.duration = 3, "RAF receives a bounded delivery allowance")
+    m.segmentClock = clockAt(48000)
+    onSegmentEnd()
+    check(m.requestCount = 1 and m.requested = "channel:1", "RAF rejoins the station's wall clock within the deadline")
+
+    resetPlayback()
     m.playing = { id: "media:episode", mediaType: "episode" }
     m.lastSavedPosition = 10
     m.video.position = 25
@@ -99,6 +125,9 @@ sub main()
             if m.values[id] = invalid then return ""
             return m.values[id]
         end function }
+    end function)
+    _brs_.mockFunction("localBookmarkKey", function(id)
+        return "test-hash-" + id
     end function)
     series = { items: [{ id: "media:one" }, { id: "media:two" }, { id: "media:three" }] }
     m.storeBookmarks = {}
@@ -132,7 +161,14 @@ sub main()
 end sub
 
 sub resetPlayback()
-    m.top = { dialog: invalid }
+    m.top = { dialog: invalid, nodes: {
+        scheduledAdSurface: { visible: false }, scheduledAdSlate: { visible: false }, scheduledAdCountdown: {},
+        scheduledAdTimer: { ObserveField: sub(field, callback)
+        end sub },
+    }, FindNode: function(id)
+        return m.nodes[id]
+    end function, SetFocus: sub(value)
+    end sub }
     m.guide = { visible: false }
     m.liveBanner = { visible: false }
     m.video = { visible: true, control: "play", position: 0, state: "playing", SetFocus: sub(value)
@@ -149,6 +185,9 @@ sub resetPlayback()
     m.saves = 0
     m.dialogShown = false
     m.launchComplete = false
+    m.fullStoreEdition = false
+    m.adSlateTimer = invalid
+    m.adRendering = false
     if m.failed = invalid then m.failed = 0
 end sub
 function clockAt(milliseconds as integer) as object

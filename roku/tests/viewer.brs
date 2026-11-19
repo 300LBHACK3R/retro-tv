@@ -14,6 +14,14 @@ sub main()
     check(m.requested = "channel:1" and not m.home.visible, "Choosing Watch for free opens the viewer and starts live TV")
 
     resetViewer()
+    m.fullStoreEdition = true
+    m.registry = { preference: "saved", Read: function(key): return m.preference: end function,
+        Delete: sub(key): m.preference = "": end sub, Flush: sub(): end sub }
+    m.home.action = "watch"
+    onHomeAction()
+    check(m.registry.preference = "", "Explicit guest viewing clears the previous adult launch preference")
+
+    resetViewer()
     m.catalog = { channels: [{ id: "channel:1", number: 1 }] }
     startApp({ source: "homescreen" })
     check(m.requested = "" and m.home.visible, "An already loaded catalogue still waits for a home selection")
@@ -30,6 +38,7 @@ sub main()
     resetViewer()
     startApp({ contentId: "media:episode", mediaType: "episode" })
     check(m.top.launch.contentId = "media:episode" and m.requested = "", "Cold deep links bypass default channel tuning")
+    check(m.preparedProfileMediaType = "episode" and m.requestedLaunchProfile, "Cold deep links prepare the profile before dispatch")
     check(not isPlaybackLaunch({ contentId: 7, mediaType: "live" }), "Malformed launch values are rejected")
     check(not isPlaybackLaunch({ contentId: "", mediaType: "live" }), "Empty content IDs cannot block ordinary launch")
 
@@ -243,6 +252,9 @@ sub resetViewer()
     m.tunedChannelId = ""
     m.stopped = false
     m.launchComplete = false
+    m.fullStoreEdition = false
+    m.preparedProfileMediaType = ""
+    m.requestedLaunchProfile = false
     if m.failed = invalid then m.failed = 0
 end sub
 
@@ -303,3 +315,5 @@ sub markLaunchComplete()
 end sub
 
 sub resetViewing(): end sub
+sub prepareLaunchProfile(mediaType): m.preparedProfileMediaType = mediaType: end sub
+sub requestLaunchProfile(): m.requestedLaunchProfile = true: end sub

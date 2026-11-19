@@ -15,6 +15,7 @@
     <field id="closeRequested" type="boolean" alwaysNotify="true" />
     <function name="open" />
     <function name="shutdown" />
+    <function name="releaseCachedGuide" />
   </interface>
   <script type="text/brightscript" uri="LiveGuide.brs" />
   <script type="text/brightscript" uri="GuideRender.brs" />
